@@ -1,0 +1,11 @@
+Flask
+pandas
+numpy
+scikit-learn
+tensorflow
+gunicorn
+authlib
+python-dotenv
+Flask-SQLAlchemy
+Werkzeug
+requests

@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MRT-3 | Operator Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --sidebar-bg: #00224D;
+            --main-bg: #F8FAFC;
+            --accent-blue: #3B82F6;
+            --accent-hover: #2563EB;
+            --text-dark: #1E293B;
+            --text-light: #64748B;
+            --white: #FFFFFF;
+            --border: #E2E8F0;
+            --success-green: #22C55E;
+            --warning-yellow: #EAB308;
+            --danger-red: #EF4444;
+            --purple: #8B5CF6;
+            --purple-light: #EDE9FE;
+            --card-bg: #FFFFFF;
+            --light-green: #22c55e;
+            --mod-yellow: #eab308;
+            --cong-orange: #f97316;
+            --sev-red: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            background-color: var(--main-bg);
+            overflow: hidden;
+        }
+
+        /* SIDEBAR */
+        .sidebar { 
+            width: 300px; 
+            background-color: var(--sidebar-bg); 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            flex-shrink: 0; 
+            padding: 20px 0; 
+        }
+
+        .logo-section { 
+            padding: 10px 25px 20px; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+
+        .logo-icon { 
+            background: #38BDF8; 
+            padding: 10px 13px; 
+            border-radius: 8px; 
+            font-size: 18px; 
+            color: white;
+        }
+
+        .logo-text h2 { 
+            font-size: 16px; 
+            margin: 0; 
+            color: white;
+        }
+
+        .logo-text p { 
+            font-size: 10px; 
+            opacity: 0.6; 
+            letter-spacing: 1px; 
+            color: white;
+        }
+
+        nav { 
+            padding: 40px 5px 5px 10px; 
+            flex: 1;
+        }
+
+        .nav-item { 
+            padding: 12px 25px; 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            cursor: pointer; 
+            transition: 0.3s; 
+            color: #CBD5E1; 
+            text-decoration: none; 
+            font-size: 16px; 
+            border-left: 4px solid transparent;
+        }
+
+        .nav-item:hover, 
+        .nav-item.active { 
+            background-color: rgba(255, 255, 255, 0.1); 
+            color: rgb(148, 207, 255); 
+            border-left: 4px solid var(--purple); 
+        }
+
+        .nav-item i {
+            width: 20px;
+            font-size: 16px;
+        }
+
+        .user-profile { 
+            margin-top: auto; 
+            padding: 15px 25px; 
+            border-top: 1px solid rgba(255, 255, 255, 0.1); 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+
+        .user-avatar { 
+            width: 35px; 
+            height: 35px; 
+            background: var(--purple); 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            color: white; 
+            font-weight: bold; 
+            text-transform: uppercase;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            color: white;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .user-role {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 11px;
+        }
+
+        .station-badge-sidebar {
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid var(--purple);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 11px;
+            color: var(--purple);
+            margin-top: 4px;
+            display: inline-block;
+        }
+
+        .logout-btn { 
+            margin: 10px 25px; 
+            padding: 8px 15px; 
+            background: rgba(239, 68, 68, 0.1); 
+            border: 1px solid rgba(239, 68, 68, 0.3); 
+            color: white; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 12px; 
+            width: calc(100% - 50px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: 0.3s;
+            text-decoration: none;
+        }
+
+        .logout-btn:hover { 
+            background: var(--danger-red); 
+            border-color: var(--danger-red);
+        }
+
+        /* MAIN CONTENT */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            background: var(--main-bg);
+        }
+
+        .topbar {
+            background: white;
+            border-bottom: 1px solid var(--border);
+            padding: 16px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .topbar-right {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .date-badge {
+            background: #F1F5F9;
+            padding: 8px 15px;
+            border-radius: 30px;
+            font-size: 13px;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .date-badge i {
+            color: var(--purple);
+        }
+
+        .station-badge {
+            background: var(--purple-light);
+            color: var(--purple);
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--purple);
+            color: white;
+            padding:10px;
+        }
+
+        .btn-primary:hover {
+            background: #7C3AED;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(139, 92, 246, 0.2);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-light);
+            border: 1px solid var(--border);
+        }
+
+        .btn-ghost:hover {
+            background: var(--main-bg);
+            color: var(--text-dark);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .content-body {
+            padding: 24px 28px;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* DASHBOARD STYLES */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        }
+
+        .stat-card h2 {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+
+        .stat-card p {
+            font-size: 13px;
+            color: var(--text-light);
+            font-weight: 500;
+        }
+
+        .status-tables {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .table-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .table-card h4 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .table-card h4 i {
+            color: var(--purple);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding: 12px 0;
+            border-bottom: 2px solid var(--border);
+        }
+
+        td {
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            color: var(--text-dark);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 30px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge.light {
+            background: #DCFCE7;
+            color: #166534;
+        }
+
+        .badge.moderate {
+            background: #FEF9C3;
+            color: #854D0E;
+        }
+
+        .badge.congested {
+            background: #FFEDD5;
+            color: #9A3412;
+        }
+
+        .badge.severe {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .btn-override {
+            background: #F1F5F9;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: 0.3s;
+            font-size: 12px;
+        }
+
+        .btn-override:hover {
+            background: var(--purple);
+            color: white;
+        }
+
+        /* BROADCAST STYLES */
+        .broadcast-layout {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 20px;
+        }
+
+        .form-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 13px;
+            outline: none;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--purple);
+        }
+
+        .dist-opt {
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .dist-opt:hover {
+            border-color: var(--purple);
+            background: var(--purple-light);
+        }
+
+        .dist-opt i {
+            font-size: 24px;
+            color: var(--purple);
+            margin-bottom: 8px;
+        }
+
+        .dist-opt p {
+            font-size: 11px;
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        .dist-opt.selected {
+            border-color: var(--purple);
+            background: var(--purple-light);
+        }
+
+        .station-select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 14px;
+            color: var(--text-dark);
+            background: white;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        .station-select:focus {
+            border-color: var(--purple);
+            outline: none;
+        }
+
+        .selected-stations-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+            min-height: 50px;
+        }
+
+        .selected-station-tag {
+            background: var(--purple-light);
+            color: var(--purple);
+            padding: 6px 12px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid var(--purple);
+        }
+
+        .selected-station-tag i {
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .selected-station-tag i:hover {
+            color: var(--danger-red);
+        }
+
+        .live-preview {
+            background: #F8FAFC;
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .preview-card {
+            padding: 15px;
+            border-left: 4px solid var(--purple);
+            background: white;
+            border-radius: 8px;
+        }
+
+        .disruption-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        /* INCIDENT LOG STYLES - REDESIGNED TO MATCH IMAGE */
+        .incident-log-container {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .log-entry {
+            background: white;
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .log-entry:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .log-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .log-type-badge {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--purple);
+            background: var(--purple-light);
+            padding: 6px 14px;
+            border-radius: 30px;
+            display: inline-block;
+        }
+
+        .log-type-badge i {
+            margin-right: 8px;
+        }
+
+        .log-main-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 16px;
+            line-height: 1.3;
+        }
+
+        .log-description {
+            font-size: 16px;
+            color: var(--text-light);
+            line-height: 1.7;
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stations-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+            background: #F8FAFC;
+            padding: 16px 20px;
+            border-radius: 14px;
+        }
+
+        .stations-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dark);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stations-header i {
+            color: var(--purple);
+        }
+
+        .station-bullet-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-left: 4px;
+        }
+
+        .station-bullet-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 15px;
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        .bullet {
+            width: 6px;
+            height: 6px;
+            background: var(--purple);
+            border-radius: 50%;
+            opacity: 0.7;
+        }
+
+        .station-name-bold {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .station-name-reg {
+            color: var(--text-light);
+            font-weight: 400;
+        }
+
+        .log-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            padding-top: 8px;
+        }
+
+        .log-time {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        .log-time i {
+            font-size: 14px;
+            color: var(--purple);
+        }
+
+        .log-severity {
+            padding: 4px 14px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .severity-critical {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .severity-warning {
+            background: #FFEDD5;
+            color: #9A3412;
+        }
+
+        .severity-advisory {
+            background: #E0F2FE;
+            color: #075985;
+        }
+
+        /* Empty State Styles */
+        .empty-state {
+            text-align: center;
+            padding: 80px 40px;
+            background: white;
+            border-radius: 24px;
+            border: 2px dashed var(--border);
+            color: var(--text-light);
+            max-width: 600px;
+            margin: 40px auto;
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 24px;
+            color: var(--purple-light);
+            opacity: 0.7;
+        }
+
+        .empty-state h3 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 12px;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            color: var(--text-light);
+            margin-bottom: 32px;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .empty-state .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 28px;
+            font-size: 15px;
+            background: var(--purple);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 0 auto;
+            width: auto;
+            min-width: 180px;
+        }
+
+        .empty-state .btn-primary i {
+            font-size: 16px;
+            margin: 0;
+            color: white;
+            opacity: 1;
+        }
+
+        .empty-state .btn-primary:hover {
+            background: #7C3AED;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        /* MODAL STYLES */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            width: 500px;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+
+        .modal-header i {
+            font-size: 24px;
+            color: var(--purple);
+        }
+
+        .modal-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .modal-subtitle {
+            font-size: 13px;
+            color: var(--text-light);
+            margin-bottom: 20px;
+        }
+
+        .status-selection-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .status-opt {
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .status-opt .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin: 0 auto 8px;
+        }
+
+        .status-opt strong {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: var(--text-dark);
+        }
+
+        .status-opt span {
+            font-size: 10px;
+            color: var(--text-light);
+            line-height: 1.2;
+            display: block;
+        }
+
+        .status-opt.light { border-color: var(--light-green); }
+        .status-opt.light .dot { background: var(--light-green); }
+        .status-opt.light.selected { background: #F0FDF4; border-width: 3px; }
+
+        .status-opt.moderate { border-color: var(--mod-yellow); }
+        .status-opt.moderate .dot { background: var(--mod-yellow); }
+        .status-opt.moderate.selected { background: #FEF9C3; border-width: 3px; }
+
+        .status-opt.congested { border-color: var(--cong-orange); }
+        .status-opt.congested .dot { background: var(--cong-orange); }
+        .status-opt.congested.selected { background: #FFEDD5; border-width: 3px; }
+
+        .status-opt.severe { border-color: var(--sev-red); }
+        .status-opt.severe .dot { background: var(--sev-red); }
+        .status-opt.severe.selected { background: #FEE2E2; border-width: 3px; }
+
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+
+        .btn-cancel {
+            background: #F1F5F9;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-dark);
+        }
+
+        .btn-cancel:hover {
+            background: #E2E8F0;
+        }
+
+        .btn-apply {
+            background: var(--purple);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-apply:hover {
+            background: #7C3AED;
+        }
+
+        .btn-apply:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1E293B;
+            color: white;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 2000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+        }
+
+        .loading-spinner i {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: var(--purple);
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 80px;
+            }
+            .logo-text, .user-info, .nav-item span:not(.nav-icon) {
+                display: none;
+            }
+            .nav-item {
+                justify-content: center;
+                padding: 12px;
+            }
+            .nav-item i {
+                font-size: 20px;
+            }
+            .stat-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .status-tables {
+                grid-template-columns: 1fr;
+            }
+            .broadcast-layout {
+                grid-template-columns: 1fr;
+            }
+            .disruption-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .log-main-title {
+                font-size: 22px;
+            }
+            .empty-state {
+                padding: 60px 20px;
+            }
+            .empty-state h3 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="logo-section">
+            <div class="logo-icon"><i class="fas fa-user-tie"></i></div>
+            <div class="logo-text">
+                <h2>MRT-3</h2>
+                <p>OPERATOR PANEL</p>
+            </div>
+        </div>
+
+        <nav>
+            <div class="nav-item active" onclick="showPage('dashboard', this)">
+                <i class="fas fa-chart-pie"></i>
+                <span>Dashboard</span>
+            </div>
+            <div class="nav-item" onclick="showPage('broadcast', this)">
+                <i class="fas fa-bullhorn"></i>
+                <span>Broadcast</span>
+            </div>
+            <div class="nav-item" onclick="showPage('log', this)">
+                <i class="fas fa-history"></i>
+                <span>Incident Log</span>
+            </div>
+        </nav>
+
+        <div class="user-profile">
+            <div class="user-avatar">{{ username[0] if username else 'O' }}</div>
+            <div class="user-info">
+                <div class="user-name">{{ username }}</div>
+                <div class="user-role">Operator</div>
+                <div class="station-badge-sidebar">
+                    <i class="fas fa-map-marker-alt"></i> {{ station }}
+                </div>
+            </div>
+        </div>
+
+        <a href="/logout" style="text-decoration: none;">
+            <button class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </a>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+        <div class="topbar">
+            <div class="page-title" id="pageTitle">Dashboard</div>
+            <div class="topbar-right">
+                <div class="date-badge">
+                    <i class="far fa-calendar"></i>
+                    <span id="currentDate"></span>
+                </div>
+                <div class="station-badge">
+                    <i class="fas fa-map-marker-alt"></i> {{ station }}
+                </div>
+            </div>
+        </div>
+
+        <div class="content-body">
+            
+            <!-- DASHBOARD PAGE -->
+            <div id="dashboard" class="page active">
+                <div style="margin-bottom: 25px;">
+                    <p style="color: var(--text-light); font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">Good {{ 'morning' if now.hour < 12 else 'afternoon' }}, Operator {{ username }}!</p>
+                </div>
+                
+                <div class="stat-grid" id="stats-container">
+                    <div class="stat-card" style="border-left: 4px solid var(--sev-red);"> 
+                        <h2 id="severe-count" style="color:var(--sev-red)">0</h2>
+                        <p>Severely Congested</p>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid var(--cong-orange);"> 
+                        <h2 id="congested-count" style="color:var(--cong-orange)">0</h2>
+                        <p>Congested Stations</p>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid var(--mod-yellow);"> 
+                        <h2 id="moderate-count" style="color:var(--mod-yellow)">0</h2>
+                        <p>Moderate Stations</p>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid var(--success-green);"> 
+                        <h2 id="light-count" style="color:var(--success-green)">0</h2>
+                        <p>Light Stations</p>
+                    </div>
+                </div>
+
+                <div class="status-tables">
+                    <div class="table-card">
+                        <h4><i class="fas fa-arrow-down"></i> Southbound - Status</h4>
+                        <table id="southbound-table">
+                            <thead>
+                                <tr>
+                                    <th>STATION</th>
+                                    <th>STATUS</th>
+                                    <th>ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="southbound-body">
+                                <tr><td colspan="3" style="text-align: center;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="table-card">
+                        <h4><i class="fas fa-arrow-up"></i> Northbound - Status</h4>
+                        <table id="northbound-table">
+                            <thead>
+                                <tr>
+                                    <th>STATION</th>
+                                    <th>STATUS</th>
+                                    <th>ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="northbound-body">
+                                <tr><td colspan="3" style="text-align: center;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BROADCAST PAGE -->
+            <div id="broadcast" class="page">
+                <div style="margin-bottom: 25px; display: flex; align-items: center; gap: 10px;">
+                </div>
+
+                <div class="broadcast-layout">
+                    
+                    <div class="controls-column">
+                        <div class="form-card" style="margin-bottom: 24px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h3 style="font-size: 16px; font-weight: 700;">Disruption Type</h3>
+                            </div>
+                            <div class="disruption-grid">
+                                <!-- Train Breakdown -->
+                                <div class="dist-opt" onclick="selectDisruption('Train Breakdown', this)">
+                                    <i class="fas fa-train"></i>
+                                    <strong>Train Breakdown</strong>
+                                    <p>Train failure / delay</p>
+                                </div>
+                                
+                                <!-- Overcrowding -->
+                                <div class="dist-opt" onclick="selectDisruption('Overcrowding', this)">
+                                    <i class="fas fa-users"></i>
+                                    <strong>Overcrowding</strong>
+                                    <p>Platform full</p>
+                                </div>
+                                
+                                <!-- Maintenance -->
+                                <div class="dist-opt" onclick="selectDisruption('Maintenance', this)">
+                                    <i class="fas fa-wrench"></i>
+                                    <strong>Maintenance</strong>
+                                    <p>Scheduled work</p>
+                                </div>
+                                
+                                <!-- Signal Issue -->
+                                <div class="dist-opt" onclick="selectDisruption('Signal Issue', this)">
+                                    <i class="fas fa-satellite-dish"></i>
+                                    <strong>Signal Issue</strong>
+                                    <p>System fault</p>
+                                </div>
+                                
+                                <!-- Gate Closure -->
+                                <div class="dist-opt" onclick="selectDisruption('Gate Closure', this)">
+                                    <i class="fas fa-door-closed"></i>
+                                    <strong>Gate Closure</strong>
+                                    <p>Entry blocked</p>
+                                </div>
+                                
+                                <!-- General Notice -->
+                                <div class="dist-opt" onclick="selectDisruption('General Notice', this)">
+                                    <i class="fas fa-bullhorn"></i>
+                                    <strong>General Notice</strong>
+                                    <p>Info advisory</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Station Selection -->
+                        <div class="form-card">
+                            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 15px;">Affected Stations</h3>
+                            
+                            <select class="station-select" id="stationSelector" onchange="addStationFromDropdown()">
+                                <option value="">-- Select a station to add --</option>
+                                <option value="North Ave">North Ave</option>
+                                <option value="Quezon Ave">Quezon Ave</option>
+                                <option value="Kamuning">Kamuning</option>
+                                <option value="Cubao">Cubao</option>
+                                <option value="Santolan">Santolan</option>
+                                <option value="Ortigas">Ortigas</option>
+                                <option value="Shaw Blvd">Shaw Blvd</option>
+                                <option value="Boni Ave">Boni Ave</option>
+                                <option value="Guadalupe">Guadalupe</option>
+                                <option value="Buendia">Buendia</option>
+                                <option value="Ayala Ave">Ayala Ave</option>
+                                <option value="Magallanes">Magallanes</option>
+                                <option value="Taft">Taft</option>
+                                <option value="All Stations">All Stations</option>
+                            </select>
+
+                            <div class="selected-stations-list" id="selectedStationsList">
+                                <!-- Selected stations will appear here as tags -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="message-column">
+                        <div class="form-card">
+                            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 15px;"><i class="fa-regular fa-envelope"></i> Message</h3>
+                            
+                            <div class="input-group">
+                                <label class="form-label">Alert Title</label>
+                                <input type="text" id="alertTitle" oninput="updatePreview()" placeholder="e.g. Train Breakdown at Ayala Station">
+                            </div>
+
+                            <div class="input-group">
+                                <label class="form-label">Message to Commuters</label>
+                                <textarea id="alertMessage" oninput="updatePreview()" rows="5" placeholder="Describe the situation and what commuters should do."></textarea>
+                            </div>
+
+                            <div class="input-group">
+                                <label class="form-label">Severity Level</label>
+                                <select id="severityLevel" class="form-select" onchange="updatePreview()">
+                                    <option value="advisory">Advisory - General Information</option>
+                                    <option value="warning">Warning - Disruption in effect</option>
+                                    <option value="critical">Critical - Immediate action needed</option>
+                                </select>
+                            </div>
+
+                            <div class="input-group">
+                                <label class="form-label">Duration (minutes)</label>
+                                <input type="number" id="broadcastDuration" value="60" min="5" max="480" step="5">
+                            </div>
+
+                            <div class="live-preview">
+                                <p style="font-size: 11px; color: var(--text-light); margin-bottom: 10px;"><i class="fa-regular fa-eye"></i> Live preview</p>
+                                <div class="preview-card" id="previewCard">
+                                    <strong id="previewTitle" style="display: block; font-size: 14px;">Alert Title will appear here</strong>
+                                    <p id="previewText" style="font-size: 13px; color: var(--text-light); margin-top: 5px;">Your message will appear here...</p>
+                                    <span style="font-size: 10px; color: #94A3B8; margin-top: 10px; display: block;"><i class="fa-regular fa-clock"></i> Just now - via Operator</span>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                                <button class="btn-ghost" style="flex: 1; border-radius: 12px;" onclick="clearBroadcastForm()">Clear</button>
+                                <button class="btn-primary" id="sendBroadcastBtn" style="flex: 2; border-radius: 12px;" onclick="sendBroadcast()">
+                                    <i class="fa-solid fa-paper-plane"></i> Send
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INCIDENT LOG PAGE - REDESIGNED WITH EMPTY STATE -->
+            <div id="log" class="page">
+                <div style="margin-bottom: 25px;">
+                </div>
+                
+                <div id="incident-log-container" class="incident-log-container">
+                    <!-- Empty State - No data yet with improved button -->
+                    <div class="empty-state">
+                        <i class="fas fa-history"></i>
+                        <h3>No incidents logged yet</h3>
+                        <p>When you send broadcasts from the Broadcast page, they will appear here as incident logs with the exact format shown in your design.</p>
+                        <button class="btn-primary" onclick="showPage('broadcast', document.querySelectorAll('.nav-item')[1])">
+                            <i class="fas fa-bullhorn"></i> Go to Broadcast
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERRIDE MODAL -->
+    <div id="overrideModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <h2>Override Congestion - <span id="modalStationName">Station</span></h2>
+            </div>
+            <p class="modal-subtitle">Select the actual congestion level observed at this station.</p>
+
+            <div class="status-selection-grid">
+                <div class="status-opt light" onclick="selectLevel(this, 'Light')">
+                    <div class="dot"></div>
+                    <strong>Light</strong>
+                    <span>Fast boarding. Plenty of space.</span>
+                </div>
+                <div class="status-opt moderate" onclick="selectLevel(this, 'Moderate')">
+                    <div class="dot"></div>
+                    <strong>Moderate</strong>
+                    <span>Standard queues. 5-10 min wait.</span>
+                </div>
+                <div class="status-opt congested" onclick="selectLevel(this, 'Congested')">
+                    <div class="dot"></div>
+                    <strong>Congested</strong>
+                    <span>Heavy crowds. Long lines.</span>
+                </div>
+                <div class="status-opt severe" onclick="selectLevel(this, 'Severe')">
+                    <div class="dot"></div>
+                    <strong>Severe</strong>
+                    <span>Maximum capacity. Significant delays.</span>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>Override Duration</label>
+                <select id="overrideDuration">
+                    <option value="30">30 minutes</option>
+                    <option value="60" selected>1 hour</option>
+                    <option value="120">2 hours</option>
+                    <option value="240">4 hours</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label>Reason (logged internally)</label>
+                <input type="text" id="overrideReason" placeholder="e.g. Broken escalator, holiday rush...">
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn-apply" onclick="applyOverride()">Apply Override</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div class="toast" id="toast">
+        <span id="toastIcon">✅</span>
+        <span id="toastMsg"></span>
+    </div>
+
+    <script>
+        // Global variables
+        let currentSelectedLevel = "";
+        let selectedDisruptionType = "";
+        let selectedStations = new Set();
+        let currentStation = "{{ station }}";
+        let username = "{{ username }}";
+
+        // Station list
+        const allStations = [
+            "North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
+            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+            "Ayala Ave", "Magallanes", "Taft"
+        ];
+
+        // Icons for disruption types
+        const typeIcons = {
+            'Train Breakdown': 'fa-train',
+            'Overcrowding': 'fa-users',
+            'Maintenance': 'fa-wrench',
+            'Signal Issue': 'fa-satellite-dish',
+            'Gate Closure': 'fa-door-closed',
+            'General Notice': 'fa-bullhorn'
+        };
+
+        // Page Navigation
+        // Page Navigation
+function showPage(pageId, element) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+    element.classList.add('active');
+    
+    const titles = {
+        dashboard: 'Dashboard',
+        broadcast: 'Broadcast Alerts',
+        log: 'Incident Log'
+    };
+    document.getElementById('pageTitle').textContent = titles[pageId];
+    
+    // Load data when switching pages
+    if (pageId === 'dashboard') {
+        loadCongestionStats();
+    } else if (pageId === 'log') {
+        loadIncidentLogs(); // Add this line
+    }
+}
+        // Current date
+        function updateDate() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', options);
+        }
+
+        // Toast notification
+        function showToast(icon, msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastIcon').textContent = icon;
+            document.getElementById('toastMsg').textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Update selected stations display
+        function updateSelectedStationsDisplay() {
+            const container = document.getElementById('selectedStationsList');
+            if (selectedStations.size === 0) {
+                container.innerHTML = '<p style="color: var(--text-light); font-size: 13px;">No stations selected</p>';
+                return;
+            }
+            
+            let html = '';
+            selectedStations.forEach(station => {
+                html += `
+                    <div class="selected-station-tag">
+                        ${station}
+                        <i class="fas fa-times" onclick="removeStation('${station}')"></i>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // Add station from dropdown
+        function addStationFromDropdown() {
+            const select = document.getElementById('stationSelector');
+            const station = select.value;
+            
+            if (!station) return;
+            
+            if (station === 'All Stations') {
+                // Add all stations
+                allStations.forEach(s => selectedStations.add(s));
+            } else {
+                selectedStations.add(station);
+            }
+            
+            updateSelectedStationsDisplay();
+            select.value = ''; // Reset dropdown
+        }
+
+        // Remove station
+        function removeStation(station) {
+            selectedStations.delete(station);
+            updateSelectedStationsDisplay();
+        }
+
+        // Load congestion stats from Flask
+        function loadCongestionStats() {
+            fetch('/api/operator/congestion-stats')
+                .then(response => response.json())
+                .then(data => {
+                    // Update stat cards
+                    document.getElementById('severe-count').textContent = data.counts.severe;
+                    document.getElementById('congested-count').textContent = data.counts.congested;
+                    document.getElementById('moderate-count').textContent = data.counts.moderate;
+                    document.getElementById('light-count').textContent = data.counts.light;
+                    
+                    // Split stations into southbound and northbound
+                    const southbound = data.stats.slice(0, 7);
+                    const northbound = data.stats.slice(7).reverse();
+                    
+                    // Render tables
+                    renderStationTable('southbound-body', southbound);
+                    renderStationTable('northbound-body', northbound);
+                })
+                .catch(error => {
+                    console.error('Error loading congestion stats:', error);
+                    // Fallback to mock data
+                    loadMockCongestionStats();
+                });
+        }
+
+        // Fallback mock data
+        function loadMockCongestionStats() {
+            const mockData = {
+                counts: {
+                    severe: 2,
+                    congested: 3,
+                    moderate: 4,
+                    light: 4
+                },
+                stats: [
+                    { name: "North Ave", status: "moderate" },
+                    { name: "Quezon Ave", status: "light" },
+                    { name: "Kamuning", status: "moderate" },
+                    { name: "Cubao", status: "severe" },
+                    { name: "Santolan", status: "light" },
+                    { name: "Ortigas", status: "congested" },
+                    { name: "Shaw Blvd", status: "congested" },
+                    { name: "Boni Ave", status: "moderate" },
+                    { name: "Guadalupe", status: "light" },
+                    { name: "Buendia", status: "light" },
+                    { name: "Ayala Ave", status: "severe" },
+                    { name: "Magallanes", status: "congested" },
+                    { name: "Taft", status: "moderate" }
+                ]
+            };
+            
+            document.getElementById('severe-count').textContent = mockData.counts.severe;
+            document.getElementById('congested-count').textContent = mockData.counts.congested;
+            document.getElementById('moderate-count').textContent = mockData.counts.moderate;
+            document.getElementById('light-count').textContent = mockData.counts.light;
+            
+            const southbound = mockData.stats.slice(0, 7);
+            const northbound = mockData.stats.slice(7).reverse();
+            
+            renderStationTable('southbound-body', southbound);
+            renderStationTable('northbound-body', northbound);
+        }
+
+        function renderStationTable(tbodyId, stations) {
+            const tbody = document.getElementById(tbodyId);
+            tbody.innerHTML = stations.map(station => {
+                const statusClass = station.status;
+                const statusText = station.status.charAt(0).toUpperCase() + station.status.slice(1);
+                
+                return `
+                    <tr>
+                        <td>${station.name}</td>
+                        <td><span class="badge ${statusClass}"><i class="fas fa-circle" style="font-size: 6px;"></i> ${statusText}</span></td>
+                        <td><button class="btn-override" onclick="openOverrideModal('${station.name}')">Override</button></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Modal Logic
+        function openOverrideModal(stationName) {
+            document.getElementById('modalStationName').innerText = stationName;
+            document.getElementById('overrideModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('overrideModal').style.display = 'none';
+            document.querySelectorAll('.status-opt').forEach(opt => opt.classList.remove('selected'));
+            document.getElementById('overrideReason').value = "";
+            currentSelectedLevel = "";
+        }
+
+        function selectLevel(element, level) {
+            document.querySelectorAll('.status-opt').forEach(opt => opt.classList.remove('selected'));
+            element.classList.add('selected');
+            currentSelectedLevel = level;
+        }
+
+        function applyOverride() {
+            if (!currentSelectedLevel) {
+                alert("Please select a congestion level.");
+                return;
+            }
+            
+            const station = document.getElementById('modalStationName').innerText;
+            const duration = document.getElementById('overrideDuration').value;
+            const reason = document.getElementById('overrideReason').value || "No reason provided";
+            
+            const btn = document.querySelector('.btn-apply');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying...';
+            
+            // Send override to Flask
+            fetch('/api/operator/override', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    station: station,
+                    level: currentSelectedLevel,
+                    duration: parseInt(duration),
+                    reason: reason
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showToast('✅', data.message);
+                closeModal();
+                loadCongestionStats(); // Refresh stats
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('❌', 'Failed to apply override');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = 'Apply Override';
+            });
+        }
+
+        // Broadcast functions
+        function selectDisruption(type, element) {
+            selectedDisruptionType = type;
+            document.querySelectorAll('.dist-opt').forEach(opt => opt.classList.remove('selected'));
+            element.classList.add('selected');
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const title = document.getElementById('alertTitle').value || "Alert Title will appear here";
+            const message = document.getElementById('alertMessage').value || "Your message will appear here...";
+            const severity = document.getElementById('severityLevel').value;
+            
+            const previewCard = document.getElementById('previewCard');
+            previewCard.style.borderLeftColor = severity === 'critical' ? '#EF4444' : 
+                                               severity === 'warning' ? '#F97316' : '#8B5CF6';
+            
+            document.getElementById('previewTitle').textContent = title;
+            document.getElementById('previewText').textContent = message;
+        }
+
+        function clearBroadcastForm() {
+            document.getElementById('alertTitle').value = '';
+            document.getElementById('alertMessage').value = '';
+            document.getElementById('severityLevel').value = 'advisory';
+            document.getElementById('broadcastDuration').value = '60';
+            document.querySelectorAll('.dist-opt').forEach(opt => opt.classList.remove('selected'));
+            selectedStations.clear();
+            selectedDisruptionType = "";
+            updateSelectedStationsDisplay();
+            updatePreview();
+        }
+
+        // Load incident logs
+function loadIncidentLogs() {
+    const container = document.getElementById('incident-log-container');
+    
+    fetch('/api/operator/broadcasts')
+        .then(response => response.json())
+        .then(broadcasts => {
+            if (!broadcasts || broadcasts.length === 0) {
+                // Show empty state if no broadcasts
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-history"></i>
+                        <h3>No incidents logged yet</h3>
+                        <p>When you send broadcasts from the Broadcast page, they will appear here as incident logs.</p>
+                        <button class="btn-primary" onclick="showPage('broadcast', document.querySelectorAll('.nav-item')[1])">
+                            <i class="fas fa-bullhorn"></i> Go to Broadcast
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Build HTML for each broadcast
+            let html = '';
+            broadcasts.forEach(b => {
+                // Determine severity class
+                let severityClass = 'severity-advisory';
+                let severityText = 'ADVISORY';
+                if (b.severity === 'critical') {
+                    severityClass = 'severity-critical';
+                    severityText = 'CRITICAL';
+                } else if (b.severity === 'warning') {
+                    severityClass = 'severity-warning';
+                    severityText = 'WARNING';
+                }
+                
+                // Build stations list
+                let stationsHtml = '';
+                b.stations.forEach(station => {
+                    stationsHtml += `
+                        <div class="station-bullet-item">
+                            <span class="bullet"></span>
+                            <span class="station-name-bold">${station}</span>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                    <div class="log-entry">
+                        <div class="log-header">
+                            <span class="log-type-badge">
+                                <i class="fas ${b.icon}"></i> ${b.type}
+                            </span>
+                        </div>
+                        
+                        <h3 class="log-main-title">${b.title}</h3>
+                        
+                        <p class="log-description">${b.message}</p>
+                        
+                        <div class="stations-section">
+                            <div class="stations-header">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>AFFECTED STATIONS</span>
+                            </div>
+                            <div class="station-bullet-list">
+                                ${stationsHtml}
+                            </div>
+                        </div>
+                        
+                        <div class="log-footer">
+                            <div class="log-time">
+                                <i class="far fa-clock"></i>
+                                <span>${b.time} • via Operator ${b.operator}</span>
+                            </div>
+                            <span class="log-severity ${severityClass}">${severityText}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading broadcasts:', error);
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-triangle" style="color: #EF4444;"></i>
+                    <h3>Error loading incidents</h3>
+                    <p>Failed to load incident logs. Please try again.</p>
+                    <button class="btn-primary" onclick="loadIncidentLogs()">
+                        <i class="fas fa-sync-alt"></i> Retry
+                    </button>
+                </div>
+            `;
+        });
+}
+
+        function sendBroadcast() {
+    const stations = Array.from(selectedStations);
+    const title = document.getElementById('alertTitle').value;
+    const message = document.getElementById('alertMessage').value;
+    const severity = document.getElementById('severityLevel').value;
+    const duration = document.getElementById('broadcastDuration').value;
+    
+    if (!selectedDisruptionType) {
+        alert("Please select a disruption type.");
+        return;
+    }
+    
+    if (stations.length === 0) {
+        alert("Please select at least one affected station.");
+        return;
+    }
+    
+    if (!title || !message) {
+        alert("Please fill in all fields.");
+        return;
+    }
+    
+    const btn = document.getElementById('sendBroadcastBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    
+    // Send broadcast to Flask
+    fetch('/api/operator/broadcast', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            type: selectedDisruptionType,
+            station: stations.join(', '), // This will be parsed in the backend
+            title: title,
+            message: message,
+            duration: parseInt(duration)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        showToast('📢', 'Broadcast sent successfully!');
+        clearBroadcastForm();
+        
+        // Show a hint that the incident log will now have data
+        showToast('💡', 'Check Incident Log to see your broadcast');
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('❌', 'Failed to send broadcast');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send';
+    });
+}
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('overrideModal');
+            if (event.target == modal) closeModal();
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDate();
+            setInterval(updateDate, 1000);
+            
+            // Load initial data
+            loadCongestionStats();
+            updateSelectedStationsDisplay();
+            
+            // Auto-refresh dashboard every 30 seconds
+            setInterval(loadCongestionStats, 30000);
+        });
+    </script>
+</body>
+</html>

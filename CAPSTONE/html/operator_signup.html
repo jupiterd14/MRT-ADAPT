@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MRT-3 | Operator Sign Up</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            --bg-dark: radial-gradient(circle at center, #1b314d 0%, #0d131f 100%);
+            --card-fill: rgba(255, 255, 255, 0.03);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --input-bg: rgba(0, 0, 0, 0.2);
+            --btn-blue: #3b82f6; 
+            --text-gray: #94a3b8;
+            --success-green: #10b981;
+            --error-red: #ef4444;
+            --warning-yellow: #f59e0b;
+            --purple: #8b5cf6;
+        }
+
+        body, html {
+            margin: 0; padding: 0; 
+            height: 100%; width: 100%;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .page-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; 
+            align-items: center; 
+            padding: 15px;
+            box-sizing: border-box;
+        }
+
+        .brand-header {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .brand-icon {
+            width: 55px; height: 55px;
+            background: var(--purple);
+            border-radius: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 8px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+        .brand-icon i { font-size: 26px; color: white; }
+        .brand-header h1 { font-size: 26px; margin: 0; font-weight: 700; }
+        .brand-header p { color: var(--text-gray); margin-top: 4px; font-size: 13px; }
+
+        .auth-card {
+            background: var(--card-fill);
+            border: 1px solid rgb(81, 125, 139);
+            border-radius: 28px;
+            width: 100%;
+            max-width: 450px; 
+            padding: 25px 30px;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.4);
+            backdrop-filter: blur(10px);
+            box-sizing: border-box;
+        }
+
+        .invite-badge {
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid var(--purple);
+            border-radius: 28px;
+            padding: 10px 18px;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+            font-size: 13px;
+        }
+
+        .invite-badge i {
+            color: var(--purple);
+            font-size: 15px;
+        }
+
+        .invite-badge strong {
+            color: var(--purple);
+            font-weight: 600;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-gray);
+            margin-bottom: 4px;
+        }
+
+        .field-wrap { 
+            position: relative; 
+            margin-bottom: 6px; 
+            border: 0.5px solid rgb(81, 125, 139);
+            border-radius: 18px;
+            transition: border-color 0.3s ease;
+        }
+
+        .field-wrap.error {
+            border-color: var(--error-red);
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+        }
+
+        .field-wrap.success {
+            border-color: var(--success-green);
+        }
+
+        .field-wrap i:not(.toggle-eye) {
+            position: absolute; left: 14px; top: 50%;
+            transform: translateY(-50%); color: var(--text-gray);
+            font-size: 15px;
+        }
+
+        input, select {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 12px 38px 12px 38px;
+            color: white;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            transition: all 0.3s ease;
+            appearance: none;
+        }
+
+        select {
+            cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            background-size: 15px;
+        }
+
+        select option {
+            background: #162130;
+            color: white;
+            font-size: 13px;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--purple);
+        }
+
+        .toggle-eye {
+            position: absolute; right: 14px; top: 50%;
+            transform: translateY(-50%); cursor: pointer; color: var(--text-gray);
+            font-size: 15px;
+        }
+
+        .field-hint {
+            font-size: 11px;
+            color: var(--text-gray);
+            margin-top: 3px;
+            margin-bottom: 6px;
+            padding-left: 14px;
+        }
+
+        .field-hint i {
+            margin-right: 4px;
+            font-size: 10px;
+        }
+
+        .field-hint.error {
+            color: var(--error-red);
+        }
+
+        .field-hint.success {
+            color: var(--success-green);
+        }
+
+        .btn-register {
+            width: 100%;
+            background: var(--purple);
+            color: white; border: none;
+            padding: 12px; border-radius: 18px;
+            font-size: 15px; font-weight: 600;
+            cursor: pointer; display: flex;
+            align-items: center; justify-content: center; gap: 8px;
+            transition: 0.3s ease;
+            margin-top: 8px;
+        }
+        .btn-register:hover { background: #7c3aed; }
+
+        .btn-register:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .login-link { text-align: center; margin-top: 18px; font-size: 13px; color: var(--text-gray); }
+        .login-link a { color: var(--purple); text-decoration: none; font-weight: 600; }
+
+        /* MODAL STYLES */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .modal-content {
+            background: #162130;
+            border: 1px solid rgb(81, 125, 139);
+            border-radius: 28px;
+            padding: 30px;
+            text-align: center;
+            max-width: 350px;
+            width: 90%;
+            box-shadow: 0 20px 45px rgba(0,0,0,0.5);
+            animation: popIn 0.4s ease;
+        }
+
+        .modal-content.warning { border-color: var(--warning-yellow); }
+        .modal-content.error { border-color: var(--error-red); }
+        .modal-content.success { border-color: var(--success-green); }
+
+        @keyframes popIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-content i {
+            font-size: 45px;
+            margin-bottom: 12px;
+        }
+
+        .modal-content i.success { color: var(--success-green); }
+        .modal-content i.warning { color: var(--warning-yellow); }
+        .modal-content i.error { color: var(--error-red); }
+
+        .modal-content h2 { margin: 0 0 5px; font-size: 22px; }
+        .modal-content p { color: var(--text-gray); font-size: 13px; line-height: 1.4; margin-bottom: 20px; }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 9px 22px;
+            border: none;
+            border-radius: 28px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn.primary {
+            background: var(--purple);
+            color: white;
+        }
+
+        .modal-btn.primary:hover {
+            background: #7c3aed;
+        }
+
+        .modal-btn.secondary {
+            background: transparent;
+            border: 1px solid var(--purple);
+            color: var(--purple);
+        }
+
+        @media (max-width: 600px) {
+            .auth-card { padding: 18px 20px; }
+            .brand-header h1 { font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Success Modal -->
+    <div class="modal-overlay" id="successModal">
+        <div class="modal-content success">
+            <i class="fa-solid fa-circle-check success"></i>
+            <h2>Operator Created! 🚆</h2>
+            <p>Your operator account has been created successfully.</p>
+            <button class="modal-btn primary" onclick="goToLogin()">Go to Login</button>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal-overlay" id="errorModal">
+        <div class="modal-content error">
+            <i class="fa-solid fa-circle-xmark error"></i>
+            <h2 id="errorTitle">Oops!</h2>
+            <p id="errorMessage">Please check your information and try again.</p>
+            <button class="modal-btn primary" style="background: var(--error-red);" onclick="closeModal('errorModal')">Try Again</button>
+        </div>
+    </div>
+
+    <div class="page-container">
+        <div class="brand-header">
+            <div class="brand-icon"><i class="fa-solid fa-user-tie"></i></div>
+            <h1>Operator Sign Up</h1>
+            <p>MRT-3 Congestion Management</p>
+        </div>
+
+        <div class="auth-card">
+            <!-- Invite Badge -->
+            <div class="invite-badge">
+                <i class="fa-solid fa-envelope"></i>
+                <span>Invite for: <strong>{{ email }}</strong></span>
+            </div>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div style="background: {% if category == 'error' %}#FEE2E2{% else %}#DCFCE7{% endif %}; 
+                                    color: {% if category == 'error' %}#991B1B{% else %}#166534{% endif %}; 
+                                    padding: 8px; border-radius: 10px; margin-bottom: 12px; font-size: 12px;
+                                    display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid {% if category == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"></i>
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form action="/operator-signup?token={{ token }}&email={{ email }}" method="POST" id="signupForm" novalidate>
+                <span class="input-label">Full Name</span>
+                <div class="field-wrap" id="name-field">
+                    <i class="fa-regular fa-user"></i>
+                    <input type="text" name="name" id="name" placeholder="Juan Dela Cruz" required>
+                </div>
+
+                <span class="input-label">Email Address</span>
+                <div class="field-wrap">
+                    <i class="fa-regular fa-envelope"></i>
+                    <input type="email" value="{{ email }}" readonly disabled style="background: rgba(0,0,0,0.3); color: var(--text-gray); font-size: 13px;">
+                </div>
+
+                <span class="input-label">Password</span>
+                <div class="field-wrap" id="password-field">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" name="password" id="password" placeholder="Create Password" required>
+                    <i class="fa-solid fa-eye-slash toggle-eye" onclick="togglePass('password', this)"></i>
+                </div>
+
+                <span class="input-label">Confirm Password</span>
+                <div class="field-wrap" id="confirm-field">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" name="confirm_password" id="confirm_password" placeholder="Re-enter Password" required>
+                    <i class="fa-solid fa-eye-slash toggle-eye" onclick="togglePass('confirm_password', this)"></i>
+                </div>
+                <div class="field-hint" id="confirm-hint">
+                    <i class="fa-solid fa-info-circle"></i> Must match the password above
+                </div>
+
+                <span class="input-label">Assigned Station</span>
+                <div class="field-wrap">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <select name="station" id="station" required>
+                        <option value="All Stations">All Stations (Line-Wide)</option>
+                        <option value="North Ave">North Ave</option>
+                        <option value="Quezon Ave">Quezon Ave</option>
+                        <option value="Kamuning">Kamuning</option>
+                        <option value="Cubao">Cubao</option>
+                        <option value="Santolan">Santolan</option>
+                        <option value="Ortigas">Ortigas</option>
+                        <option value="Shaw Blvd">Shaw Blvd</option>
+                        <option value="Boni Ave">Boni Ave</option>
+                        <option value="Guadalupe">Guadalupe</option>
+                        <option value="Buendia">Buendia</option>
+                        <option value="Ayala Ave">Ayala Ave</option>
+                        <option value="Magallanes">Magallanes</option>
+                        <option value="Taft">Taft</option>
+                    </select>
+                </div>
+
+                <input type="hidden" name="token" value="{{ token }}">
+                
+                <button type="submit" class="btn-register" id="registerBtn">CREATE ACCOUNT</button>
+            </form>
+
+            <div class="login-link">
+                Already have an account? <a href="/login">Log in</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function togglePass(id, el) {
+            const input = document.getElementById(id);
+            input.type = input.type === "password" ? "text" : "password";
+            el.classList.toggle('fa-eye-slash');
+            el.classList.toggle('fa-eye');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function goToLogin() {
+            window.location.href = "/login";
+        }
+
+        function checkPasswordMatch() {
+            const pass = document.getElementById('password').value;
+            const confirm = document.getElementById('confirm_password').value;
+            const field = document.getElementById('confirm-field');
+            const hint = document.getElementById('confirm-hint');
+            
+            if (confirm && pass !== confirm) {
+                field.classList.add('error'); field.classList.remove('success');
+                hint.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Passwords do not match';
+                hint.className = 'field-hint error';
+                return false;
+            } else if (confirm && pass === confirm) {
+                field.classList.add('success'); field.classList.remove('error');
+                hint.innerHTML = '<i class="fa-solid fa-check-circle"></i> Passwords match';
+                hint.className = 'field-hint success';
+                return true;
+            } else {
+                field.classList.remove('error', 'success');
+                hint.innerHTML = '<i class="fa-solid fa-info-circle"></i> Must match the password above';
+                hint.className = 'field-hint';
+                return false;
+            }
+        }
+
+        document.getElementById('confirm_password').addEventListener('input', checkPasswordMatch);
+        document.getElementById('password').addEventListener('input', function() {
+            if (document.getElementById('confirm_password').value) checkPasswordMatch();
+        });
+
+        document.getElementById('signupForm').onsubmit = function(e) {
+            e.preventDefault(); 
+
+            const name = document.getElementById('name').value.trim();
+            const pass = document.getElementById('password').value;
+            const confirm = document.getElementById('confirm_password').value;
+            
+            if (!name || name.length < 2) {
+                document.getElementById('errorTitle').innerText = "Invalid Name";
+                document.getElementById('errorMessage').innerText = "Please enter your full name.";
+                document.getElementById('errorModal').style.display = 'flex';
+                return;
+            }
+
+            if (pass.length < 8) {
+                document.getElementById('errorTitle').innerText = "Weak Password";
+                document.getElementById('errorMessage').innerText = "Password must be at least 8 characters.";
+                document.getElementById('errorModal').style.display = 'flex';
+                return;
+            }
+
+            if (pass !== confirm) {
+                document.getElementById('errorTitle').innerText = "Password Mismatch";
+                document.getElementById('errorMessage').innerText = "Passwords do not match.";
+                document.getElementById('errorModal').style.display = 'flex';
+                return;
+            }
+
+            const formData = new FormData(this);
+            fetch(`/operator-signup?token={{ token }}&email={{ email }}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.redirected) {
+                    document.getElementById('successModal').style.display = 'flex';
+                    setTimeout(() => window.location.href = response.url, 1500);
+                } else {
+                    throw new Error('Signup failed');
+                }
+            })
+            .catch(() => {
+                document.getElementById('errorTitle').innerText = "Error";
+                document.getElementById('errorMessage').innerText = "Signup failed. Please try again.";
+                document.getElementById('errorModal').style.display = 'flex';
+            });
+        };
+
+        window.onclick = (event) => {
+            ['errorModal', 'successModal'].forEach(id => {
+                if (event.target == document.getElementById(id)) {
+                    document.getElementById(id).style.display = 'none';
+                }
+            });
+        };
+    </script>
+</body>
+</html>
