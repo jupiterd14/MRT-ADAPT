@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MRT-ADAPT | Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    :root { 
+        --primary: #1a73e8; 
+        --bg: #f4f7f6; 
+        --line: #2c3e50; 
+        --sidebar-width: 240px; /* Slightly wider for better spacing */
+    }
+    
+    body { 
+        font-family: 'Segoe UI', sans-serif; 
+        background: var(--bg); 
+        margin: 0; 
+        display: flex; 
+        height: 100vh; 
+        overflow: hidden; 
+    }
+
+    /* ========== MODAL STYLES ========== */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        backdrop-filter: blur(5px);
+        z-index: 10000;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 16px;
+        text-align: center;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        animation: modalSlideIn 0.3s ease;
+    }
+    
+    @keyframes modalSlideIn {
+        from { transform: translateY(30px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    
+    .modal-buttons { 
+        display: flex; 
+        gap: 12px; 
+        margin-top: 25px; 
+        justify-content: center; 
+    }
+    
+    .modal-btn { 
+        padding: 12px 30px; 
+        border: none; 
+        border-radius: 50px; 
+        cursor: pointer; 
+        font-weight: 600;
+        font-size: 15px;
+        transition: all 0.2s;
+        min-width: 120px;
+    }
+    
+    .btn-confirm { 
+        background: #dc3545; 
+        color: white; 
+    }
+    .btn-confirm:hover { 
+        background: #bd2130; 
+        transform: translateY(-2px);
+    }
+    
+    .btn-cancel { 
+        background: #6c757d; 
+        color: white; 
+    }
+    .btn-cancel:hover { 
+        background: #545b62; 
+        transform: translateY(-2px);
+    }
+
+    /* ========== SIDEBAR STYLES ========== */
+    .sidebar { 
+        width: var(--sidebar-width); 
+        background: rgba(255, 255, 255, 0.03); 
+        border-right: 1px solid #e0e0e0; 
+        display: flex; 
+        flex-direction: column; 
+        padding: 20px 0; 
+        box-shadow: 2px 0 10px rgba(0,0,0,0.03); 
+        z-index: 100;
+    }
+
+    /* Sidebar Logo */
+    .sidebar-logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 20px 25px 20px;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .sidebar-logo i {
+        font-size: 28px;
+        color: var(--primary);
+    }
+    
+    .sidebar-logo span {
+        font-size: 16px;
+        font-weight: 700;
+        color: #2c3e50;
+        letter-spacing: 0.5px;
+    }
+
+    /* Navigation Items */
+    .nav-item, 
+    .logout-item, 
+    .login-item {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 12px 25px;
+        box-sizing: border-box;
+        color: #5f6368;
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-left: 4px solid transparent;
+    }
+
+    .nav-item i,
+    .logout-item i,
+    .login-item i {
+        font-size: 20px;
+        width: 24px;
+        text-align: center;
+    }
+
+    .nav-item:hover {
+        color: var(--primary);
+        background: #f8f9fa;
+        border-left-color: var(--primary);
+    }
+
+    .nav-item.active {
+        color: var(--primary);
+        background: #e8f0fe;
+        font-weight: 600;
+        border-left: 4px solid var(--primary);
+    }
+
+    /* Auth Section */
+    #auth-sidebar-button {
+        margin-top: auto;
+        width: 100%;
+        border-top: 1px solid #f0f0f0;
+        padding: 15px 0 0 0;
+    }
+
+    .logout-item {
+        color: #dc3545;
+        text-decoration: none;
+    }
+    
+    .logout-item:hover {
+        background: #fff5f5;
+        border-left-color: #dc3545;
+    }
+    
+    .login-item {
+        color: var(--primary);
+        text-decoration: none;
+    }
+    
+    .login-item:hover {
+        background: #f0f7ff;
+        border-left-color: var(--primary);
+    }
+
+    /* ========== MAIN CONTENT ========== */
+    .main-content { 
+        flex: 1; 
+        padding: 25px; 
+        overflow-y: auto; 
+        display: flex; 
+        flex-direction: column; 
+    }
+    
+    .dashboard-grid { 
+        display: grid; 
+        grid-template-columns: 360px 1fr; 
+        gap: 20px; 
+        margin-top: 15px; 
+    }
+
+    /* MRT MAP CARD */
+    .map-card { 
+        background: white; 
+        border-radius: 20px; 
+        padding: 20px; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
+        position: relative; 
+        min-height: 550px;
+        border: 1px solid #f0f0f0;
+    }
+
+    .mrt-line { 
+        position: absolute; 
+        left: 202px; 
+        top: 60px; 
+        bottom: 40px; 
+        width: 4px; 
+        background: #e0e0e0; 
+        border-radius: 10px; 
+        z-index: 2;
+    }
+
+    .stations-container { 
+        position: relative; 
+        z-index: 3; 
+        display: flex; 
+        flex-direction: column; 
+        gap: 12px; 
+    }
+    
+    .station-row { 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        height: 34px; 
+    }
+    
+    .station-label { 
+        width: 115px; 
+        text-align: right; 
+        font-size: 12px; 
+        font-weight: 600; 
+        color: #5f6368; 
+    }
+
+    .pin { 
+        width: 14px; 
+        height: 14px; 
+        border-radius: 50%; 
+        border: 3px solid white; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+        transition: all 0.3s;
+    }
+
+    .stat-box { 
+        width: 65px; 
+        padding: 4px 0; 
+        border-radius: 30px; 
+        font-size: 11px; 
+        font-weight: 700; 
+        text-align: center; 
+        color: white; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    /* Dynamic Colors */
+    .green { background: #34a853; }
+    .yellow { background: #fbbc05; }
+    .orange { background: #f97316; }
+    .red { background: #ea4335; }
+
+    /* Banners & Charts */
+    .banner { 
+        padding: 20px; 
+        border-radius: 20px; 
+        display: flex; 
+        align-items: center; 
+        gap: 18px; 
+        margin-bottom: 15px; 
+        border: 1px solid;
+        transition: all 0.3s;
+    }
+    
+    .green-banner { 
+        background: #e6f4ea; 
+        color: #137333; 
+        border-color: #ceead6; 
+    }
+    
+    .blue-banner { 
+        background: #e8f0fe; 
+        color: #185abc; 
+        border-color: #d2e3fc; 
+    }
+    
+    .chart-container { 
+        background: white; 
+        padding: 20px; 
+        border-radius: 20px; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
+        flex-grow: 1;
+        border: 1px solid #f0f0f0;
+    }
+
+    .chart-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    
+    .chart-title h4 {
+        margin: 0;
+        color: #5f6368;
+        font-size: 14px;
+    }
+    
+    .chart-badge {
+        background: #e8f0fe;
+        color: var(--primary);
+        padding: 4px 12px;
+        border-radius: 30px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    /* Map View */
+    .map-view {
+        display: none;
+        height: 100%;
+    }
+    
+    .map-container {
+        background: white;
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+        height: calc(100vh - 120px);
+        position: relative;
+        border: 1px solid #f0f0f0;
+    }
+    
+    #map {
+        height: 100%;
+        width: 100%;
+        border-radius: 12px;
+    }
+    
+    .map-controls {
+        position: absolute;
+        top: 30px;
+        right: 30px;
+        z-index: 10;
+        background: white;
+        padding: 12px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        border: 1px solid #f0f0f0;
+    }
+    
+    .map-controls select {
+        padding: 8px 15px;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+        font-size: 14px;
+        min-width: 160px;
+    }
+
+    /* Error Banner */
+    .error-banner {
+        background: #ffebee;
+        color: #c62828;
+        border-color: #ffcdd2;
+        padding: 12px 20px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+
+    /* User Info */
+    #user-info {
+        background: white;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    }
+
+    .google-icon {
+        color: var(--primary);
+    }
+
+    /* GPS Pulse */
+    .gps-pulse {
+        width: 10px;
+        height: 10px;
+        background: #34a853;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(52, 168, 83, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(52, 168, 83, 0); }
+    }
+
+    /* ========== MOBILE STYLES ========== */
+    @media screen and (max-width: 768px) {
+        body { 
+            display: block !important; 
+            overflow-y: auto !important; 
+            height: auto !important; 
+        }
+
+        .sidebar {
+            width: 100% !important;
+            height: 70px !important;
+            min-height: 70px !important;
+            flex-direction: row !important; 
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            padding: 0 !important;
+            justify-content: space-around !important;
+            align-items: center !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px) !important;
+            border-right: none !important;
+            border-top: 1px solid #e0e0e0 !important;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.05) !important;
+        }
+
+        .sidebar-logo {
+            display: none !important;
+        }
+
+        .nav-item, 
+        .logout-item, 
+        .login-item {
+            width: auto !important;
+            padding: 8px 12px !important;
+            flex-direction: column !important;
+            gap: 4px !important;
+            font-size: 11px !important;
+            border-left: none !important;
+        }
+
+        .nav-item i,
+        .logout-item i,
+        .login-item i {
+            font-size: 20px !important;
+            width: auto !important;
+        }
+
+        .nav-item.active {
+            border-left: none !important;
+            border-top: 3px solid var(--primary) !important;
+            background: transparent !important;
+        }
+
+        .nav-item:hover {
+            border-left: none !important;
+            background: #f5f5f5 !important;
+        }
+
+        .main-content { 
+            padding: 15px !important; 
+            margin-bottom: 80px !important; 
+        }
+
+        .dashboard-grid { 
+            display: flex !important; 
+            flex-direction: column !important; 
+        }
+
+        .dashboard-grid > div:nth-child(2) {
+            order: -1 !important;
+        }
+
+        .map-card {
+            min-height: auto !important;
+        }
+
+        .station-label { 
+            width: 85px !important; 
+            font-size: 11px !important; 
+        }
+
+        .mrt-line { 
+            left: 190px !important; 
+            width: 3px !important; 
+        }
+
+        .stat-box { 
+            width: 55px !important; 
+            font-size: 10px !important; 
+        }
+
+        #auth-sidebar-button { 
+            margin-top: 0 !important; 
+            width: auto !important; 
+            border-top: none !important; 
+            padding: 0 !important; 
+        }
+
+        /* Modal mobile */
+        .modal-content {
+            width: 90% !important;
+            padding: 25px !important;
+        }
+        
+        .modal-buttons {
+            flex-direction: column-reverse !important;
+        }
+        
+        .modal-btn {
+            width: 100% !important;
+        }
+    }
+</style>
+    <!-- Leaflet CSS for map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script asrc="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+    <!-- Error Banner -->
+    <div id="errorBanner" class="error-banner" style="position: fixed; top: 20px; right: 20px; z-index: 9999; display: none;">
+        <i class="fa-solid fa-exclamation-triangle"></i>
+        <span id="errorMessage"></span>
+    </div>
+
+    <!-- Logout Confirmation Modal -->
+    <div id="logoutModal" class="modal">
+        <div class="modal-content">
+            <i class="fa-solid fa-right-from-bracket" style="font-size: 48px; color: #dc3545; margin-bottom: 15px;"></i>
+            <h3 style="margin: 0 0 10px 0;">Confirm Logout</h3>
+            <p style="color: #666; margin-bottom: 20px;">Are you sure you want to logout from MRT-ADAPT?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-cancel" onclick="closeLogoutModal()">Cancel</button>
+                <button class="modal-btn btn-confirm" onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </div>
+
+  <div class="sidebar">
+    <div class="sidebar-logo">
+        <i class="fa-solid fa-train"></i>
+        <span>MRT-ADAPT</span>
+    </div>
+
+    <div class="nav-item active" onclick="switchView('dashboard', this)">
+        <i class="fa-solid fa-house"></i>
+        <span>Dashboard</span>
+    </div>
+
+    <div class="nav-item" onclick="switchView('map', this)">
+        <i class="fa-solid fa-map-location-dot"></i>
+        <span>Live Map</span>
+    </div>
+
+    <div class="nav-item" onclick="switchView('plan', this)">
+        <i class="fa-solid fa-route"></i>
+        <span>Travel Plan</span>
+    </div>
+
+    <div class="nav-item" onclick="switchView('history', this)">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span>History</span>
+    </div>
+
+    <div class="nav-item" onclick="switchView('alerts', this)">
+        <i class="fa-solid fa-bell"></i>
+        <span>Alerts</span>
+    </div>
+
+    <div class="nav-item" onclick="switchView('report', this)">
+        <i class="fa-solid fa-file-contract"></i>
+        <span>Report</span>
+    </div>
+
+    <div id="auth-sidebar-button">
+        {% if is_logged_in %}
+            <div class="nav-item logout-item" onclick="showLogoutModal()">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Logout</span>
+            </div>
+        {% else %}
+            <a href="/login" class="nav-item login-item">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                <span>Login</span>
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+    <div class="main-content">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2 style="margin:0; font-weight:800; color:#2c3e50;">
+                HOME
+            </h2>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="font-size:14px; color:#666;" id="current-time"></div>
+                <div style="display: flex; align-items: center; gap: 5px; background: #e8f0fe; padding: 5px 15px; border-radius: 20px;" id="user-info">
+                    <i class="fa-regular fa-user"></i>
+                    <span style="font-size:13px; font-weight:500;" id="username-display">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        
+
+        <!-- Favorite Station Banner (shown only when logged in) -->
+        <div id="favorite-banner" style="display: none; margin-bottom: 10px;">
+            <div class="banner blue-banner" style="padding: 10px;">
+                <i class="fa-solid fa-star" style="font-size:20px;"></i>
+                <div>
+                    <strong>Your Favorite Station: <span id="favorite-station-name"></span></strong><br>
+                    <small>Get personalized updates for your usual station</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="dashboard-grid active">
+            <div class="map-card">
+                <h4 style="margin:0 0 15px 0; color:#7f8c8d; letter-spacing:1px; font-size:12px;">MRT-3 LINE STATUS: NORTH-TAFT</h4>
+                <div class="mrt-line"></div>
+                <div class="stations-container" id="station-map">
+                    <!-- Stations will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column;">
+                <div class="banner green-banner">
+                    <i class="fa-solid fa-location-dot" style="font-size:24px;"></i>
+                    <div>
+                        <strong>YOUR LOCATION: <span id="gps-station">Detecting...</span></strong><br>
+                        <small id="gps-status">Using GPS to find nearest station</small>
+                    </div>
+                </div>
+
+                <div class="banner blue-banner">
+                    <i class="fa-solid fa-train" style="font-size:24px;"></i>
+                    <div>
+                        <strong>STATION STATUS: <span id="station-status">Loading...</span></strong><br>
+                        <small id="station-advice">Based on current congestion levels</small>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-title">
+                        <h4>HOURLY CONGESTION FORECAST</h4>
+                        <span class="chart-badge" id="chart-station-label">Cubao</span>
+                    </div>
+                    <div style="height: 250px; margin-top:10px;">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map View -->
+        <div id="map-view" class="map-view">
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="map-controls">
+                    <select id="map-station-select" onchange="focusStation()">
+                        <option value="">Select Station</option>
+                        <option value="North Ave">North Ave</option>
+                        <option value="Quezon Ave">Quezon Ave</option>
+                        <option value="Kamuning">Kamuning</option>
+                        <option value="Cubao">Cubao</option>
+                        <option value="Santolan">Santolan</option>
+                        <option value="Ortigas">Ortigas</option>
+                        <option value="Shaw Blvd">Shaw Blvd</option>
+                        <option value="Boni Ave">Boni Ave</option>
+                        <option value="Guadalupe">Guadalupe</option>
+                        <option value="Buendia">Buendia</option>
+                        <option value="Ayala Ave">Ayala Ave</option>
+                        <option value="Magallanes">Magallanes</option>
+                        <option value="Taft">Taft</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ========== VIEW SWITCHING ==========
+    function switchView(view) {
+        const dashboard = document.getElementById('dashboard-view');
+        const mapView = document.getElementById('map-view');
+        const navItems = document.querySelectorAll('.nav-item');
+        
+        // Update active state in nav
+        navItems.forEach(item => item.classList.remove('active'));
+        if (view === 'dashboard') {
+            navItems[1].classList.add('active'); // House icon
+            dashboard.style.display = 'grid';
+            mapView.style.display = 'none';
+        } else {
+            navItems[2].classList.add('active'); // Map icon
+            dashboard.style.display = 'none';
+            mapView.style.display = 'block';
+            // Initialize map if not already done
+            if (!window.mapInitialized) {
+                initMap();
+                window.mapInitialized = true;
+            }
+        }
+    }
+
+    // ========== MAP FUNCTIONS ==========
+    let map;
+    let markers = [];
+    
+    function initMap() {
+        // Center map on Metro Manila
+        map = L.map('map').setView([14.58, 121.03], 12);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // Add station markers
+        stations.forEach(station => {
+            const coords = stationCoordinates[station];
+            if (coords) {
+                const marker = L.marker([coords.lat, coords.lng]).addTo(map);
+                marker.bindPopup(`
+                    <b>${station}</b><br>
+                    <span id="map-popup-${station}">Loading...</span>
+                `);
+                markers.push({ station, marker });
+            }
+        });
+        
+        // Draw line connecting stations
+        const points = stations
+            .map(s => stationCoordinates[s])
+            .filter(c => c)
+            .map(c => [c.lat, c.lng]);
+        
+        L.polyline(points, { color: '#1a73e8', weight: 3 }).addTo(map);
+        
+        // Update popups with congestion data
+        updateMapMarkers();
+    }
+    
+    async function updateMapMarkers() {
+        try {
+            const response = await fetch('/api/batch-predict');
+            const data = await response.json();
+            
+            data.forEach(stationData => {
+                const marker = markers.find(m => m.station === stationData.station);
+                if (marker) {
+                    const popupContent = `
+                        <b>${stationData.station}</b><br>
+                        Congestion: ${stationData.congestion}%<br>
+                        Status: ${stationData.status}<br>
+                        Riders: ${stationData.ridership.toLocaleString()}
+                    `;
+                    marker.marker.setPopupContent(popupContent);
+                }
+            });
+        } catch (error) {
+            console.error("Error updating map markers:", error);
+        }
+    }
+    
+    function focusStation() {
+        const select = document.getElementById('map-station-select');
+        const station = select.value;
+        if (station && stationCoordinates[station]) {
+            const coords = stationCoordinates[station];
+            map.setView([coords.lat, coords.lng], 15);
+        }
+    }
+
+    // ========== LOGOUT FUNCTIONS ==========
+    function showLogoutModal() {
+        document.getElementById('logoutModal').style.display = 'flex';
+    }
+
+    function closeLogoutModal() {
+        document.getElementById('logoutModal').style.display = 'none';
+    }
+
+    function logout() {
+        window.location.href = '/logout';
+    }
+
+    window.onclick = function(event) {
+        const modal = document.getElementById('logoutModal');
+        if (event.target == modal) {
+            closeLogoutModal();
+        }
+    }
+
+    // Station coordinates
+    const stationCoordinates = {
+        "North Ave": { lat: 14.6556, lng: 121.0302 },
+        "Quezon Ave": { lat: 14.6390, lng: 121.0380 },
+        "Kamuning": { lat: 14.6249, lng: 121.0431 },
+        "Cubao": { lat: 14.6213, lng: 121.0529 },
+        "Santolan": { lat: 14.6135, lng: 121.0630 },
+        "Ortigas": { lat: 14.5864, lng: 121.0565 },
+        "Shaw Blvd": { lat: 14.5789, lng: 121.0532 },
+        "Boni Ave": { lat: 14.5716, lng: 121.0492 },
+        "Guadalupe": { lat: 14.5655, lng: 121.0446 },
+        "Buendia": { lat: 14.5547, lng: 121.0329 },
+        "Ayala Ave": { lat: 14.5497, lng: 121.0305 },
+        "Magallanes": { lat: 14.5450, lng: 121.0254 },
+        "Taft": { lat: 14.5378, lng: 121.0112 }
+    };
+
+    const stations = [
+        "North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
+        "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia",
+        "Ayala Ave", "Magallanes", "Taft"
+    ];
+
+    // ========== FALLBACK DATA (used if API fails) ==========
+    const fallbackCongestions = {
+        "North Ave": 78,
+        "Quezon Ave": 65,
+        "Kamuning": 45,
+        "Cubao": 92,
+        "Santolan": 38,
+        "Ortigas": 82,
+        "Shaw Blvd": 71,
+        "Boni Ave": 52,
+        "Guadalupe": 48,
+        "Buendia": 42,
+        "Ayala Ave": 88,
+        "Magallanes": 35,
+        "Taft": 76
+    };
+
+    // Get color based on congestion
+    // Get color based on congestion
+function getCongestionColor(congestion) {
+    if (congestion > 80) return 'red';
+    if (congestion > 60) return 'orange';
+    if (congestion > 30) return 'yellow';
+    return 'green'; // This will show green for 0% too, which is correct
+}
+
+    // Render stations with initial data
+    function renderStations() {
+        console.log("🎨 Rendering stations");
+        const container = document.getElementById('station-map');
+        container.innerHTML = "";
+
+        stations.forEach((station, index) => {
+            container.innerHTML += `
+                <div class="station-row">
+                    <span class="station-label">${station}</span>
+                    <div class="pin green" id="circle-${index}"></div>
+                    <div class="stat-box green" id="stat-${index}">0%</div>
+                </div>
+            `;
+        });
+    }
+
+    // ========== USER INFO FUNCTIONS ==========
+    
+    // Fetch user info from backend
+   // ========== USER INFO - USING TEMPLATE VARIABLES ==========
+function setupUserInterface() {
+    console.log("👤 Setting up user interface...");
+    
+    const usernameDisplay = document.getElementById('username-display');
+    const authButton = document.getElementById('auth-sidebar-button');
+    const favoriteBanner = document.getElementById('favorite-banner');
+    
+    // Get values passed from Flask
+    const isLoggedIn = {{ is_logged_in|tojson }};
+    const username = {{ username|tojson }};
+    const googleUser = {{ google_user|tojson }};
+    const favoriteStation = {{ favorite_station|tojson }};
+    
+    console.log(`👤 Logged in: ${isLoggedIn}, Username: ${username}`);
+    
+    if (isLoggedIn) {
+        // User is LOGGED IN
+        if (googleUser) {
+            usernameDisplay.innerHTML = `<i class="fa-brands fa-google google-icon"></i> ${username}`;
+        } else {
+            usernameDisplay.innerHTML = username;
+        }
+        
+        // Show LOGOUT button
+        authButton.innerHTML = `
+            <div style="text-align:center; margin-top: auto;">
+                <div class="logout-btn" onclick="showLogoutModal()">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </div>
+                <div class="logout-text">LOGOUT</div>
+            </div>
+        `;
+        
+        // Show favorite banner if they have one
+        if (favoriteStation) {
+            favoriteBanner.style.display = 'block';
+            document.getElementById('favorite-station-name').innerHTML = favoriteStation;
+        } else {
+            favoriteBanner.style.display = 'none';
+        }
+    } else {
+        // User is GUEST
+        usernameDisplay.innerHTML = 'Guest';
+        
+        // Show LOGIN button
+        authButton.innerHTML = `
+            <div style="text-align:center; margin-top: auto;">
+                <a href="/login" class="login-btn" style="text-decoration: none; display: inline-block;">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                </a>
+                <div class="login-text">LOGIN</div>
+            </div>
+        `;
+        
+        favoriteBanner.style.display = 'none';
+    }
+}
+
+    // Update single station UI
+// Update single station UI
+function updateSingleStation(stationData, index) {
+    const circle = document.getElementById(`circle-${index}`);
+    const statBox = document.getElementById(`stat-${index}`);
+    
+    if (!circle || !statBox) return;
+    
+    // Fix: Check if congestion is defined and not null, otherwise use fallback
+    const congestion = stationData.congestion !== undefined ? stationData.congestion : 50;
+    const colorClass = getCongestionColor(congestion);
+    
+    statBox.innerText = congestion + "%";
+    circle.className = `pin ${colorClass}`;
+    statBox.className = `stat-box ${colorClass}`;
+}
+    // Fallback to hardcoded data if API fails
+    // Fallback to hardcoded data if API fails
+function useFallbackData() {
+    console.log("🔄 Using fallback data");
+    stations.forEach((station, index) => {
+        let congestion = fallbackCongestions[station];
+        const variation = Math.floor(Math.random() * 5) - 2;
+        congestion = Math.min(100, Math.max(0, congestion + variation)); // Allow 0
+        
+        const colorClass = getCongestionColor(congestion);
+        
+        const circle = document.getElementById(`circle-${index}`);
+        const statBox = document.getElementById(`stat-${index}`);
+        
+        if (circle && statBox) {
+            statBox.innerText = congestion + "%";
+            circle.className = `pin ${colorClass}`;
+            statBox.className = `stat-box ${colorClass}`;
+        }
+    });
+}
+    
+
+    // Update station status banner with REAL data
+    async function updateStationStatus(stationName) {
+        try {
+            const response = await fetch(`/api/predict/${encodeURIComponent(stationName)}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            const stationStatus = document.getElementById('station-status');
+            const stationAdvice = document.getElementById('station-advice');
+            
+            const congestion = data.congestion;
+            
+            let statusText = '';
+            let adviceText = '';
+            
+            if (congestion > 80) {
+                statusText = `🔴 CRITICAL (${congestion}% full)`;
+                adviceText = `Avoid ${stationName} if possible. Very high congestion.`;
+            } else if (congestion > 60) {
+                statusText = `🟠 BUSY (${congestion}% full)`;
+                adviceText = `Moderate crowding at ${stationName}. Expect delays.`;
+            } else if (congestion > 30) {
+                statusText = `🟡 MODERATE (${congestion}% full)`;
+                adviceText = `${stationName} is manageable. Normal operations.`;
+            } else {
+                statusText = `🟢 LIGHT (${congestion}% full)`;
+                adviceText = `${stationName} is not crowded. Good time to travel.`;
+            }
+            
+            stationStatus.innerHTML = statusText;
+            stationAdvice.innerHTML = adviceText;
+            
+        } catch (error) {
+            console.error("Error updating station status:", error);
+            const congestion = fallbackCongestions[stationName] || 50;
+            updateStationStatusFallback(stationName, congestion);
+        }
+    }
+
+    // Fallback for station status
+    function updateStationStatusFallback(stationName, congestion) {
+        const stationStatus = document.getElementById('station-status');
+        const stationAdvice = document.getElementById('station-advice');
+        
+        let statusText = '';
+        let adviceText = '';
+        
+        if (congestion > 80) {
+            statusText = `🔴 CRITICAL (${congestion}% full)`;
+            adviceText = `Avoid ${stationName} if possible.`;
+        } else if (congestion > 60) {
+            statusText = `🟠 BUSY (${congestion}% full)`;
+            adviceText = `Moderate crowding.`;
+        } else if (congestion > 30) {
+            statusText = `🟡 MODERATE (${congestion}% full)`;
+            adviceText = `Normal operations.`;
+        } else {
+            statusText = `🟢 LIGHT (${congestion}% full)`;
+            adviceText = `Not crowded.`;
+        }
+        
+        stationStatus.innerHTML = statusText;
+        stationAdvice.innerHTML = adviceText;
+    }
+
+    // Update chart with REAL forecast data
+    async function updateStationForecast(stationName) {
+        try {
+            console.log(`📊 Fetching forecast for ${stationName}`);
+            const response = await fetch(`/api/station-forecast/${encodeURIComponent(stationName)}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log(`✅ Forecast data:`, data);
+            
+            if (!window.myChart) {
+                initChart();
+            }
+            
+            window.myChart.data.datasets[0].data = data.forecast;
+            window.myChart.data.datasets[0].label = `${stationName} Congestion %`;
+            window.myChart.data.datasets[0].pointBackgroundColor = data.forecast.map(v => {
+                if (v > 80) return '#ea4335';
+                if (v > 60) return '#f97316';
+                if (v > 30) return '#fbbc05';
+                return '#34a853';
+            });
+            
+            window.myChart.update();
+            document.getElementById('chart-station-label').innerHTML = stationName;
+            
+        } catch (error) {
+            console.error("Error updating forecast:", error);
+            // Generate fallback forecast
+            const baseCongestion = fallbackCongestions[stationName] || 50;
+            generateFallbackForecast(stationName, baseCongestion);
+        }
+    }
+
+    // Generate fallback forecast
+    function generateFallbackForecast(stationName, baseCongestion) {
+        const forecast = [];
+        const now = new Date();
+        const hour = now.getHours();
+        
+        for (let i = 0; i < 6; i++) {
+            let variation;
+            
+            // Create realistic patterns based on time of day
+            if (7 <= hour && hour <= 9) { // Morning rush - increasing
+                variation = i * 2;
+            } else if (17 <= hour && hour <= 19) { // Evening rush - peak then decrease
+                if (i < 3) {
+                    variation = i * 1.5;
+                } else {
+                    variation = (6 - i) * 1.5;
+                }
+            } else if (10 <= hour && hour <= 16) { // Midday - stable with slight variation
+                variation = Math.sin(i) * 3;
+            } else { // Off-peak - decreasing
+                variation = -i * 1.5;
+            }
+            
+            let value = baseCongestion + variation;
+            value = Math.min(100, Math.max(10, Math.round(value)));
+            forecast.push(value);
+        }
+        
+        if (window.myChart) {
+            window.myChart.data.datasets[0].data = forecast;
+            window.myChart.data.datasets[0].label = `${stationName} Congestion % (est)`;
+            window.myChart.data.datasets[0].pointBackgroundColor = forecast.map(v => {
+                if (v > 80) return '#ea4335';
+                if (v > 60) return '#f97316';
+                if (v > 30) return '#fbbc05';
+                return '#34a853';
+            });
+            window.myChart.update();
+            document.getElementById('chart-station-label').innerHTML = stationName;
+        }
+    }
+
+    // ========== GPS FUNCTIONS ==========
+    
+    function getGPSLocation() {
+        const gpsStation = document.getElementById('gps-station');
+        const gpsStatus = document.getElementById('gps-status');
+
+        if (navigator.geolocation) {
+            gpsStatus.innerHTML = 'Requesting location access...';
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    
+                    let nearestStation = stations[0];
+                    let shortestDistance = Infinity;
+                    
+                    stations.forEach(station => {
+                        const coords = stationCoordinates[station];
+                        if (coords) {
+                            const distance = calculateDistance(
+                                latitude, longitude,
+                                coords.lat, coords.lng
+                            );
+                            
+                            if (distance < shortestDistance) {
+                                shortestDistance = distance;
+                                nearestStation = station;
+                            }
+                        }
+                    });
+                    
+                    gpsStation.innerHTML = `${nearestStation} (${shortestDistance.toFixed(2)} km)`;
+                    gpsStatus.innerHTML = 'GPS Active - Real-time location tracking';
+                    
+                    updateStationStatus(nearestStation);
+                    updateStationForecast(nearestStation);
+                },
+                (error) => {
+                    console.error('GPS Error:', error);
+                    
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            gpsStation.innerHTML = 'Location access denied';
+                            gpsStatus.innerHTML = 'Please enable location access';
+                            break;
+                        default:
+                            gpsStation.innerHTML = 'Cubao (approx. 0.8 km)';
+                            gpsStatus.innerHTML = 'Using approximate location';
+                    }
+                    
+                    updateStationStatus('Cubao');
+                    updateStationForecast('Cubao');
+                }
+            );
+        } else {
+            gpsStation.innerHTML = 'GPS not supported';
+            gpsStatus.innerHTML = 'Browser does not support geolocation';
+            updateStationStatus('Cubao');
+            updateStationForecast('Cubao');
+        }
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = 
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    // ========== TIME FUNCTIONS ==========
+    
+    function updateCurrentTime() {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        document.getElementById('current-time').innerHTML = `<i class="fa-regular fa-clock"></i> ${timeStr}`;
+    }
+
+    // ========== CHART FUNCTIONS ==========
+    
+    // In your HTML file, update the initChart function:
+function initChart() {
+    const ctx = document.getElementById('forecastChart').getContext('2d');
+    
+    const initialForecast = [92, 88, 84, 80, 76, 72];
+    
+    window.myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['+1h', '+2h', '+3h', '+4h', '+5h', '+6h'], // Changed to hourly labels
+            datasets: [{
+                label: 'Cubao Congestion %',
+                data: initialForecast,
+                borderColor: '#1a73e8',
+                backgroundColor: 'rgba(26, 115, 232, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointBackgroundColor: initialForecast.map(v => {
+                    if (v > 80) return '#ea4335';
+                    if (v > 60) return '#f97316';
+                    if (v > 30) return '#fbbc05';
+                    return '#34a853';
+                })
+            }]
+        },
+        options: { 
+            maintainAspectRatio: false, 
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { 
+                    beginAtZero: true, 
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Congestion %'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Hours from now'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Also update the forecast update function to handle hourly data:
+async function updateStationForecast(stationName) {
+    try {
+        console.log(`📊 Fetching hourly forecast for ${stationName}`);
+        const response = await fetch(`/api/station-forecast/${encodeURIComponent(stationName)}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`✅ Forecast data:`, data);
+        
+        if (!window.myChart) {
+            initChart();
+        }
+        
+        window.myChart.data.datasets[0].data = data.forecast;
+        window.myChart.data.datasets[0].label = `${stationName} Congestion %`;
+        window.myChart.data.labels = data.intervals; // Use the intervals from API
+        window.myChart.data.datasets[0].pointBackgroundColor = data.forecast.map(v => {
+            if (v > 80) return '#ea4335';
+            if (v > 60) return '#f97316';
+            if (v > 30) return '#fbbc05';
+            return '#34a853';
+        });
+        
+        window.myChart.update();
+        document.getElementById('chart-station-label').innerHTML = stationName;
+        
+    } catch (error) {
+        console.error("Error updating forecast:", error);
+        // Generate fallback forecast
+        const baseCongestion = fallbackCongestions[stationName] || 50;
+        generateFallbackForecast(stationName, baseCongestion);
+    }
+}
+
+// Update fallback forecast generator for hourly
+function generateFallbackForecast(stationName, baseCongestion) {
+    const forecast = [];
+    const now = new Date();
+    const hour = now.getHours();
+    
+    for (let i = 0; i < 6; i++) {
+        let variation;
+        let forecastHour = (hour + i + 1) % 24;
+        
+        // Create realistic patterns based on time of day
+        if (7 <= forecastHour && forecastHour <= 9) { // Morning rush
+            variation = 10 + (i * 5);
+        } else if (17 <= forecastHour && forecastHour <= 19) { // Evening rush
+            variation = 15 + (i * 3);
+        } else if (10 <= forecastHour && forecastHour <= 16) { // Midday
+            variation = 5 + Math.sin(i) * 5;
+        } else if (20 <= forecastHour && forecastHour <= 22) { // Late evening
+            variation = -5 - (i * 3);
+        } else { // Off-peak
+            variation = -10 - (i * 2);
+        }
+        
+        let value = baseCongestion + variation;
+        value = Math.min(100, Math.max(10, Math.round(value)));
+        forecast.push(value);
+    }
+    
+    if (window.myChart) {
+        window.myChart.data.datasets[0].data = forecast;
+        window.myChart.data.datasets[0].label = `${stationName} Congestion % (est)`;
+        window.myChart.data.labels = ['+1h', '+2h', '+3h', '+4h', '+5h', '+6h'];
+        window.myChart.data.datasets[0].pointBackgroundColor = forecast.map(v => {
+            if (v > 80) return '#ea4335';
+            if (v > 60) return '#f97316';
+            if (v > 30) return '#fbbc05';
+            return '#34a853';
+        });
+        window.myChart.update();
+        document.getElementById('chart-station-label').innerHTML = stationName;
+    }
+}
+
+    // ========== DEBUG FUNCTIONS ==========
+    
+    async function debugAPI() {
+        console.log("🔍 Checking API...");
+        try {
+            const response = await fetch('/api/batch-predict');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log("✅ API Response:", data);
+        } catch (e) {
+            console.error("❌ API Error:", e);
+            showError("API connection failed. Using fallback data.");
+        }
+    }
+
+    function showError(message) {
+        const banner = document.getElementById('errorBanner');
+        const messageSpan = document.getElementById('errorMessage');
+        messageSpan.innerText = message;
+        banner.style.display = 'flex';
+        setTimeout(() => {
+            banner.style.display = 'none';
+        }, 5000);
+    }
+
+    async function updateAllStations() {
+        console.log("🔄 Fetching live batch updates...");
+        try {
+            const response = await fetch('/api/batch-predict');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            
+            // Loop through the 13 stations and update the map
+            data.forEach((stationData) => {
+                const index = stations.indexOf(stationData.station);
+                if (index !== -1) {
+                    updateSingleStation(stationData, index);
+                }
+            });
+            
+            // Also update map markers if map is initialized
+            if (window.mapInitialized) {
+                updateMapMarkers();
+            }
+        } catch (error) {
+            console.error("❌ Batch update failed, using fallback:", error);
+            useFallbackData(); // Fall back to your averages if API is down
+        }
+    }
+
+    // ========== INITIALIZATION ==========
+    
+    window.onload = () => {
+        console.log("🚀 Dashboard initializing...");
+        
+        // Setup user interface using template variables
+        setupUserInterface();
+        
+        renderStations();
+        initChart();
+        getGPSLocation();
+        updateAllStations();
+        
+        setTimeout(debugAPI, 2000);
+        setInterval(updateCurrentTime, 1000);
+        
+        setInterval(() => {
+            updateAllStations();
+            const gpsText = document.getElementById('gps-station').innerHTML;
+            const stationName = gpsText.split(' ')[0];
+            if (stationName && stations.includes(stationName)) {
+                updateStationForecast(stationName);
+            }
+        }, 30000);
+    };
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeLogoutModal();
+        }
+    });
+</script>
+</body>
+</html>
