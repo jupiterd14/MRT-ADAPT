@@ -2250,6 +2250,55 @@ def admin_profile():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+# Add this near the top of your app.py, after the other imports
+import zipfile
+import io
+
+def load_data_from_zip():
+    """Load historical data from zip file"""
+    zip_path = 'data_new_2025.zip'
+    
+    if not os.path.exists(zip_path):
+        print(f"⚠️ {zip_path} not found, using generated data")
+        return False
+    
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            # Look for CSV files in the zip
+            csv_files = [f for f in zip_ref.namelist() if f.endswith('.csv')]
+            
+            if not csv_files:
+                print("⚠️ No CSV files found in zip")
+                return False
+            
+            # Load first CSV file as historical data
+            first_csv = csv_files[0]
+            print(f"📊 Loading data from {first_csv}")
+            
+            with zip_ref.open(first_csv) as csv_file:
+                df = pd.read_csv(io.TextIOWrapper(csv_file, encoding='utf-8'))
+                
+                # Update historical data with values from CSV
+                if 'station' in df.columns and 'congestion' in df.columns:
+                    for _, row in df.iterrows():
+                        station = row['station']
+                        if station in historical_entry:
+                            historical_entry[station] = row.get('entry', historical_entry.get(station, 0))
+                            historical_exit[station] = row.get('exit', historical_exit.get(station, 0))
+                    
+                    print(f"✅ Updated historical data from {first_csv}")
+                    return True
+            
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error loading zip: {e}")
+        return False
+
+# Call this after loading cache
+load_data_from_zip()
+
 # ========== RUN SYSTEM ==========
 if __name__ == '__main__':
     print("\n" + "="*70)

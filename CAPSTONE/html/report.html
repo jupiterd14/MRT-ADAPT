@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MRT-ADAPT | Report Congestion</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --sidebar-bg: #00224D;
+            --main-bg: #F8FAFC;
+            --accent-blue: #3B82F6;
+            --text-dark: #1E293B;
+            --text-light: #64748B;
+            --white: #FFFFFF;
+            --border: #E2E8F0;
+            --red: #EF4444;
+            --orange: #F97316;
+            --yellow: #EAB308;
+            --green: #22C55E;
+            --light-green-bg: #F0FDF4;
+            --blue-bg: #EFF6FF;
+            --severe: #FFCCCC;
+            --severe-text: #D63031;
+            --congested: #FFE5CC;
+            --congested-text: #E67E22;
+            --moderate: #FFF9CC;
+            --moderate-text: #F1C40F;
+            --light: #CCFFCC;
+            --light-text: #27AE60;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            background-color: var(--main-bg);
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 300px;
+            background-color: var(--sidebar-bg);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            padding: 20px 0;
+        }
+
+        .logo-section {
+            padding: 10px 25px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            background: #38BDF8;
+            padding: 10px 13px;
+            border-radius: 8px;
+            font-size: 18px;
+        }
+
+        .logo-text h2 {
+            font-size: 16px;
+            margin: 0;
+            color: white;
+        }
+        .logo-text p {
+            font-size: 10px;
+            opacity: 0.6;
+            letter-spacing: 1px;
+            color: white;
+        }
+
+        nav {
+            padding: 40px 5px 5px 10px;
+            flex: 1;
+        }
+
+        .nav-item {
+            padding: 12px 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            cursor: pointer;
+            transition: 0.3s;
+            color: #CBD5E1;
+            text-decoration: none;
+            font-size: 16px;
+            position: relative;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: rgb(148, 207, 255);
+            border-left: 4px solid var(--accent-blue);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 25px 40px;
+            overflow-y: auto;
+        }
+
+        .greeting { 
+            font-size: 11px; 
+            color: var(--text-light); 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            margin-bottom: 5px; 
+            letter-spacing: 0.5px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .header-title {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .header-top h1 {
+            font-size: 24px;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 0;
+        }
+
+        .header-subtitle {
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        .header-icons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .action-btn {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            padding: 8px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            color: var(--text-dark);
+            text-decoration: none;
+        }
+
+        .action-btn i {
+            font-size: 14px;
+            color: var(--accent-blue);
+        }
+
+        .action-btn:hover {
+            background: var(--blue-bg);
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+
+        .action-btn.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .action-btn.active i {
+            color: white;
+        }
+
+        .icon-btn {
+            background: #F1F5F9;
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            position: relative;
+            color: var(--text-dark);
+            transition: 0.3s;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover {
+            background: #E2E8F0;
+        }
+
+        .badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: var(--red);
+            color: white;
+            font-size: 10px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            font-size: 16px;
+            color: var(--text-dark);
+        }
+
+        .section-header i {
+            color: var(--accent-blue);
+            font-size: 18px;
+        }
+
+        .station-selector {
+            width: 300px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .report-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            min-height: 160px;
+        }
+
+        .report-card i { 
+            font-size: 36px; 
+            margin-bottom: 4px;
+        }
+        
+        .report-card h3 { 
+            font-size: 18px; 
+            font-weight: 700; 
+            margin-bottom: 2px;
+        }
+        
+        .report-card p { 
+            font-size: 12px; 
+            color: var(--text-light);
+            line-height: 1.4;
+        }
+
+        .card-low { border-color: var(--green); }
+        .card-low i, .card-low h3 { color: var(--green); }
+        .card-low.selected { background: var(--green); border-color: var(--green); }
+        .card-low.selected i, .card-low.selected h3, .card-low.selected p { color: white; }
+
+        .card-moderate { border-color: var(--yellow); }
+        .card-moderate i, .card-moderate h3 { color: #dec100; }
+        .card-moderate.selected { background: var(--yellow); border-color: var(--yellow); }
+        .card-moderate.selected i, .card-moderate.selected h3, .card-moderate.selected p { color: white; }
+
+        .card-congested { border-color: var(--orange); }
+        .card-congested i, .card-congested h3 { color: #f07a00; }
+        .card-congested.selected { background: var(--orange); border-color: var(--orange); }
+        .card-congested.selected i, .card-congested.selected h3, .card-congested.selected p { color: white; }
+
+        .card-severe { border-color: var(--red); }
+        .card-severe i, .card-severe h3 { color: #c90000; }
+        .card-severe.selected { background: var(--red); border-color: var(--red); }
+        .card-severe.selected i, .card-severe.selected h3, .card-severe.selected p { color: white; }
+
+        .photo-upload { 
+            border: 2px dashed var(--accent-blue); 
+            border-radius: 12px; 
+            padding: 16px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 12px; 
+            cursor: pointer;
+            transition: 0.2s;
+            margin-bottom: 15px;
+            background: var(--main-bg);
+        }
+        
+        .photo-upload:hover { 
+            border-color: var(--accent-blue); 
+            background: var(--blue-bg);
+        }
+
+        .report-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 15px;
+            border: 1px solid var(--accent-blue);
+            border-radius: 12px;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.3s;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .submit-btn:hover {
+            background: #2563EB;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 34, 77, 0.45);
+            backdrop-filter: blur(6px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            width: 400px;
+            text-align: center;
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            cursor: pointer;
+            background: #F1F5F9;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .report-summary {
+            background: var(--blue-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            text-align: left;
+            border: 1px solid var(--accent-blue);
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .report-summary strong {
+            color: var(--accent-blue);
+            width: 90px;
+            display: inline-block;
+        }
+
+        .view-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        .reports-view {
+            margin-top: 20px;
+        }
+
+        .reports-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+/* Remove the old .reports-header styles and replace with this */
+        
+
+        /* Smaller Filter Dropdown Styles */
+        .filter-container {
+            position: relative;
+        }
+
+        .filter-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1.5px solid var(--accent-blue);
+            border-radius: 25px;
+            padding: 5px 14px;
+            background: white;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 13px;
+            color: var(--text-dark);
+            transition: all 0.2s;
+        }
+
+        .filter-header:hover {
+            background: var(--blue-bg);
+        }
+
+        .dropdown-card {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            width: 280px;
+            background: white;
+            border: 1px solid var(--accent-blue);
+            border-radius: 16px;
+            padding: 14px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: none;
+        }
+
+        .dropdown-card.show {
+            display: block;
+        }
+
+        .dropdown-card h3 {
+            margin: 0 0 8px 0;
+            color: var(--text-light);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .dropdown-card hr {
+            border: 0;
+            border-top: 1px solid var(--border);
+            margin: 10px 0;
+        }
+
+        .date-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .chip {
+            padding: 4px 10px;
+            border-radius: 16px;
+            background: #EFEFEF;
+            color: #999;
+            font-size: 11px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: 0.2s;
+        }
+
+        .chip.active {
+            background: white;
+            border: 1px solid var(--accent-blue);
+            color: var(--accent-blue);
+        }
+
+        .congestion-grid-filter {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .badge-filter {
+            padding: 5px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .badge-filter.severe { background: var(--severe); color: var(--severe-text); border: 1px solid var(--severe-text); }
+        .badge-filter.congested { background: var(--congested); color: var(--congested-text); border: 1px solid var(--congested-text); }
+        .badge-filter.moderate { background: var(--moderate); color: var(--moderate-text); border: 1px solid var(--moderate-text); }
+        .badge-filter.light { background: var(--light); color: var(--light-text); border: 1px solid var(--light-text); }
+        .badge-filter.active-filter { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+
+        .stations-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+
+        .select-all {
+            color: var(--accent-blue);
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .stations-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        .station-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #333;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 28px;
+            height: 16px;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .3s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: var(--green); }
+        input:checked + .slider:before { transform: translateX(12px); }
+
+        .apply-filter-btn {
+            width: 100%;
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 25px;
+            margin-top: 12px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 12px;
+        }
+
+        .reports-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .report-item {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 18px;
+            transition: 0.2s;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .no-reports {
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--white);
+            border-radius: 16px;
+            border: 1px dashed var(--border);
+            color: var(--text-light);
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+        }
+
+        .info-text {
+            font-size: 13px;
+            color: var(--text-light);
+            margin-top: 4px;
+        }
+
+        .success-message {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--green);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            animation: slideIn 0.3s ease;
+            z-index: 1000;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo-section">
+            <div class="logo-icon"><i class="fas fa-subway"></i></div>
+            <div class="logo-text">
+                <h2>MRT-3</h2>
+                <p>CONGESTION TRACKER</p>
+            </div>
+        </div>
+        <nav>
+            <a href="/user-dashboard" class="nav-item"><i class="fas fa-th-large"></i> Dashboard</a>
+            <a href="/live-map" class="nav-item"><i class="fas fa-map-marked-alt"></i> Live Map</a>
+            <a href="/travel-plan" class="nav-item"><i class="fas fa-route"></i> Travel Status</a>
+            <a href="/alerts" class="nav-item"><i class="fas fa-exclamation-triangle"></i> Alerts</a>
+            <a href="/report" class="nav-item active"><i class="fas fa-chart-line"></i> Report</a>
+        </nav>
+    </div>
+
+    <div class="main-content">
+        <div class="greeting">GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, {{ username.upper() }}</div>
+
+        <div class="header-top">
+            <div class="header-title">
+                <h1>Report Congestion</h1>
+                <span class="header-subtitle">Help improve predictions by reporting what you actually see at the station.</span>
+            </div>
+            <div class="header-icons">
+                <button class="action-btn" id="viewReportsBtn" onclick="toggleReports()">
+                    <i class="fas fa-eye"></i> <span id="viewReportsText">View Reports</span>
+                </button>
+                <span class="icon-btn" onclick="window.location.href='/alerts'">
+                    <i class="fas fa-bell"></i>
+                    <span class="badge" id="alertBadge">0</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="view-container">
+            <div id="reportFormView" class="view active">
+                <select class="station-selector" id="stationSelect">
+                    <option value="" disabled selected>Choose a station...</option>
+                    <option value="North Ave">North Avenue</option>
+                    <option value="Quezon Ave">Quezon Avenue</option>
+                    <option value="Kamuning">Kamuning</option>
+                    <option value="Cubao">Cubao</option>
+                    <option value="Santolan">Santolan</option>
+                    <option value="Ortigas">Ortigas</option>
+                    <option value="Shaw Blvd">Shaw Boulevard</option>
+                    <option value="Boni Ave">Boni Avenue</option>
+                    <option value="Guadalupe">Guadalupe</option>
+                    <option value="Buendia">Buendia</option>
+                    <option value="Ayala Ave">Ayala Avenue</option>
+                    <option value="Magallanes">Magallanes</option>
+                    <option value="Taft">Taft Avenue</option>
+                </select>
+
+                <div class="section-header" style="margin-bottom: 12px;">
+                    <i class="fas fa-users"></i>
+                    <span>CROWD DENSITY</span>
+                </div>
+
+                <div class="report-grid">
+                    <div class="report-card card-low" onclick="selectLevel('low')" id="card-low">
+                        <i class="fas fa-smile"></i>
+                        <h3>Light</h3>
+                        <p>Plenty of seats available</p>
+                    </div>
+                    <div class="report-card card-moderate" onclick="selectLevel('moderate')" id="card-moderate">
+                        <i class="fas fa-walking"></i>
+                        <h3>Moderate</h3>
+                        <p>Standard flow, 5 min wait</p>
+                    </div>
+                    <div class="report-card card-congested" onclick="selectLevel('congested')" id="card-congested">
+                        <i class="fas fa-user-friends"></i>
+                        <h3>Congested</h3>
+                        <p>Heavy crowds, long queues</p>
+                    </div>
+                    <div class="report-card card-severe" onclick="selectLevel('severe')" id="card-severe">
+                        <i class="fas fa-skull-crossbones"></i>
+                        <h3>Severe</h3>
+                        <p>Extreme density at platform</p>
+                    </div>
+                </div>
+
+                <div class="card attachment-card">
+                    <div class="section-header">
+                        <i class="fas fa-camera"></i>
+                        <span>Attach Photos <span style="color:grey;">(max 5 photos)</span></span>
+                    </div>
+                    
+                    <div class="photo-upload" onclick="document.getElementById('imageInput').click()">
+                        <i class="fas fa-images" style="color: var(--accent-blue); font-size: 20px;"></i>
+                        <span style="font-size: 13px; color: var(--text-light);">Click to select multiple photos (Max 5)</span>
+                        <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
+                    </div>
+                    
+                    <div id="imagePreviewGrid" style="display: none; margin-top: 15px;">
+                        <div class="section-header" style="margin-bottom: 10px;">
+                            <i class="fas fa-th"></i>
+                            <span>Selected Photos (<span id="photoCount">0</span>/5)</span>
+                        </div>
+                        <div id="previewContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; max-height: 200px; overflow-y: auto; padding: 5px;"></div>
+                    </div>
+                    
+                    <div class="section-header">
+                        <span>Additional Notes <span style="color:grey;">(optional)</span></span>
+                    </div>
+                    
+                    <textarea class="report-textarea" id="remarks" placeholder="Add details (e.g., 'Broken train at North Ave', 'Elevator not working')"></textarea>
+                    <div class="info-text" style="margin-top: 8px;">
+                        <i class="fas fa-info-circle"></i> Your report helps other commuters
+                    </div>
+                </div>
+
+                <button class="submit-btn" onclick="submitReport()">
+                    <i class="fas fa-paper-plane"></i> Submit Report
+                </button>
+            </div>
+
+            <div id="reportsView" class="view reports-view">
+                <div class="reports-header">
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <div class="filter-container">
+                            <div class="filter-header" onclick="toggleFilterDropdown()">
+                                <i class="fas fa-filter"></i>
+                                <span>Filter</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div id="filterDropdown" class="dropdown-card">
+                                <h3>Date</h3>
+                                <div class="date-chips">
+                                    <div class="chip" data-date="today">Today</div>
+                                    <div class="chip" data-date="yesterday">Yesterday</div>
+                                    <div class="chip" data-date="week">7 days</div>
+                                    <div class="chip" data-date="month">30 days</div>
+                                </div>
+
+                                <hr>
+
+                                <h3>Congestion Level</h3>
+                                <div class="congestion-grid-filter">
+                                    <div class="badge-filter severe" data-level="severe">Severe</div>
+                                    <div class="badge-filter congested" data-level="congested">Congested</div>
+                                    <div class="badge-filter moderate" data-level="moderate">Moderate</div>
+                                    <div class="badge-filter light" data-level="light">Light</div>
+                                </div>
+
+                                <hr>
+
+                                <div class="stations-header">
+                                    <h3>Stations</h3>
+                                    <span class="select-all">Select all</span>
+                                </div>
+
+                                <div class="stations-grid" id="stationsGrid">
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="North Ave" checked><span class="slider"></span></label> North Ave</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Quezon Ave" checked><span class="slider"></span></label> Quezon Ave</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Kamuning" checked><span class="slider"></span></label> Kamuning</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Cubao" checked><span class="slider"></span></label> Cubao</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Santolan" checked><span class="slider"></span></label> Santolan</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Ortigas" checked><span class="slider"></span></label> Ortigas</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Shaw Blvd" checked><span class="slider"></span></label> Shaw Blvd</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Boni Ave" checked><span class="slider"></span></label> Boni Ave</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Guadalupe" checked><span class="slider"></span></label> Guadalupe</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Buendia" checked><span class="slider"></span></label> Buendia</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Ayala Ave" checked><span class="slider"></span></label> Ayala Ave</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Magallanes" checked><span class="slider"></span></label> Magallanes</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Taft" checked><span class="slider"></span></label> Taft</div>
+                                </div>
+
+                                <button class="apply-filter-btn" onclick="applyFilters()">Apply Filters</button>
+                            </div>
+                        </div>
+                       
+                    </div>
+                </div>
+                <div id="reportsList" class="reports-list">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading reports...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeConfirmModal()"><i class="fas fa-times"></i></span>
+            <div class="modal-icon">
+                <i class="fas fa-paper-plane" style="color: var(--accent-blue); font-size: 48px;"></i>
+            </div>
+            <h2 class="modal-title">Submit Report?</h2>
+            <div class="report-summary" id="reportSummary">
+                <strong>Station:</strong> <span id="summaryStation"></span><br>
+                <strong>Congestion:</strong> <span id="summaryLevel"></span><br>
+                <strong>Photo:</strong> <span id="summaryPhoto">Not attached</span>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="confirmSubmit()" style="background: var(--accent-blue); color: white; padding: 12px 24px; border-radius: 30px; border: none; cursor: pointer;">
+                    <i class="fas fa-check"></i> Yes, Submit
+                </button>
+                <button class="modal-btn secondary" onclick="closeConfirmModal()" style="background: white; color: var(--text-dark); border: 1px solid var(--border); padding: 12px 24px; border-radius: 30px; cursor: pointer;">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let selectedLevel = null;
+    let selectedFiles = [];
+    let reportsVisible = false;
+    let allReportsData = [];
+    let activeFilters = {
+        dateRange: null,
+        congestionLevels: [],
+        stations: []
+    };
+
+    // Toggle filter dropdown
+    function toggleFilterDropdown() {
+        const dropdown = document.getElementById('filterDropdown');
+        dropdown.classList.toggle('show');
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const filterContainer = document.querySelector('.filter-container');
+        const dropdown = document.getElementById('filterDropdown');
+        if (filterContainer && !filterContainer.contains(event.target) && dropdown) {
+            dropdown.classList.remove('show');
+        }
+    });
+
+    // Apply filters
+    function applyFilters() {
+        console.log("========== APPLYING FILTERS ==========");
+        
+        // Get selected congestion levels
+        const selectedLevels = [];
+        document.querySelectorAll('.badge-filter.active-filter').forEach(badge => {
+            selectedLevels.push(badge.dataset.level);
+        });
+        console.log("Selected congestion levels:", selectedLevels);
+        
+        // Get selected stations
+        const selectedStations = [];
+        document.querySelectorAll('#stationsGrid input:checked').forEach(cb => {
+            selectedStations.push(cb.value);
+        });
+        console.log("Selected stations from checkboxes:", selectedStations);
+        
+        // Get date range
+        let dateRange = null;
+        const activeChip = document.querySelector('.chip.active');
+        if (activeChip) {
+            dateRange = activeChip.dataset.date;
+            console.log("Selected date range:", dateRange);
+        }
+        
+        activeFilters = {
+            congestionLevels: selectedLevels,
+            stations: selectedStations,
+            dateRange: dateRange
+        };
+        
+        console.log("Active filters object:", activeFilters);
+        
+        // Apply filters
+        filterAndDisplayReports();
+        
+        // Close dropdown
+        toggleFilterDropdown();
+    }
+
+    // Filter and display reports
+   // Replace the filterAndDisplayReports function with this fixed version:
+
+function filterAndDisplayReports() {
+    console.log("========== FILTERING REPORTS ==========");
+    console.log("Total reports before filter:", allReportsData.length);
+    
+    if (!allReportsData || allReportsData.length === 0) {
+        console.log("No reports data available");
+        const reportsList = document.getElementById('reportsList');
+        reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports available</h3></div>`;
+        return;
+    }
+    
+    // DEBUG: Show all actual station names from reports
+    const actualStationsInReports = [...new Set(allReportsData.map(r => r.station))];
+    console.log("ACTUAL STATIONS IN REPORTS:", actualStationsInReports);
+    console.log("STATIONS IN FILTER CHECKBOXES:", [...document.querySelectorAll('#stationsGrid input')].map(cb => cb.value));
+    
+    // DEBUG: Show sample of timestamps
+    console.log("SAMPLE REPORT TIMESTAMPS:", allReportsData.slice(0, 5).map(r => ({
+        station: r.station,
+        timestamp: r.timestamp,
+        parsedDate: new Date(r.timestamp)
+    })));
+    
+    let filteredReports = [...allReportsData];
+    
+    // Filter by station - FIXED: If no stations selected, show nothing
+    if (activeFilters.stations.length > 0) {
+        console.log("Filtering by stations:", activeFilters.stations);
+        filteredReports = filteredReports.filter(report => {
+            const matches = activeFilters.stations.includes(report.station);
+            if (!matches) {
+                console.log(`Excluding: "${report.station}" - Not in selected stations [${activeFilters.stations.join(', ')}]`);
+            }
+            return matches;
+        });
+        console.log(`After station filter: ${filteredReports.length} reports remaining`);
+    } else {
+        // If NO stations are selected, show 0 reports
+        console.log("⚠️ No stations selected - showing 0 reports");
+        filteredReports = [];
+    }
+    
+    // Filter by congestion level
+    if (activeFilters.congestionLevels.length > 0 && filteredReports.length > 0) {
+        console.log("Filtering by congestion levels:", activeFilters.congestionLevels);
+        filteredReports = filteredReports.filter(report => {
+            let level = '';
+            if (report.reported_congestion > 80) level = 'severe';
+            else if (report.reported_congestion > 60) level = 'congested';
+            else if (report.reported_congestion > 30) level = 'moderate';
+            else level = 'light';
+            const matches = activeFilters.congestionLevels.includes(level);
+            if (!matches) {
+                console.log(`Excluding: ${report.station} - Congestion ${report.reported_congestion}% (${level}) not in filter [${activeFilters.congestionLevels.join(', ')}]`);
+            }
+            return matches;
+        });
+        console.log(`After congestion filter: ${filteredReports.length} reports remaining`);
+    } else if (activeFilters.congestionLevels.length > 0) {
+        console.log("No reports to filter by congestion");
+    } else {
+        console.log("No congestion filter applied");
+    }
+    
+    // Filter by date range - FIXED VERSION WITH END DATE FOR TODAY/YESTERDAY
+    if (activeFilters.dateRange && filteredReports.length > 0) {
+        const now = new Date();
+        let startDate = null;
+        let endDate = null;
+        
+        switch(activeFilters.dateRange) {
+            case 'today':
+                startDate = new Date();
+                startDate.setHours(0, 0, 0, 0);
+                endDate = new Date();
+                endDate.setHours(23, 59, 59, 999);
+                console.log("Filtering for TODAY - range:", startDate, "to", endDate);
+                break;
+            case 'yesterday':
+                startDate = new Date();
+                startDate.setDate(startDate.getDate() - 1);
+                startDate.setHours(0, 0, 0, 0);
+                endDate = new Date();
+                endDate.setDate(endDate.getDate() - 1);
+                endDate.setHours(23, 59, 59, 999);
+                console.log("Filtering for YESTERDAY - range:", startDate, "to", endDate);
+                break;
+            case 'week':
+                startDate = new Date();
+                startDate.setDate(startDate.getDate() - 7);
+                startDate.setHours(0, 0, 0, 0);
+                console.log("Filtering for LAST 7 DAYS - from:", startDate);
+                break;
+            case 'month':
+                startDate = new Date();
+                startDate.setDate(startDate.getDate() - 30);
+                startDate.setHours(0, 0, 0, 0);
+                console.log("Filtering for LAST 30 DAYS - from:", startDate);
+                break;
+        }
+        
+        if (startDate) {
+            console.log("Filtering reports...");
+            filteredReports = filteredReports.filter(report => {
+                const reportDate = new Date(report.timestamp);
+                
+                if (activeFilters.dateRange === 'today' || activeFilters.dateRange === 'yesterday') {
+                    // For exact day filters, check if date is within that day
+                    const isInRange = reportDate >= startDate && reportDate <= endDate;
+                    if (!isInRange) {
+                        console.log(`Excluding: ${report.station} - Date ${reportDate} is not in range [${startDate} to ${endDate}]`);
+                    }
+                    return isInRange;
+                } else {
+                    // For week/month filters, check if after start date
+                    const isAfter = reportDate >= startDate;
+                    if (!isAfter) {
+                        console.log(`Excluding: ${report.station} - Date ${reportDate} is before ${startDate}`);
+                    }
+                    return isAfter;
+                }
+            });
+            console.log(`After date filter: ${filteredReports.length} reports remaining`);
+        }
+    } else if (activeFilters.dateRange) {
+        console.log("No reports to filter by date");
+    } else {
+        console.log("No date filter applied");
+    }
+    
+    console.log(`FINAL FILTERED COUNT: ${filteredReports.length}`);
+    displayReports(filteredReports);
+}
+
+    function selectLevel(level) {
+        document.querySelectorAll('.report-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        document.getElementById(`card-${level}`).classList.add('selected');
+        selectedLevel = level;
+    }
+
+    document.getElementById('imageInput').addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        
+        if (selectedFiles.length + files.length > 5) {
+            showToast(`Maximum 5 photos allowed. You already have ${selectedFiles.length} selected.`, 'error');
+            return;
+        }
+        
+        files.forEach(file => {
+            if (file.type.startsWith('image/')) {
+                selectedFiles.push(file);
+            }
+        });
+        
+        updateImagePreview();
+        updatePhotoUploadText();
+    });
+
+    function updateImagePreview() {
+        const previewContainer = document.getElementById('previewContainer');
+        const previewGrid = document.getElementById('imagePreviewGrid');
+        const photoCountSpan = document.getElementById('photoCount');
+        
+        if (selectedFiles.length === 0) {
+            previewGrid.style.display = 'none';
+            return;
+        }
+        
+        previewGrid.style.display = 'block';
+        photoCountSpan.textContent = selectedFiles.length;
+        
+        previewContainer.innerHTML = '';
+        selectedFiles.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewDiv = document.createElement('div');
+                previewDiv.style.position = 'relative';
+                previewDiv.style.width = '100%';
+                previewDiv.style.aspectRatio = '1';
+                
+                previewDiv.innerHTML = `
+                    <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid var(--border);">
+                    <button onclick="removePhoto(${index})" style="position: absolute; top: -8px; right: -8px; background: var(--red); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 12px;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                previewContainer.appendChild(previewDiv);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function removePhoto(index) {
+        selectedFiles.splice(index, 1);
+        updateImagePreview();
+        updatePhotoUploadText();
+        document.getElementById('imageInput').value = '';
+    }
+
+    function updatePhotoUploadText() {
+        const uploadSpan = document.querySelector('.photo-upload span');
+        if (selectedFiles.length > 0) {
+            uploadSpan.textContent = `📸 ${selectedFiles.length} photo(s) selected`;
+            uploadSpan.style.color = 'var(--accent-blue)';
+        } else {
+            uploadSpan.textContent = 'Click to select multiple photos (Max 5)';
+            uploadSpan.style.color = 'var(--text-light)';
+        }
+    }
+
+    function toggleReports() {
+        const reportFormView = document.getElementById('reportFormView');
+        const reportsView = document.getElementById('reportsView');
+        const viewReportsBtn = document.getElementById('viewReportsBtn');
+        const viewReportsText = document.getElementById('viewReportsText');
+        
+        if (reportsVisible) {
+            reportFormView.classList.add('active');
+            reportsView.classList.remove('active');
+            viewReportsBtn.classList.remove('active');
+            viewReportsText.textContent = 'View Reports';
+            reportsVisible = false;
+        } else {
+            reportFormView.classList.remove('active');
+            reportsView.classList.add('active');
+            viewReportsBtn.classList.add('active');
+            viewReportsText.textContent = 'Hide Reports';
+            reportsVisible = true;
+            fetchReports();
+        }
+    }
+
+    function refreshReports() {
+        fetchReports();
+    }
+
+    function openConfirmModal() {
+        const station = document.getElementById('stationSelect').value;
+        const stationName = station.replace(' Ave', ' Avenue').replace(' Blvd', ' Boulevard');
+        
+        const levelMap = {
+            'low': 'Low',
+            'moderate': 'Moderate',
+            'congested': 'Congested',
+            'severe': 'Severe'
+        };
+        
+        document.getElementById('summaryStation').textContent = stationName;
+        document.getElementById('summaryLevel').textContent = levelMap[selectedLevel];
+        document.getElementById('summaryPhoto').textContent = selectedFiles.length > 0 ? `${selectedFiles.length} photo(s) attached` : 'Not attached';
+        
+        document.getElementById('confirmModal').classList.add('active');
+    }
+
+    function closeConfirmModal() {
+        document.getElementById('confirmModal').classList.remove('active');
+    }
+
+    function fetchReports() {
+        const reportsList = document.getElementById('reportsList');
+        reportsList.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading reports...</p></div>`;
+        
+        fetch('/api/reports')
+            .then(res => res.json())
+            .then(data => {
+                console.log("========== FETCHED REPORTS ==========");
+                console.log("Total reports fetched:", data.length);
+                console.log("Sample of actual station names in reports:", [...new Set(data.map(r => r.station))]);
+                console.log("First report sample:", data[0]);
+                allReportsData = data;
+                
+                // DEBUG: Show the actual station values vs filter checkbox values
+                const reportStations = [...new Set(allReportsData.map(r => r.station))];
+                const filterStations = [...document.querySelectorAll('#stationsGrid input')].map(cb => cb.value);
+                console.log("Report stations:", reportStations);
+                console.log("Filter stations:", filterStations);
+                console.log("Stations that DON'T match:", reportStations.filter(s => !filterStations.includes(s)));
+                console.log("Stations in filter NOT in reports:", filterStations.filter(s => !reportStations.includes(s)));
+                
+                // Reset filters to show all
+                activeFilters = {
+                    dateRange: null,
+                    congestionLevels: [],
+                    stations: []
+                };
+                // Reset UI filter selections
+                document.querySelectorAll('.badge-filter').forEach(b => b.classList.remove('active-filter'));
+                document.querySelectorAll('#stationsGrid input').forEach(cb => cb.checked = true);
+                document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+                if (document.querySelector('.chip')) {
+                    document.querySelector('.chip').classList.add('active');
+                }
+                displayReports(allReportsData);
+            })
+            .catch(error => {
+                console.error("Error fetching reports:", error);
+                reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Failed to load reports</h3></div>`;
+            });
+    }
+
+    function displayReports(reports) {
+        const reportsList = document.getElementById('reportsList');
+        
+        if (!reports || reports.length === 0) {
+            reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports match your filters</h3><p>Try adjusting your filter criteria</p></div>`;
+            return;
+        }
+        
+        let html = '';
+        reports.forEach((report, idx) => {
+            let levelText = '';
+            let levelColor = '';
+            let borderColor = '';
+            
+            if (report.reported_congestion > 80) {
+                levelText = 'Severe Congestion';
+                levelColor = '#EF4444';
+                borderColor = '#EF4444';
+            } else if (report.reported_congestion > 60) {
+                levelText = 'Congested';
+                levelColor = '#F97316';
+                borderColor = '#F97316';
+            } else if (report.reported_congestion > 30) {
+                levelText = 'Moderate';
+                levelColor = '#EAB308';
+                borderColor = '#EAB308';
+            } else {
+                levelText = 'Light';
+                levelColor = '#22C55E';
+                borderColor = '#22C55E';
+            }
+            
+            const reportTime = new Date(report.timestamp);
+            const now = new Date();
+            const diffMs = now - reportTime;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
+            
+            let timeAgo = '';
+            if (diffMins < 1) {
+                timeAgo = 'just now';
+            } else if (diffMins < 60) {
+                timeAgo = `${diffMins} min ago`;
+            } else if (diffHours < 24) {
+                timeAgo = `${diffHours} hour ago`;
+            } else {
+                timeAgo = `${diffDays} day ago`;
+            }
+            
+            let displayName = '';
+            let avatarLetter = '?';
+            
+            if (report.anonymous) {
+                displayName = 'Anonymous';
+                avatarLetter = 'A';
+            } else if (report.username) {
+                const username = report.username;
+                if (username.includes('@')) {
+                    displayName = username.split('@')[0];
+                } else {
+                    displayName = username;
+                }
+                avatarLetter = displayName.charAt(0).toUpperCase();
+            } else {
+                displayName = 'Commuter';
+                avatarLetter = 'C';
+            }
+            
+            const hasRemarks = report.remarks && report.remarks.trim() !== '';
+            const hasPhotos = report.photo_path && report.photo_path !== '';
+            const contentId = `content-${report.id}-${idx}`;
+            
+            html += `
+                <div class="report-item" style="border: 2px solid ${borderColor}; border-radius: 16px; padding: 18px; margin-bottom: 12px; background: white;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 36px; height: 36px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-weight: bold;">
+                                ${avatarLetter}
+                            </div>
+                            <div style="font-weight: 600; font-size: 14px;">${displayName}</div>
+                        </div>
+                        <div style="font-size: 11px; color: #64748B;"><i class="far fa-clock"></i> ${timeAgo}</div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="font-weight: 700; font-size: 18px;">${report.station}</span>
+                            <span style="font-size: 13px; font-weight: 600; color: ${levelColor};"> - ${levelText}</span>
+                        </div>
+                        
+                        <button onclick="toggleReportContent('${contentId}', this)" style="background: none; border: none; color: #3B82F6; cursor: pointer; font-size: 13px;">
+                            <i class="fas fa-chevron-down"></i> View more
+                        </button>
+                    </div>
+
+                  
+                    
+                    <div id="${contentId}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
+                        ${hasRemarks ? `<div style="background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 12px;"><i class="fas fa-quote-left"></i> ${escapeHtml(report.remarks)}</div>` : ''}
+                        ${hasPhotos ? `<div><i class="fas fa-camera"></i> ${report.photo_path.split(',').length} photo(s) attached</div>` : ''}
+                        ${!hasRemarks && !hasPhotos ? `<div style="color: #94A3B8; text-align: center; padding: 12px;">No additional details</div>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        reportsList.innerHTML = html;
+    }
+
+    function toggleReportContent(contentId, button) {
+        const content = document.getElementById(contentId);
+        const icon = button.querySelector('i');
+        
+        if (content.style.display === 'none' || content.style.display === '') {
+            content.style.display = 'block';
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+            button.innerHTML = '<i class="fas fa-chevron-up"></i> View less';
+        } else {
+            content.style.display = 'none';
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+            button.innerHTML = '<i class="fas fa-chevron-down"></i> View more';
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function submitReport() {
+        const station = document.getElementById('stationSelect').value;
+        if (!station) { showToast('Please select a station', 'error'); return; }
+        if (!selectedLevel) { showToast('Please select congestion level', 'error'); return; }
+        openConfirmModal();
+    }
+
+    function confirmSubmit() {
+        closeConfirmModal();
+        
+        const station = document.getElementById('stationSelect').value;
+        const remarks = document.getElementById('remarks').value;
+        
+        let congestionValue = 0;
+        switch(selectedLevel) {
+            case 'low': congestionValue = 20; break;
+            case 'moderate': congestionValue = 45; break;
+            case 'congested': congestionValue = 70; break;
+            case 'severe': congestionValue = 90; break;
+        }
+        
+        showToast('Submitting report...', 'info');
+        
+        const formData = new FormData();
+        formData.append('station', station);
+        formData.append('congestion', congestionValue);
+        formData.append('remarks', remarks || '');
+        formData.append('anonymous', 'false');
+        
+        selectedFiles.forEach((file) => {
+            formData.append('images', file);
+        });
+        
+        fetch('/api/report-congestion', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast(selectedFiles.length > 0 ? `Report with ${selectedFiles.length} photo(s) submitted!` : 'Report submitted successfully!', 'success');
+                resetForm();
+                if (reportsVisible) fetchReports();
+            } else {
+                showToast('Error submitting report', 'error');
+            }
+        })
+        .catch(error => {
+            showToast(`Failed: ${error.message}`, 'error');
+        });
+    }
+
+    function resetForm() {
+        document.getElementById('stationSelect').value = '';
+        document.querySelectorAll('.report-card').forEach(card => card.classList.remove('selected'));
+        selectedLevel = null;
+        selectedFiles = [];
+        document.getElementById('imageInput').value = '';
+        document.getElementById('imagePreviewGrid').style.display = 'none';
+        document.getElementById('previewContainer').innerHTML = '';
+        updatePhotoUploadText();
+        document.getElementById('remarks').value = '';
+    }
+
+    function checkAlertCount() {
+        fetch('/api/alerts/count')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('alertBadge').textContent = data.count > 0 ? (data.display || data.count) : '0';
+            })
+            .catch(() => {});
+    }
+
+    function showToast(message, type = 'info') {
+        const existingToast = document.querySelector('.success-message');
+        if (existingToast) existingToast.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = 'success-message';
+        if (type === 'error') toast.style.background = 'var(--red)';
+        else if (type === 'success') toast.style.background = 'var(--green)';
+        else toast.style.background = 'var(--accent-blue)';
+        
+        toast.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'check-circle'}"></i> ${message}`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        checkAlertCount();
+        
+        // Initialize filter chips
+        const chips = document.querySelectorAll('.chip');
+        if (chips.length > 0) {
+            chips[0].classList.add('active');
+        }
+        
+        chips.forEach(chip => {
+            chip.addEventListener('click', function() {
+                chips.forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                console.log("Date chip clicked:", this.dataset.date);
+            });
+        });
+        
+        // Set up congestion level badge click handlers
+        document.querySelectorAll('.badge-filter').forEach(badge => {
+            badge.addEventListener('click', function() {
+                this.classList.toggle('active-filter');
+                console.log("Level badge clicked:", this.dataset.level, "Active:", this.classList.contains('active-filter'));
+            });
+        });
+        
+        // Set up select all stations
+        const selectAllBtn = document.querySelector('.select-all');
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', function() {
+                const checkboxes = document.querySelectorAll('#stationsGrid input');
+                const allChecked = Array.from(checkboxes).every(c => c.checked);
+                checkboxes.forEach(c => c.checked = !allChecked);
+                console.log("Select all clicked, all checked:", !allChecked);
+            });
+        }
+        
+        // Log station checkbox changes
+        document.querySelectorAll('#stationsGrid input').forEach(cb => {
+            cb.addEventListener('change', function() {
+                console.log("Station checkbox:", this.value, "Checked:", this.checked);
+            });
+        });
+        
+        // Auto-select station from URL if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const stationParam = urlParams.get('station');
+        if (stationParam) {
+            const stationName = decodeURIComponent(stationParam);
+            const stationSelect = document.getElementById('stationSelect');
+            for (let i = 0; i < stationSelect.options.length; i++) {
+                if (stationSelect.options[i].value === stationName) {
+                    stationSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        // Initial fetch of reports
+        fetchReports();
+    });
+</script>
+</body>
+</html>
