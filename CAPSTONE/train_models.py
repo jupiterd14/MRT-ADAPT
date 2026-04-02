@@ -1,3 +1,4 @@
+
 # train_models_with_real_data.py
 import pandas as pd
 import numpy as np
@@ -21,59 +22,74 @@ STATION_ID_MAP = {
     5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
     9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
 }
-
 def load_real_data():
-    """Load actual historical data from CSV files"""
+    """Load ONLY 2023, 2024, and 2025 data"""
     data_folder = 'data_new_2025'
+    # We explicitly define the years we want here
+    target_years = ['2023', '2024', '2025'] 
     all_data = []
     
     if not os.path.exists(data_folder):
         print(f"❌ Folder '{data_folder}' not found!")
         return None
     
-    csv_files = [f for f in os.listdir(data_folder) if f.endswith('.csv')]
-    print(f"📁 Found {len(csv_files)} CSV files")
+    print(f"🎯 Target Years: {target_years}")
     
-    for file in csv_files:
-        file_path = os.path.join(data_folder, file)
-        print(f"📖 Reading {file}...")
-        df = pd.read_csv(file_path)
-        all_data.append(df)
+    for year in target_years:
+        file_path = os.path.join(data_folder, f'{year}.csv')
+        if os.path.exists(file_path):
+            print(f"📖 Reading {year}.csv...")
+            df = pd.read_csv(file_path)
+            # Basic cleaning: remove rows with missing Date/Time immediately to save RAM
+            df = df.dropna(subset=['Date', 'Time'])
+            all_data.append(df)
+        else:
+            print(f"⚠️ Warning: {year}.csv not found in {data_folder}")
+    
+    if not all_data:
+        print("❌ No target CSV files found!")
+        return None
     
     df_combined = pd.concat(all_data, ignore_index=True)
-    print(f"✅ Loaded {len(df_combined)} total records")
+    print(f"✅ Successfully loaded {len(df_combined)} records for training.")
     return df_combined
 
 def create_station_time_series(df, station_name):
-    """Create time series for a specific station from real data"""
-    # Get all trips where passenger entered this station
+    """Create a REAL chronological time series (2023-2025)"""
+    # 1. Filter for the specific station
     station_data = df[df['StationEntry'].map(STATION_ID_MAP) == station_name].copy()
     
     if len(station_data) == 0:
-        print(f"⚠️ No data for {station_name}")
         return None
+
+    # 2. Create a proper Datetime column
+    station_data['datetime'] = pd.to_datetime(
+        station_data['Date'] + ' ' + station_data['Time'], 
+        errors='coerce'
+    )
     
-    # Convert Time to hour
-    station_data['hour'] = pd.to_datetime(station_data['Time'], format='%H:%M:%S', errors='coerce').dt.hour
+    # 3. Group by Hour and Date to get the actual sequence of history
+    # This keeps the 'natural' order of 2023 -> 2024 -> 2025
+    # 3. Group by Hour and Date using specific names to avoid the crash
+    chrono_data = station_data.groupby([
+        station_data['datetime'].dt.date.rename('date_idx'), 
+        station_data['datetime'].dt.hour.rename('hour_idx')
+    ])['TotalPassenger'].sum().reset_index()
     
-    # Group by hour and calculate average passengers per hour
-    hourly_avg = station_data.groupby('hour')['TotalPassenger'].mean().reset_index()
+    # Rename them to something clear for the next step
+    chrono_data.columns = ['date', 'hour', 'passengers']
     
-    # Create time series: 24 hours of average passengers
-    time_series = np.zeros(24)
-    for _, row in hourly_avg.iterrows():
-        time_series[int(row['hour'])] = row['TotalPassenger']
+    # 4. Sort chronologically (CRITICAL for LSTM)
+    chrono_data = chrono_data.sort_values(['date', 'hour'])
     
-    # Repeat to create longer sequence for training (2 years of daily patterns)
-    # This replicates the 24-hour pattern to create a longer time series
-    days = 365 * 2  # 2 years
-    full_series = np.tile(time_series, days)
+    # 5. Convert to a continuous array
+    full_series = chrono_data['passengers'].values
     
-    # Add some noise to make it more realistic
-    noise = np.random.normal(0, full_series.mean() * 0.1, len(full_series))
-    full_series = full_series + noise
-    full_series = np.maximum(full_series, full_series.mean() * 0.3)  # Minimum
-    
+    # Validation: If we have gaps (e.g., midnight), we should have at least some data
+    if len(full_series) < 100:
+        print(f"⚠️ {station_name} has very few chronological data points.")
+        return None
+
     return full_series
 
 def create_sequences(data, seq_length=24):
@@ -136,7 +152,7 @@ def train_station_model(station_name, time_series_data, seq_length=24):
     )
     
     # Save model and scaler
-    model.save(f'models/{station_name}_lstm.h5')
+    model.save(f'models/{station_name}_lstm.keras')
     with open(f'models/{station_name}_scaler.pkl', 'wb') as f:
         pickle.dump(scaler, f)
     

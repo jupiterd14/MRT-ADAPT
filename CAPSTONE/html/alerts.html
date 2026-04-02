@@ -6,6 +6,8 @@
     <title>MRT-ADAPT | Alerts</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
         :root {
             --sidebar-bg: #00224D;
             --main-bg: #F8FAFC;
@@ -15,14 +17,28 @@
             --white: #FFFFFF;
             --border: #E2E8F0;
             --red: #EF4444;
+            --dark-red: #DC2626;
             --orange: #F97316;
+            --yellow: #F59E0B;
             --green: #10B981;
             --purple: #8B5CF6;
             --blue-bg: #EFF6FF;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { display: flex; height: 100vh; width: 100vw; background-color: var(--main-bg); overflow: hidden; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Bricolage Grotesque", sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            background-color: var(--main-bg);
+            overflow: hidden;
+        }
 
         .sidebar { width: 300px; background-color: var(--sidebar-bg); color: white; display: flex; flex-direction: column; flex-shrink: 0; padding: 20px 0; }
         .logo-section { padding: 10px 25px 20px; display: flex; align-items: center; gap: 12px; }
@@ -39,34 +55,63 @@
         .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         .header-top h1 { font-size: 24px; color: var(--text-dark); display: flex; align-items: center; gap: 12px; }
         .new-badge { background: var(--red); color: white; font-size: 10px; padding: 2px 8px; border-radius: 5px; text-transform: uppercase; font-weight: bold; }
+        .filter-buttons { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: white; cursor: pointer; font-size: 13px; transition: 0.2s; }
+        .filter-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
         .mark-read-btn { background: #4F46E5; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.3s; }
         .mark-read-btn:hover { background: #4338CA; transform: translateY(-1px); }
         .mark-read-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .clear-all-btn { background: #64748B; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.3s; }
+        .clear-all-btn:hover { background: #475569; }
 
         .loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; background: white; border-radius: 16px; border: 1px solid var(--border); min-height: 400px; }
         .loading-spinner { width: 40px; height: 40px; border: 3px solid #E2E8F0; border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.5s linear infinite; margin-bottom: 15px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-screen p { color: var(--text-light); font-size: 13px; }
 
-        .alert-card { background: white; border: 1px solid var(--border); border-radius: 16px; padding: 18px 22px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start; transition: 0.2s; position: relative; animation: fadeIn 0.15s ease; }
+        .alert-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 22px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            transition: all 0.2s;
+            position: relative;
+            animation: fadeIn 0.15s ease;
+        }
+        
+        /* Border colors based on severity */
+        .alert-card.severe { border-color: var(--dark-red); border-width: 1.5px; background: #FEF2F2; }
+        .alert-card.critical { border-color: var(--red); border-width: 1.5px; background: #FEF2F2; }
+        .alert-card.warning { border-color: var(--orange); border-width: 1.5px; background: #FFF7ED; }
+        .alert-card.info { border-color: var(--accent-blue); border-width: 1.5px; background: #EFF6FF; }
+        .alert-card.success { border-color: var(--green); border-width: 1.5px; background: #F0FDF4; }
+        .alert-card.default { border-color: var(--border); }
+        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
-        .alert-card.unread { border-left: 3px solid var(--accent-blue); background: #FBFCFE; }
-        .unread-dot { position: absolute; top: 18px; right: 18px; width: 8px; height: 8px; background: var(--accent-blue); border-radius: 50%; }
-
+        .alert-card.unread { border-left-width: 4px; border-left-style: solid; }
+        
         .alert-content { display: flex; gap: 14px; flex: 1; }
-        .alert-icon { font-size: 16px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; flex-shrink: 0; }
-        .alert-icon.red { color: var(--red); background: #FEE2E2; }
-        .alert-icon.blue { color: var(--accent-blue); background: #EFF6FF; }
-        .alert-icon.orange { color: var(--orange); background: #FFEDD5; }
-        .alert-icon.purple { color: #8B5CF6; background: #EDE9FE; }
+        .alert-icon { font-size: 20px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 10px; flex-shrink: 0; }
+        .alert-icon.severe { background: #FEE2E2; color: var(--dark-red); }
+        .alert-icon.critical { background: #FEE2E2; color: var(--red); }
+        .alert-icon.warning { background: #FFEDD5; color: var(--orange); }
+        .alert-icon.info { background: #EFF6FF; color: var(--accent-blue); }
+        .alert-icon.success { background: #DCFCE7; color: var(--green); }
 
-        .alert-text h3 { font-size: 14px; color: var(--text-dark); margin-bottom: 3px; font-weight: 600; }
-        .alert-text p { font-size: 12px; color: var(--text-light); line-height: 1.4; margin-bottom: 5px; }
-        .alert-time { font-size: 10px; color: var(--text-light); display: flex; align-items: center; gap: 5px; }
+        .alert-text { flex: 1; }
+        .alert-text h3 { font-size: 15px; color: var(--text-dark); margin-bottom: 6px; font-weight: 600; }
+        .alert-text p { font-size: 13px; color: var(--text-light); line-height: 1.5; margin-bottom: 8px; }
+        .alert-meta { display: flex; gap: 12px; font-size: 11px; color: var(--text-light); }
+        .alert-meta span { display: flex; align-items: center; gap: 4px; }
 
-        .alert-actions { margin-left: 12px; }
-        .alert-action-btn { background: none; border: none; color: var(--text-light); cursor: pointer; padding: 5px; border-radius: 5px; transition: 0.2s; font-size: 12px; }
+        .alert-actions { display: flex; gap: 8px; margin-left: 12px; }
+        .alert-action-btn { background: none; border: none; color: var(--text-light); cursor: pointer; padding: 6px; border-radius: 6px; transition: 0.2s; font-size: 14px; }
         .alert-action-btn:hover { background: #F1F5F9; color: var(--accent-blue); }
+        .alert-action-btn.delete-btn:hover { color: var(--red); background: #FEF2F2; }
         .alert-action-btn.marked { color: var(--green); }
 
         .header-icons { display: flex; gap: 10px; align-items: center; }
@@ -108,8 +153,19 @@
             <h1>Alerts <span class="new-badge" id="newAlertBadge">0 New</span></h1>
             <div class="header-icons">
                 <span class="icon-btn" onclick="refreshAlerts()"><i class="fas fa-sync-alt"></i></span>
+                <button class="clear-all-btn" onclick="clearAllAlerts()"><i class="fas fa-trash-alt"></i> Clear All</button>
                 <button class="mark-read-btn" id="markAllBtn" onclick="markAllAsRead()"><i class="far fa-envelope-open"></i> Mark all as read</button>
             </div>
+        </div>
+
+        <!-- Filter buttons -->
+        <div class="filter-buttons">
+            <button class="filter-btn active" onclick="filterAlerts('all')">All Alerts</button>
+            <button class="filter-btn" onclick="filterAlerts('unread')">Unread</button>
+            <button class="filter-btn" onclick="filterAlerts('rush')">Rush Hour</button>
+            <button class="filter-btn" onclick="filterAlerts('congestion')">Congestion</button>
+            <button class="filter-btn" onclick="filterAlerts('advisory')">Advisory</button>
+            <button class="filter-btn" onclick="filterAlerts('service')">Service Notice</button>
         </div>
 
         <div id="loadingScreen" class="loading-screen">
@@ -120,194 +176,443 @@
     </div>
 
     <script>
-        let currentAlerts = [];
-        let readAlerts = new Set();
-        let isLoading = false;
 
-        function loadReadStatus() { const saved = localStorage.getItem('readAlerts'); if (saved) readAlerts = new Set(JSON.parse(saved)); }
-        function saveReadStatus() { localStorage.setItem('readAlerts', JSON.stringify([...readAlerts])); }
+        /*
+        para i clear lang
+        localStorage.removeItem('allAlerts');
+localStorage.removeItem('readAlerts');
+localStorage.removeItem('deletedAlerts');
+    // Store all alerts permanently
+    */
+    let allAlerts = [];
+    let readAlerts = new Set();
+    let deletedAlerts = new Set();
+    let currentFilter = 'all';
+    let isLoading = false;
 
-        function showLoading() {
-            document.getElementById('loadingScreen').classList.remove('hidden');
-            document.getElementById('alertsContainer').classList.remove('loaded');
+    // Load saved alerts from localStorage
+    function loadSavedAlerts() {
+        const saved = localStorage.getItem('allAlerts');
+        if (saved) {
+            allAlerts = JSON.parse(saved);
         }
-        function hideLoading() {
-            document.getElementById('loadingScreen').classList.add('hidden');
-            document.getElementById('alertsContainer').classList.add('loaded');
-        }
+        const readSaved = localStorage.getItem('readAlerts');
+        if (readSaved) readAlerts = new Set(JSON.parse(readSaved));
+        const deletedSaved = localStorage.getItem('deletedAlerts');
+        if (deletedSaved) deletedAlerts = new Set(JSON.parse(deletedSaved));
+    }
 
-        // Generate alerts instantly from current time
-        function getInstantAlerts() {
-            const now = new Date();
-            const hour = now.getHours();
-            const minute = now.getMinutes();
-            const alerts = [];
-            
-            // Rush hour alert
-            if (hour >= 7 && hour <= 9) {
-                alerts.push({
-                    id: 'rush-morning',
-                    type: 'rush',
-                    icon: 'clock',
-                    icon_color: 'orange',
-                    title: '⚠️ MORNING RUSH HOUR',
-                    message: `Rush hour in progress. Expect heavy congestion at North Ave, Cubao, and Ayala stations.`,
-                    time: 'Just now',
-                    unread: true
-                });
-            } else if (hour >= 17 && hour <= 19) {
-                alerts.push({
-                    id: 'rush-evening',
-                    type: 'rush',
-                    icon: 'clock',
-                    icon_color: 'orange',
-                    title: '⚠️ EVENING RUSH HOUR',
-                    message: `Rush hour in progress. Heavy congestion at Ayala, Magallanes, and Taft stations.`,
-                    time: 'Just now',
-                    unread: true
-                });
-            }
-            
-            // Time-based advisory
-            let timeMsg = '';
-            if (hour < 7) timeMsg = 'Early morning service. Trains run every 8-10 minutes.';
-            else if (hour >= 10 && hour <= 16) timeMsg = 'Midday operations. Comfortable travel conditions.';
-            else if (hour >= 20 && hour <= 22) timeMsg = 'Last trains departing soon. Service ends at 10:30 PM.';
-            else timeMsg = 'Regular operations. Next train arriving in 3-5 minutes.';
-            
-            alerts.push({
-                id: 'time-status',
-                type: 'advisory',
-                icon: 'info-circle',
-                icon_color: 'blue',
-                title: '📅 CURRENT STATUS',
-                message: timeMsg,
-                time: 'Just now',
-                unread: true
-            });
-            
-            return alerts;
-        }
+    // Save alerts to localStorage
+    function saveAlerts() {
+        localStorage.setItem('allAlerts', JSON.stringify(allAlerts));
+        localStorage.setItem('readAlerts', JSON.stringify([...readAlerts]));
+        localStorage.setItem('deletedAlerts', JSON.stringify([...deletedAlerts]));
+    }
 
-        async function loadAlerts() {
-            if (isLoading) return;
-            isLoading = true;
-            showLoading();
+    function showLoading() {
+        document.getElementById('loadingScreen').classList.remove('hidden');
+        document.getElementById('alertsContainer').classList.remove('loaded');
+    }
+    function hideLoading() {
+        document.getElementById('loadingScreen').classList.add('hidden');
+        document.getElementById('alertsContainer').classList.add('loaded');
+    }
+
+    // Generate a unique ID for alerts
+    function generateAlertId() {
+        return Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // Get severity class based on alert type and congestion level
+    function getSeverityClass(alertType, congestionLevel = null) {
+        if (alertType === 'rush') return 'warning';
+        if (alertType === 'congestion') {
+            if (congestionLevel > 80) return 'severe';
+            if (congestionLevel > 60) return 'critical';
+            if (congestionLevel > 30) return 'warning';
+            return 'info';
+        }
+        if (alertType === 'advisory') return 'info';
+        if (alertType === 'service') return 'success';
+        return 'info'; // Default to info instead of default to avoid white border
+    }
+
+    // Add a new alert
+    function addAlert(title, message, alertType, icon = 'bell', congestionLevel = null) {
+        // Clean title - remove emojis properly
+        const cleanTitle = title.replace(/[🔴🟠🟡🟢⚠️🚇📅🟣🟤⚪🔵🟥🟧🟨🟩]/g, '').trim();
+        
+        const severityClass = getSeverityClass(alertType, congestionLevel);
+        
+        const newAlert = {
+            id: generateAlertId(),
+            title: cleanTitle,
+            message: message,
+            alertType: alertType,
+            severity: severityClass,
+            icon: icon,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            date: new Date().toLocaleDateString(),
+            timestamp: Date.now(),
+            unread: true,
+            congestionLevel: congestionLevel
+        };
+        
+        // Add to beginning of array
+        allAlerts.unshift(newAlert);
+        
+        // Keep only last 200 alerts
+        if (allAlerts.length > 200) {
+            allAlerts = allAlerts.slice(0, 200);
+        }
+        
+        saveAlerts();
+        displayAlerts();
+        updateAlertCounts();
+        showToast('New alert: ' + cleanTitle);
+    }
+
+    // Generate congestion alerts from API
+    async function checkCongestionAlerts() {
+        try {
+            const response = await fetch('/api/batch-predict');
+            const stations = await response.json();
             
-            // Show instant alerts immediately (no waiting!)
-            currentAlerts = getInstantAlerts();
-            displayAlerts(currentAlerts);
-            updateAlertCounts(currentAlerts);
-            hideLoading();
-            
-            // Then fetch real API data in background (don't block UI)
-            try {
-                const response = await fetch('/api/alerts/list');
-                const apiAlerts = await response.json();
-                if (apiAlerts && apiAlerts.length > 0) {
-                    // Merge new alerts without duplicates
-                    const existingIds = new Set(currentAlerts.map(a => a.id));
-                    const newAlerts = apiAlerts.filter(a => !existingIds.has(a.id));
-                    if (newAlerts.length > 0) {
-                        currentAlerts = [...newAlerts, ...currentAlerts].slice(0, 15);
-                        displayAlerts(currentAlerts);
-                        updateAlertCounts(currentAlerts);
+            for (const station of stations) {
+                const congestion = station.congestion;
+                const lastHour = Date.now() - 60 * 60 * 1000;
+                
+                if (congestion > 80) {
+                    const recentAlert = allAlerts.find(a => 
+                        a.alertType === 'congestion' && 
+                        a.title.includes(station.station) &&
+                        a.congestionLevel > 80 &&
+                        a.timestamp > lastHour
+                    );
+                    if (!recentAlert) {
+                        addAlert(
+                            `Severe Congestion at ${station.station}`,
+                            `${station.station} Station is severely congested at ${congestion}% capacity. Expect delays of 15-20 minutes. Consider using alternative stations if possible.`,
+                            'congestion',
+                            'exclamation-triangle',
+                            congestion
+                        );
+                    }
+                } else if (congestion > 60) {
+                    const recentAlert = allAlerts.find(a => 
+                        a.alertType === 'congestion' && 
+                        a.title.includes(station.station) &&
+                        a.congestionLevel > 60 &&
+                        a.congestionLevel <= 80 &&
+                        a.timestamp > lastHour
+                    );
+                    if (!recentAlert) {
+                        addAlert(
+                            `High Congestion at ${station.station}`,
+                            `${station.station} Station is heavily congested at ${congestion}% capacity. Expect delays of 10-15 minutes.`,
+                            'congestion',
+                            'exclamation-triangle',
+                            congestion
+                        );
+                    }
+                } else if (congestion > 30) {
+                    const recentAlert = allAlerts.find(a => 
+                        a.alertType === 'congestion' && 
+                        a.title.includes(station.station) &&
+                        a.congestionLevel > 30 &&
+                        a.congestionLevel <= 60 &&
+                        a.timestamp > lastHour
+                    );
+                    if (!recentAlert) {
+                        addAlert(
+                            `Moderate Congestion at ${station.station}`,
+                            `${station.station} Station has moderate congestion at ${congestion}% capacity. Normal wait times expected.`,
+                            'congestion',
+                            'info-circle',
+                            congestion
+                        );
                     }
                 }
-            } catch (error) { /* Silent fail - keep local alerts */ }
-            
-            isLoading = false;
-        }
-
-        function displayAlerts(alerts) {
-            const container = document.getElementById('alertsContainer');
-            if (!alerts || alerts.length === 0) {
-                container.innerHTML = `<div class="empty-state"><i class="fas fa-bell-slash"></i><h3>No new alerts</h3><p>All systems are running smoothly</p></div>`;
-                return;
             }
+        } catch (error) {
+            console.error('Error checking congestion:', error);
+        }
+    }
+
+    // Generate rush hour alerts
+    function generateRushHourAlerts() {
+        const now = new Date();
+        const hour = now.getHours();
+        const minute = now.getMinutes();
+        
+        // Morning rush
+        if (hour === 7 && minute < 10) {
+            const lastHour = Date.now() - 60 * 60 * 1000;
+            const recentAlert = allAlerts.find(a => 
+                a.alertType === 'rush' && 
+                a.title.includes('Morning Rush') &&
+                a.timestamp > lastHour
+            );
+            if (!recentAlert) {
+                addAlert(
+                    'Morning Rush Hour Advisory',
+                    'Rush hour period: 7:00 AM - 9:00 AM. Expect heavy passenger volume at North Avenue, Cubao, and Ayala Avenue stations. Allow extra travel time.',
+                    'rush',
+                    'clock'
+                );
+            }
+        }
+        
+        // Evening rush
+        if (hour === 17 && minute < 10) {
+            const lastHour = Date.now() - 60 * 60 * 1000;
+            const recentAlert = allAlerts.find(a => 
+                a.alertType === 'rush' && 
+                a.title.includes('Evening Rush') &&
+                a.timestamp > lastHour
+            );
+            if (!recentAlert) {
+                addAlert(
+                    'Evening Rush Hour Advisory',
+                    'Rush hour period: 5:00 PM - 8:00 PM. Expect heavy passenger volume at Ayala Avenue, Magallanes, and Taft Avenue stations. Consider alternative travel times.',
+                    'rush',
+                    'clock'
+                );
+            }
+        }
+    }
+
+    // Generate advisory alerts
+    function generateAdvisoryAlerts() {
+        const now = new Date();
+        const hour = now.getHours();
+        const minute = now.getMinutes();
+        
+        // Opening time
+        if (hour === 4 && minute < 15) {
+            const lastHour = Date.now() - 12 * 60 * 60 * 1000;
+            const recentAlert = allAlerts.find(a => 
+                a.alertType === 'advisory' && 
+                a.title.includes('Service Resumes') &&
+                a.timestamp > lastHour
+            );
+            if (!recentAlert) {
+                addAlert(
+                    'Service Resumes',
+                    'MRT-3 operations have started for the day. First trains departing from North Avenue and Taft Avenue stations.',
+                    'advisory',
+                    'info-circle'
+                );
+            }
+        }
+        
+        // Closing time
+        if (hour === 22 && minute < 10) {
+            const lastHour = Date.now() - 12 * 60 * 60 * 1000;
+            const recentAlert = allAlerts.find(a => 
+                a.alertType === 'advisory' && 
+                a.title.includes('Last Trains') &&
+                a.timestamp > lastHour
+            );
+            if (!recentAlert) {
+                addAlert(
+                    'Last Trains Advisory',
+                    'Last trains will depart at 10:30 PM. Please plan your trip accordingly to avoid being stranded.',
+                    'advisory',
+                    'train'
+                );
+            }
+        }
+    }
+
+    // Initial load of alerts
+    async function loadAlerts() {
+        if (isLoading) return;
+        isLoading = true;
+        showLoading();
+        
+        loadSavedAlerts();
+        generateRushHourAlerts();
+        generateAdvisoryAlerts();
+        await checkCongestionAlerts();
+        
+        displayAlerts();
+        updateAlertCounts();
+        hideLoading();
+        isLoading = false;
+    }
+
+    function displayAlerts() {
+        const container = document.getElementById('alertsContainer');
+        
+        // Filter out deleted alerts
+        let filteredAlerts = allAlerts.filter(alert => !deletedAlerts.has(alert.id));
+        
+        // Apply filter
+        if (currentFilter === 'unread') {
+            filteredAlerts = filteredAlerts.filter(alert => alert.unread && !readAlerts.has(alert.id));
+        } else if (currentFilter === 'rush') {
+            filteredAlerts = filteredAlerts.filter(alert => alert.alertType === 'rush');
+        } else if (currentFilter === 'congestion') {
+            filteredAlerts = filteredAlerts.filter(alert => alert.alertType === 'congestion');
+        } else if (currentFilter === 'advisory') {
+            filteredAlerts = filteredAlerts.filter(alert => alert.alertType === 'advisory');
+        } else if (currentFilter === 'service') {
+            filteredAlerts = filteredAlerts.filter(alert => alert.alertType === 'service');
+        }
+        
+        if (filteredAlerts.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-bell-slash"></i><h3>No alerts</h3><p>All systems are running smoothly</p></div>`;
+            return;
+        }
+        
+        const unreadCount = filteredAlerts.filter(a => a.unread && !readAlerts.has(a.id)).length;
+        document.getElementById('markAllBtn').disabled = unreadCount === 0;
+        
+        let html = '';
+        filteredAlerts.forEach(alert => {
+            const isRead = readAlerts.has(alert.id) || !alert.unread;
+            const unreadClass = (!isRead && alert.unread) ? 'unread' : '';
+            let iconClass = '';
             
-            const unreadCount = alerts.filter(a => a.unread && !readAlerts.has(a.id)).length;
-            document.getElementById('markAllBtn').disabled = unreadCount === 0;
+            // Set icon based on alert type
+            if (alert.alertType === 'rush') iconClass = 'fa-clock';
+            else if (alert.alertType === 'congestion') iconClass = 'fa-chart-line';
+            else if (alert.alertType === 'advisory') iconClass = 'fa-info-circle';
+            else if (alert.alertType === 'service') iconClass = 'fa-train';
+            else iconClass = 'fa-bell';
             
-            let html = '';
-            alerts.forEach(alert => {
-                const isRead = readAlerts.has(alert.id) || !alert.unread;
-                const unreadClass = (!isRead && alert.unread) ? 'unread' : '';
-                const unreadDot = (!isRead && alert.unread) ? '<div class="unread-dot"></div>' : '';
-                html += `
-                    <div class="alert-card ${unreadClass}" data-alert-id="${alert.id}">
-                        <div class="alert-content">
-                            <div class="alert-icon ${alert.icon_color}"><i class="fas fa-${alert.icon}"></i></div>
-                            <div class="alert-text">
-                                <h3>${alert.title}</h3>
-                                <p>${alert.message}</p>
-                                <div class="alert-time"><i class="far fa-clock"></i> ${alert.time}</div>
+            html += `
+                <div class="alert-card ${alert.severity} ${unreadClass}" data-alert-id="${alert.id}">
+                    <div class="alert-content">
+                        <div class="alert-icon ${alert.severity}">
+                            <i class="fas ${iconClass}"></i>
+                        </div>
+                        <div class="alert-text">
+                            <h3>${escapeHtml(alert.title)}</h3>
+                            <p>${escapeHtml(alert.message)}</p>
+                            <div class="alert-meta">
+                                <span><i class="far fa-calendar-alt"></i> ${alert.date}</span>
+                                <span><i class="far fa-clock"></i> ${alert.time}</span>
                             </div>
                         </div>
-                        <div class="alert-actions">
-                            <button class="alert-action-btn ${isRead ? 'marked' : ''}" onclick="markAsRead('${alert.id}')">
-                                <i class="far ${isRead ? 'fa-check-circle' : 'fa-circle'}"></i>
-                            </button>
-                        </div>
-                        ${unreadDot}
                     </div>
-                `;
-            });
-            container.innerHTML = html;
-        }
+                    <div class="alert-actions">
+                        <button class="alert-action-btn ${isRead ? 'marked' : ''}" onclick="markAsRead('${alert.id}')">
+                            <i class="far ${isRead ? 'fa-check-circle' : 'fa-circle'}"></i>
+                        </button>
+                        <button class="alert-action-btn delete-btn" onclick="deleteAlert('${alert.id}')">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+    
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
-        function updateAlertCounts(alerts) {
-            const unreadCount = alerts.filter(a => a.unread && !readAlerts.has(a.id)).length;
-            const badge = document.getElementById('newAlertBadge');
-            badge.textContent = unreadCount > 0 ? unreadCount + ' New' : '0 New';
-            badge.style.background = unreadCount > 0 ? 'var(--red)' : '#94A3B8';
-            
-            const sidebarBadge = document.getElementById('sidebarAlertCount');
-            if (sidebarBadge) {
-                if (unreadCount > 0) { sidebarBadge.textContent = unreadCount > 9 ? '9+' : unreadCount; sidebarBadge.style.display = 'block'; }
-                else { sidebarBadge.style.display = 'none'; }
+    function updateAlertCounts() {
+        const activeAlerts = allAlerts.filter(alert => !deletedAlerts.has(alert.id));
+        const unreadCount = activeAlerts.filter(a => a.unread && !readAlerts.has(a.id)).length;
+        const badge = document.getElementById('newAlertBadge');
+        badge.textContent = unreadCount > 0 ? unreadCount + ' New' : '0 New';
+        badge.style.background = unreadCount > 0 ? 'var(--red)' : '#94A3B8';
+        
+        const sidebarBadge = document.getElementById('sidebarAlertCount');
+        if (sidebarBadge) {
+            if (unreadCount > 0) { 
+                sidebarBadge.textContent = unreadCount > 9 ? '9+' : unreadCount; 
+                sidebarBadge.style.display = 'block'; 
+            } else { 
+                sidebarBadge.style.display = 'none'; 
             }
         }
+    }
 
-        function markAsRead(alertId) {
-            readAlerts.add(alertId);
-            saveReadStatus();
-            const card = document.querySelector(`[data-alert-id="${alertId}"]`);
-            if (card) {
-                card.classList.remove('unread');
-                const dot = card.querySelector('.unread-dot');
-                if (dot) dot.remove();
-                const btn = card.querySelector('.alert-action-btn');
-                if (btn) { btn.classList.add('marked'); btn.innerHTML = '<i class="far fa-check-circle"></i>'; }
+    function markAsRead(alertId) {
+        readAlerts.add(alertId);
+        saveAlerts();
+        displayAlerts();
+        updateAlertCounts();
+        showToast('Marked as read');
+    }
+
+    function markAllAsRead() {
+        const btn = document.getElementById('markAllBtn');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Marking...';
+        btn.disabled = true;
+        
+        allAlerts.forEach(alert => {
+            if (alert.unread && !deletedAlerts.has(alert.id)) {
+                readAlerts.add(alert.id);
             }
-            updateAlertCounts(currentAlerts);
-            showToast('Marked as read');
+        });
+        saveAlerts();
+        displayAlerts();
+        updateAlertCounts();
+        
+        setTimeout(() => { 
+            btn.innerHTML = '<i class="far fa-envelope-open"></i> Mark all as read'; 
+            btn.disabled = false; 
+        }, 300);
+        showToast('All alerts marked as read');
+    }
+
+    function deleteAlert(alertId) {
+        deletedAlerts.add(alertId);
+        saveAlerts();
+        displayAlerts();
+        updateAlertCounts();
+        showToast('Alert deleted');
+    }
+
+    function clearAllAlerts() {
+        if (confirm('Are you sure you want to delete all alerts? This action cannot be undone.')) {
+            deletedAlerts = new Set(allAlerts.map(a => a.id));
+            saveAlerts();
+            displayAlerts();
+            updateAlertCounts();
+            showToast('All alerts cleared');
         }
+    }
 
-        function markAllAsRead() {
-            const btn = document.getElementById('markAllBtn');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Marking...';
-            btn.disabled = true;
-            currentAlerts.forEach(alert => { if (alert.unread) readAlerts.add(alert.id); });
-            saveReadStatus();
-            document.querySelectorAll('.alert-card.unread').forEach(card => {
-                card.classList.remove('unread');
-                const dot = card.querySelector('.unread-dot');
-                if (dot) dot.remove();
-                const btn = card.querySelector('.alert-action-btn');
-                if (btn) { btn.classList.add('marked'); btn.innerHTML = '<i class="far fa-check-circle"></i>'; }
-            });
-            updateAlertCounts(currentAlerts);
-            setTimeout(() => { btn.innerHTML = '<i class="far fa-envelope-open"></i> Mark all as read'; btn.disabled = false; }, 300);
-            showToast('All alerts marked as read');
-        }
+    function filterAlerts(filter) {
+        currentFilter = filter;
+        // Update active button styling
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        displayAlerts();
+    }
 
-        function refreshAlerts() { loadAlerts(); }
-        function showToast(msg) { const toast = document.createElement('div'); toast.className = 'toast success'; toast.textContent = '✓ ' + msg; document.body.appendChild(toast); setTimeout(() => toast.remove(), 2000); }
+    function refreshAlerts() { 
+        loadAlerts(); 
+        showToast('Refreshing alerts...');
+    }
+    
+    function showToast(msg) { 
+        const toast = document.createElement('div'); 
+        toast.className = 'toast success'; 
+        toast.textContent = '✓ ' + msg; 
+        document.body.appendChild(toast); 
+        setTimeout(() => toast.remove(), 2000); 
+    }
 
-        loadReadStatus();
-        loadAlerts();
-        setInterval(() => { if (!isLoading) loadAlerts(); }, 60000);
-    </script>
+    // Check for new alerts every 2 minutes
+    setInterval(() => {
+        generateRushHourAlerts();
+        generateAdvisoryAlerts();
+        checkCongestionAlerts();
+    }, 120000);
+    
+    // Initial load
+    loadAlerts();
+</script>
 </body>
 </html>

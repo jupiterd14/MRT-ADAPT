@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
+    /* ... keep all your existing styles ... */
     :root {
         --sidebar-bg: #00224D;
         --main-bg: #F8FAFC;
@@ -43,38 +44,39 @@
     }
 
     .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background: white;
-    border-radius: 24px;
-    padding: 28px;
-    max-width: 450px;
-    width: 90%;
-    animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-    from {
-        transform: translateY(-30px);
-        opacity: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
     }
-    to {
-        transform: translateY(0);
-        opacity: 1;
+
+    .modal-content {
+        background: white;
+        border-radius: 24px;
+        padding: 28px;
+        max-width: 450px;
+        width: 90%;
+        animation: modalSlideIn 0.3s ease;
     }
-}
+
+    @keyframes modalSlideIn {
+        from {
+            transform: translateY(-30px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    
     .sidebar { 
         width: 300px; 
         background-color: var(--sidebar-bg); 
@@ -110,135 +112,38 @@
     }
 
     .btn-success {
-    background: #DCFCE7;
-    color: #166534;
-    border: 1.5px solid #86EFAC;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background: white;
-    border-radius: 24px;
-    padding: 28px;
-    max-width: 450px;
-    width: 90%;
-    animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-    from {
-        transform: translateY(-30px);
-        opacity: 0;
+        background: #DCFCE7;
+        color: #166534;
+        border: 1.5px solid #86EFAC;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
     }
-    to {
-        transform: translateY(0);
-        opacity: 1;
+
+    .btn-success:hover {
+        background: #22C55E;
+        color: white;
+        border-color: #22C55E;
+        transform: translateY(-1px);
     }
-}
 
-.modal-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-.modal-header i {
-    font-size: 28px;
-}
-
-.modal-header h2 {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--text-dark);
-    margin: 0;
-}
-
-.modal-subtitle {
-    font-size: 14px;
-    color: var(--text-light);
-    line-height: 1.5;
-    margin-bottom: 20px;
-}
-
-.modal-footer {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    margin-top: 8px;
-}
-
-.btn-cancel {
-    background: #F1F5F9;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    color: var(--text-dark);
-    transition: all 0.2s;
-}
-
-.btn-cancel:hover {
-    background: #E2E8F0;
-}
-
-.btn-apply {
-    background: var(--purple);
-    color: white;
-    border: none;
-    padding: 10px 24px;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-apply:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.btn-success:hover {
-    background: #22C55E;
-    color: white;
-    border-color: #22C55E;
-    transform: translateY(-1px);
-}
-
-.status-deactivated {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 30px;
-    font-size: 12px;
-    font-weight: 600;
-    background: #FEE2E2;
-    color: var(--danger-red);
-}
+    .status-deactivated {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 30px;
+        font-size: 12px;
+        font-weight: 600;
+        background: #FEE2E2;
+        color: var(--danger-red);
+    }
 
     .logo-text p { 
         font-size: 11px; 
@@ -729,52 +634,52 @@
 <body>
 
     <!-- Deactivate Operator Confirmation Modal -->
-<div id="deactivateModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 400px;">
-        <div class="modal-header">
-            <i class="fas fa-exclamation-triangle" style="color: var(--danger-red);"></i>
-            <h2>Deactivate Operator</h2>
-        </div>
-        <p class="modal-subtitle" style="margin-bottom: 20px;">Are you sure you want to deactivate this operator? They will not be able to log in until reactivated.</p>
-        <div style="background: #FEF3C7; border-radius: 12px; padding: 12px; margin-bottom: 24px;">
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <i class="fas fa-user-tie" style="color: #F59E0B;"></i>
-                <div>
-                    <div style="font-size: 14px; font-weight: 600; color: #92400E;" id="deactivateOperatorName">Operator Name</div>
-                    <div style="font-size: 12px; color: #B45309;" id="deactivateOperatorEmail">operator@email.com</div>
+    <div id="deactivateModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <i class="fas fa-exclamation-triangle" style="color: var(--danger-red);"></i>
+                <h2>Deactivate Operator</h2>
+            </div>
+            <p class="modal-subtitle" style="margin-bottom: 20px;">Are you sure you want to deactivate this operator? They will not be able to log in until reactivated.</p>
+            <div style="background: #FEF3C7; border-radius: 12px; padding: 12px; margin-bottom: 24px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <i class="fas fa-user-tie" style="color: #F59E0B;"></i>
+                    <div>
+                        <div style="font-size: 14px; font-weight: 600; color: #92400E;" id="deactivateOperatorName">Operator Name</div>
+                        <div style="font-size: 12px; color: #B45309;" id="deactivateOperatorEmail">operator@email.com</div>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="modal-footer" style="justify-content: center; gap: 16px;">
-            <button class="btn-cancel" onclick="closeDeactivateModal()">Cancel</button>
-            <button class="btn-apply" id="confirmDeactivateBtn" style="background: var(--danger-red);">Deactivate</button>
+            <div class="modal-footer" style="justify-content: center; gap: 16px;">
+                <button class="btn-cancel" onclick="closeDeactivateModal()">Cancel</button>
+                <button class="btn-apply" id="confirmDeactivateBtn" style="background: var(--danger-red);">Deactivate</button>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Reactivate Operator Confirmation Modal -->
-<div id="reactivateModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 400px;">
-        <div class="modal-header">
-            <i class="fas fa-check-circle" style="color: var(--success-green);"></i>
-            <h2>Reactivate Operator</h2>
-        </div>
-        <p class="modal-subtitle" style="margin-bottom: 20px;">Are you sure you want to reactivate this operator? They will be able to log in again.</p>
-        <div style="background: #DCFCE7; border-radius: 12px; padding: 12px; margin-bottom: 24px;">
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <i class="fas fa-user-tie" style="color: #22C55E;"></i>
-                <div>
-                    <div style="font-size: 14px; font-weight: 600; color: #166534;" id="reactivateOperatorName">Operator Name</div>
-                    <div style="font-size: 12px; color: #15803D;" id="reactivateOperatorEmail">operator@email.com</div>
+    <!-- Reactivate Operator Confirmation Modal -->
+    <div id="reactivateModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <i class="fas fa-check-circle" style="color: var(--success-green);"></i>
+                <h2>Reactivate Operator</h2>
+            </div>
+            <p class="modal-subtitle" style="margin-bottom: 20px;">Are you sure you want to reactivate this operator? They will be able to log in again.</p>
+            <div style="background: #DCFCE7; border-radius: 12px; padding: 12px; margin-bottom: 24px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <i class="fas fa-user-tie" style="color: #22C55E;"></i>
+                    <div>
+                        <div style="font-size: 14px; font-weight: 600; color: #166534;" id="reactivateOperatorName">Operator Name</div>
+                        <div style="font-size: 12px; color: #15803D;" id="reactivateOperatorEmail">operator@email.com</div>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="modal-footer" style="justify-content: center; gap: 16px;">
-            <button class="btn-cancel" onclick="closeReactivateModal()">Cancel</button>
-            <button class="btn-apply" id="confirmReactivateBtn" style="background: var(--success-green);">Reactivate</button>
+            <div class="modal-footer" style="justify-content: center; gap: 16px;">
+                <button class="btn-cancel" onclick="closeReactivateModal()">Cancel</button>
+                <button class="btn-apply" id="confirmReactivateBtn" style="background: var(--success-green);">Reactivate</button>
+            </div>
         </div>
     </div>
-</div>
 
     <div class="sidebar">
         <div class="logo-section">
@@ -820,7 +725,7 @@
                                     <button class="dir-btn" id="northBtn" onclick="setDirection('north')"><i class="fas fa-arrow-up"></i> NORTH</button>
                                     <button class="dir-btn" id="southBtn" onclick="setDirection('south')"><i class="fas fa-arrow-down"></i> SOUTH</button>
                                 </div>
-                                <div class="direction-badge"><i class="fas fa-map-marker-alt"></i> </div>
+                                <div class="direction-badge"><i class="fas fa-map-marker-alt"></i> <span id="currentDirLabel">Northbound</span></div>
                             </div>
                         </div>
                         <div class="table-scroll-container">
@@ -854,7 +759,37 @@
                         <div class="card-title"><i class="fas fa-user-plus"></i> Create Operator Account</div>
                         <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="opName" placeholder="e.g. Juan Dela Cruz"></div>
                         <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="opEmail" placeholder="operator@mrt3.gov.ph" type="email"></div>
-                        <div class="form-group"><label class="form-label">Assigned Station(s)</label><select class="form-select" id="opStation"><option>All Stations (Line-Wide)</option><option>North Ave Zone</option><option>Cubao Zone</option><option>Ayala – Taft Zone</option></select></div>
+                        
+                        <!-- ALL 13 STATIONS DROPDOWN -->
+                        <div class="form-group">
+                            <label class="form-label">Assigned Station(s)</label>
+                            <select class="form-select" id="opStation">
+                                <option value="All Stations (Line-Wide)">All Stations (Line-Wide) - Full Access</option>
+                                <option value="North Ave">North Ave</option>
+                                <option value="Quezon Ave">Quezon Ave</option>
+                                <option value="Kamuning">Kamuning</option>
+                                <option value="Cubao">Cubao</option>
+                                <option value="Santolan">Santolan</option>
+                                <option value="Ortigas">Ortigas</option>
+                                <option value="Shaw Blvd">Shaw Blvd</option>
+                                <option value="Boni Ave">Boni Ave</option>
+                                <option value="Guadalupe">Guadalupe</option>
+                                <option value="Buendia">Buendia</option>
+                                <option value="Ayala Ave">Ayala Ave</option>
+                                <option value="Magallanes">Magallanes</option>
+                                <option value="Taft">Taft</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Access Level</label>
+                            <select class="form-select" id="opAccessLevel">
+                                <option value="standard">Standard - Broadcast and Override</option>
+                                <option value="limited">Limited - Broadcast only</option>
+                                <option value="full">Full - All Operator Features</option>
+                            </select>
+                        </div>
+
                         <button class="btn btn-purple" style="width:100%;" onclick="generateInvite()"><i class="fas fa-key"></i> Generate Invite Link</button>
                         <div id="linkResult" style="display:none;"><div class="link-box" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;margin-top:16px;"><div class="link-text" id="generatedLink" style="flex:1;font-size:14px;color:var(--accent-blue);word-break:break-all;"></div><button class="link-copy-btn" onclick="copyLink()" style="background:var(--accent-blue);color:white;border:none;padding:8px 20px;border-radius:10px;cursor:pointer;">Copy</button></div><p style="font-size:12px; margin-top:12px;"><i class="far fa-clock"></i> Expires in 24h</p></div>
                     </div>
@@ -862,7 +797,7 @@
                         <div class="card-title"><i class="fas fa-user-tie"></i> Active Operators</div>
                         <div class="table-scroll-container">
                             <table class="data-table">
-                                <thead><tr><th>Operator</th><th>Zone</th><th>Last Login</th><th>Status</th><th></th></tr></thead>
+                                <thead><tr><th>Operator</th><th>Zone/Station</th><th>Last Login</th><th>Status</th><th></th></tr></thead>
                                 <tbody id="operatorsBody"><tr><td colspan="5" style="text-align:center;">Loading...</td></tr></tbody>
                             </table>
                         </div>
@@ -895,7 +830,7 @@
                 <div class="card" style="padding: 0; overflow: hidden;">
                     <div class="table-scroll-container" style="max-height: 520px;">
                         <table class="data-table" style="width: 100%;">
-                            <thead><tr><th>USER</th><th>ACTION</th><th>TARGET</th><th style="text-align: right;">TIMESTAMP</th></tr></thead>
+                            <thead> <tr><th>USER</th><th>ACTION</th><th>TARGET</th><th style="text-align: right;">TIMESTAMP</th></tr> </thead>
                             <tbody id="auditLogBody"><tr><td colspan="4" style="text-align:center;">Loading...</td></tr></tbody>
                         </table>
                     </div>
@@ -914,6 +849,8 @@
         let currentOperatorToDeactivate = null;
         let currentOperatorToReactivate = null;
 
+        const allStations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
+
         function showToast(icon, msg) {
             const toast = document.getElementById('toast');
             document.getElementById('toastIcon').innerText = icon;
@@ -926,7 +863,6 @@
             document.getElementById('currentDate').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         }
 
-        // ========== DASHBOARD DATA FROM BACKEND ==========
         async function loadDashboardStats() {
             try {
                 const response = await fetch('/api/admin/dashboard-stats');
@@ -939,23 +875,71 @@
                 console.error('Error loading dashboard stats:', error);
             }
         }
-
-        async function loadStationStatus() {
-            try {
-                const response = await fetch(`/api/admin/station-status?direction=${currentDirection}`);
-                const data = await response.json();
-                const tbody = document.getElementById('stationStatusBody');
-                tbody.innerHTML = data.stations.map(s => `
-                    <tr><td style="font-weight:500;">${s.name}</td><td><span class="${s.status_class}">${s.status_text}</span></td>
-                `).join('');
-                document.getElementById('northBtn').classList.toggle('active', currentDirection === 'north');
-                document.getElementById('southBtn').classList.toggle('active', currentDirection === 'south');
-                document.getElementById('currentDirLabel').innerText = currentDirection === 'north' ? 'Northbound' : 'Southbound';
-            } catch (error) {
-                console.error('Error loading station status:', error);
+async function loadStationStatus() {
+    try {
+        // Fetch real congestion data from the live-map endpoint instead
+        const response = await fetch('/api/live-map/directions');
+        const data = await response.json();
+        
+        const tbody = document.getElementById('stationStatusBody');
+        
+        // Get the correct direction data
+        const directionData = currentDirection === 'north' ? data.northbound : data.southbound;
+        
+        if (!directionData) {
+            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No data available</td></tr>';
+            return;
+        }
+        
+        const rows = [];
+        for (const station of allStations) {
+            const stationData = directionData[station];
+            if (stationData) {
+                const congestion = stationData.congestion || 0;
+                
+                // Determine status text and class based on congestion
+                let statusText = 'Light';
+                let statusClass = 'status-active';
+                
+                if (congestion > 80) {
+                    statusText = 'Severe';
+                    statusClass = 'status-severe';
+                } else if (congestion > 60) {
+                    statusText = 'Congested';
+                    statusClass = 'status-congested';
+                } else if (congestion > 30) {
+                    statusText = 'Moderate';
+                    statusClass = 'status-active';  // Reuse active class for moderate
+                } else if (congestion === 0) {
+                    statusText = 'Closed';
+                    statusClass = 'status-deactivated';
+                } else {
+                    statusText = 'Light';
+                    statusClass = 'status-active';
+                }
+                
+                rows.push(`
+                    <tr>
+                        <td style="font-weight:500;">${station}</td>
+                        <td><span class="${statusClass}">${statusText}</span></td>
+                    </tr>
+                `);
             }
         }
-
+        
+        tbody.innerHTML = rows.join('');
+        
+        // Update toggle buttons
+        document.getElementById('northBtn').classList.toggle('active', currentDirection === 'north');
+        document.getElementById('southBtn').classList.toggle('active', currentDirection === 'south');
+        document.getElementById('currentDirLabel').innerText = currentDirection === 'north' ? 'Northbound' : 'Southbound';
+        
+    } catch (error) {
+        console.error('Error loading station status:', error);
+        const tbody = document.getElementById('stationStatusBody');
+        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Error loading data</td></tr>';
+    }
+}
         async function loadMostReportedStations() {
             try {
                 const response = await fetch('/api/reports');
@@ -965,7 +949,7 @@
                 const sorted = Object.entries(stationCounts).sort((a,b) => b[1] - a[1]).slice(0, 4);
                 const tbody = document.getElementById('mostReportedBody');
                 tbody.innerHTML = sorted.map(([station, count]) => `
-                     <tr><td>${station}</td><td>${count}</td><td style="color:#f59e0b;">● Moderate</td></tr>
+                    <tr><td>${station}</td><td>${count}</td><td style="color:#f59e0b;">● Moderate</td></tr>
                 `).join('');
                 if (sorted.length === 0) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No reports yet</td></tr>';
             } catch (error) {
@@ -993,7 +977,6 @@
             }
         }
 
-        // ========== OPERATORS DATA FROM BACKEND ==========
         async function loadOperators() {
             try {
                 const response = await fetch('/api/admin/operator-list');
@@ -1004,22 +987,8 @@
                         <td><div style="font-weight:600;">${op.name}</div><div style="font-size:12px;color:#64748B;">${op.email}</div></td>
                         <td>${op.zone}</td>
                         <td>${op.last_login}</td>
-                        <td>
-                            <span class="${op.active ? 'status-active' : 'status-deactivated'}">
-                                <i class="fas ${op.active ? 'fa-circle' : 'fa-ban'}" style="font-size:8px;"></i>
-                                ${op.active ? 'Active' : 'Deactivated'}
-                            </span>
-                        </td>
-                        <td>
-                            ${op.active ? 
-                                `<button class="btn btn-danger btn-sm" onclick="deactivateOperator(${op.id}, '${op.name.replace(/'/g, "\\'")}', '${op.email}')">
-                                    <i class="fas fa-ban"></i> Deactivate
-                                </button>` : 
-                                `<button class="btn btn-success btn-sm" onclick="reactivateOperator(${op.id}, '${op.name.replace(/'/g, "\\'")}', '${op.email}')">
-                                    <i class="fas fa-check-circle"></i> Reactivate
-                                </button>`
-                            }
-                        </td>
+                        <td><span class="${op.active ? 'status-active' : 'status-deactivated'}"><i class="fas ${op.active ? 'fa-circle' : 'fa-ban'}" style="font-size:8px;"></i> ${op.active ? 'Active' : 'Deactivated'}</span></td>
+                        <td>${op.active ? `<button class="btn btn-danger btn-sm" onclick="deactivateOperator(${op.id}, '${op.name.replace(/'/g, "\\'")}', '${op.email}')"><i class="fas fa-ban"></i> Deactivate</button>` : `<button class="btn btn-success btn-sm" onclick="reactivateOperator(${op.id}, '${op.name.replace(/'/g, "\\'")}', '${op.email}')"><i class="fas fa-check-circle"></i> Reactivate</button>`}</td>
                     </tr>
                 `).join('');
                 if (operators.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;">No operators found</td></tr>';
@@ -1056,13 +1025,15 @@
             const name = document.getElementById('opName').value;
             const email = document.getElementById('opEmail').value;
             const station = document.getElementById('opStation').value;
+            const accessLevel = document.getElementById('opAccessLevel').value;
+            
             if (!name || !email) return showToast('⚠️', 'Fill name & email');
             
             try {
                 const response = await fetch('/api/admin/generate-invite', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, station })
+                    body: JSON.stringify({ name, email, station, access_level: accessLevel })
                 });
                 const data = await response.json();
                 if (data.success) {
@@ -1071,6 +1042,8 @@
                     showToast('🔑', `Invite for ${name}`);
                     document.getElementById('opName').value = '';
                     document.getElementById('opEmail').value = '';
+                } else {
+                    showToast('⚠️', data.error || 'Failed to generate invite');
                 }
             } catch (error) {
                 console.error('Error generating invite:', error);
@@ -1084,7 +1057,6 @@
             showToast('📋', 'Link copied');
         }
 
-        // ========== AUDIT LOG FROM BACKEND ==========
         async function loadAuditLog() {
             try {
                 const response = await fetch('/api/admin/audit-log');
@@ -1111,14 +1083,16 @@
         }
 
         function getActionClass(action) {
-            if (action.includes('login')) return 'action-login';
-            if (action.includes('archived') || action.includes('report')) return 'action-archive';
-            if (action.includes('logout')) return 'action-logout';
-            if (action.includes('override')) return 'action-override';
-            if (action.includes('created') || action.includes('generated')) return 'action-create';
-            if (action.includes('broadcast')) return 'action-login';
-            return 'action-login';
-        }
+    if (action.includes('login') && !action.includes('failed')) return 'action-login';
+    if (action.includes('login_failed')) return 'action-failed';
+    if (action.includes('archived') || action.includes('report')) return 'action-archive';
+    if (action.includes('logout')) return 'action-logout';
+    if (action.includes('override')) return 'action-override';
+    if (action.includes('created') || action.includes('generated')) return 'action-create';
+    if (action.includes('broadcast')) return 'action-login';
+    if (action.includes('report_failed')) return 'action-failed';
+    return 'action-login';
+}
 
         function formatTimestamp(dateStr) {
             const date = new Date(dateStr);
@@ -1196,7 +1170,6 @@
             if (id === 'audit') loadAuditLog();
         }
 
-        // Set up modal confirm buttons after DOM is loaded
         document.addEventListener('DOMContentLoaded', () => {
             updateDate();
             setInterval(updateDate, 1000);
@@ -1207,7 +1180,6 @@
             loadOperators();
             loadAuditLog();
             
-            // Set up modal confirm buttons
             const confirmDeactivateBtn = document.getElementById('confirmDeactivateBtn');
             const confirmReactivateBtn = document.getElementById('confirmReactivateBtn');
             
@@ -1218,7 +1190,7 @@
                             const response = await fetch(`/api/admin/deactivate-operator/${currentOperatorToDeactivate.id}`, { method: 'POST' });
                             const data = await response.json();
                             if (data.success) {
-                                showToast('', `Operator ${currentOperatorToDeactivate.name} deactivated successfully`);
+                                showToast('✅', `Operator ${currentOperatorToDeactivate.name} deactivated successfully`);
                                 loadOperators();
                                 closeDeactivateModal();
                             } else {
@@ -1239,7 +1211,7 @@
                             const response = await fetch(`/api/admin/reactivate-operator/${currentOperatorToReactivate.id}`, { method: 'POST' });
                             const data = await response.json();
                             if (data.success) {
-                                showToast('', `Operator ${currentOperatorToReactivate.name} reactivated successfully`);
+                                showToast('✅', `Operator ${currentOperatorToReactivate.name} reactivated successfully`);
                                 loadOperators();
                                 closeReactivateModal();
                             } else {
@@ -1253,7 +1225,6 @@
                 };
             }
             
-            // Get admin name from session (if available)
             fetch('/api/admin/profile')
                 .then(res => res.json())
                 .then(data => {
