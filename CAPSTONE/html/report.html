@@ -6,6 +6,8 @@
     <title>MRT-ADAPT | Report Congestion</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
         :root {
             --sidebar-bg: #00224D;
             --main-bg: #F8FAFC;
@@ -34,7 +36,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: "Bricolage Grotesque", sans-serif;
         }
 
         body {
@@ -442,18 +444,14 @@
         }
 
         .reports-header {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    gap: 12px;
-}
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
 
-/* Remove the old .reports-header styles and replace with this */
-        
-
-        /* Smaller Filter Dropdown Styles */
         .filter-container {
             position: relative;
         }
@@ -650,6 +648,66 @@
             margin-bottom: 12px;
         }
 
+        /* Image Gallery Styles */
+        .photo-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .gallery-image {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            aspect-ratio: 1;
+        }
+
+        .gallery-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.2s;
+        }
+
+        .gallery-image:hover img {
+            transform: scale(1.05);
+        }
+
+        .gallery-image .overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            font-size: 11px;
+            padding: 4px;
+            text-align: center;
+        }
+
+        /* Fullscreen Image Modal */
+        .image-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+        }
+
         .no-reports {
             text-align: center;
             padding: 60px 20px;
@@ -688,6 +746,25 @@
         @keyframes slideIn {
             from { transform: translateY(100px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Verification Badge */
+        .verified-badge {
+            background: var(--green);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+
+        .disputed-badge {
+            background: var(--orange);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 10px;
+            margin-left: 8px;
         }
     </style>
 </head>
@@ -795,9 +872,28 @@
                         <div id="previewContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; max-height: 200px; overflow-y: auto; padding: 5px;"></div>
                     </div>
                     
-                    <div class="section-header">
-                        <span>Additional Notes <span style="color:grey;">(optional)</span></span>
-                    </div>
+                    <div class="section-header" style="margin-bottom: 12px; margin-top: 20px;">
+    <i class="fas fa-exchange-alt"></i>
+    <span>DIRECTION <span style="color:grey;">(optional)</span></span>
+</div>
+
+<div style="display: flex; gap: 15px; margin-bottom: 20px;">
+    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="radio" name="direction" value="northbound" id="directionNorth">
+        <i class="fas fa-arrow-up" style="color: var(--accent-blue);"></i>
+        <span>Northbound</span>
+    </label>
+    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="radio" name="direction" value="southbound" id="directionSouth">
+        <i class="fas fa-arrow-down" style="color: var(--accent-blue);"></i>
+        <span>Southbound</span>
+    </label>
+    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="radio" name="direction" value="" id="directionBoth" checked>
+        <i class="fas fa-arrows-alt-h" style="color: var(--text-light);"></i>
+        <span>Both / Not Sure</span>
+    </label>
+</div>
                     
                     <textarea class="report-textarea" id="remarks" placeholder="Add details (e.g., 'Broken train at North Ave', 'Elevator not working')"></textarea>
                     <div class="info-text" style="margin-top: 8px;">
@@ -812,7 +908,6 @@
 
             <div id="reportsView" class="view reports-view">
                 <div class="reports-header">
-                    
                     <div style="display: flex; gap: 10px;">
                         <div class="filter-container">
                             <div class="filter-header" onclick="toggleFilterDropdown()">
@@ -828,9 +923,7 @@
                                     <div class="chip" data-date="week">7 days</div>
                                     <div class="chip" data-date="month">30 days</div>
                                 </div>
-
                                 <hr>
-
                                 <h3>Congestion Level</h3>
                                 <div class="congestion-grid-filter">
                                     <div class="badge-filter severe" data-level="severe">Severe</div>
@@ -838,14 +931,11 @@
                                     <div class="badge-filter moderate" data-level="moderate">Moderate</div>
                                     <div class="badge-filter light" data-level="light">Light</div>
                                 </div>
-
                                 <hr>
-
                                 <div class="stations-header">
                                     <h3>Stations</h3>
                                     <span class="select-all">Select all</span>
                                 </div>
-
                                 <div class="stations-grid" id="stationsGrid">
                                     <div class="station-item"><label class="switch"><input type="checkbox" value="North Ave" checked><span class="slider"></span></label> North Ave</div>
                                     <div class="station-item"><label class="switch"><input type="checkbox" value="Quezon Ave" checked><span class="slider"></span></label> Quezon Ave</div>
@@ -861,11 +951,12 @@
                                     <div class="station-item"><label class="switch"><input type="checkbox" value="Magallanes" checked><span class="slider"></span></label> Magallanes</div>
                                     <div class="station-item"><label class="switch"><input type="checkbox" value="Taft" checked><span class="slider"></span></label> Taft</div>
                                 </div>
-
                                 <button class="apply-filter-btn" onclick="applyFilters()">Apply Filters</button>
                             </div>
                         </div>
-                       
+                        <button class="action-btn" onclick="refreshReports()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
                     </div>
                 </div>
                 <div id="reportsList" class="reports-list">
@@ -912,46 +1003,49 @@
         stations: []
     };
 
-    // Toggle filter dropdown
+    // Helper Functions
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function showToast(message, type = 'info') {
+        const existingToast = document.querySelector('.success-message');
+        if (existingToast) existingToast.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = 'success-message';
+        if (type === 'error') toast.style.background = 'var(--red)';
+        else if (type === 'success') toast.style.background = 'var(--green)';
+        else toast.style.background = 'var(--accent-blue)';
+        
+        toast.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'check-circle'}"></i> ${message}`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    // Filter Functions
     function toggleFilterDropdown() {
         const dropdown = document.getElementById('filterDropdown');
         dropdown.classList.toggle('show');
     }
 
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(event) {
-        const filterContainer = document.querySelector('.filter-container');
-        const dropdown = document.getElementById('filterDropdown');
-        if (filterContainer && !filterContainer.contains(event.target) && dropdown) {
-            dropdown.classList.remove('show');
-        }
-    });
-
-    // Apply filters
     function applyFilters() {
-        console.log("========== APPLYING FILTERS ==========");
-        
-        // Get selected congestion levels
         const selectedLevels = [];
         document.querySelectorAll('.badge-filter.active-filter').forEach(badge => {
             selectedLevels.push(badge.dataset.level);
         });
-        console.log("Selected congestion levels:", selectedLevels);
         
-        // Get selected stations
         const selectedStations = [];
         document.querySelectorAll('#stationsGrid input:checked').forEach(cb => {
             selectedStations.push(cb.value);
         });
-        console.log("Selected stations from checkboxes:", selectedStations);
         
-        // Get date range
         let dateRange = null;
         const activeChip = document.querySelector('.chip.active');
-        if (activeChip) {
-            dateRange = activeChip.dataset.date;
-            console.log("Selected date range:", dateRange);
-        }
+        if (activeChip) dateRange = activeChip.dataset.date;
         
         activeFilters = {
             congestionLevels: selectedLevels,
@@ -959,177 +1053,281 @@
             dateRange: dateRange
         };
         
-        console.log("Active filters object:", activeFilters);
-        
-        // Apply filters
         filterAndDisplayReports();
-        
-        // Close dropdown
         toggleFilterDropdown();
     }
 
-    // Filter and display reports
-   // Replace the filterAndDisplayReports function with this fixed version:
-
-function filterAndDisplayReports() {
-    console.log("========== FILTERING REPORTS ==========");
-    console.log("Total reports before filter:", allReportsData.length);
-    
-    if (!allReportsData || allReportsData.length === 0) {
-        console.log("No reports data available");
-        const reportsList = document.getElementById('reportsList');
-        reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports available</h3></div>`;
-        return;
-    }
-    
-    // DEBUG: Show all actual station names from reports
-    const actualStationsInReports = [...new Set(allReportsData.map(r => r.station))];
-    console.log("ACTUAL STATIONS IN REPORTS:", actualStationsInReports);
-    console.log("STATIONS IN FILTER CHECKBOXES:", [...document.querySelectorAll('#stationsGrid input')].map(cb => cb.value));
-    
-    // DEBUG: Show sample of timestamps
-    console.log("SAMPLE REPORT TIMESTAMPS:", allReportsData.slice(0, 5).map(r => ({
-        station: r.station,
-        timestamp: r.timestamp,
-        parsedDate: new Date(r.timestamp)
-    })));
-    
-    let filteredReports = [...allReportsData];
-    
-    // Filter by station - FIXED: If no stations selected, show nothing
-    if (activeFilters.stations.length > 0) {
-        console.log("Filtering by stations:", activeFilters.stations);
-        filteredReports = filteredReports.filter(report => {
-            const matches = activeFilters.stations.includes(report.station);
-            if (!matches) {
-                console.log(`Excluding: "${report.station}" - Not in selected stations [${activeFilters.stations.join(', ')}]`);
-            }
-            return matches;
-        });
-        console.log(`After station filter: ${filteredReports.length} reports remaining`);
-    } else {
-        // If NO stations are selected, show 0 reports
-        console.log("⚠️ No stations selected - showing 0 reports");
-        filteredReports = [];
-    }
-    
-    // Filter by congestion level
-    if (activeFilters.congestionLevels.length > 0 && filteredReports.length > 0) {
-        console.log("Filtering by congestion levels:", activeFilters.congestionLevels);
-        filteredReports = filteredReports.filter(report => {
-            let level = '';
-            if (report.reported_congestion > 80) level = 'severe';
-            else if (report.reported_congestion > 60) level = 'congested';
-            else if (report.reported_congestion > 30) level = 'moderate';
-            else level = 'light';
-            const matches = activeFilters.congestionLevels.includes(level);
-            if (!matches) {
-                console.log(`Excluding: ${report.station} - Congestion ${report.reported_congestion}% (${level}) not in filter [${activeFilters.congestionLevels.join(', ')}]`);
-            }
-            return matches;
-        });
-        console.log(`After congestion filter: ${filteredReports.length} reports remaining`);
-    } else if (activeFilters.congestionLevels.length > 0) {
-        console.log("No reports to filter by congestion");
-    } else {
-        console.log("No congestion filter applied");
-    }
-    
-    // Filter by date range - FIXED VERSION WITH END DATE FOR TODAY/YESTERDAY
-    if (activeFilters.dateRange && filteredReports.length > 0) {
-        const now = new Date();
-        let startDate = null;
-        let endDate = null;
-        
-        switch(activeFilters.dateRange) {
-            case 'today':
-                startDate = new Date();
-                startDate.setHours(0, 0, 0, 0);
-                endDate = new Date();
-                endDate.setHours(23, 59, 59, 999);
-                console.log("Filtering for TODAY - range:", startDate, "to", endDate);
-                break;
-            case 'yesterday':
-                startDate = new Date();
-                startDate.setDate(startDate.getDate() - 1);
-                startDate.setHours(0, 0, 0, 0);
-                endDate = new Date();
-                endDate.setDate(endDate.getDate() - 1);
-                endDate.setHours(23, 59, 59, 999);
-                console.log("Filtering for YESTERDAY - range:", startDate, "to", endDate);
-                break;
-            case 'week':
-                startDate = new Date();
-                startDate.setDate(startDate.getDate() - 7);
-                startDate.setHours(0, 0, 0, 0);
-                console.log("Filtering for LAST 7 DAYS - from:", startDate);
-                break;
-            case 'month':
-                startDate = new Date();
-                startDate.setDate(startDate.getDate() - 30);
-                startDate.setHours(0, 0, 0, 0);
-                console.log("Filtering for LAST 30 DAYS - from:", startDate);
-                break;
-        }
-        
-        if (startDate) {
-            console.log("Filtering reports...");
-            filteredReports = filteredReports.filter(report => {
-                const reportDate = new Date(report.timestamp);
-                
-                if (activeFilters.dateRange === 'today' || activeFilters.dateRange === 'yesterday') {
-                    // For exact day filters, check if date is within that day
-                    const isInRange = reportDate >= startDate && reportDate <= endDate;
-                    if (!isInRange) {
-                        console.log(`Excluding: ${report.station} - Date ${reportDate} is not in range [${startDate} to ${endDate}]`);
-                    }
-                    return isInRange;
-                } else {
-                    // For week/month filters, check if after start date
-                    const isAfter = reportDate >= startDate;
-                    if (!isAfter) {
-                        console.log(`Excluding: ${report.station} - Date ${reportDate} is before ${startDate}`);
-                    }
-                    return isAfter;
-                }
-            });
-            console.log(`After date filter: ${filteredReports.length} reports remaining`);
-        }
-    } else if (activeFilters.dateRange) {
-        console.log("No reports to filter by date");
-    } else {
-        console.log("No date filter applied");
-    }
-    
-    console.log(`FINAL FILTERED COUNT: ${filteredReports.length}`);
-    displayReports(filteredReports);
-}
-
-    function selectLevel(level) {
-        document.querySelectorAll('.report-card').forEach(card => {
-            card.classList.remove('selected');
-        });
-        document.getElementById(`card-${level}`).classList.add('selected');
-        selectedLevel = level;
-    }
-
-    document.getElementById('imageInput').addEventListener('change', function(e) {
-        const files = Array.from(e.target.files);
-        
-        if (selectedFiles.length + files.length > 5) {
-            showToast(`Maximum 5 photos allowed. You already have ${selectedFiles.length} selected.`, 'error');
+    function filterAndDisplayReports() {
+        if (!allReportsData || allReportsData.length === 0) {
+            const reportsList = document.getElementById('reportsList');
+            reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports available</h3></div>`;
             return;
         }
         
-        files.forEach(file => {
-            if (file.type.startsWith('image/')) {
-                selectedFiles.push(file);
-            }
-        });
+        let filteredReports = [...allReportsData];
         
-        updateImagePreview();
-        updatePhotoUploadText();
+        if (activeFilters.stations.length > 0) {
+            filteredReports = filteredReports.filter(report => 
+                activeFilters.stations.includes(report.station)
+            );
+        }
+        
+        if (activeFilters.congestionLevels.length > 0 && filteredReports.length > 0) {
+            filteredReports = filteredReports.filter(report => {
+                let level = '';
+                if (report.reported_congestion > 80) level = 'severe';
+                else if (report.reported_congestion > 60) level = 'congested';
+                else if (report.reported_congestion > 30) level = 'moderate';
+                else level = 'light';
+                return activeFilters.congestionLevels.includes(level);
+            });
+        }
+        
+        if (activeFilters.dateRange && filteredReports.length > 0) {
+            const now = new Date();
+            let startDate = null;
+            let endDate = null;
+            
+            switch(activeFilters.dateRange) {
+                case 'today':
+                    startDate = new Date();
+                    startDate.setHours(0, 0, 0, 0);
+                    endDate = new Date();
+                    endDate.setHours(23, 59, 59, 999);
+                    break;
+                case 'yesterday':
+                    startDate = new Date();
+                    startDate.setDate(startDate.getDate() - 1);
+                    startDate.setHours(0, 0, 0, 0);
+                    endDate = new Date();
+                    endDate.setDate(endDate.getDate() - 1);
+                    endDate.setHours(23, 59, 59, 999);
+                    break;
+                case 'week':
+                    startDate = new Date();
+                    startDate.setDate(startDate.getDate() - 7);
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+                case 'month':
+                    startDate = new Date();
+                    startDate.setDate(startDate.getDate() - 30);
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+            }
+            
+            if (startDate) {
+                filteredReports = filteredReports.filter(report => {
+                    const reportDate = new Date(report.timestamp);
+                    if (activeFilters.dateRange === 'today' || activeFilters.dateRange === 'yesterday') {
+                        return reportDate >= startDate && reportDate <= endDate;
+                    } else {
+                        return reportDate >= startDate;
+                    }
+                });
+            }
+        }
+        
+        displayReports(filteredReports);
+    }
+
+    // Report Display Functions
+   function displayReports(reports) {
+    const reportsList = document.getElementById('reportsList');
+    
+    if (!reports || reports.length === 0) {
+        reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports match your filters</h3><p>Try adjusting your filter criteria</p></div>`;
+        return;
+    }
+    
+    let html = '';
+    reports.forEach((report, idx) => {
+        let levelText = '', levelColor = '', borderColor = '';
+        
+        if (report.reported_congestion > 80) {
+            levelText = 'Severe Congestion';
+            levelColor = '#EF4444';
+            borderColor = '#EF4444';
+        } else if (report.reported_congestion > 60) {
+            levelText = 'Congested';
+            levelColor = '#F97316';
+            borderColor = '#F97316';
+        } else if (report.reported_congestion > 30) {
+            levelText = 'Moderate';
+            levelColor = '#EAB308';
+            borderColor = '#EAB308';
+        } else {
+            levelText = 'Light';
+            levelColor = '#22C55E';
+            borderColor = '#22C55E';
+        }
+        
+        const reportTime = new Date(report.timestamp);
+        const now = new Date();
+        const diffMs = now - reportTime;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+        
+        let timeAgo = '';
+        if (diffMins < 1) timeAgo = 'just now';
+        else if (diffMins < 60) timeAgo = `${diffMins} min ago`;
+        else if (diffHours < 24) timeAgo = `${diffHours} hour ago`;
+        else timeAgo = `${diffDays} day ago`;
+        
+        let displayName = '', avatarLetter = '?';
+        if (report.anonymous) {
+            displayName = 'Anonymous';
+            avatarLetter = 'A';
+        } else if (report.username) {
+            displayName = report.username.includes('@') ? report.username.split('@')[0] : report.username;
+            avatarLetter = displayName.charAt(0).toUpperCase();
+        } else {
+            displayName = 'Commuter';
+            avatarLetter = 'C';
+        }
+        
+        const hasRemarks = report.remarks && report.remarks.trim() !== '';
+        const hasPhotos = report.photo_path && report.photo_path !== '';
+        const contentId = `content-${report.id}-${idx}`;
+        
+        // Parse photos
+        let photos = [];
+        if (hasPhotos) {
+            try {
+                photos = JSON.parse(report.photo_path);
+            } catch(e) {
+                photos = report.photo_path.split(',').filter(p => p.trim());
+            }
+        }
+        
+        const verifiedBadge = report.verified ? '<span class="verified-badge"><i class="fas fa-check-circle"></i> Verified</span>' : '';
+        const disputedBadge = report.disputed ? '<span class="disputed-badge"><i class="fas fa-flag"></i> Disputed</span>' : '';
+        
+        html += `
+            <div class="report-item" style="border: 2px solid ${borderColor}; border-radius: 16px; padding: 18px; margin-bottom: 12px; background: white;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 36px; height: 36px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-weight: bold;">
+                            ${avatarLetter}
+                        </div>
+                        <div style="font-weight: 600; font-size: 14px;">${escapeHtml(displayName)} ${verifiedBadge} ${disputedBadge}</div>
+                    </div>
+                    <div style="font-size: 11px; color: #64748B;"><i class="far fa-clock"></i> ${timeAgo}</div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span style="font-weight: 700; font-size: 18px;">${escapeHtml(report.station)}</span>
+                        ${report.direction ? `<span style="font-size: 12px; color: #64748B; margin-left: 8px;">
+                            <i class="fas fa-arrow-${report.direction === 'northbound' ? 'up' : 'down'}"></i> ${report.direction === 'northbound' ? 'Northbound' : 'Southbound'}
+                        </span>` : ''}
+                        <span style="font-size: 13px; font-weight: 600; color: ${levelColor};"> - ${levelText}</span>
+                    </div>
+                    <button onclick="toggleReportContent('${contentId}', this)" style="background: none; border: none; color: #3B82F6; cursor: pointer; font-size: 13px;">
+                        <i class="fas fa-chevron-down"></i> View details
+                    </button>
+                </div>
+                
+                <div id="${contentId}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
+                    ${hasRemarks ? `
+                        <div style="background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 12px;">
+                            <i class="fas fa-quote-left" style="color: #3B82F6; margin-right: 8px;"></i>
+                            ${escapeHtml(report.remarks)}
+                        </div>
+                    ` : ''}
+                    
+                    ${hasPhotos && photos.length > 0 ? `
+                        <div style="margin-bottom: 12px;">
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-weight: 600; font-size: 13px;">
+                                    <i class="fas fa-camera"></i> ${photos.length} photo(s) attached
+                                </span>
+                            </div>
+                            <div class="photo-gallery">
+                                ${photos.map(photo => `
+                                    <div class="gallery-image" onclick="viewFullImage('${photo}')">
+                                        <img src="${photo}" alt="Report photo" onerror="this.src='https://via.placeholder.com/150?text=Image+Error'">
+                                        <div class="overlay"><i class="fas fa-search-plus"></i> Click to enlarge</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${!hasRemarks && !hasPhotos ? `
+                        <div style="color: #94A3B8; text-align: center; padding: 12px;">
+                            <i class="fas fa-info-circle"></i> No additional details provided
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
     });
+    
+    reportsList.innerHTML = html;
+}
+
+    function toggleReportContent(contentId, button) {
+        const content = document.getElementById(contentId);
+        if (content.style.display === 'none' || content.style.display === '') {
+            content.style.display = 'block';
+            button.innerHTML = '<i class="fas fa-chevron-up"></i> View less';
+        } else {
+            content.style.display = 'none';
+            button.innerHTML = '<i class="fas fa-chevron-down"></i> View details';
+        }
+    }
+
+    function togglePhotoGallery(galleryId, button) {
+        const gallery = document.getElementById(galleryId);
+        if (gallery.style.display === 'none' || gallery.style.display === '') {
+            gallery.style.display = 'grid';
+            button.innerHTML = '<i class="fas fa-eye-slash"></i> Hide photos';
+        } else {
+            gallery.style.display = 'none';
+            button.innerHTML = '<i class="fas fa-images"></i> View photos';
+        }
+    }
+
+    function viewFullImage(imageUrl) {
+        const modal = document.createElement('div');
+        modal.className = 'image-modal';
+        modal.onclick = () => modal.remove();
+        
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.onerror = () => img.src = 'https://via.placeholder.com/500?text=Image+Not+Found';
+        
+        modal.appendChild(img);
+        document.body.appendChild(modal);
+    }
+
+    function verifyReport(reportId, status) {
+        fetch('/api/admin/verify-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reportId, status })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`Report ${status === 'verified' ? 'verified' : 'disputed'}`, 'success');
+                fetchReports();
+            } else {
+                showToast('Failed to verify report', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error verifying report', 'error');
+        });
+    }
+
+    // Form Functions
+    function selectLevel(level) {
+        document.querySelectorAll('.report-card').forEach(card => card.classList.remove('selected'));
+        document.getElementById(`card-${level}`).classList.add('selected');
+        selectedLevel = level;
+    }
 
     function updateImagePreview() {
         const previewContainer = document.getElementById('previewContainer');
@@ -1143,8 +1341,8 @@ function filterAndDisplayReports() {
         
         previewGrid.style.display = 'block';
         photoCountSpan.textContent = selectedFiles.length;
-        
         previewContainer.innerHTML = '';
+        
         selectedFiles.forEach((file, index) => {
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -1152,7 +1350,6 @@ function filterAndDisplayReports() {
                 previewDiv.style.position = 'relative';
                 previewDiv.style.width = '100%';
                 previewDiv.style.aspectRatio = '1';
-                
                 previewDiv.innerHTML = `
                     <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid var(--border);">
                     <button onclick="removePhoto(${index})" style="position: absolute; top: -8px; right: -8px; background: var(--red); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 12px;">
@@ -1183,30 +1380,32 @@ function filterAndDisplayReports() {
         }
     }
 
-    function toggleReports() {
-        const reportFormView = document.getElementById('reportFormView');
-        const reportsView = document.getElementById('reportsView');
-        const viewReportsBtn = document.getElementById('viewReportsBtn');
-        const viewReportsText = document.getElementById('viewReportsText');
+    // API Functions
+    function fetchReports() {
+        const reportsList = document.getElementById('reportsList');
+        reportsList.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading reports...</p></div>`;
         
-        if (reportsVisible) {
-            reportFormView.classList.add('active');
-            reportsView.classList.remove('active');
-            viewReportsBtn.classList.remove('active');
-            viewReportsText.textContent = 'View Reports';
-            reportsVisible = false;
-        } else {
-            reportFormView.classList.remove('active');
-            reportsView.classList.add('active');
-            viewReportsBtn.classList.add('active');
-            viewReportsText.textContent = 'Hide Reports';
-            reportsVisible = true;
-            fetchReports();
-        }
+        fetch('/api/reports')
+            .then(res => res.json())
+            .then(data => {
+                allReportsData = data;
+                displayReports(allReportsData);
+            })
+            .catch(error => {
+                reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Failed to load reports</h3></div>`;
+            });
     }
 
     function refreshReports() {
         fetchReports();
+        showToast('Refreshing reports...', 'info');
+    }
+
+    function submitReport() {
+        const station = document.getElementById('stationSelect').value;
+        if (!station) { showToast('Please select a station', 'error'); return; }
+        if (!selectedLevel) { showToast('Please select congestion level', 'error'); return; }
+        openConfirmModal();
     }
 
     function openConfirmModal() {
@@ -1214,7 +1413,7 @@ function filterAndDisplayReports() {
         const stationName = station.replace(' Ave', ' Avenue').replace(' Blvd', ' Boulevard');
         
         const levelMap = {
-            'low': 'Low',
+            'low': 'Light',
             'moderate': 'Moderate',
             'congested': 'Congested',
             'severe': 'Severe'
@@ -1231,214 +1430,38 @@ function filterAndDisplayReports() {
         document.getElementById('confirmModal').classList.remove('active');
     }
 
-    function fetchReports() {
-        const reportsList = document.getElementById('reportsList');
-        reportsList.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading reports...</p></div>`;
-        
-        fetch('/api/reports')
-            .then(res => res.json())
-            .then(data => {
-                console.log("========== FETCHED REPORTS ==========");
-                console.log("Total reports fetched:", data.length);
-                console.log("Sample of actual station names in reports:", [...new Set(data.map(r => r.station))]);
-                console.log("First report sample:", data[0]);
-                allReportsData = data;
-                
-                // DEBUG: Show the actual station values vs filter checkbox values
-                const reportStations = [...new Set(allReportsData.map(r => r.station))];
-                const filterStations = [...document.querySelectorAll('#stationsGrid input')].map(cb => cb.value);
-                console.log("Report stations:", reportStations);
-                console.log("Filter stations:", filterStations);
-                console.log("Stations that DON'T match:", reportStations.filter(s => !filterStations.includes(s)));
-                console.log("Stations in filter NOT in reports:", filterStations.filter(s => !reportStations.includes(s)));
-                
-                // Reset filters to show all
-                activeFilters = {
-                    dateRange: null,
-                    congestionLevels: [],
-                    stations: []
-                };
-                // Reset UI filter selections
-                document.querySelectorAll('.badge-filter').forEach(b => b.classList.remove('active-filter'));
-                document.querySelectorAll('#stationsGrid input').forEach(cb => cb.checked = true);
-                document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-                if (document.querySelector('.chip')) {
-                    document.querySelector('.chip').classList.add('active');
-                }
-                displayReports(allReportsData);
-            })
-            .catch(error => {
-                console.error("Error fetching reports:", error);
-                reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Failed to load reports</h3></div>`;
-            });
+   function confirmSubmit() {
+    closeConfirmModal();
+    
+    const station = document.getElementById('stationSelect').value;
+    const remarks = document.getElementById('remarks').value;
+    
+    // Get selected direction
+    let direction = null;
+    if (document.getElementById('directionNorth').checked) direction = 'northbound';
+    else if (document.getElementById('directionSouth').checked) direction = 'southbound';
+    
+    let congestionValue = 0;
+    switch(selectedLevel) {
+        case 'low': congestionValue = 20; break;
+        case 'moderate': congestionValue = 45; break;
+        case 'congested': congestionValue = 70; break;
+        case 'severe': congestionValue = 90; break;
     }
+    
+    const formData = new FormData();
+    formData.append('station', station);
+    formData.append('direction', direction || '');
+    formData.append('congestion', congestionValue);
+    formData.append('remarks', remarks || '');
+    formData.append('anonymous', 'false');
+    
+    selectedFiles.forEach((file) => {
+        formData.append('images', file);
+    });
+    
+    // ... rest of submit code
 
-    function displayReports(reports) {
-        const reportsList = document.getElementById('reportsList');
-        
-        if (!reports || reports.length === 0) {
-            reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports match your filters</h3><p>Try adjusting your filter criteria</p></div>`;
-            return;
-        }
-        
-        let html = '';
-        reports.forEach((report, idx) => {
-            let levelText = '';
-            let levelColor = '';
-            let borderColor = '';
-            
-            if (report.reported_congestion > 80) {
-                levelText = 'Severe Congestion';
-                levelColor = '#EF4444';
-                borderColor = '#EF4444';
-            } else if (report.reported_congestion > 60) {
-                levelText = 'Congested';
-                levelColor = '#F97316';
-                borderColor = '#F97316';
-            } else if (report.reported_congestion > 30) {
-                levelText = 'Moderate';
-                levelColor = '#EAB308';
-                borderColor = '#EAB308';
-            } else {
-                levelText = 'Light';
-                levelColor = '#22C55E';
-                borderColor = '#22C55E';
-            }
-            
-            const reportTime = new Date(report.timestamp);
-            const now = new Date();
-            const diffMs = now - reportTime;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMins / 60);
-            const diffDays = Math.floor(diffHours / 24);
-            
-            let timeAgo = '';
-            if (diffMins < 1) {
-                timeAgo = 'just now';
-            } else if (diffMins < 60) {
-                timeAgo = `${diffMins} min ago`;
-            } else if (diffHours < 24) {
-                timeAgo = `${diffHours} hour ago`;
-            } else {
-                timeAgo = `${diffDays} day ago`;
-            }
-            
-            let displayName = '';
-            let avatarLetter = '?';
-            
-            if (report.anonymous) {
-                displayName = 'Anonymous';
-                avatarLetter = 'A';
-            } else if (report.username) {
-                const username = report.username;
-                if (username.includes('@')) {
-                    displayName = username.split('@')[0];
-                } else {
-                    displayName = username;
-                }
-                avatarLetter = displayName.charAt(0).toUpperCase();
-            } else {
-                displayName = 'Commuter';
-                avatarLetter = 'C';
-            }
-            
-            const hasRemarks = report.remarks && report.remarks.trim() !== '';
-            const hasPhotos = report.photo_path && report.photo_path !== '';
-            const contentId = `content-${report.id}-${idx}`;
-            
-            html += `
-                <div class="report-item" style="border: 2px solid ${borderColor}; border-radius: 16px; padding: 18px; margin-bottom: 12px; background: white;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 36px; height: 36px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-weight: bold;">
-                                ${avatarLetter}
-                            </div>
-                            <div style="font-weight: 600; font-size: 14px;">${displayName}</div>
-                        </div>
-                        <div style="font-size: 11px; color: #64748B;"><i class="far fa-clock"></i> ${timeAgo}</div>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <span style="font-weight: 700; font-size: 18px;">${report.station}</span>
-                            <span style="font-size: 13px; font-weight: 600; color: ${levelColor};"> - ${levelText}</span>
-                        </div>
-                        
-                        <button onclick="toggleReportContent('${contentId}', this)" style="background: none; border: none; color: #3B82F6; cursor: pointer; font-size: 13px;">
-                            <i class="fas fa-chevron-down"></i> View more
-                        </button>
-                    </div>
-
-                  
-                    
-                    <div id="${contentId}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
-                        ${hasRemarks ? `<div style="background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 12px;"><i class="fas fa-quote-left"></i> ${escapeHtml(report.remarks)}</div>` : ''}
-                        ${hasPhotos ? `<div><i class="fas fa-camera"></i> ${report.photo_path.split(',').length} photo(s) attached</div>` : ''}
-                        ${!hasRemarks && !hasPhotos ? `<div style="color: #94A3B8; text-align: center; padding: 12px;">No additional details</div>` : ''}
-                    </div>
-                </div>
-            `;
-        });
-        
-        reportsList.innerHTML = html;
-    }
-
-    function toggleReportContent(contentId, button) {
-        const content = document.getElementById(contentId);
-        const icon = button.querySelector('i');
-        
-        if (content.style.display === 'none' || content.style.display === '') {
-            content.style.display = 'block';
-            icon.classList.remove('fa-chevron-down');
-            icon.classList.add('fa-chevron-up');
-            button.innerHTML = '<i class="fas fa-chevron-up"></i> View less';
-        } else {
-            content.style.display = 'none';
-            icon.classList.remove('fa-chevron-up');
-            icon.classList.add('fa-chevron-down');
-            button.innerHTML = '<i class="fas fa-chevron-down"></i> View more';
-        }
-    }
-
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function submitReport() {
-        const station = document.getElementById('stationSelect').value;
-        if (!station) { showToast('Please select a station', 'error'); return; }
-        if (!selectedLevel) { showToast('Please select congestion level', 'error'); return; }
-        openConfirmModal();
-    }
-
-    function confirmSubmit() {
-        closeConfirmModal();
-        
-        const station = document.getElementById('stationSelect').value;
-        const remarks = document.getElementById('remarks').value;
-        
-        let congestionValue = 0;
-        switch(selectedLevel) {
-            case 'low': congestionValue = 20; break;
-            case 'moderate': congestionValue = 45; break;
-            case 'congested': congestionValue = 70; break;
-            case 'severe': congestionValue = 90; break;
-        }
-        
-        showToast('Submitting report...', 'info');
-        
-        const formData = new FormData();
-        formData.append('station', station);
-        formData.append('congestion', congestionValue);
-        formData.append('remarks', remarks || '');
-        formData.append('anonymous', 'false');
-        
-        selectedFiles.forEach((file) => {
-            formData.append('images', file);
-        });
         
         fetch('/api/report-congestion', {
             method: 'POST',
@@ -1471,6 +1494,28 @@ function filterAndDisplayReports() {
         document.getElementById('remarks').value = '';
     }
 
+    function toggleReports() {
+        const reportFormView = document.getElementById('reportFormView');
+        const reportsView = document.getElementById('reportsView');
+        const viewReportsBtn = document.getElementById('viewReportsBtn');
+        const viewReportsText = document.getElementById('viewReportsText');
+        
+        if (reportsVisible) {
+            reportFormView.classList.add('active');
+            reportsView.classList.remove('active');
+            viewReportsBtn.classList.remove('active');
+            viewReportsText.textContent = 'View Reports';
+            reportsVisible = false;
+        } else {
+            reportFormView.classList.remove('active');
+            reportsView.classList.add('active');
+            viewReportsBtn.classList.add('active');
+            viewReportsText.textContent = 'Hide Reports';
+            reportsVisible = true;
+            fetchReports();
+        }
+    }
+
     function checkAlertCount() {
         fetch('/api/alerts/count')
             .then(res => res.json())
@@ -1480,81 +1525,56 @@ function filterAndDisplayReports() {
             .catch(() => {});
     }
 
-    function showToast(message, type = 'info') {
-        const existingToast = document.querySelector('.success-message');
-        if (existingToast) existingToast.remove();
-        
-        const toast = document.createElement('div');
-        toast.className = 'success-message';
-        if (type === 'error') toast.style.background = 'var(--red)';
-        else if (type === 'success') toast.style.background = 'var(--green)';
-        else toast.style.background = 'var(--accent-blue)';
-        
-        toast.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'check-circle'}"></i> ${message}`;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
-    }
-
+    // Event Listeners
     document.addEventListener('DOMContentLoaded', function() {
         checkAlertCount();
         
-        // Initialize filter chips
-        const chips = document.querySelectorAll('.chip');
-        if (chips.length > 0) {
-            chips[0].classList.add('active');
-        }
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            if (selectedFiles.length + files.length > 5) {
+                showToast(`Maximum 5 photos allowed. You already have ${selectedFiles.length} selected.`, 'error');
+                return;
+            }
+            files.forEach(file => {
+                if (file.type.startsWith('image/')) selectedFiles.push(file);
+            });
+            updateImagePreview();
+            updatePhotoUploadText();
+        });
         
-        chips.forEach(chip => {
+        document.querySelectorAll('.chip').forEach(chip => {
             chip.addEventListener('click', function() {
-                chips.forEach(c => c.classList.remove('active'));
+                document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
                 this.classList.add('active');
-                console.log("Date chip clicked:", this.dataset.date);
             });
         });
         
-        // Set up congestion level badge click handlers
         document.querySelectorAll('.badge-filter').forEach(badge => {
             badge.addEventListener('click', function() {
                 this.classList.toggle('active-filter');
-                console.log("Level badge clicked:", this.dataset.level, "Active:", this.classList.contains('active-filter'));
             });
         });
         
-        // Set up select all stations
-        const selectAllBtn = document.querySelector('.select-all');
-        if (selectAllBtn) {
-            selectAllBtn.addEventListener('click', function() {
-                const checkboxes = document.querySelectorAll('#stationsGrid input');
-                const allChecked = Array.from(checkboxes).every(c => c.checked);
-                checkboxes.forEach(c => c.checked = !allChecked);
-                console.log("Select all clicked, all checked:", !allChecked);
-            });
-        }
-        
-        // Log station checkbox changes
-        document.querySelectorAll('#stationsGrid input').forEach(cb => {
-            cb.addEventListener('change', function() {
-                console.log("Station checkbox:", this.value, "Checked:", this.checked);
-            });
+        document.querySelector('.select-all')?.addEventListener('click', function() {
+            const checkboxes = document.querySelectorAll('#stationsGrid input');
+            const allChecked = Array.from(checkboxes).every(c => c.checked);
+            checkboxes.forEach(c => c.checked = !allChecked);
         });
         
-        // Auto-select station from URL if present
         const urlParams = new URLSearchParams(window.location.search);
         const stationParam = urlParams.get('station');
         if (stationParam) {
-            const stationName = decodeURIComponent(stationParam);
             const stationSelect = document.getElementById('stationSelect');
             for (let i = 0; i < stationSelect.options.length; i++) {
-                if (stationSelect.options[i].value === stationName) {
+                if (stationSelect.options[i].value === decodeURIComponent(stationParam)) {
                     stationSelect.selectedIndex = i;
                     break;
                 }
             }
         }
         
-        // Initial fetch of reports
         fetchReports();
     });
-</script>
+    </script>
 </body>
 </html>

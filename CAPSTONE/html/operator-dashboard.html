@@ -8,1061 +8,629 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-    :root {
-        --sidebar-bg: #00224D;
-        --main-bg: #F8FAFC;
-        --accent-blue: #3B82F6;
-        --accent-hover: #2563EB;
-        --text-dark: #1E293B;
-        --text-light: #64748B;
-        --white: #FFFFFF;
-        --border: #E2E8F0;
-        --success-green: #22C55E;
-        --warning-yellow: #EAB308;
-        --danger-red: #EF4444;
-        --purple: #8B5CF6;
-        --purple-light: #EDE9FE;
-        --card-bg: #FFFFFF;
-        --light-green: #22c55e;
-        --mod-yellow: #eab308;
-        --cong-orange: #f97316;
-        --sev-red: #ef4444;
-        --severe: #FFCCCC;
-        --severe-text: #D63031;
-        --congested: #FFE5CC;
-        --congested-text: #E67E22;
-        --moderate: #FFF9CC;
-        --moderate-text: #F1C40F;
-        --light: #CCFFCC;
-        --light-text: #27AE60;
-        --card-border: #a5d0ff;
-        --text-muted: #64748b;
-    }
-
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-        font-family: 'Inter', sans-serif;
-    }
-
-    body {
-        display: flex;
-        height: 100vh;
-        width: 100vw;
-        background-color: var(--main-bg);
-        overflow: hidden;
-    }
-
-    /* ========== SIDEBAR ========== */
-    .sidebar { 
-        width: 300px; 
-        background-color: var(--sidebar-bg); 
-        color: white; 
-        display: flex; 
-        flex-direction: column; 
-        flex-shrink: 0; 
-        padding: 20px 0; 
-    }
-
-    .logo-section { 
-        padding: 10px 25px 20px; 
-        display: flex; 
-        align-items: center; 
-        gap: 12px; 
-    }
-
-    .logo-icon { 
-        background: #38BDF8; 
-        padding: 10px 13px; 
-        border-radius: 8px; 
-        font-size: 18px; 
-        color: white;
-    }
-
-    .logo-text h2 { 
-        font-size: 16px; 
-        margin: 0; 
-        color: white;
-    }
-
-    .logo-text p { 
-        font-size: 10px; 
-        opacity: 0.6; 
-        letter-spacing: 1px; 
-        color: white;
-    }
-
-    nav { 
-        padding: 40px 5px 5px 10px; 
-        flex: 1;
-    }
-
-    .nav-item { 
-        padding: 12px 25px; 
-        display: flex; 
-        align-items: center; 
-        gap: 15px; 
-        cursor: pointer; 
-        transition: 0.3s; 
-        color: #CBD5E1; 
-        text-decoration: none; 
-        font-size: 16px; 
-        border-left: 4px solid transparent;
-    }
-
-    .nav-item:hover, 
-    .nav-item.active { 
-        background-color: rgba(255, 255, 255, 0.1); 
-        color: rgb(148, 207, 255); 
-        border-left: 4px solid var(--purple); 
-    }
-
-    .nav-item i {
-        width: 20px;
-        font-size: 16px;
-    }
-
-    .user-profile { 
-        margin-top: auto; 
-        padding: 15px 25px; 
-        border-top: 1px solid rgba(255, 255, 255, 0.1); 
-        display: flex; 
-        align-items: center; 
-        gap: 12px; 
-    }
-
-    .user-avatar { 
-        width: 35px; 
-        height: 35px; 
-        background: var(--purple); 
-        border-radius: 50%; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        color: white; 
-        font-weight: bold; 
-        text-transform: uppercase;
-    }
-
-    .user-info {
-        flex: 1;
-    }
-
-    .user-name {
-        color: white;
-        font-size: 13px;
-        font-weight: bold;
-    }
-
-    .user-role {
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 11px;
-    }
-
-    .station-badge-sidebar {
-        background: rgba(139, 92, 246, 0.2);
-        border: 1px solid var(--purple);
-        border-radius: 20px;
-        padding: 4px 12px;
-        font-size: 11px;
-        color: var(--purple);
-        margin-top: 4px;
-        display: inline-block;
-    }
-
-    .logout-btn { 
-        margin: 10px 25px; 
-        padding: 8px 15px; 
-        background: rgba(239, 68, 68, 0.1); 
-        border: 1px solid rgba(239, 68, 68, 0.3); 
-        color: white; 
-        border-radius: 5px; 
-        cursor: pointer; 
-        font-size: 12px; 
-        width: calc(100% - 50px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        transition: 0.3s;
-        text-decoration: none;
-    }
-
-    .logout-btn:hover { 
-        background: var(--danger-red); 
-        border-color: var(--danger-red);
-    }
-
-    /* ========== MAIN CONTENT ========== */
-    .main-content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow-y: auto;
-        background: var(--main-bg);
-    }
-
-    .topbar {
-        background: white;
-        border-bottom: 1px solid var(--border);
-        padding: 16px 28px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-    }
-
-    .page-title {
-        font-size: 24px;
-        font-weight: 700;
-        color: var(--text-dark);
-    }
-
-    .topbar-right {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-    }
-
-    .date-badge {
-        background: #F1F5F9;
-        padding: 8px 15px;
-        border-radius: 30px;
-        font-size: 13px;
-        color: var(--text-dark);
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .date-badge i {
-        color: var(--purple);
-    }
-
-    .station-badge {
-        background: var(--purple-light);
-        color: var(--purple);
-        padding: 8px 16px;
-        border-radius: 30px;
-        font-size: 13px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 10px 18px;
-        border-radius: 10px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        border: none;
-        transition: all 0.2s;
-        font-family: inherit;
-    }
-
-    .btn-primary {
-        background: var(--purple);
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background: #7C3AED;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 6px rgba(139, 92, 246, 0.2);
-    }
-
-    .btn-ghost {
-        background: transparent;
-        color: var(--text-light);
-        border: 1px solid var(--border);
-    }
-
-    .btn-ghost:hover {
-        background: var(--main-bg);
-        color: var(--text-dark);
-    }
-
-    .btn-sm {
-        padding: 6px 12px;
-        font-size: 12px;
-    }
-
-    .content-body {
-        padding: 24px 28px;
-    }
-
-    .page {
-        display: none;
-    }
-
-    .page.active {
-        display: block;
-    }
-
-    /* ========== DASHBOARD STYLES ========== */
-    .stat-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 20px;
-        margin-bottom: 30px;
-    }
-
-    .stat-card {
-        background: white;
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 20px;
-        transition: transform 0.2s;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-    }
-
-    .stat-card h2 {
-        font-size: 28px;
-        font-weight: 800;
-        color: var(--text-dark);
-        margin-bottom: 4px;
-    }
-
-    .stat-card p {
-        font-size: 13px;
-        color: var(--text-light);
-        font-weight: 500;
-    }
-
-    .status-tables {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-        margin-bottom: 30px;
-    }
-
-    .table-card {
-        background: white;
-        border-radius: 16px;
-        padding: 20px;
-        border: 1px solid var(--border);
-    }
-
-    .table-card h4 {
-        font-size: 15px;
-        font-weight: 700;
-        color: var(--text-dark);
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .table-card h4 i {
-        color: var(--purple);
-    }
-
-    .table-scroll-container {
-        max-height: 450px;
-        overflow-y: auto;
-        overflow-x: auto;
-        border-radius: 12px;
-        scrollbar-width: thin;
-    }
-
-    .table-scroll-container::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-    }
-    
-    .table-scroll-container::-webkit-scrollbar-track {
-        background: #F1F5F9;
-        border-radius: 10px;
-    }
-    
-    .table-scroll-container::-webkit-scrollbar-thumb {
-        background: #CBD5E1;
-        border-radius: 10px;
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    th {
-        text-align: left;
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--text-light);
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        padding: 12px 0;
-        border-bottom: 2px solid var(--border);
-        position: sticky;
-        top: 0;
-        background: white;
-        z-index: 5;
-    }
-
-    td {
-        padding: 14px 0;
-        border-bottom: 1px solid var(--border);
-        font-size: 13px;
-        color: var(--text-dark);
-    }
-
-    .badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 12px;
-        border-radius: 30px;
-        font-size: 11px;
-        font-weight: 600;
-    }
-
-    .badge.light { background: #DCFCE7; color: #166534; }
-    .badge.moderate { background: #FEF9C3; color: #854D0E; }
-    .badge.congested { background: #FFEDD5; color: #9A3412; }
-    .badge.severe { background: #FEE2E2; color: #991B1B; }
-
-    .btn-override {
-        background: #F1F5F9;
-        border: none;
-        padding: 6px 12px;
-        border-radius: 6px;
-        cursor: pointer;
-        color: var(--text-light);
-        transition: 0.3s;
-        font-size: 12px;
-    }
-
-    .btn-override:hover {
-        background: var(--purple);
-        color: white;
-    }
-
-    /* ========== FORECAST CARD ========== */
-    .forecast-card {
-        background: white;
-        border-radius: 20px;
-        padding: 24px;
-        border: 1px solid var(--border);
-        margin-top: 20px;
-    }
-
-    .chart-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .chart-header h4 {
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--text-dark);
-        margin: 0;
-    }
-
-    .chart-header p {
-        font-size: 12px;
-        color: var(--text-light);
-        margin: 0;
-    }
-
-    .station-selector {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .station-selector select {
-        padding: 8px 16px;
-        border: 1px solid var(--border);
-        border-radius: 30px;
-        font-size: 13px;
-        background: white;
-        cursor: pointer;
-        outline: none;
-    }
-
-    canvas {
-        max-height: 250px;
-        width: 100%;
-    }
-
-    /* ========== BROADCAST STYLES - ICONS ABOVE TEXT ========== */
-    .broadcast-layout {
-        display: grid;
-        grid-template-columns: 1.5fr 1fr;
-        gap: 20px;
-    }
-
-    .form-card {
-        background: white;
-        border-radius: 16px;
-        padding: 20px;
-        border: 1px solid var(--border);
-    }
-
-    .input-group {
-        margin-bottom: 20px;
-    }
-
-    label {
-        display: block;
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--text-dark);
-        margin-bottom: 8px;
-    }
-
-    input, select, textarea {
-        width: 100%;
-        padding: 12px 15px;
-        border: 1.5px solid var(--border);
-        border-radius: 10px;
-        font-size: 13px;
-        outline: none;
-        transition: 0.2s;
-        font-family: inherit;
-    }
-
-    input:focus, select:focus, textarea:focus {
-        border-color: var(--purple);
-    }
-
-    /* Disruption Grid - Icons ABOVE text (not beside) */
-    .disruption-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        margin-bottom: 20px;
-    }
-
-    .dist-opt {
-        border: 1px solid var(--border);
-        padding: 16px 12px;
-        border-radius: 16px;
-        text-align: center;
-        cursor: pointer;
-        transition: 0.2s;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .dist-opt:hover {
-        border-color: var(--purple);
-        background: var(--purple-light);
-    }
-
-    .dist-opt i {
-        font-size: 32px;
-        color: var(--purple);
-        display: block;
-        margin-bottom: 4px;
-    }
-
-    .dist-opt strong {
-        font-size: 13px;
-        font-weight: 700;
-        color: var(--text-dark);
-    }
-
-    .dist-opt p {
-        font-size: 10px;
-        color: var(--text-light);
-        margin: 0;
-    }
-
-    .dist-opt.selected {
-        border-color: var(--purple);
-        background: var(--purple-light);
-        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
-    }
-
-    /* Direction & Station Selection */
-    .direction-section {
-        margin-bottom: 24px;
-    }
-    
-    .direction-buttons {
-        display: flex;
-        gap: 12px;
-        margin-top: 8px;
-    }
-    
-    .dir-btn {
-        flex: 1;
-        padding: 10px 16px;
-        border-radius: 40px;
-        font-weight: 600;
-        font-size: 13px;
-        cursor: pointer;
-        transition: all 0.2s;
-        border: 2px solid var(--border);
-        background: white;
-        color: var(--text-dark);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-    }
-    
-    .dir-btn i {
-        font-size: 14px;
-    }
-    
-    .dir-btn.active {
-        background: var(--purple);
-        border-color: var(--purple);
-        color: white;
-    }
-
-    .stations-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
-        max-height: 320px;
-        overflow-y: auto;
-        padding: 4px;
-        scrollbar-width: thin;
-        margin-bottom: 16px;
-    }
-    
-    .stations-grid::-webkit-scrollbar {
-        width: 5px;
-    }
-    
-    .station-btn {
-        padding: 10px 8px;
-        border-radius: 30px;
-        font-size: 12px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s;
-        border: 1.5px solid var(--border);
-        background: white;
-        color: var(--text-dark);
-        text-align: center;
-    }
-    
-    .station-btn:hover {
-        border-color: var(--purple);
-        background: var(--purple-light);
-    }
-    
-    .station-btn.selected {
-        background: var(--purple);
-        border-color: var(--purple);
-        color: white;
-    }
-    
-    .selected-stations-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 12px;
-        min-height: 50px;
-        padding: 12px;
-        background: #F8FAFC;
-        border-radius: 12px;
-        max-height: 100px;
-        overflow-y: auto;
-    }
-
-    .selected-station-tag {
-        background: var(--purple-light);
-        color: var(--purple);
-        padding: 6px 12px;
-        border-radius: 30px;
-        font-size: 12px;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        border: 1px solid var(--purple);
-    }
-
-    .selected-station-tag i {
-        cursor: pointer;
-        font-size: 12px;
-    }
-
-    .selected-station-tag i:hover {
-        color: var(--danger-red);
-    }
-
-    .live-preview {
-        background: #F8FAFC;
-        border: 1px dashed var(--border);
-        border-radius: 12px;
-        padding: 15px;
-        margin-top: 20px;
-    }
-
-    .preview-card {
-        padding: 15px;
-        border-left: 4px solid var(--purple);
-        background: white;
-        border-radius: 8px;
-    }
-
-    /* ========== MODAL STYLES ========== */
-    .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        backdrop-filter: blur(5px);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-    }
-
-    .modal-content {
-        background: white;
-        border-radius: 24px;
-        padding: 28px;
-        max-width: 450px;
-        width: 90%;
-        animation: modalSlideIn 0.3s ease;
-    }
-
-    @keyframes modalSlideIn {
-        from {
-            transform: translateY(-30px);
+        :root {
+            --sidebar-bg: #00224D;
+            --main-bg: #F8FAFC;
+            --accent-blue: #3B82F6;
+            --text-dark: #1E293B;
+            --text-light: #64748B;
+            --white: #FFFFFF;
+            --border: #E2E8F0;
+            --success-green: #22C55E;
+            --danger-red: #EF4444;
+            --purple: #8B5CF6;
+            --purple-light: #EDE9FE;
+            --light-green: #22c55e;
+            --mod-yellow: #eab308;
+            --cong-orange: #f97316;
+            --sev-red: #ef4444;
+            --bg-overlay: rgba(0, 0, 0, 0.4);
+            --card-bg: #ffffff;
+            --text-main: #333;
+            --text-sub: #757575;
+            --border-light: #e0e0e0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            background-color: var(--main-bg);
+            overflow: hidden;
+        }
+
+        .sidebar { 
+            width: 300px; 
+            background-color: var(--sidebar-bg); 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            flex-shrink: 0; 
+            padding: 20px 0; 
+        }
+
+        .photo-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .gallery-image {
+            position: relative;
+            cursor: pointer;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 1;
+            background: #F1F5F9;
+            transition: transform 0.2s;
+        }
+
+        .gallery-image:hover {
+            transform: scale(1.02);
+        }
+
+        .gallery-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-image .overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            font-size: 10px;
+            text-align: center;
+            padding: 4px;
+        }
+
+        .logo-section { 
+            padding: 10px 25px 20px; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+
+        .logo-icon { 
+            background: #38BDF8; 
+            padding: 10px 13px; 
+            border-radius: 8px; 
+            font-size: 18px; 
+            color: white;
+        }
+
+        .logo-text h2 { font-size: 16px; margin: 0; color: white; }
+        .logo-text p { font-size: 10px; opacity: 0.6; color: white; }
+
+        nav { padding: 40px 5px 5px 10px; flex: 1; }
+
+        .nav-item { 
+            padding: 12px 25px; 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            cursor: pointer; 
+            transition: 0.3s; 
+            color: #CBD5E1; 
+            font-size: 16px; 
+            border-left: 4px solid transparent;
+        }
+
+        .nav-item:hover, .nav-item.active { 
+            background-color: rgba(255, 255, 255, 0.1); 
+            color: rgb(148, 207, 255); 
+            border-left: 4px solid var(--purple); 
+        }
+
+        .nav-item i { width: 20px; font-size: 16px; }
+
+        .user-profile { 
+            margin-top: auto; 
+            padding: 15px 25px; 
+            border-top: 1px solid rgba(255, 255, 255, 0.1); 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+
+        .user-avatar { 
+            width: 35px; 
+            height: 35px; 
+            background: var(--purple); 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            color: white; 
+            font-weight: bold; 
+            text-transform: uppercase;
+        }
+
+        .user-info { flex: 1; }
+        .user-name { color: white; font-size: 13px; font-weight: bold; }
+        .user-role { color: rgba(255, 255, 255, 0.5); font-size: 11px; }
+
+        .station-badge-sidebar {
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid var(--purple);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 11px;
+            color: var(--purple);
+            margin-top: 4px;
+            display: inline-block;
+        }
+
+        .logout-btn { 
+            margin: 10px 25px; 
+            padding: 8px 15px; 
+            background: rgba(239, 68, 68, 0.1); 
+            border: 1px solid rgba(239, 68, 68, 0.3); 
+            color: white; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 12px; 
+            width: calc(100% - 50px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: 0.3s;
+            text-decoration: none;
+        }
+
+        .logout-btn:hover { background: var(--danger-red); border-color: var(--danger-red); }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            background: var(--main-bg);
+        }
+
+        .topbar {
+            background: white;
+            border-bottom: 1px solid var(--border);
+            padding: 16px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .page-title { font-size: 24px; font-weight: 700; color: var(--text-dark); }
+
+        .topbar-right { display: flex; gap: 12px; align-items: center; }
+
+        .date-badge {
+            background: #F1F5F9;
+            padding: 8px 15px;
+            border-radius: 30px;
+            font-size: 13px;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .station-badge {
+            background: var(--purple-light);
+            color: var(--purple);
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary { background: var(--purple); color: white; }
+        .btn-primary:hover { background: #7C3AED; transform: translateY(-1px); }
+        .btn-ghost { background: transparent; color: var(--text-light); border: 1px solid var(--border); }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+        .content-body { padding: 24px 28px; }
+        .page { display: none; }
+        .page.active { display: block; }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .stat-card h2 { font-size: 28px; font-weight: 800; color: var(--text-dark); }
+        .stat-card p { font-size: 13px; color: var(--text-light); font-weight: 500; }
+
+        .status-tables {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .table-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .table-card h4 { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .table-card h4 i { color: var(--purple); }
+
+        .table-scroll-container {
+            max-height: 450px;
+            overflow-y: auto;
+            border-radius: 12px;
+        }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--text-light); padding: 12px 8px; border-bottom: 2px solid var(--border); }
+        .data-table td { padding: 12px 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge.light { background: #DCFCE7; color: #166534; }
+        .badge.moderate { background: #FEF9C3; color: #854D0E; }
+        .badge.congested { background: #FFEDD5; color: #9A3412; }
+        .badge.severe { background: #FEE2E2; color: #991B1B; }
+
+        .btn-override {
+            background: #F1F5F9;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: 0.3s;
+        }
+        .btn-override:hover { background: var(--purple); color: white; }
+
+        .forecast-card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            margin-top: 20px;
+        }
+
+        .station-selector select {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            font-size: 13px;
+            background: white;
+            cursor: pointer;
+        }
+
+        canvas { max-height: 250px; width: 100%; }
+
+        .broadcast-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
+        .form-card { background: white; border-radius: 16px; padding: 20px; border: 1px solid var(--border); }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--text-dark); }
+        input, select, textarea { width: 100%; padding: 12px 15px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 13px; outline: none; }
+
+        .disruption-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+        .dist-opt {
+            border: 1px solid var(--border);
+            padding: 16px 12px;
+            border-radius: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .dist-opt.selected { border-color: var(--purple); background: var(--purple-light); }
+        .dist-opt i { font-size: 32px; color: var(--purple); }
+
+        .stations-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            max-height: 320px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+
+        .station-btn {
+            padding: 10px 8px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1.5px solid var(--border);
+            background: white;
+            text-align: center;
+            transition: 0.2s;
+        }
+        .station-btn.selected { background: var(--purple); border-color: var(--purple); color: white; }
+
+        .selected-stations-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px;
+            background: #F8FAFC;
+            border-radius: 12px;
+            min-height: 60px;
+        }
+        .selected-station-tag {
+            background: var(--purple-light);
+            color: var(--purple);
+            padding: 6px 12px;
+            border-radius: 30px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .live-preview { background: #F8FAFC; border: 1px dashed var(--border); border-radius: 12px; padding: 15px; margin-top: 20px; }
+        .preview-card { padding: 15px; border-left: 4px solid var(--purple); background: white; border-radius: 8px; }
+
+        .incident-log-container { display: flex; flex-direction: column; gap: 20px; }
+        .incident-card { background: white; border-radius: 20px; padding: 20px; border-left: 5px solid var(--purple); }
+
+        .reports-list { display: flex; flex-direction: column; gap: 16px; max-height: 65vh; overflow-y: auto; padding-right: 8px; }
+        .report-card { background: white; border-radius: 20px; padding: 20px; border-left: 4px solid; transition: transform 0.2s, box-shadow 0.2s; }
+        .report-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); }
+
+        .empty-state { text-align: center; padding: 60px 40px; background: white; border-radius: 24px; border: 2px dashed var(--border); }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1E293B;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px;
+            z-index: 2000;
+            transform: translateY(100px);
             opacity: 0;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        to {
-            transform: translateY(0);
-            opacity: 1;
+        .toast.show { transform: translateY(0); opacity: 1; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-overlay);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
         }
-    }
 
-    .modal-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
+        .modal-container {
+            background: var(--card-bg);
+            width: 450px;
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            animation: modalSlideIn 0.3s ease;
+        }
 
-    .modal-header i {
-        font-size: 28px;
-        color: var(--purple);
-    }
+        @keyframes modalSlideIn {
+            from { transform: translateY(-30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
 
-    .modal-header h2 {
-        font-size: 22px;
-        font-weight: 700;
-        color: var(--text-dark);
-        margin: 0;
-    }
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
 
-    .modal-subtitle {
-        font-size: 14px;
-        color: var(--text-light);
-        line-height: 1.5;
-        margin-bottom: 20px;
-    }
+        .modal-header h2 {
+            font-size: 20px;
+            margin: 0;
+            color: #000;
+        }
 
-    .status-selection-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        margin-bottom: 20px;
-    }
+        .modal-subtitle {
+            color: var(--text-sub);
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
 
-    .status-opt {
-        border: 2px solid var(--border);
-        border-radius: 16px;
-        padding: 15px;
-        cursor: pointer;
-        transition: all 0.2s;
-        text-align: center;
-    }
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
 
-    .status-opt .dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        margin: 0 auto 8px;
-    }
+        .status-card {
+            border: 2px solid var(--border-light);
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.1s, border-color 0.2s;
+        }
 
-    .status-opt strong {
-        display: block;
-        font-size: 13px;
-        margin-bottom: 4px;
-        color: var(--text-dark);
-    }
+        .status-card:hover { transform: translateY(-2px); }
+        .status-card.selected { border-width: 3px; background: var(--purple-light); }
 
-    .status-opt span {
-        font-size: 10px;
-        color: var(--text-light);
-    }
+        .dot {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-bottom: 8px;
+        }
 
-    .status-opt.light { border-color: var(--light-green); }
-    .status-opt.light .dot { background: var(--light-green); }
-    .status-opt.light.selected { background: #F0FDF4; border-width: 3px; }
+        .status-name { display: block; font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+        .status-desc { font-size: 12px; color: var(--text-sub); line-height: 1.4; }
 
-    .status-opt.moderate { border-color: var(--mod-yellow); }
-    .status-opt.moderate .dot { background: var(--mod-yellow); }
-    .status-opt.moderate.selected { background: #FEF9C3; border-width: 3px; }
+        .card-light { border-color: var(--light-green); }
+        .card-light .dot { background-color: var(--light-green); }
+        .card-light .status-name { color: var(--light-green); }
+        
+        .card-mod { border-color: var(--mod-yellow); }
+        .card-mod .dot { background-color: var(--mod-yellow); }
+        .card-mod .status-name { color: var(--mod-yellow); }
+        
+        .card-cong { border-color: var(--cong-orange); }
+        .card-cong .dot { background-color: var(--cong-orange); }
+        .card-cong .status-name { color: var(--cong-orange); }
+        
+        .card-sev { border-color: var(--sev-red); }
+        .card-sev .dot { background-color: var(--sev-red); }
+        .card-sev .status-name { color: var(--sev-red); }
 
-    .status-opt.congested { border-color: var(--cong-orange); }
-    .status-opt.congested .dot { background: var(--cong-orange); }
-    .status-opt.congested.selected { background: #FFEDD5; border-width: 3px; }
+        .field-group { margin-bottom: 16px; }
+        .field-group label { display: block; font-weight: 600; font-size: 15px; margin-bottom: 8px; color: var(--text-dark); }
+        .field-group select, .field-group input { width: 100%; padding: 12px; border: 1px solid var(--border-light); border-radius: 10px; font-size: 14px; box-sizing: border-box; background-color: #fff; }
 
-    .status-opt.severe { border-color: var(--sev-red); }
-    .status-opt.severe .dot { background: var(--sev-red); }
-    .status-opt.severe.selected { background: #FEE2E2; border-width: 3px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+        .btn-cancel { background: #fff; border: 1px solid var(--border-light); color: #333; padding: 12px 32px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 15px; }
+        .btn-apply { background: #0084ff; color: white; border: none; padding: 12px 32px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 15px; }
+        .btn-cancel:hover, .btn-apply:hover { transform: translateY(-1px); }
 
-    .modal-footer {
-        display: flex;
-        gap: 12px;
-        justify-content: flex-end;
-        margin-top: 24px;
-    }
-
-    .btn-cancel {
-        background: #F1F5F9;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 10px;
-        font-weight: 600;
-        cursor: pointer;
-        color: var(--text-dark);
-        transition: all 0.2s;
-    }
-
-    .btn-cancel:hover {
-        background: #E2E8F0;
-    }
-
-    .btn-apply {
-        background: var(--purple);
-        color: white;
-        border: none;
-        padding: 10px 24px;
-        border-radius: 10px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .btn-apply:hover {
-        background: #7C3AED;
-        transform: translateY(-1px);
-    }
-
-    /* ========== INCIDENT LOG STYLES ========== */
-    .incident-log-container {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-    }
-
-    .incident-card {
-        background: white;
-        border-radius: 20px;
-        padding: 20px;
-        border-left: 5px solid var(--purple);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-
-    .incident-card h3 {
-        font-size: 16px;
-        font-weight: 700;
-        margin: 10px 0;
-    }
-
-    .incident-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin: 12px 0;
-    }
-
-    .incident-tag {
-        background: #F1F5F9;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 11px;
-    }
-
-    .empty-state {
-        text-align: center;
-        padding: 60px 40px;
-        background: white;
-        border-radius: 24px;
-        border: 2px dashed var(--border);
-    }
-
-    .empty-state h3 {
-        font-size: 20px;
-        margin-bottom: 8px;
-    }
-
-    .toast {
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        background: #1E293B;
-        color: white;
-        padding: 12px 20px;
-        border-radius: 12px;
-        z-index: 2000;
-        transform: translateY(100px);
-        opacity: 0;
-        transition: all 0.3s;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .toast.show {
-        transform: translateY(0);
-        opacity: 1;
-    }
-
-    .reports-list {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        max-height: 70vh;
-        overflow-y: auto;
-    }
-
-    .report-card {
-        background: white;
-        border-radius: 20px;
-        padding: 20px;
-        border-left: 4px solid;
-    }
+        /* Filter chips */
+        .filter-chip {
+            transition: all 0.2s ease;
+        }
+        .filter-chip:hover {
+            background: rgba(59, 130, 246, 0.2) !important;
+            color: var(--accent-blue) !important;
+        }
     </style>
 </head>
 <body>
 
-    <!-- SIDEBAR -->
     <div class="sidebar">
         <div class="logo-section">
             <div class="logo-icon"><i class="fas fa-user-tie"></i></div>
-            <div class="logo-text">
-                <h2>MRT-3</h2>
-                <p>OPERATOR PANEL</p>
-            </div>
+            <div class="logo-text"><h2>MRT-3</h2><p>OPERATOR PANEL</p></div>
         </div>
 
         <nav>
-            <div class="nav-item active" onclick="showPage('dashboard', this)">
-                <i class="fas fa-chart-pie"></i>
-                <span>Dashboard</span>
-            </div>
-            <div class="nav-item" onclick="showPage('broadcast', this)">
-                <i class="fas fa-bullhorn"></i>
-                <span>Broadcast</span>
-            </div>
-            <div class="nav-item" onclick="showPage('log', this)">
-                <i class="fas fa-history"></i>
-                <span>Incident Log</span>
-            </div>
-            <div class="nav-item" onclick="showPage('userReports', this)">
-                <i class="fas fa-flag-checkered"></i>
-                <span>User Reports</span>
-            </div>
+            <div class="nav-item active" onclick="showPage('dashboard', this)"><i class="fas fa-chart-pie"></i><span>Dashboard</span></div>
+            <div class="nav-item" onclick="showPage('broadcast', this)"><i class="fas fa-bullhorn"></i><span>Broadcast</span></div>
+            <div class="nav-item" onclick="showPage('log', this)"><i class="fas fa-history"></i><span>Incident Log</span></div>
+            <div class="nav-item" onclick="showPage('userReports', this)"><i class="fas fa-flag-checkered"></i><span>User Reports</span></div>
         </nav>
 
         <div class="user-profile">
-            <div class="user-avatar">O</div>
+            <div class="user-avatar" id="operatorAvatar">O</div>
             <div class="user-info">
-                <div class="user-name">Operator</div>
-                <div class="user-role">MRT-3 Operator</div>
-                <div class="station-badge-sidebar">
-                    <i class="fas fa-map-marker-alt"></i> All Stations
+                <div class="user-name" id="operatorName">{{ session.get('username', 'Operator') }}</div>
+                <div class="user-role">{{ session.get('role', 'Operator') }}</div>
+                <div class="station-badge-sidebar" id="managedStationsBadge">
+                    <i class="fas fa-map-marker-alt"></i> {{ managed_stations|length }} Station(s) Assigned
                 </div>
             </div>
         </div>
 
-        
-
-<button class="logout-btn" onclick="window.location.href='/logout'"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        <button class="logout-btn" onclick="window.location.href='/logout'"><i class="fas fa-sign-out-alt"></i> Logout</button>
     </div>
 
-    <!-- MAIN CONTENT -->
     <div class="main-content">
         <div class="topbar">
             <div class="page-title" id="pageTitle">Dashboard</div>
             <div class="topbar-right">
-                <div class="date-badge">
-                    <i class="far fa-calendar"></i>
-                    <span id="currentDate"></span>
-                </div>
-                <div class="station-badge">
-                    <i class="fas fa-map-marker-alt"></i> All Stations
+                <div class="date-badge"><i class="far fa-calendar"></i><span id="currentDate"></span></div>
+                <div class="station-badge" id="managedStationsBadgeTop">
+                    <i class="fas fa-map-marker-alt"></i> {{ managed_stations|length }} Station(s) Assigned
                 </div>
             </div>
         </div>
 
         <div class="content-body">
-            <!-- DASHBOARD PAGE -->
             <div id="dashboard" class="page active">
                 <div class="stat-grid">
-                    <div class="stat-card"><h2 id="severe-count">2</h2><p>Severely Congested</p></div>
-                    <div class="stat-card"><h2 id="congested-count">3</h2><p>Congested Stations</p></div>
-                    <div class="stat-card"><h2 id="moderate-count">4</h2><p>Moderate Stations</p></div>
-                    <div class="stat-card"><h2 id="light-count">4</h2><p>Light Stations</p></div>
+                    <div class="stat-card"><h2 id="severe-count">0</h2><p>Severely Congested</p></div>
+                    <div class="stat-card"><h2 id="congested-count">0</h2><p>Congested Stations</p></div>
+                    <div class="stat-card"><h2 id="moderate-count">0</h2><p>Moderate Stations</p></div>
+                    <div class="stat-card"><h2 id="light-count">0</h2><p>Light Stations</p></div>
                 </div>
                 <div class="status-tables">
-                    <div class="table-card"><h4><i class="fas fa-arrow-down"></i> Southbound</h4><div class="table-scroll-container"><table><thead><tr><th>STATION</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="southbound-body"></tbody></table></div></div>
-                    <div class="table-card"><h4><i class="fas fa-arrow-up"></i> Northbound</h4><div class="table-scroll-container"><table><thead><tr><th>STATION</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="northbound-body"></tbody></table></div></div>
+                    <div class="table-card"><h4><i class="fas fa-arrow-down"></i> Southbound</h4><div class="table-scroll-container"><table class="data-table"><thead> <th>STATION</th><th>STATUS</th><th>ACTION</th> </thead><tbody id="southbound-body"></tbody> </table></div></div>
+                    <div class="table-card"><h4><i class="fas fa-arrow-up"></i> Northbound</h4><div class="table-scroll-container"><table class="data-table"><thead> <th>STATION</th><th>STATUS</th><th>ACTION</th> </thead><tbody id="northbound-body"></tbody> </table></div></div>
                 </div>
-                <div class="forecast-card"><div class="chart-header"><div><h4 id="forecastStationName">NORTH AVE: NEXT 6 HOURS</h4></div><div class="station-selector"><i class="fas fa-map-marker-alt"></i><select id="forecastStationSelect" onchange="updateForecast()">${["North Ave","Quezon Ave","Kamuning","Cubao","Santolan","Ortigas","Shaw Blvd","Boni Ave","Guadalupe","Buendia","Ayala Ave","Magallanes","Taft"].map(s=>`<option>${s}</option>`).join('')}</select></div></div><canvas id="forecastChart" height="100"></canvas></div>
+                <div class="forecast-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h4 id="forecastStationName">FORECAST</h4>
+                        <div class="station-selector"><i class="fas fa-map-marker-alt"></i><select id="forecastStationSelect" onchange="updateForecast()"></select></div>
+                    </div>
+                    <canvas id="forecastChart" height="100"></canvas>
+                </div>
             </div>
 
-            <!-- BROADCAST PAGE with Icons ABOVE text and Directional Station Selection -->
             <div id="broadcast" class="page">
                 <div class="broadcast-layout">
                     <div>
                         <div class="form-card">
                             <h3 style="margin-bottom:16px;">Disruption Type</h3>
                             <div class="disruption-grid" id="disruptionGrid"></div>
-                            
-                            <div class="direction-section">
-                                <label>Affected Direction</label>
-                                <div class="direction-buttons">
-                                    <button class="dir-btn" onclick="filterStationsByDirection('north')"><i class="fas fa-arrow-up"></i> Northbound</button>
-                                    <button class="dir-btn" onclick="filterStationsByDirection('south')"><i class="fas fa-arrow-down"></i> Southbound</button>
-                                    <button class="dir-btn active" onclick="filterStationsByDirection('both')"><i class="fas fa-exchange-alt"></i> Both</button>
-                                </div>
-                            </div>
-                            
-                            <label>Select Stations (13 stations)</label>
+                            <label>Select Stations</label>
                             <div class="stations-grid" id="stationsGrid"></div>
                             <div class="selected-stations-list" id="selectedStationsList"></div>
                         </div>
                     </div>
-
                     <div>
                         <div class="form-card">
                             <h3><i class="fa-regular fa-envelope"></i> Message</h3>
-                            <div class="input-group"><label>Alert Title</label><input type="text" id="alertTitle" oninput="updatePreview()" placeholder="e.g., Train Malfunction at Cubao"></div>
+                            <div class="input-group"><label>Alert Title</label><input type="text" id="alertTitle" oninput="updatePreview()" placeholder="e.g., Train Malfunction"></div>
                             <div class="input-group"><label>Message</label><textarea id="alertMessage" oninput="updatePreview()" rows="4" placeholder="Describe situation..."></textarea></div>
                             <div class="input-group"><label>Severity</label><select id="severityLevel"><option value="advisory">Advisory</option><option value="warning">Warning</option><option value="critical">Critical</option></select></div>
                             <div class="live-preview"><div class="preview-card"><strong id="previewTitle">Alert Title</strong><p id="previewText">Message preview</p></div></div>
@@ -1072,289 +640,860 @@
                 </div>
             </div>
 
-            <!-- INCIDENT LOG PAGE -->
-            <div id="log" class="page">
-                <div id="incident-log-container" class="incident-log-container">
-                    <div class="empty-state"><i class="fas fa-clipboard-list fa-3x" style="color:var(--purple); margin-bottom:16px; display:block;"></i><h3>No incidents logged yet</h3><p>Send broadcasts to see them here</p></div>
-                </div>
-            </div>
-
-            <!-- USER REPORTS PAGE -->
+            <div id="log" class="page"><div id="incident-log-container" class="incident-log-container"><div class="empty-state"><i class="fas fa-clipboard-list fa-3x"></i><h3>No incidents logged yet</h3></div></div></div>
+            
             <div id="userReports" class="page">
-                <div style="display:flex; justify-content:flex-end; margin-bottom:20px;"><button class="btn-ghost btn-sm" onclick="fetchUserReports()"><i class="fas fa-sync-alt"></i> Refresh</button></div>
-                <div id="reportsList" class="reports-list"><div class="empty-state">Loading reports...</div></div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <div class="card-title" style="margin: 0;">
+                        <i class="fas fa-flag-checkered"></i> User Submitted Reports
+                    </div>
+                    <button class="btn-ghost btn-sm" onclick="fetchUserReports()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                
+                <!-- Filter Bar -->
+                <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+                    <div style="display: flex; gap: 8px; background: #F1F5F9; padding: 4px; border-radius: 40px;">
+                        <button class="filter-chip" data-filter="all" onclick="filterReports('all')" style="padding: 6px 16px; border-radius: 30px; border: none; background: var(--accent-blue); color: white; cursor: pointer; font-size: 12px; font-weight: 600;">All</button>
+                        <button class="filter-chip" data-filter="severe" onclick="filterReports('severe')" style="padding: 6px 16px; border-radius: 30px; border: none; background: transparent; color: var(--text-light); cursor: pointer; font-size: 12px; font-weight: 600;">Severe</button>
+                        <button class="filter-chip" data-filter="congested" onclick="filterReports('congested')" style="padding: 6px 16px; border-radius: 30px; border: none; background: transparent; color: var(--text-light); cursor: pointer; font-size: 12px; font-weight: 600;">Congested</button>
+                        <button class="filter-chip" data-filter="moderate" onclick="filterReports('moderate')" style="padding: 6px 16px; border-radius: 30px; border: none; background: transparent; color: var(--text-light); cursor: pointer; font-size: 12px; font-weight: 600;">Moderate</button>
+                        <button class="filter-chip" data-filter="light" onclick="filterReports('light')" style="padding: 6px 16px; border-radius: 30px; border: none; background: transparent; color: var(--text-light); cursor: pointer; font-size: 12px; font-weight: 600;">Light</button>
+                    </div>
+                    
+                    <div style="flex: 1; max-width: 300px; position: relative;">
+                        <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94A3B8; font-size: 12px;"></i>
+                        <input type="text" id="reportSearchInput" placeholder="Search by station..." 
+                               style="width: 100%; padding: 8px 12px 8px 32px; border: 1.5px solid var(--border); border-radius: 30px; font-size: 13px; outline: none;">
+                    </div>
+                </div>
+                
+                <div id="reportsList" class="reports-list">
+                    <div class="empty-state">
+                        <i class="fas fa-flag-checkered fa-3x" style="color: var(--text-light); margin-bottom: 12px;"></i>
+                        <h3>No reports for your stations</h3>
+                        <p style="color: var(--text-light); margin-top: 8px;">User reports will appear here</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- MODAL -->
     <div id="overrideModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header"><i class="fa-solid fa-wand-magic-sparkles"></i><h2>Override - <span id="modalStationName">Station</span></h2></div>
-            <div class="status-selection-grid">
-                <div class="status-opt light" onclick="selectLevel(this, 'Light')"><div class="dot"></div><strong>Light</strong></div>
-                <div class="status-opt moderate" onclick="selectLevel(this, 'Moderate')"><div class="dot"></div><strong>Moderate</strong></div>
-                <div class="status-opt congested" onclick="selectLevel(this, 'Congested')"><div class="dot"></div><strong>Congested</strong></div>
-                <div class="status-opt severe" onclick="selectLevel(this, 'Severe')"><div class="dot"></div><strong>Severe</strong></div>
+        <div class="modal-container">
+            <div class="modal-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                <h2>Override Congestion - <span id="modalStationName">Station</span></h2>
             </div>
-            <div class="modal-footer"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-apply" onclick="applyOverride()">Apply</button></div>
+            <div class="modal-subtitle">Select the actual congestion level you're observing at this station.</div>
+
+            <div class="status-grid" id="statusGrid">
+                <div class="status-card card-light" data-level="light" data-congestion="20">
+                    <span class="dot"></span>
+                    <span class="status-name">Light</span>
+                    <span class="status-desc">Fast boarding. Plenty of space.</span>
+                </div>
+                <div class="status-card card-mod" data-level="moderate" data-congestion="50">
+                    <span class="dot"></span>
+                    <span class="status-name">Moderate</span>
+                    <span class="status-desc">Standard queues. 5-10 min wait.</span>
+                </div>
+                <div class="status-card card-cong" data-level="congested" data-congestion="75">
+                    <span class="dot"></span>
+                    <span class="status-name">Congested</span>
+                    <span class="status-desc">Heavy crowds. Long lines.</span>
+                </div>
+                <div class="status-card card-sev" data-level="severe" data-congestion="90">
+                    <span class="dot"></span>
+                    <span class="status-name">Severely Congested</span>
+                    <span class="status-desc">Overcrowding</span>
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label>Override Duration</label>
+                <select id="overrideDuration">
+                    <option value="30">30 mins</option>
+                    <option value="60" selected>1 hour</option>
+                    <option value="120">2 hours</option>
+                    <option value="manual">Until I manually change it</option>
+                </select>
+            </div>
+
+            <div class="field-group">
+                <label>Reason (logged internally)</label>
+                <input type="text" id="overrideReason" placeholder="e.g. Train delay, peak hours ...">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn-apply" onclick="applyOverride()">Apply</button>
+            </div>
         </div>
     </div>
 
     <div class="toast" id="toast"><span id="toastIcon">✅</span><span id="toastMsg"></span></div>
 
     <script>
-        const allStations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
-        const southStations = [...allStations].reverse();
-        const northStations = [...allStations];
+    // ========== DATA FROM FLASK BACKEND ==========
+    const managedStations = {{ managed_stations | tojson }};
+    const allStations = {{ all_stations | tojson }};
+    const operatorName = "{{ session.get('username', 'Operator') }}";
+    
+    let selectedDisruptionType = "";
+    let selectedStationsSet = new Set();
+    let broadcasts = [];
+    let currentSelectedLevel = "";
+    let currentSelectedCongestion = 0;
+    let currentStation = "";
+    let forecastChart = null;
+    
+    // Report filtering variables
+    let allReportsData = [];
+    let currentReportFilter = 'all';
+    let currentReportSearch = '';
+    
+    const disruptionTypes = ["Train Breakdown", "Overcrowding", "Maintenance", "Signal Issue", "Gate Closure", "General Notice"];
+    const typeIcons = {"Train Breakdown":"fa-train","Overcrowding":"fa-users","Maintenance":"fa-wrench","Signal Issue":"fa-satellite-dish","Gate Closure":"fa-door-closed","General Notice":"fa-bullhorn"};
+    
+    function showToast(icon, msg) {
+        const toast = document.getElementById('toast');
+        document.getElementById('toastIcon').textContent = icon;
+        document.getElementById('toastMsg').textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+    
+    function updateDate() {
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    
+    function showPage(pageId, element) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        element.classList.add('active');
+        const titles = { dashboard: 'Dashboard', broadcast: 'Broadcast Alerts', log: 'Incident Log', userReports: 'User Reports' };
+        document.getElementById('pageTitle').textContent = titles[pageId];
+        if (pageId === 'log') loadIncidentLogs();
+        if (pageId === 'userReports') fetchUserReports();
+    }
+    
+    function canManageStation(station) {
+        return managedStations.includes(station);
+    }
+    
+    function getStatusInfo(congestion) {
+        if (congestion > 80) {
+            return { class: 'severe', text: 'Severe' };
+        } else if (congestion > 60) {
+            return { class: 'congested', text: 'Congested' };
+        } else if (congestion > 30) {
+            return { class: 'moderate', text: 'Moderate' };
+        } else {
+            return { class: 'light', text: 'Light' };
+        }
+    }
+    
+   async function loadCongestionData() {
+    try {
+        const response = await fetch('/api/live-map/directions');
+        const data = await response.json();
         
-        const disruptionTypes = ["Train Breakdown", "Overcrowding", "Maintenance", "Signal Issue", "Gate Closure", "General Notice"];
-        const typeIcons = {"Train Breakdown":"fa-train","Overcrowding":"fa-users","Maintenance":"fa-wrench","Signal Issue":"fa-satellite-dish","Gate Closure":"fa-door-closed","General Notice":"fa-bullhorn"};
-        
-        let selectedDisruptionType = "";
-        let selectedStationsSet = new Set();
-        let currentDirection = "both";
-        let broadcasts = JSON.parse(localStorage.getItem('mrt_broadcasts') || '[]');
-        let currentSelectedLevel = "";
-        let currentStation = "";
-        let forecastChart = null;
-
-        function showToast(icon, msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toastIcon').textContent = icon;
-            document.getElementById('toastMsg').textContent = msg;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
-
-        function updateDate() {
-            document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        }
-
-        function showPage(pageId, element) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
-            element.classList.add('active');
-            const titles = { dashboard: 'Dashboard', broadcast: 'Broadcast Alerts', log: 'Incident Log', userReports: 'User Reports' };
-            document.getElementById('pageTitle').textContent = titles[pageId];
-            if (pageId === 'log') loadIncidentLogs();
-            if (pageId === 'userReports') fetchUserReports();
-        }
-
-        // Station filtering by direction
-        function filterStationsByDirection(direction) {
-            currentDirection = direction;
-            document.querySelectorAll('.dir-btn').forEach(btn => btn.classList.remove('active'));
-            if (direction === 'north') document.querySelectorAll('.dir-btn')[0].classList.add('active');
-            else if (direction === 'south') document.querySelectorAll('.dir-btn')[1].classList.add('active');
-            else document.querySelectorAll('.dir-btn')[2].classList.add('active');
-            renderStationsGrid();
-        }
-
-        function renderStationsGrid() {
-            let stationsToShow = [];
-            if (currentDirection === 'north') stationsToShow = northStations;
-            else if (currentDirection === 'south') stationsToShow = southStations;
-            else stationsToShow = allStations;
+        // 🔧 Check for active overrides and their expiry
+        if (data.active_overrides && data.active_overrides > 0) {
+            console.log(`🔧 ${data.active_overrides} active override(s) on the system`);
             
-            const grid = document.getElementById('stationsGrid');
-            grid.innerHTML = stationsToShow.map(station => `
-                <div class="station-btn ${selectedStationsSet.has(station) ? 'selected' : ''}" onclick="toggleStation('${station}')">${station}</div>
-            `).join('');
-        }
-
-        function toggleStation(station) {
-            if (selectedStationsSet.has(station)) selectedStationsSet.delete(station);
-            else selectedStationsSet.add(station);
-            renderStationsGrid();
-            updateSelectedDisplay();
-        }
-
-        function removeStation(station) {
-            selectedStationsSet.delete(station);
-            renderStationsGrid();
-            updateSelectedDisplay();
-        }
-
-        function updateSelectedDisplay() {
-            const container = document.getElementById('selectedStationsList');
-            if (selectedStationsSet.size === 0) { container.innerHTML = '<p style="color: var(--text-light);">No stations selected</p>'; return; }
-            container.innerHTML = Array.from(selectedStationsSet).map(s => `<div class="selected-station-tag">${s} <i class="fas fa-times" onclick="removeStation('${s}')"></i></div>`).join('');
-        }
-
-        // Disruption grid with icons ABOVE text
-        function initDisruptionGrid() {
-            const grid = document.getElementById('disruptionGrid');
-            grid.innerHTML = disruptionTypes.map(type => `
-                <div class="dist-opt" onclick="selectDisruption('${type}', this)">
-                    <i class="fas ${typeIcons[type]}"></i>
-                    <strong>${type}</strong>
-                    <p>${type === 'Train Breakdown' ? 'Train failure' : type === 'Overcrowding' ? 'Platform full' : type === 'Maintenance' ? 'Scheduled' : 'Alert'}</p>
-                </div>
-            `).join('');
-        }
-
-        function selectDisruption(type, el) {
-            selectedDisruptionType = type;
-            document.querySelectorAll('.dist-opt').forEach(opt => opt.classList.remove('selected'));
-            el.classList.add('selected');
-            updatePreview();
-        }
-
-        function updatePreview() {
-            document.getElementById('previewTitle').textContent = document.getElementById('alertTitle').value || "Alert Title";
-            document.getElementById('previewText').textContent = document.getElementById('alertMessage').value || "Message preview";
-        }
-
-        function clearBroadcastForm() {
-            document.getElementById('alertTitle').value = '';
-            document.getElementById('alertMessage').value = '';
-            document.getElementById('severityLevel').value = 'advisory';
-            selectedStationsSet.clear();
-            selectedDisruptionType = '';
-            document.querySelectorAll('.dist-opt').forEach(opt => opt.classList.remove('selected'));
-            renderStationsGrid();
-            updateSelectedDisplay();
-            updatePreview();
-        }
-
-        function sendBroadcast() {
-            if (!selectedDisruptionType) { showToast('⚠️', 'Select disruption type'); return; }
-            if (selectedStationsSet.size === 0) { showToast('⚠️', 'Select affected stations'); return; }
-            const title = document.getElementById('alertTitle').value;
-            const message = document.getElementById('alertMessage').value;
-            if (!title || !message) { showToast('⚠️', 'Fill all fields'); return; }
-            
-            const newBroadcast = {
-                id: Date.now(),
-                type: selectedDisruptionType,
-                icon: typeIcons[selectedDisruptionType],
-                title, message,
-                stations: Array.from(selectedStationsSet),
-                direction: currentDirection,
-                time: new Date().toLocaleString(),
-                severity: document.getElementById('severityLevel').value,
-                active: true
-            };
-            broadcasts.unshift(newBroadcast);
-            localStorage.setItem('mrt_broadcasts', JSON.stringify(broadcasts));
-            showToast('', 'Broadcast sent!');
-            clearBroadcastForm();
-            loadIncidentLogs();
-        }
-
-        function loadIncidentLogs() {
-            const container = document.getElementById('incident-log-container');
-            if (broadcasts.length === 0) {
-                container.innerHTML = `<div class="empty-state"><i class="fas fa-clipboard-list fa-3x"></i><h3>No incidents logged</h3><p>Send broadcasts to see them here</p></div>`;
-                return;
+            // Optional: Show a toast notification for active overrides
+            if (data.active_overrides_details) {
+                const overriddenStations = Object.keys(data.active_overrides_details).join(', ');
+                console.log(`   Stations: ${overriddenStations}`);
+                // Uncomment below to show toast (optional)
+                // showToast('🔧', `${data.active_overrides} station(s) have active overrides`);
             }
-            container.innerHTML = broadcasts.map(b => `
-                <div class="incident-card" style="border-left-color: var(--purple);">
-                    <div style="display:flex; justify-content:space-between;"><span><i class="fas ${b.icon}"></i> ${b.type}</span><span style="font-size:12px;">${b.time}</span></div>
-                    <h3>${escapeHtml(b.title)}</h3>
-                    <p style="color: #475569;">${escapeHtml(b.message)}</p>
-                    <div class="incident-tags">${b.stations.map(s => `<span class="incident-tag">${escapeHtml(s)}</span>`).join('')}</div>
-                    <div style="margin-top:8px;"><span class="badge ${b.severity === 'critical' ? 'severe' : b.severity === 'warning' ? 'congested' : 'light'}">${b.severity.toUpperCase()}</span></div>
-                </div>
-            `).join('');
-        }
-
-        // Dashboard mock data
-        function loadCongestionStats() {
-            const mockStats = [
-                { name: "North Ave", status: "moderate" }, { name: "Quezon Ave", status: "light" }, { name: "Kamuning", status: "moderate" },
-                { name: "Cubao", status: "severe" }, { name: "Santolan", status: "light" }, { name: "Ortigas", status: "congested" },
-                { name: "Shaw Blvd", status: "congested" }, { name: "Boni Ave", status: "moderate" }, { name: "Guadalupe", status: "light" },
-                { name: "Buendia", status: "light" }, { name: "Ayala Ave", status: "severe" }, { name: "Magallanes", status: "congested" }, { name: "Taft", status: "moderate" }
-            ];
-            document.getElementById('severe-count').textContent = mockStats.filter(s => s.status === 'severe').length;
-            document.getElementById('congested-count').textContent = mockStats.filter(s => s.status === 'congested').length;
-            document.getElementById('moderate-count').textContent = mockStats.filter(s => s.status === 'moderate').length;
-            document.getElementById('light-count').textContent = mockStats.filter(s => s.status === 'light').length;
-            
-            document.getElementById('southbound-body').innerHTML = mockStats.slice(0,7).map(s => `<tr><td>${s.name}</td><td><span class="badge ${s.status}">${s.status.charAt(0).toUpperCase()+s.status.slice(1)}</span></td><td><button class="btn-override" onclick="openOverrideModal('${s.name}')">Override</button></td></tr>`).join('');
-            document.getElementById('northbound-body').innerHTML = mockStats.slice(7).reverse().map(s => `<tr><td>${s.name}</td><td><span class="badge ${s.status}">${s.status.charAt(0).toUpperCase()+s.status.slice(1)}</span></td><td><button class="btn-override" onclick="openOverrideModal('${s.name}')">Override</button></td></tr>`).join('');
-        }
-
-        function openOverrideModal(station) { currentStation = station; document.getElementById('modalStationName').textContent = station; document.getElementById('overrideModal').style.display = 'flex'; currentSelectedLevel = ""; document.querySelectorAll('.status-opt').forEach(opt => opt.classList.remove('selected')); }
-        function closeModal() { document.getElementById('overrideModal').style.display = 'none'; }
-        function selectLevel(el, level) { document.querySelectorAll('.status-opt').forEach(opt => opt.classList.remove('selected')); el.classList.add('selected'); currentSelectedLevel = level; }
-        function applyOverride() { if (!currentSelectedLevel) return; closeModal(); showToast('✅', `${currentStation} set to ${currentSelectedLevel}`); loadCongestionStats(); }
-
-        // User Reports mock
-        function fetchUserReports() {
-            const demos = [
-                { station: "Cubao", reported_congestion: 85, remarks: "Extremely crowded", timestamp: new Date().toISOString(), username: "commuter123" },
-                { station: "Ayala Ave", reported_congestion: 72, remarks: "Long queues", timestamp: new Date(Date.now()-3600000).toISOString(), username: "juan_d" },
-                { station: "North Ave", reported_congestion: 45, remarks: "Moderate crowd", timestamp: new Date(Date.now()-7200000).toISOString(), username: "maria_r" }
-            ];
-            displayUserReports(demos);
         }
         
-        function displayUserReports(reports) {
-            const container = document.getElementById('reportsList');
-            if (!reports.length) { container.innerHTML = '<div class="empty-state">No reports</div>'; return; }
-            container.innerHTML = reports.map(r => {
-                let levelClass = r.reported_congestion > 80 ? 'severe' : r.reported_congestion > 60 ? 'congested' : r.reported_congestion > 30 ? 'moderate' : 'light';
-                return `<div class="report-card" style="border-left-color: var(--${levelClass === 'severe' ? 'sev-red' : levelClass === 'congested' ? 'cong-orange' : levelClass === 'moderate' ? 'mod-yellow' : 'success-green'});">
-                    <div><strong>${r.station}</strong> <span class="badge ${levelClass}">${r.reported_congestion}%</span></div>
-                    <div style="font-size:12px; color:#64748B;">${r.username} • ${new Date(r.timestamp).toLocaleTimeString()}</div>
-                    ${r.remarks ? `<div style="margin-top:8px;">💬 ${r.remarks}</div>` : ''}
-                </div>`;
-            }).join('');
-        }
-
-        function updateForecast() {
-            const station = document.getElementById('forecastStationSelect').value;
-            document.getElementById('forecastStationName').innerHTML = `${station.toUpperCase()}: NEXT 6 HOURS`;
-            const hours = [], data = [];
-            for (let i = 0; i < 8; i++) {
-                let h = (new Date().getHours() + i) % 24;
-                hours.push(`${h % 12 || 12}:00 ${h >= 12 ? 'PM' : 'AM'}`);
-                let base = 40;
-                if (h >= 7 && h <= 9) base = 85;
-                else if (h >= 17 && h <= 19) base = 90;
-                else if (h >= 12 && h <= 14) base = 65;
-                else if (h >= 21 || h <= 5) base = 15;
-                if (station === 'Cubao' || station === 'Ayala Ave') base += 15;
-                data.push(Math.min(100, Math.max(5, base + (Math.random() * 10 - 5))));
+        let severeCount = 0, congestedCount = 0, moderateCount = 0, lightCount = 0;
+        
+        const southboundBody = document.getElementById('southbound-body');
+        const southRows = [];
+        for (const station of allStations) {
+            const stationData = data.southbound?.[station];
+            if (stationData) {
+                const congestion = stationData.congestion;
+                const statusInfo = getStatusInfo(congestion);
+                const isOverridden = stationData.overridden || false;
+                
+                if (statusInfo.class === 'severe') severeCount++;
+                else if (statusInfo.class === 'congested') congestedCount++;
+                else if (statusInfo.class === 'moderate') moderateCount++;
+                else lightCount++;
+                
+                const canManage = canManageStation(station);
+                const buttonHtml = canManage 
+                    ? `<button class="btn-override" onclick="openOverrideModal('${station}')">Override</button>` 
+                    : `<button class="btn-override" disabled style="opacity:0.5; cursor:not-allowed;"><i class="fas fa-lock"></i> Not Allowed</button>`;
+                
+                const overrideBadge = isOverridden ? ' <span style="font-size:10px; background:#8B5CF6; color:white; padding:2px 6px; border-radius:10px; margin-left:5px;">OVERRIDDEN</span>' : '';
+                
+                southRows.push(`
+                    <tr>
+                        <td style="font-weight:500;">${station}${overrideBadge}</td>
+                        <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                        <td>${buttonHtml}</td>
+                    </tr>
+                `);
             }
+        }
+        southboundBody.innerHTML = southRows.join('');
+        
+        const northboundBody = document.getElementById('northbound-body');
+        const northRows = [];
+        for (const station of allStations) {
+            const stationData = data.northbound?.[station];
+            if (stationData) {
+                const congestion = stationData.congestion;
+                const statusInfo = getStatusInfo(congestion);
+                const isOverridden = stationData.overridden || false;
+                
+                const canManage = canManageStation(station);
+                const buttonHtml = canManage 
+                    ? `<button class="btn-override" onclick="openOverrideModal('${station}')">Override</button>` 
+                    : `<button class="btn-override" disabled style="opacity:0.5; cursor:not-allowed;"><i class="fas fa-lock"></i> Not Allowed</button>`;
+                
+                const overrideBadge = isOverridden ? ' <span style="font-size:10px; background:#8B5CF6; color:white; padding:2px 6px; border-radius:10px; margin-left:5px;">OVERRIDDEN</span>' : '';
+                
+                northRows.push(`
+                    <tr>
+                        <td style="font-weight:500;">${station}${overrideBadge}</td>
+                        <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                        <td>${buttonHtml}</td>
+                    </tr>
+                `);
+            }
+        }
+        northboundBody.innerHTML = northRows.join('');
+        
+        document.getElementById('severe-count').textContent = severeCount;
+        document.getElementById('congested-count').textContent = congestedCount;
+        document.getElementById('moderate-count').textContent = moderateCount;
+        document.getElementById('light-count').textContent = lightCount;
+        
+        // Optional: Log when an override expires (compare with previous data)
+        if (window.previousOverrides) {
+            const currentOverrides = data.active_overrides_details || {};
+            for (const [station, level] of Object.entries(window.previousOverrides)) {
+                if (!currentOverrides[station]) {
+                    console.log(`⏰ Override EXPIRED for ${station} (was set to ${level})`);
+                    showToast('⏰', `${station} override has expired, returning to normal prediction`);
+                }
+            }
+        }
+        window.previousOverrides = data.active_overrides_details || {};
+        
+    } catch (error) {
+        console.error('Error loading congestion data:', error);
+        showToast('⚠️', 'Failed to load congestion data');
+    }
+}
+
+async function applyOverride() {
+    if (!currentSelectedLevel) { 
+        showToast('⚠️', 'Select a congestion level'); 
+        return; 
+    }
+    
+    const duration = document.getElementById('overrideDuration').value;
+    const reason = document.getElementById('overrideReason').value;
+    
+    let durationText = '';
+    let expiryMessage = '';
+    if (duration === '30') {
+        durationText = '30 minutes';
+        expiryMessage = 'Will expire in 30 minutes';
+    } else if (duration === '60') {
+        durationText = '1 hour';
+        expiryMessage = 'Will expire in 1 hour';
+    } else if (duration === '120') {
+        durationText = '2 hours';
+        expiryMessage = 'Will expire in 2 hours';
+    } else {
+        durationText = 'until manually changed';
+        expiryMessage = 'Will remain until manually cleared';
+    }
+    
+    const applyBtn = document.querySelector('.btn-apply');
+    const originalText = applyBtn.textContent;
+    applyBtn.disabled = true;
+    applyBtn.textContent = 'Applying...';
+    
+    try {
+        const response = await fetch('/api/operator/override-congestion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                station: currentStation,
+                level: currentSelectedLevel,
+                congestion_value: currentSelectedCongestion,
+                duration: duration,
+                reason: reason
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('✅', `${currentStation} set to ${currentSelectedLevel} (Duration: ${durationText}) - ${expiryMessage}`);
+            closeModal();
+            await loadCongestionData();
+            
+            const forecastSelect = document.getElementById('forecastStationSelect');
+            if (forecastSelect.value === currentStation) {
+                await updateForecast();
+            }
+        } else {
+            showToast('⚠️', data.error || 'Failed to override');
+        }
+    } catch (error) {
+        console.error('Error applying override:', error);
+        showToast('⚠️', 'Failed to apply override');
+    } finally {
+        applyBtn.disabled = false;
+        applyBtn.textContent = originalText;
+    }
+}
+    // Report Filtering Functions
+    function filterReports(level) {
+        currentReportFilter = level;
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.style.background = 'transparent';
+            chip.style.color = 'var(--text-light)';
+            if (chip.getAttribute('data-filter') === level) {
+                chip.style.background = 'var(--accent-blue)';
+                chip.style.color = 'white';
+            }
+        });
+        applyReportFilters();
+    }
+    
+    function searchReports() {
+        currentReportSearch = document.getElementById('reportSearchInput').value.toLowerCase();
+        applyReportFilters();
+    }
+    
+    function applyReportFilters() {
+        let filtered = [...allReportsData];
+        
+        if (currentReportFilter !== 'all') {
+            filtered = filtered.filter(r => {
+                if (currentReportFilter === 'severe') return r.reported_congestion > 80;
+                if (currentReportFilter === 'congested') return r.reported_congestion > 60 && r.reported_congestion <= 80;
+                if (currentReportFilter === 'moderate') return r.reported_congestion > 30 && r.reported_congestion <= 60;
+                if (currentReportFilter === 'light') return r.reported_congestion <= 30;
+                return true;
+            });
+        }
+        
+        if (currentReportSearch) {
+            filtered = filtered.filter(r => r.station.toLowerCase().includes(currentReportSearch));
+        }
+        
+        displayFilteredReports(filtered);
+    }
+    
+    async function fetchUserReports() {
+        try {
+            const response = await fetch('/api/reports');
+            const reports = await response.json();
+            allReportsData = reports.filter(r => canManageStation(r.station));
+            applyReportFilters();
+        } catch (error) {
+            console.error('Error fetching reports:', error);
+            showToast('⚠️', 'Failed to load reports');
+        }
+    }
+    
+    function displayFilteredReports(reports) {
+        const container = document.getElementById('reportsList');
+        if (!reports.length) { 
+            container.innerHTML = '<div class="empty-state"><i class="fas fa-flag-checkered fa-3x"></i><h3>No reports for your stations</h3><p style="color: var(--text-light); margin-top: 8px;">Try changing your filters</p></div>'; 
+            return; 
+        }
+        
+        container.innerHTML = reports.map(r => {
+            const statusInfo = getStatusInfo(r.reported_congestion);
+            const reportTime = new Date(r.timestamp).toLocaleString();
+            const borderColor = statusInfo.class === 'severe' ? 'var(--sev-red)' : 
+                               statusInfo.class === 'congested' ? 'var(--cong-orange)' : 
+                               statusInfo.class === 'moderate' ? 'var(--mod-yellow)' : 'var(--success-green)';
+            
+            let photos = [];
+            if (r.photo_path) {
+                try {
+                    photos = JSON.parse(r.photo_path);
+                } catch(e) {
+                    if (r.photo_path) photos = [r.photo_path];
+                }
+            }
+            
+            const hasPhotos = photos.length > 0;
+            
+            return `
+                <div class="report-card" style="border-left-color: ${borderColor};">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <div style="width: 40px; height: 40px; background: var(--purple-light); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-subway" style="color: var(--purple); font-size: 18px;"></i>
+                            </div>
+                            <div>
+                                <h4 style="font-size: 16px; font-weight: 700; color: var(--text-dark); margin-bottom: 4px;">${r.station}</h4>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <span class="badge ${statusInfo.class}" style="font-size: 11px;">${statusInfo.text}</span>
+                                    <span style="font-size: 11px; color: var(--text-light);">
+                                        <i class="far fa-clock"></i> ${reportTime}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="font-size: 12px; color: var(--text-light);">
+                                <i class="fas fa-user"></i> ${r.anonymous ? 'Anonymous' : (r.username || 'Commuter')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${r.remarks ? `
+                        <div style="margin: 16px 0; background: #F8FAFC; padding: 12px 16px; border-radius: 12px;">
+                            <i class="fas fa-comment" style="color: var(--purple); margin-right: 8px; font-size: 12px;"></i>
+                            <span style="font-size: 13px; color: var(--text-dark);">${escapeHtml(r.remarks)}</span>
+                        </div>
+                    ` : ''}
+                    
+                    ${hasPhotos ? `
+                        <div style="margin-top: 12px;">
+                            <div style="font-size: 12px; font-weight: 600; margin-bottom: 10px; color: var(--text-dark); display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-camera" style="color: var(--purple);"></i> 
+                                ${photos.length} photo(s) attached
+                            </div>
+                            <div class="photo-gallery">
+                                ${photos.map(photo => `
+                                    <div class="gallery-image" onclick="viewFullImage('${photo}')">
+                                        <img src="${photo}" alt="Report photo" 
+                                             onerror="this.src='https://via.placeholder.com/100?text=Image+Error'">
+                                        <div class="overlay"><i class="fas fa-search-plus"></i> Click to enlarge</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${r.direction ? `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-light); display: flex; align-items: center; gap: 6px;">
+                            <i class="fas fa-arrow-${r.direction === 'northbound' ? 'up' : 'down'}"></i>
+                            Direction: ${r.direction === 'northbound' ? 'Northbound' : 'Southbound'}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+    
+    function viewFullImage(imageUrl) {
+        const modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.backgroundColor = 'rgba(0,0,0,0.95)';
+        modal.style.zIndex = '9999';
+        modal.style.display = 'flex';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.cursor = 'pointer';
+        
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.style.maxWidth = '90%';
+        img.style.maxHeight = '90%';
+        img.style.borderRadius = '8px';
+        img.style.boxShadow = '0 0 30px rgba(0,0,0,0.5)';
+        
+        modal.appendChild(img);
+        modal.onclick = () => modal.remove();
+        
+        document.body.appendChild(modal);
+    }
+    
+    async function updateForecast() {
+        const select = document.getElementById('forecastStationSelect');
+        const station = select.value;
+        if (!station) return;
+        
+        document.getElementById('forecastStationName').innerHTML = `${station.toUpperCase()}: NEXT 6 HOURS`;
+        
+        try {
+            const response = await fetch(`/api/station-forecast/${encodeURIComponent(station)}`);
+            const data = await response.json();
+            
             if (forecastChart) forecastChart.destroy();
+            
             const ctx = document.getElementById('forecastChart').getContext('2d');
             forecastChart = new Chart(ctx, {
                 type: 'line',
-                data: { labels: hours, datasets: [{ data, borderColor: '#8B5CF6', borderWidth: 3, pointRadius: 5, tension: 0.2, fill: false }] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } }
+                data: {
+                    labels: data.intervals || ['+1h', '+2h', '+3h', '+4h', '+5h', '+6h'],
+                    datasets: [{
+                        data: data.forecast || [0,0,0,0,0,0],
+                        borderColor: '#8B5CF6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        pointBackgroundColor: (context) => {
+                            const value = context.raw;
+                            if (value > 80) return '#EF4444';
+                            if (value > 60) return '#F97316';
+                            if (value > 30) return '#EAB308';
+                            return '#22C55E';
+                        },
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 2,
+                        tension: 0.2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    if (value === 0) return 'CLOSED';
+                                    let level = 'LIGHT';
+                                    if (value > 80) level = 'SEVERE';
+                                    else if (value > 60) level = 'CONGESTED';
+                                    else if (value > 30) level = 'MODERATE';
+                                    return `${level}: ${value}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            max: 100, 
+                            title: { display: true, text: 'Congestion' },
+                            ticks: { callback: function(value) { return value; } }
+                        }
+                    }
+                }
             });
+        } catch (error) {
+            console.error('Error loading forecast:', error);
         }
-
-        function escapeHtml(text) { if (!text) return ''; return text.replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            updateDate(); setInterval(updateDate, 1000);
-            initDisruptionGrid();
-            renderStationsGrid();
-            updateSelectedDisplay();
-            loadCongestionStats();
-            updateForecast();
-            loadIncidentLogs();
-            fetchUserReports();
-            window.filterStationsByDirection = filterStationsByDirection;
-            window.toggleStation = toggleStation;
-            window.removeStation = removeStation;
-            window.selectDisruption = selectDisruption;
-            window.sendBroadcast = sendBroadcast;
-            window.clearBroadcastForm = clearBroadcastForm;
-            window.openOverrideModal = openOverrideModal;
-            window.closeModal = closeModal;
-            window.selectLevel = selectLevel;
-            window.applyOverride = applyOverride;
-            window.showPage = showPage;
-            window.fetchUserReports = fetchUserReports;
-            window.updateForecast = updateForecast;
-        });
+    }
+    
+    function initForecastSelect() {
+        const select = document.getElementById('forecastStationSelect');
+        select.innerHTML = allStations.map(s => `<option value="${s}" ${managedStations.includes(s) ? 'selected' : ''}>${s}</option>`).join('');
+        if (allStations.length > 0) updateForecast();
+    }
+    
+    function renderStationsGrid() {
+        const grid = document.getElementById('stationsGrid');
+        grid.innerHTML = allStations.map(station => {
+            const canManage = canManageStation(station);
+            const isSelected = selectedStationsSet.has(station);
+            const disabledClass = !canManage ? 'disabled' : '';
+            return `<div class="station-btn ${isSelected ? 'selected' : ''} ${disabledClass}" 
+                onclick="${canManage ? `toggleStation('${station}')` : 'showToast(\'🔒\', \'You do not have permission for this station\')'}">
+                ${station}
+            </div>`;
+        }).join('');
+    }
+    
+    function toggleStation(station) {
+        if (selectedStationsSet.has(station)) selectedStationsSet.delete(station);
+        else selectedStationsSet.add(station);
+        renderStationsGrid();
+        updateSelectedDisplay();
+    }
+    
+    function removeStation(station) {
+        selectedStationsSet.delete(station);
+        renderStationsGrid();
+        updateSelectedDisplay();
+    }
+    
+    function updateSelectedDisplay() {
+        const container = document.getElementById('selectedStationsList');
+        if (selectedStationsSet.size === 0) { 
+            container.innerHTML = '<p style="color: var(--text-light); font-size:12px;">No stations selected</p>'; 
+            return; 
+        }
+        container.innerHTML = Array.from(selectedStationsSet).map(s => `<div class="selected-station-tag">${s} <i class="fas fa-times" onclick="removeStation('${s}')"></i></div>`).join('');
+    }
+    
+    function initDisruptionGrid() {
+        const grid = document.getElementById('disruptionGrid');
+        grid.innerHTML = disruptionTypes.map(type => `
+            <div class="dist-opt" onclick="selectDisruption('${type}', this)">
+                <i class="fas ${typeIcons[type]}"></i>
+                <strong>${type}</strong>
+            </div>
+        `).join('');
+    }
+    
+    function selectDisruption(type, el) {
+        selectedDisruptionType = type;
+        document.querySelectorAll('.dist-opt').forEach(opt => opt.classList.remove('selected'));
+        el.classList.add('selected');
+        updatePreview();
+    }
+    
+    function updatePreview() {
+        document.getElementById('previewTitle').textContent = document.getElementById('alertTitle').value || "Alert Title";
+        document.getElementById('previewText').textContent = document.getElementById('alertMessage').value || "Message preview";
+    }
+    
+    function clearBroadcastForm() {
+        document.getElementById('alertTitle').value = '';
+        document.getElementById('alertMessage').value = '';
+        document.getElementById('severityLevel').value = 'advisory';
+        selectedStationsSet.clear();
+        selectedDisruptionType = '';
+        document.querySelectorAll('.dist-opt').forEach(opt => opt.classList.remove('selected'));
+        renderStationsGrid();
+        updateSelectedDisplay();
+        updatePreview();
+    }
+    
+    async function sendBroadcast() {
+        if (!selectedDisruptionType) { showToast('⚠️', 'Select disruption type'); return; }
+        if (selectedStationsSet.size === 0) { showToast('⚠️', 'Select affected stations'); return; }
+        
+        for (let station of selectedStationsSet) {
+            if (!canManageStation(station)) {
+                showToast('🔒', `You don't have permission for ${station}`);
+                return;
+            }
+        }
+        
+        const title = document.getElementById('alertTitle').value;
+        const message = document.getElementById('alertMessage').value;
+        if (!title || !message) { showToast('⚠️', 'Fill all fields'); return; }
+        
+        const newBroadcast = {
+            id: Date.now(),
+            type: selectedDisruptionType,
+            icon: typeIcons[selectedDisruptionType],
+            title: title,
+            message: message,
+            stations: Array.from(selectedStationsSet),
+            time: new Date().toLocaleString(),
+            severity: document.getElementById('severityLevel').value,
+            active: true
+        };
+        
+        const stored = localStorage.getItem('mrt_broadcasts');
+        const existing = stored ? JSON.parse(stored) : [];
+        existing.unshift(newBroadcast);
+        localStorage.setItem('mrt_broadcasts', JSON.stringify(existing));
+        
+        showToast('✅', 'Broadcast sent successfully!');
+        clearBroadcastForm();
+        loadIncidentLogs();
+        
+        try {
+            await fetch('/api/operator/send-broadcast', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: title,
+                    message: message,
+                    disruption_type: selectedDisruptionType,
+                    stations: Array.from(selectedStationsSet),
+                    severity: document.getElementById('severityLevel').value
+                })
+            });
+        } catch (error) {
+            console.log('Backend broadcast endpoint not available, saved locally only');
+        }
+    }
+    
+    function loadIncidentLogs() {
+        const stored = localStorage.getItem('mrt_broadcasts');
+        const allBroadcasts = stored ? JSON.parse(stored) : [];
+        const filtered = allBroadcasts.filter(b => b.stations.some(s => managedStations.includes(s)));
+        
+        const container = document.getElementById('incident-log-container');
+        if (filtered.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-clipboard-list fa-3x"></i><h3>No incidents logged yet</h3></div>`;
+            return;
+        }
+        container.innerHTML = filtered.map(b => `
+            <div class="incident-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <span><i class="fas ${b.icon}"></i> ${b.type}</span>
+                    <span>${b.time}</span>
+                </div>
+                <h3 style="margin:10px 0;">${escapeHtml(b.title)}</h3>
+                <p>${escapeHtml(b.message)}</p>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin:12px 0;">
+                    ${b.stations.map(s => `<span style="background:#F1F5F9; padding:4px 12px; border-radius:20px;">${escapeHtml(s)}</span>`).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function openOverrideModal(station) {
+        if (!canManageStation(station)) {
+            showToast('🔒', 'You do not have permission to override this station');
+            return;
+        }
+        currentStation = station;
+        document.getElementById('modalStationName').textContent = station;
+        currentSelectedLevel = "";
+        currentSelectedCongestion = 0;
+        document.querySelectorAll('.status-card').forEach(card => card.classList.remove('selected'));
+        document.getElementById('overrideDuration').value = '60';
+        document.getElementById('overrideReason').value = '';
+        document.getElementById('overrideModal').style.display = 'flex';
+    }
+    
+    function closeModal() { 
+        document.getElementById('overrideModal').style.display = 'none'; 
+    }
+    
+    document.addEventListener('click', function(e) {
+        const statusCard = e.target.closest('.status-card');
+        if (statusCard && document.getElementById('overrideModal').style.display === 'flex') {
+            document.querySelectorAll('.status-card').forEach(card => card.classList.remove('selected'));
+            statusCard.classList.add('selected');
+            currentSelectedLevel = statusCard.getAttribute('data-level');
+            currentSelectedCongestion = parseInt(statusCard.getAttribute('data-congestion'));
+        }
+    });
+    
+    async function applyOverride() {
+        if (!currentSelectedLevel) { 
+            showToast('⚠️', 'Select a congestion level'); 
+            return; 
+        }
+        
+        const duration = document.getElementById('overrideDuration').value;
+        const reason = document.getElementById('overrideReason').value;
+        
+        let durationText = '';
+        if (duration === '30') durationText = '30 minutes';
+        else if (duration === '60') durationText = '1 hour';
+        else if (duration === '120') durationText = '2 hours';
+        else durationText = 'until manually changed';
+        
+        const applyBtn = document.querySelector('.btn-apply');
+        const originalText = applyBtn.textContent;
+        applyBtn.disabled = true;
+        applyBtn.textContent = 'Applying...';
+        
+        try {
+            const response = await fetch('/api/operator/override-congestion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    station: currentStation,
+                    level: currentSelectedLevel,
+                    congestion_value: currentSelectedCongestion,
+                    duration: duration,
+                    reason: reason
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast('✅', `${currentStation} set to ${currentSelectedLevel} (Duration: ${durationText})`);
+                closeModal();
+                await loadCongestionData();
+                
+                const forecastSelect = document.getElementById('forecastStationSelect');
+                if (forecastSelect.value === currentStation) {
+                    await updateForecast();
+                }
+            } else {
+                showToast('⚠️', data.error || 'Failed to override');
+            }
+        } catch (error) {
+            console.error('Error applying override:', error);
+            showToast('⚠️', 'Failed to apply override');
+        } finally {
+            applyBtn.disabled = false;
+            applyBtn.textContent = originalText;
+        }
+    }
+    
+    function escapeHtml(text) { 
+        if (!text) return ''; 
+        return text.replace(/[&<>]/g, function(m) { 
+            if (m === '&') return '&amp;'; 
+            if (m === '<') return '&lt;'; 
+            if (m === '>') return '&gt;'; 
+            return m; 
+        }); 
+    }
+    
+    let refreshInterval = null;
+    function startAutoRefresh() {
+        if (refreshInterval) clearInterval(refreshInterval);
+        refreshInterval = setInterval(() => {
+            if (document.getElementById('dashboard').classList.contains('active')) {
+                loadCongestionData();
+            }
+            if (document.getElementById('userReports').classList.contains('active')) {
+                fetchUserReports();
+            }
+        }, 60000);
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        updateDate();
+        setInterval(updateDate, 1000);
+        initDisruptionGrid();
+        renderStationsGrid();
+        updateSelectedDisplay();
+        initForecastSelect();
+        loadCongestionData();
+        loadIncidentLogs();
+        fetchUserReports();
+        startAutoRefresh();
+        
+        document.getElementById('operatorName').textContent = operatorName;
+        document.getElementById('operatorAvatar').textContent = operatorName.charAt(0).toUpperCase();
+        
+        // Add search input event listener
+        const searchInput = document.getElementById('reportSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('keyup', searchReports);
+        }
+        
+        window.toggleStation = toggleStation;
+        window.removeStation = removeStation;
+        window.selectDisruption = selectDisruption;
+        window.sendBroadcast = sendBroadcast;
+        window.clearBroadcastForm = clearBroadcastForm;
+        window.openOverrideModal = openOverrideModal;
+        window.closeModal = closeModal;
+        window.applyOverride = applyOverride;
+        window.showPage = showPage;
+        window.fetchUserReports = fetchUserReports;
+        window.updateForecast = updateForecast;
+        window.filterReports = filterReports;
+        window.searchReports = searchReports;
+        window.viewFullImage = viewFullImage;
+    });
     </script>
 </body>
 </html>

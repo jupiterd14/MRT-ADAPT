@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MRT-3 Tracker | Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+      
+    <style>
+        /* Keep all your existing CSS styles here */
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
+        :root {
+            --sidebar-bg: #00224D;
+            --main-bg: #F8FAFC;
+            --dark-bluew: #0c437b;
+            --light-bluew: #f9fcff;
+            --azureblue: #0085ff;
+            --accent-blue: #3B82F6;
+            --text-dark: #1E293B;
+            --text-light: #64748B;
+            --white: #FFFFFF;
+            --border: #E2E8F0;
+            --red: #EF4444;
+            --orange: #F97316;
+            --yellow: #F59E0B;
+            --green: #22C55E;
+            --blue-navy: #1E3A8A;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Bricolage Grotesque", sans-serif;
+        }
+
+        body {
+            background: linear-gradient(to right, #144182, #0b1525);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        /* Modal Styles - Enhanced for different error types */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 28px;
+            padding: 2rem 2rem 2rem 2rem;
+            max-width: 380px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.4);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.2rem;
+        }
+
+        .modal-icon.error {
+            background: #FEF3C7;
+        }
+        
+        .modal-icon.warning {
+            background: #FEF3C7;
+        }
+        
+        .modal-icon.info {
+            background: #DBEAFE;
+        }
+        
+        .modal-icon.success {
+            background: #D1FAE5;
+        }
+
+        .modal-icon i {
+            font-size: 2.5rem;
+        }
+        
+        .modal-icon.error i {
+            color: #EF4444;
+        }
+        
+        .modal-icon.warning i {
+            color: #F59E0B;
+        }
+        
+        .modal-icon.info i {
+            color: #3B82F6;
+        }
+        
+        .modal-icon.success i {
+            color: #22C55E;
+        }
+
+        .modal-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #1E293B;
+            margin-bottom: 0.75rem;
+        }
+
+        .modal-message {
+            color: #475569;
+            margin-bottom: 1.8rem;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .modal-btn {
+            background: #0085ff;
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 0.8rem 1.8rem;
+            border-radius: 60px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .modal-btn:hover {
+            background: #0066cc;
+            transform: scale(0.98);
+        }
+
+        /* Keep all your other existing CSS styles */
+        .page-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            width: 100%;
+            max-width: 520px;
+        }
+
+        .brand-header {
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .brand-icon {
+            background: linear-gradient(135deg, #0085ff, #1a5bbf);
+            border-radius: 12px;
+            height: 65px;
+            width: 65px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.3);
+        }
+
+        .brand-icon i {
+            font-size: 35px;
+            color: white;
+        }
+
+        .brand-header h1 {
+            font-size: 1.9rem;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            margin-bottom: 0.3rem;
+        }
+
+        .brand-header p {
+            font-size: 0.9rem;
+            opacity: 0.85;
+            font-weight: 500;
+        }
+
+        .auth-card {
+            background: rgba(20, 30, 45, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 36px;
+            padding: 2rem 2rem 2rem 2rem;
+            width: 100%;
+            box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: transform 0.2s;
+        }
+
+        .input-label {
+            color: #e2e8f0;
+            font-weight: 600;
+            font-size: 0.85rem;
+            letter-spacing: 0.3px;
+            margin-bottom: 0.4rem;
+            display: inline-block;
+            width: auto;
+            min-width: 80px;
+        }
+
+        .field-wrap {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 60px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0.6rem 1.2rem;
+            margin-bottom: 1.3rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.2s;
+        }
+
+        .field-wrap:focus-within {
+            border-color: #0085ff;
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 0 0 3px rgba(0, 133, 255, 0.2);
+        }
+
+        .field-wrap i:first-child {
+            color: #94a3b8;
+            font-size: 1rem;
+        }
+
+        .field-wrap input {
+            background: transparent;
+            border: none;
+            flex: 1;
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+            padding: 0.5rem 0;
+            font-weight: 500;
+        }
+
+        .field-wrap input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 400;
+        }
+
+        .toggle-eye {
+            cursor: pointer;
+            color: #94a3b8;
+            font-size: 1rem;
+            transition: color 0.2s;
+        }
+
+        .toggle-eye:hover {
+            color: white;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #a0afc0;
+            font-size: 0.75rem;
+            margin: 1rem 0 1.2rem;
+            gap: 12px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .social-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1.6rem;
+            width: 100%;
+        }
+
+        .btn-social {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 60px;
+            padding: 0.85rem 2.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            font-weight: 600;
+            font-size: 1rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            backdrop-filter: blur(4px);
+            width: 100%;
+            max-width: 320px;
+            min-width: 450px;
+            letter-spacing: 0.3px;
+        }
+
+        .btn-social:hover {
+            background: rgba(255, 255, 255, 0.18);
+            transform: translateY(-2px);
+            border-color: #0085ff;
+            box-shadow: 0 6px 16px rgba(0, 133, 255, 0.25);
+        }
+
+        .btn-signin {
+            background: linear-gradient(95deg, #0085ff, #1e6ed4);
+            border: none;
+            width: 100%;
+            padding: 0.9rem;
+            border-radius: 60px;
+            font-weight: 700;
+            font-size: 1rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 0.3rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 8px 20px -8px rgba(0, 133, 255, 0.4);
+        }
+
+        .btn-signin:hover {
+            background: linear-gradient(95deg, #1e6ed4, #0085ff);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px -10px rgba(0, 133, 255, 0.6);
+        }
+
+        .signup-link {
+            text-align: center;
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            margin-top: 0.5rem;
+        }
+
+        .signup-link a {
+            color: #60a5fa;
+            text-decoration: none;
+            font-weight: 600;
+            margin-left: 5px;
+            transition: color 0.2s;
+        }
+
+        .signup-link a:hover {
+            color: white;
+            text-decoration: underline;
+        }
+
+        .shake {
+            animation: shakeAnim 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        }
+
+        @keyframes shakeAnim {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        @media (max-width: 550px) {
+            body {
+                padding: 1rem;
+            }
+            .auth-card {
+                padding: 1.8rem;
+            }
+            .brand-header h1 {
+                font-size: 1.6rem;
+            }
+            .field-wrap {
+                padding: 0.5rem 1rem;
+            }
+            .btn-social {
+                padding: 0.75rem 1.8rem;
+                max-width: 100%;
+                min-width: auto;
+                font-size: 0.9rem;
+                gap: 10px;
+            }
+        }
+
+        form {
+            display: block;
+        }
+
+        .field-wrap input:-webkit-autofill,
+        .field-wrap input:-webkit-autofill:hover,
+        .field-wrap input:-webkit-autofill:focus {
+            -webkit-text-fill-color: white;
+            -webkit-box-shadow: 0 0 0px 1000px rgba(30, 40, 60, 0.9) inset;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Enhanced Error Modal -->
+    <div class="modal-overlay" id="errorModal">
+        <div class="modal-content">
+            <div class="modal-icon error" id="modalIcon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h2 class="modal-title" id="modalTitle">Login Failed</h2>
+            <p class="modal-message" id="errorMessage">Invalid email or password. Please try again.</p>
+            <button class="modal-btn" onclick="closeModal()">Try Again</button>
+        </div>
+    </div>
+
+    <div class="page-container">
+        <div class="brand-header">
+            <div class="brand-icon"><i class="fa-solid fa-train-subway"></i></div>
+            <h1>MRT-3 Tracker</h1>
+            <p>Smart Congestion Prediction System</p>
+        </div>
+
+        <div class="auth-card">
+            <form id="loginForm" action="/login" method="POST">
+                <span class="input-label">Email</span>
+                <div class="field-wrap">
+                    <i class="fa-regular fa-envelope"></i>
+                    <input type="email" name="email" id="email" placeholder="you@email.com" required>
+                </div>
+
+                <span class="input-label">Password</span>
+                <div class="field-wrap">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" name="password" id="password" placeholder="••••••••••••" required>
+                    <i class="fa-solid fa-eye toggle-eye" id="toggleIcon"></i>
+                </div>
+
+                <div class="divider"><span>OR</span></div>
+
+                <div class="social-row">
+                    <button type="button" class="btn-social" onclick="window.location.href='/login/google?select_account=true'">
+    <img src="https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png" width="20" alt="Google" style="filter: brightness(0) invert(1);"> 
+    Continue with Google
+</button>
+                </div>
+
+                <button type="submit" class="btn-signin"> Sign In</button>
+            </form>
+            <div class="signup-link" style="display: none;">No account? <a href="/signup">Create one</a></div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle password visibility
+        const togglePassword = document.querySelector('#toggleIcon');
+        const passwordInput = document.querySelector('#password');
+        
+        if (togglePassword && passwordInput) {
+            togglePassword.addEventListener('click', function () {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.classList.toggle('fa-eye');
+                this.classList.toggle('fa-eye-slash');
+            });
+        }
+
+        // Check for OAuth errors in URL
+window.addEventListener('DOMContentLoaded', function() {
+    // Check URL for OAuth error parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    const errorDescription = urlParams.get('error_description');
+    
+    if (error) {
+        let errorMessage = 'Google login failed. ';
+        if (error === 'access_denied') {
+            errorMessage = 'You denied access to your Google account. Please try again.';
+        } else if (errorDescription) {
+            errorMessage = decodeURIComponent(errorDescription);
+        }
+        showModal(errorMessage, 'error');
+        
+        // Clean URL without reloading page
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+    }
+    
+    // ... rest of your existing code
+});
+
+
+
+        // Enhanced showModal function with type support
+        function showModal(message, type = 'error') {
+            const modal = document.getElementById('errorModal');
+            const messageElement = document.getElementById('errorMessage');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalIcon = document.getElementById('modalIcon');
+            const form = document.getElementById('loginForm');
+            
+            if (!modal || !messageElement) return;
+            
+            messageElement.textContent = message || 'Invalid email or password. Please try again.';
+            
+            // Update modal styling based on type
+            modalIcon.className = 'modal-icon ' + type;
+            
+            // Update icon and title based on type
+            const iconElement = modalIcon.querySelector('i');
+            if (type === 'error') {
+                iconElement.className = 'fas fa-exclamation-triangle';
+                modalTitle.textContent = 'Login Failed';
+            } else if (type === 'warning') {
+                iconElement.className = 'fas fa-exclamation-circle';
+                modalTitle.textContent = 'Account Pending';
+            } else if (type === 'info') {
+                iconElement.className = 'fas fa-info-circle';
+                modalTitle.textContent = 'Google Sign-In Required';
+            } else if (type === 'success') {
+                iconElement.className = 'fas fa-check-circle';
+                modalTitle.textContent = 'Success';
+            }
+            
+            modal.style.display = 'flex';
+            
+            // Add shake animation to form
+            if (form) {
+                form.classList.add('shake');
+                setTimeout(() => {
+                    form.classList.remove('shake');
+                }, 500);
+            }
+            
+            // Highlight fields temporarily
+            const inputs = document.querySelectorAll('.field-wrap input');
+            inputs.forEach(input => {
+                input.style.borderColor = '#ef4444';
+                setTimeout(() => {
+                    input.style.borderColor = '';
+                }, 1000);
+            });
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('errorModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+            const emailField = document.getElementById('email');
+            if (emailField) {
+                emailField.focus();
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('errorModal');
+            if (modal && event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // Handle error from Flask flash messages
+        window.addEventListener('DOMContentLoaded', function() {
+            // Check for error from URL parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const errorParam = urlParams.get('error');
+            const errorType = urlParams.get('error_type');
+            
+            if (errorParam && errorParam !== 'null') {
+                let decodedError = decodeURIComponent(errorParam);
+                showModal(decodedError, errorType || 'error');
+            }
+            
+            // Check for flash messages (from Flask)
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        showModal('{{ message }}', '{{ category if category in ['error', 'warning', 'info', 'success'] else 'error' }}');
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        });
+
+        // Form submission handling with enhanced validation
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', function(e) {
+                const email = document.getElementById('email').value.trim();
+                const password = document.getElementById('password').value;
+                
+                if (!email || !password) {
+                    e.preventDefault();
+                    showModal('Please fill in both email and password fields.', 'warning');
+                    return false;
+                }
+                
+                // Basic email format validation
+                const emailPattern = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/;
+                if (!emailPattern.test(email)) {
+                    e.preventDefault();
+                    showModal('Please enter a valid email address.', 'warning');
+                    return false;
+                }
+                
+                return true;
+            });
+        }
+        
+        // Remove any hash errors
+        if (window.location.hash && window.location.hash.includes('error')) {
+            const errMsg = window.location.hash.split('error=')[1];
+            if (errMsg) showModal(decodeURIComponent(errMsg), 'error');
+            window.location.hash = '';
+        }
+        
+        // Google button styling
+        const googleBtn = document.querySelector('.btn-social');
+        if (googleBtn) {
+            googleBtn.style.fontWeight = '500';
+        }
+    </script>
+</body>
+</html>

@@ -1,10 +1,15 @@
+"""
+evaluate_model.py - FIXED VERSION
+Matches the training data format!
+"""
+
 import pandas as pd
 import numpy as np
 import tensorflow as tf
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, confusion_matrix, f1_score
-from sklearn.preprocessing import StandardScaler
 import pickle
 import os
+import json
 from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
@@ -14,15 +19,15 @@ STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
             "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
             "Ayala Ave", "Magallanes", "Taft"]
 
-STATION_ID_MAP = {
-    1: "North Ave", 2: "Quezon Ave", 3: "Kamuning", 4: "Cubao",
-    5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
-    9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
+STATION_CAPACITY = {
+    "North Ave": 12000, "Quezon Ave": 9000, "Kamuning": 7500, "Cubao": 15000,
+    "Santolan": 8000, "Ortigas": 9500, "Shaw Blvd": 11000, "Boni Ave": 8500,
+    "Guadalupe": 10000, "Buendia": 9000, "Ayala Ave": 14000, "Magallanes": 9000, 
+    "Taft": 16000
 }
 
 def calculate_metrics(y_true, y_pred):
     """Calculate all evaluation metrics"""
-    # Remove any NaN or infinite values
     mask = ~(np.isnan(y_true) | np.isinf(y_true) | np.isnan(y_pred) | np.isinf(y_pred))
     y_true_clean = y_true[mask]
     y_pred_clean = y_pred[mask]
@@ -30,271 +35,232 @@ def calculate_metrics(y_true, y_pred):
     if len(y_true_clean) == 0:
         return None
     
-    # MAE - Mean Absolute Error
     mae = mean_absolute_error(y_true_clean, y_pred_clean)
-    
-    # RMSE - Root Mean Square Error
     rmse = np.sqrt(mean_squared_error(y_true_clean, y_pred_clean))
-    
-    # MAPE - Mean Absolute Percentage Error (avoid division by zero)
-    non_zero_mask = y_true_clean != 0
-    if np.sum(non_zero_mask) > 0:
-        mape = np.mean(np.abs((y_true_clean[non_zero_mask] - y_pred_clean[non_zero_mask]) / y_true_clean[non_zero_mask])) * 100
-    else:
-        mape = float('inf')
     
     # R² Score
     r2 = r2_score(y_true_clean, y_pred_clean)
     
-    # For confusion matrix and F1, we need to categorize into congestion levels
-    def categorize_congestion(value):
-        if value > 80:
-            return 4  # Critical
-        elif value > 60:
-            return 3  # Congested
-        elif value > 30:
-            return 2  # Moderate
-        else:
-            return 1  # Light
+    # F1 Score for congestion levels
+    def categorize(value):
+        pct = (value / STATION_CAPACITY.get("North Ave", 10000)) * 100  # Approximate
+        if pct > 80: return 4
+        elif pct > 60: return 3
+        elif pct > 30: return 2
+        return 1
     
-    y_true_cat = [categorize_congestion(v) for v in y_true_clean]
-    y_pred_cat = [categorize_congestion(v) for v in y_pred_clean]
+    y_true_cat = [categorize(v) for v in y_true_clean]
+    y_pred_cat = [categorize(v) for v in y_pred_clean]
     
-    # Confusion Matrix
-    cm = confusion_matrix(y_true_cat, y_pred_cat, labels=[1, 2, 3, 4])
-    
-    # F1 Score (weighted average)
-    f1 = f1_score(y_true_cat, y_pred_cat, average='weighted')
+    f1 = f1_score(y_true_cat, y_pred_cat, average='weighted', zero_division=0)
     
     return {
         'mae': mae,
         'rmse': rmse,
-        'mape': mape,
         'r2': r2,
-        'confusion_matrix': cm,
         'f1_score': f1,
         'samples': len(y_true_clean)
     }
 
-def prepare_time_features(df):
-    """Prepare time-based features for prediction"""
-    # Convert date and time to datetime
-    df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce')
-    
-    # Extract features
-    df['hour'] = pd.to_datetime(df['Time'], format='%H:%M:%S', errors='coerce').dt.hour
-    df['minute'] = pd.to_datetime(df['Time'], format='%H:%M:%S', errors='coerce').dt.minute
-    df['day_of_week'] = df['datetime'].dt.dayofweek
-    df['month'] = df['datetime'].dt.month
-    
-    # Weekend flag
-    df['is_weekend'] = (df['day_of_week'] >= 5).astype(int)
-    
-    # Rush hour flags
-    df['is_morning_rush'] = ((df['hour'] >= 7) & (df['hour'] <= 9)).astype(int)
-    df['is_evening_rush'] = ((df['hour'] >= 17) & (df['hour'] <= 20)).astype(int)
-    
-    return df
 
-def load_and_prepare_data(years=None):
-    """Load data from specified years"""
-    data_folder = 'data_new_2025'
+def create_station_time_series(df, station_name):
+    """MIMIC THE TRAINING SCRIPT - Create time series same as train_model.py"""
     
-    if years is None:
-        years = ['2024', '2025']  # Default to recent years for evaluation
+    # Filter for the station
+    station_data = df[df['entry_station'] == station_name].copy()
     
-    all_data = []
-    
-    for year in years:
-        file_path = os.path.join(data_folder, f'{year}.csv')
-        if os.path.exists(file_path):
-            df = pd.read_csv(file_path)
-            df['year'] = int(year)
-            all_data.append(df)
-            print(f"✅ Loaded {year}.csv with {len(df)} records")
-    
-    if not all_data:
-        print("❌ No data files found!")
+    if len(station_data) == 0:
         return None
     
-    df_combined = pd.concat(all_data, ignore_index=True)
+    # Create datetime column
+    station_data['datetime'] = pd.to_datetime(
+        station_data['Date'] + ' ' + station_data['Time'], 
+        errors='coerce'
+    )
     
-    # Convert station IDs to names
-    df_combined['entry_station'] = df_combined['StationEntry'].map(STATION_ID_MAP)
-    df_combined['exit_station'] = df_combined['StationExit'].map(STATION_ID_MAP)
+    # Group by date and hour to get total passengers per hour
+    chrono_data = station_data.groupby([
+        station_data['datetime'].dt.date.rename('date_idx'), 
+        station_data['datetime'].dt.hour.rename('hour_idx')
+    ])['total_volume'].sum().reset_index()
     
-    # Calculate total passengers per station (for congestion)
-    # We'll use entry + exit as total passenger volume
-    df_combined['total_volume'] = df_combined['TotalPassenger']
+    chrono_data.columns = ['date', 'hour', 'passengers']
     
-    # Add time features
-    df_combined = prepare_time_features(df_combined)
+    # Sort chronologically
+    chrono_data = chrono_data.sort_values(['date', 'hour'])
     
-    return df_combined
+    # Get the time series
+    full_series = chrono_data['passengers'].values
+    
+    return full_series
+
 
 def evaluate_lstm_model():
-    """Evaluate LSTM model performance"""
+    """Evaluate LSTM model performance with sliding window"""
     print("\n" + "="*70)
     print("🔬 EVALUATING LSTM MODEL PERFORMANCE")
     print("="*70)
     
     # Load data
-    print("\n📊 Loading data for evaluation...")
-    df = load_and_prepare_data(years=['2024', '2025'])
+    data_folder = 'data_new_2025'
+    all_data = []
     
-    if df is None:
+    for year in ['2024', '2025']:
+        file_path = os.path.join(data_folder, f'{year}.csv')
+        if os.path.exists(file_path):
+            df = pd.read_csv(file_path)
+            all_data.append(df)
+            print(f"✅ Loaded {year}.csv with {len(df)} records")
+    
+    if not all_data:
+        print("❌ No data files found!")
         return
     
-    # Load LSTM models
-    print("\n🤖 Loading LSTM models...")
-    lstm_models = {}
-    scalers = {}
-    models_loaded = 0
+    df_combined = pd.concat(all_data, ignore_index=True)
     
-    for station in STATIONS:
-        m_path = f'models/{station}_lstm.h5'
-        s_path = f'models/{station}_scaler.pkl'
-        
-        if os.path.exists(m_path) and os.path.exists(s_path):
-            try:
-                lstm_models[station] = tf.keras.models.load_model(m_path, compile=False)
-                with open(s_path, 'rb') as f:
-                    scalers[station] = pickle.load(f)
-                models_loaded += 1
-                print(f"  ✅ Loaded {station} model")
-            except Exception as e:
-                print(f"  ❌ Error loading {station}: {e}")
+    # Map station IDs
+    STATION_ID_MAP = {
+        1: "North Ave", 2: "Quezon Ave", 3: "Kamuning", 4: "Cubao",
+        5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
+        9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
+    }
     
-    print(f"\n📊 Loaded {models_loaded}/{len(STATIONS)} models")
+    df_combined['entry_station'] = df_combined['StationEntry'].map(STATION_ID_MAP)
+    df_combined['total_volume'] = df_combined['TotalPassenger']
     
-    if models_loaded == 0:
-        print("❌ No models loaded. Train models first!")
-        return
-    
-    # Evaluate each station
-    print("\n" + "="*70)
-    print("📊 EVALUATION RESULTS BY STATION")
-    print("="*70)
-    
-    all_results = {}
+    print("\n🤖 Loading and evaluating models...")
     station_results = []
     
     for station in STATIONS:
-        if station not in lstm_models:
-            print(f"\n❌ Skipping {station}: Model not available")
+        m_path = f'models/{station}_lstm.keras'
+        s_path = f'models/{station}_scaler.pkl'
+        
+        if not (os.path.exists(m_path) and os.path.exists(s_path)):
+            print(f"⚠️ Missing files for {station}")
             continue
         
-        print(f"\n📈 Evaluating {station}...")
-        
-        # Get data for this station
-        station_entry_data = df[df['entry_station'] == station].copy()
-        station_exit_data = df[df['exit_station'] == station].copy()
-        
-        # Combine entry and exit for total volume
-        station_data = pd.concat([
-            station_entry_data[['total_volume', 'hour', 'minute', 'day_of_week', 'month', 'is_weekend', 'is_morning_rush', 'is_evening_rush']],
-            station_exit_data[['total_volume', 'hour', 'minute', 'day_of_week', 'month', 'is_weekend', 'is_morning_rush', 'is_evening_rush']]
-        ])
-        
-        if len(station_data) == 0:
-            print(f"  ⚠️ No data for {station}")
-            continue
-        
-        # Group by hour to get average volume per hour
-        hourly_avg = station_data.groupby('hour')['total_volume'].mean().reset_index()
-        
-        # For LSTM prediction, we need sequential data
-        # Sort by hour to create a time series
-        hourly_avg = hourly_avg.sort_values('hour')
-        
-        if len(hourly_avg) < 24:
-            print(f"  ⚠️ Insufficient data for {station}")
-            continue
-        
-        # Prepare data for LSTM
-        scaler = scalers[station]
-        model = lstm_models[station]
-        
-        # Use last 24 hours to predict next
-        X_test = hourly_avg['total_volume'].values[-24:].reshape(1, -1, 1)
-        X_test_scaled = scaler.transform(X_test.reshape(-1, 1)).reshape(1, 24, 1)
-        
-        # Predict
-        y_pred_scaled = model.predict(X_test_scaled, verbose=0)
-        y_pred = scaler.inverse_transform(y_pred_scaled)[0][0]
-        
-        # True value (average of next hour)
-        y_true = hourly_avg['total_volume'].values[-1] if len(hourly_avg) > 0 else y_pred
-        
-        # Calculate metrics
-        y_true_list = hourly_avg['total_volume'].values
-        y_pred_list = []
-        
-        # Generate predictions for each hour
-        for i in range(24, len(hourly_avg)):
-            input_seq = hourly_avg['total_volume'].values[i-24:i].reshape(1, -1, 1)
-            input_scaled = scaler.transform(input_seq.reshape(-1, 1)).reshape(1, 24, 1)
-            pred = model.predict(input_scaled, verbose=0)
-            pred_inv = scaler.inverse_transform(pred)[0][0]
-            y_pred_list.append(pred_inv)
-        
-        # Align for comparison
-        y_true_align = hourly_avg['total_volume'].values[24:]
-        
-        if len(y_true_align) > 0 and len(y_pred_list) > 0:
-            metrics = calculate_metrics(y_true_align, np.array(y_pred_list))
+        try:
+            # Load model and scaler
+            model = tf.keras.models.load_model(m_path, compile=False)
+            with open(s_path, 'rb') as f:
+                scaler = pickle.load(f)
+            
+            print(f"\n📈 Evaluating {station}...")
+            
+            # Create time series SAME WAY as training
+            time_series = create_station_time_series(df_combined, station)
+            
+            if time_series is None or len(time_series) < 100:
+                print(f"   ⚠️ Insufficient data for {station}")
+                continue
+            
+            print(f"   Time series length: {len(time_series)} hours")
+            print(f"   Value range: {time_series.min():.0f} - {time_series.max():.0f}")
+            
+            # Use last 30% for testing
+            test_size = int(len(time_series) * 0.3)
+            test_series = time_series[-test_size:]
+            
+            # Create predictions using sliding window
+            seq_length = 24
+            y_true_list = []
+            y_pred_list = []
+            
+            for i in range(seq_length, len(test_series)):
+                # Input sequence (last 24 hours)
+                input_seq = test_series[i-seq_length:i]
+                
+                # Scale
+                input_scaled = scaler.transform(input_seq.reshape(-1, 1))
+                X_input = input_scaled.reshape(1, seq_length, 1)
+                
+                # Predict
+                pred_scaled = model.predict(X_input, verbose=0)
+                pred_value = scaler.inverse_transform(pred_scaled)[0][0]
+                
+                y_true_list.append(test_series[i])
+                y_pred_list.append(pred_value)
+            
+            # Calculate metrics
+            y_true_arr = np.array(y_true_list)
+            y_pred_arr = np.array(y_pred_list)
+            
+            # Show sample predictions
+            print(f"   Sample predictions (last 5):")
+            for j in range(-5, 0):
+                if abs(j) <= len(y_true_arr):
+                    print(f"      Actual: {y_true_arr[j]:.0f}, Pred: {y_pred_arr[j]:.0f}")
+            
+            metrics = calculate_metrics(y_true_arr, y_pred_arr)
             
             if metrics:
-                station_results.append({
-                    'station': station,
-                    **metrics
-                })
-                
-                print(f"  ✅ {station} Results:")
-                print(f"     MAE: {metrics['mae']:.2f}")
-                print(f"     RMSE: {metrics['rmse']:.2f}")
-                print(f"     MAPE: {metrics['mape']:.2f}%")
-                print(f"     R²: {metrics['r2']:.4f}")
-                print(f"     F1 Score: {metrics['f1_score']:.4f}")
-                print(f"     Samples: {metrics['samples']}")
+                station_results.append({'station': station, **metrics})
+                print(f"   ✅ MAE: {metrics['mae']:.0f} | R²: {metrics['r2']:.4f} | F1: {metrics['f1_score']:.4f}")
+            
+            # Clear memory
+            tf.keras.backend.clear_session()
+            
+        except Exception as e:
+            print(f"   ❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
     
     # Summary
     print("\n" + "="*70)
-    print("📊 OVERALL PERFORMANCE SUMMARY")
+    print("📊 EVALUATION SUMMARY")
     print("="*70)
     
     if station_results:
-        avg_mae = np.mean([r['mae'] for r in station_results])
-        avg_rmse = np.mean([r['rmse'] for r in station_results])
-        avg_mape = np.mean([r['mape'] for r in station_results])
-        avg_r2 = np.mean([r['r2'] for r in station_results])
-        avg_f1 = np.mean([r['f1_score'] for r in station_results])
+        results_df = pd.DataFrame(station_results)
         
-        print(f"\n📈 Average Metrics Across All Stations:")
-        print(f"   MAE: {avg_mae:.2f}")
-        print(f"   RMSE: {avg_rmse:.2f}")
-        print(f"   MAPE: {avg_mape:.2f}%")
-        print(f"   R² Score: {avg_r2:.4f}")
-        print(f"   F1 Score: {avg_f1:.4f}")
+        print(f"\n📈 Overall Metrics:")
+        print(f"   Average R²: {results_df['r2'].mean():.4f}")
+        print(f"   Average MAE: {results_df['mae'].mean():.0f} passengers")
+        print(f"   Average F1: {results_df['f1_score'].mean():.4f}")
         
-        # Best performing station
-        best_station = max(station_results, key=lambda x: x['r2'])
-        print(f"\n🏆 Best Performing Station: {best_station['station']}")
-        print(f"   R²: {best_station['r2']:.4f}")
-        print(f"   F1: {best_station['f1_score']:.4f}")
+        # Best and worst
+        best = results_df.loc[results_df['r2'].idxmax()]
+        worst = results_df.loc[results_df['r2'].idxmin()]
+        print(f"\n🏆 Best: {best['station']} (R²={best['r2']:.4f}, MAE={best['mae']:.0f})")
+        print(f"⚠️ Worst: {worst['station']} (R²={worst['r2']:.4f}, MAE={worst['mae']:.0f})")
         
         # Save results
-        results_df = pd.DataFrame(station_results)
         results_df.to_csv('evaluation_results.csv', index=False)
         print(f"\n✅ Results saved to evaluation_results.csv")
         
-        # Save confusion matrices
-        print("\n📊 Confusion Matrices:")
-        for r in station_results:
-            print(f"\n  {r['station']}:")
-            print(f"     Confusion Matrix:\n{r['confusion_matrix']}")
-    
-    return station_results
+        # Readiness
+        avg_r2 = results_df['r2'].mean()
+        print("\n" + "="*70)
+        print("🚦 DEPLOYMENT READINESS")
+        print("="*70)
+        
+        if avg_r2 > 0.7:
+            print("✅ READY FOR DEPLOYMENT! Models are excellent.")
+        elif avg_r2 > 0.5:
+            print("⚠️ ACCEPTABLE - Deploy with monitoring.")
+        elif avg_r2 > 0.3:
+            print("⚠️ NEEDS IMPROVEMENT - Consider retraining with more data.")
+        else:
+            print("❌ NOT READY - Models need significant improvement.")
+        
+        # Save readiness report
+        readiness_report = {
+            'evaluation_date': datetime.now().isoformat(),
+            'avg_r2': float(avg_r2),
+            'avg_mae': float(results_df['mae'].mean()),
+            'avg_f1': float(results_df['f1_score'].mean()),
+            'best_station': best['station'],
+            'worst_station': worst['station']
+        }
+        
+        with open('deployment_readiness.json', 'w') as f:
+            json.dump(readiness_report, f, indent=2, default=str)
+        
+        print(f"\n💾 Readiness report saved to deployment_readiness.json")
+        
+    else:
+        print("❌ No successful evaluations!")
+
 
 if __name__ == '__main__':
     evaluate_lstm_model()

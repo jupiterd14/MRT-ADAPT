@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> 02b8ad29728558911c1b62c16f2773b41ee9fad7
 # check_db.py
 from app import app, db, User
 from datetime import datetime
@@ -49,6 +52,8 @@ with app.app_context():
     for user in all_users:
         print(f"  • {user.username} - Role: {user.role}")
     
+<<<<<<< HEAD
+=======
 =======
 # check_db.py
 from app import app, db, User
@@ -101,4 +106,5 @@ with app.app_context():
         print(f"  • {user.username} - Role: {user.role}")
     
 >>>>>>> 0e298cf38a7d514a3e1b54ad86b1b6b57ed2c510
+>>>>>>> 02b8ad29728558911c1b62c16f2773b41ee9fad7
     print("="*70)

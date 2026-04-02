@@ -1,0 +1,53 @@
+MRT-3 Ridership Origin Destination (OD) Reference Guide
+
+This file provides the reference mapping for StationEntry and StationExit values used in the dataset.
+
+---
+
+## DIRECTION RULE
+
+Travel direction can be determined using the station IDs:
+
+If StationEntry < StationExit  →  SOUTHBOUND
+If StationEntry > StationExit  →  NORTHBOUND
+If StationEntry = StationExit  →  INVALID / SAME STATION
+
+Example:
+StationEntry = 2
+StationExit  = 5
+Direction    = SOUTHBOUND
+
+---
+
+## STATION ID REFERENCE
+
+1  = North Avenue
+2  = Quezon Avenue
+3  = GMA Kamuning
+4  = Araneta Center Cubao
+5  = Santolan-Annapolis
+6  = Ortigas
+7  = Shaw Boulevard
+8  = Boni
+9  = Guadalupe
+10 = Buendia
+11 = Ayala
+12 = Magallanes
+13 = Taft Avenue
+
+---
+
+## DATA FIELDS
+
+TotalPassenger   : Total number of passengers recorded for the OD pair
+TimeOfDay        : Time period classification of the trip
+TransactionDate  : Date of passenger transaction
+StationEntry     : Station ID where the passenger entered
+StationExit      : Station ID where the passenger exited
+
+---
+
+## NOTES
+
+• StationEntry and StationExit correspond to the station ID list above.
+• Passenger direction is derived from station ordering along the MRT-3 line.
