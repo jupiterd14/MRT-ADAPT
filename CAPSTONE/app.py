@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import os
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 import json
 import numpy as np
 import pandas as pd
@@ -32,7 +33,7 @@ from prediction_api import MRT3Predictor
 load_dotenv()
 warnings.filterwarnings('ignore')
 
-app = Flask(__name__, template_folder='html', static_folder='javascript')
+app = Flask(__name__, template_folder='html', static_folder='static')
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -866,12 +867,177 @@ def predict_congestion(station_name):
         "congestion": congestion, 
         "status": status
     })
+    
+#user dashboard
+"""
+1. get api
+2. get north and south data
+2. return
+"""
+
+
+@app.route('/api/station-forecast-badge/<station_name>')
+def station_forecast_api_badge(station_name):
+    """Get forecast for next 6 hours using LSTM model"""
+    
+    
+    name = station_name.replace('%20', ' ')
+    
+    northbound = {}
+    sourhbound = {}
+    
+    now = datetime.now()
+    current_hour = now.hour
+    current_minute = now.minute
+    
+    # Check if station is closed
+    OPERATING_START = 4.5
+    OPERATING_END = 22.5
+    current_time = current_hour + current_minute / 60
+    north_origin = ("northbound")
+    south_origin = ("southbound")
+    
+    # After you calculate current_congestion, add this:
+
+
+    current_ridership = get_station_prediction(name)
+    capacity = STATION_BASE_CAPACITY.get(name, 10000)
+    current_congestion = min(100, int((current_ridership / capacity) * 100))
+    
+    
+
+    station_idx = STATIONS.index(name)
+    is_morning_rush = 7 <= current_hour <= 9
+    is_evening_rush = 17 <= current_hour <= 20
+
+    north_congestion = current_congestion
+    south_congestion = current_congestion
+
+    if current_congestion >= 70:
+        if is_morning_rush:
+            if station_idx <= 6:  # Northern stations (North Ave to Cubao area)
+                south_congestion = current_congestion  # Higher
+                north_congestion = max(40, int(current_congestion * 0.6))  # Lower
+            else:  # Southern stations
+                north_congestion = current_congestion
+                south_congestion = max(40, int(current_congestion * 0.6))
+        elif is_evening_rush:
+            if station_idx <= 6:
+                north_congestion = current_congestion
+                south_congestion = max(40, int(current_congestion * 0.6))
+            else:
+                south_congestion = current_congestion
+                north_congestion = max(40, int(current_congestion * 0.6))
+    
+    print(f"🔴 CHART API - {name}: current_congestion = {current_congestion}")
+    print(f"🔵 BADGE API - {name}: current_congestion = {current_congestion}")
+    try:
+    
+        
+        if current_time < OPERATING_START or current_time >= OPERATING_END:
+            return jsonify({
+                "northbound": {
+                    "station": name,
+                    "forecast": [5, 5, 5, 10, 15, 20],
+                    "current": 5,
+                    "origin": north_origin, 
+                    "data_source": "Station Closed - Forecast for opening hours",
+                    "operating_hours": "4:30 AM - 10:30 PM"
+                    
+                },
+                "southbound": {
+                    "station": name,
+                    "forecast": [5, 5, 5, 10, 15, 20],
+                    "current": 5,
+                    "origin": south_origin, 
+                    "data_source": "Station Closed - Forecast for opening hours",
+                    "operating_hours": "4:30 AM - 10:30 PM"
+                }
+            })
+        
+    except Exception as e:
+        print(f"Error {e}")
+        
+    
+    forecast = []
+    
+    # Get current prediction
+   
+    
+    # ========== FIX: Use previous ridership as base ==========
+    prev_ridership = current_ridership  # Start with current
+    
+    for i in range(6):
+        forecast_time = now + timedelta(hours=i+1)
+        forecast_hour = forecast_time.hour
+        
+       
+            # Time-based logic
+        if 7 <= forecast_hour <= 9:  # Morning rush - INCREASING
+            multiplier = 1.2
+        elif 17 <= forecast_hour <= 20:  # Evening rush - INCREASING
+                multiplier = 1.15
+        elif forecast_hour <= 6 or forecast_hour >= 22:  # Late night - DECREASING
+                multiplier = 0.7
+        else:  # Normal hours - SLIGHT DECREASE
+            multiplier = 0.95
+            
+            # Use PREVIOUS ridership, not current!
+        forecast_ridership = int(prev_ridership * multiplier)
+        forecast_ridership = max(50, min(forecast_ridership, capacity))
+        forecast_congestion = min(100, int((forecast_ridership / capacity) * 100))
+            
+            # Update prev_ridership for next iteration
+        prev_ridership = forecast_ridership
+        
+        forecast.append(forecast_congestion)
+        
+    
+    return jsonify({
+        "northbound": {
+            "station": name,
+            "forecast": forecast,
+            "current": north_congestion,
+            "origin": north_origin, 
+            "data_source": "Station North",
+            "operating_hours": "4:30 AM - 10:30 PM"
+                
+        },
+        "southbound": {
+            "station": name,
+            "forecast": forecast,
+            "current": south_congestion,
+            "origin": south_origin, 
+            "data_source": "Station South",
+            "operating_hours": "4:30 AM - 10:30 PM"
+            }
+    })
+    
+    
 @app.route('/api/station-forecast/<station_name>')
 def station_forecast_api(station_name):
     """Get forecast for next 6 hours using LSTM model"""
     name = station_name.replace('%20', ' ')
     
     now = datetime.now()
+    current_hour = now.hour
+    current_minute = now.minute
+    
+    # Check if station is closed
+    OPERATING_START = 4.5
+    OPERATING_END = 22.5
+    current_time = current_hour + current_minute / 60
+    
+    if current_time < OPERATING_START or current_time >= OPERATING_END:
+        return jsonify({
+            "station": name,
+            "forecast": [5, 5, 5, 10, 15, 20],
+            "intervals": ["+1h", "+2h", "+3h", "+4h", "+5h", "+6h"],
+            "current": 5,
+            "data_source": "Station Closed - Forecast for opening hours",
+            "operating_hours": "4:30 AM - 10:30 PM"
+        })
+    
     forecast = []
     
     # Get current prediction
@@ -879,31 +1045,33 @@ def station_forecast_api(station_name):
     capacity = STATION_BASE_CAPACITY.get(name, 10000)
     current_congestion = min(100, int((current_ridership / capacity) * 100))
     
-    # Get historical patterns for better forecasting
-    historical_forecast = get_historical_forecast(name, now)
+  
     
-    # Generate forecast for next 6 hours
-    for i in range(6):  # Changed from 1-7 to 0-5 for 6 hours total
+    # ========== FIX: Use previous ridership as base ==========
+    prev_ridership = current_ridership  # Start with current
+    
+    for i in range(6):
         forecast_time = now + timedelta(hours=i+1)
         forecast_hour = forecast_time.hour
         
-        # Use historical patterns if available, otherwise use time-based logic
-        if historical_forecast and i < len(historical_forecast):
-            forecast_congestion = historical_forecast[i]
-        else:
-            # Time-based logic with station-specific adjustments
-            if 7 <= forecast_hour <= 9:  # Morning rush
-                multiplier = 1.2
-            elif 17 <= forecast_hour <= 20:  # Evening rush
+       
+            # Time-based logic
+        if 7 <= forecast_hour <= 9:  # Morning rush - INCREASING
+            multiplier = 1.2
+        elif 17 <= forecast_hour <= 20:  # Evening rush - INCREASING
                 multiplier = 1.15
-            elif forecast_hour <= 6 or forecast_hour >= 22:  # Late night/early morning
-                multiplier = 0.3
-            else:  # Normal hours
-                multiplier = 0.85
+        elif forecast_hour <= 6 or forecast_hour >= 22:  # Late night - DECREASING
+                multiplier = 0.7
+        else:  # Normal hours - SLIGHT DECREASE
+            multiplier = 0.95
             
-            forecast_ridership = int(current_ridership * multiplier)
-            forecast_ridership = max(50, min(forecast_ridership, capacity))
-            forecast_congestion = min(100, int((forecast_ridership / capacity) * 100))
+            # Use PREVIOUS ridership, not current!
+        forecast_ridership = int(prev_ridership * multiplier)
+        forecast_ridership = max(50, min(forecast_ridership, capacity))
+        forecast_congestion = min(100, int((forecast_ridership / capacity) * 100))
+            
+            # Update prev_ridership for next iteration
+        prev_ridership = forecast_ridership
         
         forecast.append(forecast_congestion)
     
@@ -916,31 +1084,7 @@ def station_forecast_api(station_name):
         "operating_hours": "4:30 AM - 10:30 PM"
     })
 
-def get_historical_forecast(station_name, current_time):
-    """Get historical forecast pattern for a station"""
-    # Simple pattern based on time of day
-    patterns = {
-        "North Ave": [75, 70, 65, 60, 55, 50],
-        "Cubao": [80, 75, 70, 65, 60, 55],
-        "Ayala Ave": [78, 73, 68, 63, 58, 53],
-        "Taft": [70, 68, 65, 60, 55, 50]
-    }
-    
-    # Return pattern if station has specific pattern, otherwise generate generic
-    if station_name in patterns:
-        return patterns[station_name]
-    
-    # Generic pattern based on current hour
-    hour = current_time.hour
-    if 7 <= hour <= 9:  # Morning rush - decreasing pattern
-        return [75, 70, 65, 60, 55, 50]
-    elif 17 <= hour <= 20:  # Evening rush - decreasing pattern
-        return [80, 75, 70, 65, 60, 55]
-    elif 10 <= hour <= 16:  # Mid-day - stable pattern
-        return [50, 52, 55, 55, 53, 50]
-    else:  # Light traffic - increasing to rush or decreasing from rush
-        return [30, 35, 40, 45, 50, 55]
-    
+
 @app.route('/api/batch-predict')
 def batch_predict():
     results = []
@@ -1341,15 +1485,58 @@ def get_congestion(station_name):
     except Exception as e:
         print(f"❌ Error getting congestion: {e}")
         return jsonify({"error": str(e)}), 500
+    
 
-# REPLACE this entire function
+@app.route('/api/bestTime/<station_name>')
+def bestTime(station_name):
+    """Get congestion data for a specific station"""
+    name = station_name
+    
+    try:
+        ridership = get_station_prediction(name)
+        capacity = STATION_BASE_CAPACITY.get(name, 10000)
+        congestion = min(100, int((ridership / capacity) * 100))
+        
+        
+        if congestion > 80:
+            status = "SEVERELY CONGESTED"
+            color = "critical"
+            wait_time = "15-20 min"
+        elif congestion > 60:
+            status = "CONGESTED"
+            color = "congested"
+            wait_time = "10-15 min"
+        elif congestion > 30:
+            status = "MODERATE"
+            color = "moderate"
+            wait_time = "5-10 min"
+        else:
+            status = "LIGHT"
+            color = "light"
+            wait_time = "2-5 min"
+        
+        return jsonify({
+            "station": name,
+            "congestion": congestion,
+            "status": status,
+            "color": color,
+            "wait_time": wait_time,
+            "ridership": ridership,
+            "capacity": capacity
+        })
+    except Exception as e:
+        print(f"❌ Error getting congestion: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+
 @app.route('/api/schedule/station/<station_name>')
 def get_schedule(station_name):
     """Get train schedule for a station - NOW USING REAL SCHEDULE"""
-    name = station_name.replace('%20', ' ')
+    name = station_name.replace('%20', '')
     
     try:
         schedule = get_all_trains_for_station(name, limit=5)
+        print("🔍 DEBUG: schedule keys =", schedule.keys())
         
         if "error" in schedule:
             return jsonify({"erro8r": schedule["error"], "status": "closed"})
@@ -1360,7 +1547,7 @@ def get_schedule(station_name):
         congestion = min(100, int((ridership / capacity) * 100))
         
         # Adjust headway if severely congested (still realistic adjustment)
-        headway = schedule["headway_minutes"]
+        headway = schedule["headway"]
         if congestion > 80:
             headway = max(8, headway + 2)
         elif congestion > 60:
@@ -1369,7 +1556,7 @@ def get_schedule(station_name):
         return jsonify({
             "station": name,
             "headway": headway,
-            "trains": schedule["northbound"][:3],  # Return first 3 northbound trains
+            "trains": schedule["trains"]["northbound"][:3],  # Return first 3 northbound trains
             "status": "normal" if schedule["is_operating"] else "closed"
         })
     except Exception as e:
