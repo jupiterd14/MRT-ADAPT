@@ -1,0 +1,505 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
+:root {
+    --sidebar-bg: #00224D;
+    --main-bg: #F8FAFC;
+    --dark-bluew:#0c437b;
+    --light-bluew: #f9fcff;
+    --azureblue:#0085ff;
+    --accent-blue: #3B82F6;
+    --text-dark: #1E293B;
+    --text-light: #64748B;
+    --white: #FFFFFF;
+    --border: #E2E8F0;
+    --red: #EF4444;
+    --orange: #F97316;
+    --yellow: #F59E0B;
+    --green: #22C55E;
+    --blue-navy: #1E3A8A;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Bricolage Grotesque", sans-serif;
+}
+
+body {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    background-color: var(--main-bg);
+    overflow: hidden;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width: 300px;
+    background-color: var(--sidebar-bg);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    padding: 20px 0;
+}
+
+.logo-section {
+    padding: 10px 25px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-icon {
+    background: #38BDF8;
+    padding: 10px 13px;
+    border-radius: 8px;
+    font-size: 18px;
+}
+
+.logo-text h2 { 
+    font-size: 16px; 
+    margin: 0; 
+}
+
+.logo-text p { 
+    font-size: 10px; 
+    opacity: 0.6; 
+    letter-spacing: 1px; 
+}
+
+/* Closed state styling */
+.hero-card.closed {
+    opacity: 0.8;
+    filter: grayscale(0.3);
+}
+
+.closed-message {
+    background: #6B7280;
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 16px;
+}
+
+.closing-soon-warning {
+    background: #F97316;
+    color: white;
+    padding: 8px;
+    border-radius: 8px;
+    margin-top: 10px;
+    text-align: center;
+    font-size: 13px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
+nav { 
+    padding: 40px 5px 5px 10px; 
+}
+
+.nav-item {
+    padding: 12px 25px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    cursor: pointer;
+    transition: 0.3s;
+    color: #CBD5E1;
+    text-decoration: none;
+    font-size: 16px;
+    position: relative;
+}
+
+.nav-item:hover, .nav-item.active {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: rgb(148, 207, 255);
+    border-left: 4px solid var(--accent-blue);
+}
+
+.nav-badge {
+    position: absolute;
+    right: 25px;
+    background: var(--red);
+    color: white;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: bold;
+    display: none;
+}
+
+/* MAIN CONTENT */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 25px 40px;
+    overflow-y: auto;
+}
+
+.greeting { 
+    font-size: 11px; 
+    color: var(--text-light); 
+    font-weight: bold; 
+    text-transform: uppercase; 
+    margin-bottom: 5px; 
+    letter-spacing: 0.5px;
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header-top h1 {
+    font-size: 24px;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header-icons {
+    display: flex;
+    gap: 10px;
+}
+
+.icon-btn {
+    background: #F1F5F9;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    color: var(--text-dark);
+    transition: 0.3s;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-btn:hover { 
+    background: #E2E8F0; 
+}
+
+.badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--red);
+    color: white;
+    font-size: 10px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+/* RUSH HOUR ALERT */
+.rush-alert-banner {
+    background: #FFF;
+    border: 1px solid var(--orange);
+    border-radius: 10px;
+    padding: 12px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #7B341E;
+    font-size: 14px;
+}
+
+.rush-alert-banner strong { 
+    color: var(--red); 
+}
+
+/* HERO CARD */
+.hero-card {
+    background: var(--light-bluew);
+    border: 2px solid var(--dark-bluew);
+    border-radius: 15px;
+    padding: 25px;
+    color: white;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.hero-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 25px;
+}
+
+.station-label-2 { 
+    font-size: 16px; 
+    opacity: 0.8; 
+    margin-bottom: 4px; 
+    text-align: center; 
+    align-items: center; 
+    gap: 8px; 
+    color: black;
+}
+
+.station-label { 
+    font-size: 20px; 
+    opacity: 0.8; 
+    margin-bottom: 4px; 
+    display: flex; 
+    align-items: center; 
+    gap: 8px; 
+    color: var(--azureblue);
+}
+
+.station-title { 
+    font-size: 20px; 
+    font-weight: bold; 
+    color: black;
+}
+
+.status-pill {
+    background: var(--orange);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.train-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.train-direction-card {
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid lightgrey;
+}
+
+.north {
+    background: #f7f7f7;
+}
+
+.south {
+    background: #eefcff;
+}
+
+.direction-label { 
+    font-size: 14px; 
+    margin-bottom: 10px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 8px; 
+    color: var(--azureblue); 
+}
+
+.arrival-timer { 
+    font-size: 48px; 
+    font-weight: bold; 
+    color: var(--accent-blue); 
+}
+
+.arrival-timer span { 
+    font-size: 18px; 
+    font-weight: normal; 
+    opacity: 0.7; 
+}
+
+.sub-arrival { 
+    font-size: 11px; 
+    opacity: 0.6; 
+    margin-top: 8px; 
+    color: black; 
+}
+
+/* BEST TIME CARD */
+.best-time-card {
+    background: white;
+    border: 1px solid var(--dark-bluew);
+    border-radius: 12px;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.best-time-info { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+}
+
+.best-time-info i { 
+    font-size: 24px; 
+    color: var(--green); 
+}
+
+.best-time-text { 
+    color: var(--text-light); 
+    font-size: 14px; 
+}
+
+.best-time-text strong { 
+    color: var(--text-dark); 
+}
+
+.btn-plan {
+    border: 1px solid var(--azureblue);
+    background: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--azureblue);
+}
+
+/* FORECAST CARD */
+.forecast-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    flex: 1;
+}
+
+/* DROPDOWN FIXES - FORCE ALWAYS VISIBLE */
+.station-select,
+#forecastStationSelect {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 9999 !important;
+    background-color: white !important;
+    pointer-events: auto !important;
+    border: 1px solid var(--border) !important;
+    padding: 5px 10px !important;
+    border-radius: 5px !important;
+    font-size: 12px !important;
+    color: var(--text-light) !important;
+    margin-left: 10px !important;
+    cursor: pointer !important;
+}
+
+/* FORECAST HEADER FIXES */
+.forecast-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    min-height: 40px !important;
+    position: relative !important;
+    z-index: 100 !important;
+    margin-bottom: 20px !important;
+}
+
+.forecast-header h3 { 
+    font-size: 14px; 
+    color: var(--text-dark); 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+    margin: 0 !important;
+}
+
+/* CHART CONTAINER FIXES - PREVENT OVERLAP */
+.chart-container { 
+    height: 250px; 
+    width: 100%; 
+    position: relative; 
+    margin-top: 10px;
+    z-index: 1 !important;
+    clear: both !important;
+}
+
+/* PREVENT CANVAS FROM COVERING DROPDOWN */
+canvas {
+    position: relative !important;
+    z-index: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* ENSURE DROPDOWN IS ABOVE EVERYTHING */
+#forecastStationSelect:hover,
+.station-select:hover {
+    z-index: 10000 !important;
+    background-color: #f0f0f0 !important;
+}
+
+/* CUSTOM BUTTON */
+.custom-btn {
+    background: var(--light-bluew);
+    color: var(--azureblue);
+    border: 1px solid var(--azureblue);
+    background-color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.3s ease;
+}
+
+.custom-btn:hover {
+    background-color: var(--azureblue);
+    color: white;
+}
+
+/* PULSE ANIMATION */
+@keyframes pulse {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.05); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+ #forecastStationSelect,
+        .station-select {
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: relative !important;
+            z-index: 99999 !important;
+            background: white !important;
+            border: 1px solid #ccc !important;
+            padding: 5px 10px !important;
+            border-radius: 5px !important;
+            margin-left: 10px !important;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+        }
+        
+/* ADDITIONAL SAFETY - PREVENT ANY HIDING */
+.forecast-card,
+.forecast-header,
+#forecastStationSelect,
+.station-select {
+    overflow: visible !important;
+}
+
+/* FIX FOR ANY POTENTIAL HOVER ISSUES */
+.station-select option {
+    display: block !important;
+    visibility: visible !important;
+}
