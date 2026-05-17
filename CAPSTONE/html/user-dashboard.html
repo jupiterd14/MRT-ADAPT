@@ -61,7 +61,6 @@ body {
     gap: 12px;
 }
 
-/* Location Banner Styles */
 .location-banner {
     background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
     border: 2px solid var(--accent-blue);
@@ -604,7 +603,6 @@ nav {
     margin: 0 !important;
 }
 
-/* CHART CONTAINER FIXES - PREVENT OVERLAP */
 .chart-container { 
     height: 250px; 
     width: 100%; 
@@ -614,14 +612,12 @@ nav {
     clear: both !important;
 }
 
-/* PREVENT CANVAS FROM COVERING DROPDOWN */
 canvas {
     position: relative !important;
     z-index: 1 !important;
     pointer-events: auto !important;
 }
 
-/* ENSURE DROPDOWN IS ABOVE EVERYTHING */
 #forecastStationSelect:hover,
 .station-select:hover {
     z-index: 10000 !important;
@@ -652,7 +648,6 @@ canvas {
     color: white;
 }
 
-/* PULSE ANIMATION */
 @keyframes pulse {
     0% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.7; transform: scale(1.05); }
@@ -675,7 +670,6 @@ canvas {
             pointer-events: auto !important;
         }
         
-/* ADDITIONAL SAFETY - PREVENT ANY HIDING */
 .forecast-card,
 .forecast-header,
 #forecastStationSelect,
@@ -683,13 +677,11 @@ canvas {
     overflow: visible !important;
 }
 
-/* FIX FOR ANY POTENTIAL HOVER ISSUES */
 .station-select option {
     display: block !important;
     visibility: visible !important;
 }
 
-/* Add to styles */
 .toggle-btn {
     padding: 8px 20px;
     border: none;
