@@ -1,568 +1,811 @@
-# mrt_schedule.py - Complete MRT-3 Schedule with detailed headway by period
-from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, Optional
+# mrt_schedule.py
+# MRT Train Schedule Data
 
-# Station order for MRT-3 (Northbound = Taft → North Ave, Southbound = North Ave → Taft)
-STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-            "Ayala Ave", "Magallanes", "Taft"]
-
-# Travel time between stations (in seconds) - based on official distances
-TRAVEL_TIMES = {
-    ("North Ave", "Quezon Ave"): 110,   # 1:50
-    ("Quezon Ave", "Kamuning"): 87,     # 1:27
-    ("Kamuning", "Cubao"): 190,         # 3:10
-    ("Cubao", "Santolan"): 168,         # 2:48
-    ("Santolan", "Ortigas"): 180,       # 3:00
-    ("Ortigas", "Shaw Blvd"): 115,      # 1:55
-    ("Shaw Blvd", "Boni Ave"): 131,     # 2:11
-    ("Boni Ave", "Guadalupe"): 112,     # 1:52
-    ("Guadalupe", "Buendia"): 190,      # 3:10
-    ("Buendia", "Ayala Ave"): 122,      # 2:02
-    ("Ayala Ave", "Magallanes"): 101,   # 1:41
-    ("Magallanes", "Taft"): 355,        # 5:55
+# Regular Weekdays Train Schedule
+WEEKDAY_TRAIN_SCHEDULE = {
+    'Morning': {'start': '4:30 AM', 'end': '7:00 AM', 'trains': 14, 'headway': '7 - 4 Minutes'},
+    'AM Peak': {'start': '7:01 AM', 'end': '9:00 AM', 'trains': 19, 'headway': '3.5 Minutes'},
+    'Off Peak': {'start': '9:01 AM', 'end': '5:00 PM', 'trains': 14, 'headway': '5 - 5.5 Minutes'},
+    'PM Peak': {'start': '5:01 PM', 'end': '7:00 PM', 'trains': 19, 'headway': '3.5 Minutes'},
+    'Night': {'start': '7:01 PM', 'end': '9:30 PM', 'trains': 14, 'headway': '5 - 8 Minutes'},
+    'Extended': {'start': '9:31 PM', 'end': '11:40 PM', 'trains': 4, 'headway': '15 Minutes'}
 }
 
-# Station dwell time (seconds)
-DWELL_TIME = 40
+# Regular Weekends Train Schedule
+WEEKEND_TRAIN_SCHEDULE = {
+    'Saturday Morning': {'start': '4:30 AM', 'end': '5:00 PM', 'trains': 14, 'headway': '5.5 - 6 Minutes'},
+    'Saturday Afternoon': {'start': '5:01 PM', 'end': '7:00 PM', 'trains': 16, 'headway': '5 - 5.5 Minutes'},
+    'Saturday Evening': {'start': '7:01 PM', 'end': '10:40 PM', 'trains': 12, 'headway': '6.5 - 7 Minutes'},
+    'Sunday/Holidays': {'start': '4:30 AM', 'end': '10:40 PM', 'trains': 12, 'headway': '6.5 - 7 Minutes'}
+}
 
-# ========== WEEKDAY SCHEDULE ==========
-# Headway configuration for WEEKDAYS (Monday-Friday)
-WEEKDAY_HEADWAY = [
-    {"period": "Morning", "start": "04:30", "end": "07:00", "headway": 330, "trains": 14},      # 5.5 min avg
-    {"period": "AM_Peak", "start": "07:01", "end": "09:00", "headway": 210, "trains": 19},      # 3.5 min
-    {"period": "Off_Peak", "start": "09:01", "end": "17:00", "headway": 315, "trains": 14},     # 5.25 min avg
-    {"period": "PM_Peak", "start": "17:01", "end": "19:00", "headway": 210, "trains": 19},      # 3.5 min
-    {"period": "Night", "start": "19:01", "end": "21:30", "headway": 390, "trains": 14},        # 6.5 min avg
-    {"period": "Extended", "start": "21:31", "end": "23:40", "headway": 900, "trains": 4}       # 15 min
+# Station Entrance Opening Schedule - Weekday
+WEEKDAY_ENTRANCE_SCHEDULE = {
+    'North Avenue': {'southbound': '04:20 AM', 'northbound': '05:24 AM'},
+    'Quezon Avenue': {'southbound': '04:22 AM', 'northbound': '05:23 AM'},
+    'GMA Kamuning': {'southbound': '04:24 AM', 'northbound': '05:21 AM'},
+    'Araneta Cubao': {'southbound': '04:27 AM', 'northbound': '05:17 AM'},
+    'Santolan': {'southbound': '04:30 AM', 'northbound': '05:14 AM'},
+    'Ortigas': {'southbound': '04:33 AM', 'northbound': '05:11 AM'},
+    'Shaw Boulevard': {'southbound': '04:36 AM', 'northbound': '05:10 AM'},
+    'Boni': {'southbound': '04:38 AM', 'northbound': '05:07 AM'},
+    'Guadalupe': {'southbound': '04:40 AM', 'northbound': '05:06 AM'},
+    'Buendia': {'southbound': '04:43 AM', 'northbound': '05:02 AM'},
+    'Ayala': {'southbound': '04:45 AM', 'northbound': '05:00 AM'},
+    'Magallanes': {'southbound': '04:47 AM', 'northbound': '04:58 AM'},
+    'Taft Avenue': {'southbound': '04:50 AM', 'northbound': '04:55 AM'}
+}
+
+# Station Entrance Opening Schedule - Weekend
+WEEKEND_ENTRANCE_SCHEDULE = {
+    'North Avenue': {'southbound': '04:20 AM', 'northbound': '05:27 AM'},
+    'Quezon Avenue': {'southbound': '04:22 AM', 'northbound': '05:25 AM'},
+    'GMA Kamuning': {'southbound': '04:24 AM', 'northbound': '05:22 AM'},
+    'Araneta Cubao': {'southbound': '04:28 AM', 'northbound': '05:19 AM'},
+    'Santolan': {'southbound': '04:31 AM', 'northbound': '05:15 AM'},
+    'Ortigas': {'southbound': '04:34 AM', 'northbound': '05:12 AM'},
+    'Shaw Boulevard': {'southbound': '04:36 AM', 'northbound': '05:10 AM'},
+    'Boni': {'southbound': '04:38 AM', 'northbound': '05:08 AM'},
+    'Guadalupe': {'southbound': '04:40 AM', 'northbound': '05:06 AM'},
+    'Buendia': {'southbound': '04:44 AM', 'northbound': '05:03 AM'},
+    'Ayala': {'southbound': '04:46 AM', 'northbound': '05:01 AM'},
+    'Magallanes': {'southbound': '04:49 AM', 'northbound': '04:58 AM'},
+    'Taft Avenue': {'southbound': '04:52 AM', 'northbound': '04:55 AM'}
+}
+
+# List of all stations (southbound order from North Avenue to Taft)
+STATIONS = [
+    'North Avenue', 'Quezon Avenue', 'GMA Kamuning', 'Araneta Cubao',
+    'Santolan', 'Ortigas', 'Shaw Boulevard', 'Boni', 'Guadalupe',
+    'Buendia', 'Ayala', 'Magallanes', 'Taft Avenue'
 ]
 
-# ========== SATURDAY SCHEDULE ==========
-SATURDAY_HEADWAY = [
-    {"period": "Morning", "start": "04:30", "end": "17:00", "headway": 345, "trains": 14},      # 5.75 min avg
-    {"period": "Afternoon", "start": "17:01", "end": "19:00", "headway": 315, "trains": 16},    # 5.25 min avg
-    {"period": "Evening", "start": "19:01", "end": "22:40", "headway": 405, "trains": 12}       # 6.75 min avg
-]
-
-# ========== SUNDAY/HOLIDAY SCHEDULE ==========
-SUNDAY_HEADWAY = [
-    {"period": "Full_Day", "start": "04:30", "end": "22:40", "headway": 405, "trains": 12}      # 6.75 min avg
-]
-
-# ========== STATION ENTRANCE OPENING TIMES ==========
-ENTRANCE_OPENING = {
-    "weekday": {
-        "North Ave": {"southbound": "04:20", "northbound": "05:24"},
-        "Quezon Ave": {"southbound": "04:22", "northbound": "05:23"},
-        "Kamuning": {"southbound": "04:24", "northbound": "05:21"},
-        "Cubao": {"southbound": "04:27", "northbound": "05:17"},
-        "Santolan": {"southbound": "04:30", "northbound": "05:14"},
-        "Ortigas": {"southbound": "04:33", "northbound": "05:11"},
-        "Shaw Blvd": {"southbound": "04:36", "northbound": "05:10"},
-        "Boni Ave": {"southbound": "04:38", "northbound": "05:07"},
-        "Guadalupe": {"southbound": "04:40", "northbound": "05:06"},
-        "Buendia": {"southbound": "04:43", "northbound": "05:02"},
-        "Ayala Ave": {"southbound": "04:45", "northbound": "05:00"},
-        "Magallanes": {"southbound": "04:47", "northbound": "04:58"},
-        "Taft": {"southbound": "04:50", "northbound": "04:55"}
-    },
-    "weekend": {
-        "North Ave": {"southbound": "04:20", "northbound": "05:27"},
-        "Quezon Ave": {"southbound": "04:22", "northbound": "05:25"},
-        "Kamuning": {"southbound": "04:24", "northbound": "05:22"},
-        "Cubao": {"southbound": "04:28", "northbound": "05:19"},
-        "Santolan": {"southbound": "04:31", "northbound": "05:15"},
-        "Ortigas": {"southbound": "04:34", "northbound": "05:12"},
-        "Shaw Blvd": {"southbound": "04:36", "northbound": "05:10"},
-        "Boni Ave": {"southbound": "04:38", "northbound": "05:08"},
-        "Guadalupe": {"southbound": "04:40", "northbound": "05:06"},
-        "Buendia": {"southbound": "04:44", "northbound": "05:03"},
-        "Ayala Ave": {"southbound": "04:46", "northbound": "05:01"},
-        "Magallanes": {"southbound": "04:49", "northbound": "04:58"},
-        "Taft": {"southbound": "04:52", "northbound": "04:55"}
-    }
-}
-
-# ========== LAST TRAIN DEPARTURES ==========
-LAST_TRAINS = {
-    "weekday": {
-        "North Ave": {"southbound_departure": "22:30", "northbound_entrance_close": None},
-        "Quezon Ave": {"southbound_departure": "22:33", "northbound_departure": "23:37"},
-        "Kamuning": {"southbound_departure": "22:35", "northbound_departure": "23:35"},
-        "Cubao": {"southbound_departure": "22:38", "northbound_departure": "23:33"},
-        "Santolan": {"southbound_departure": "22:40", "northbound_departure": "23:35"},
-        "Ortigas": {"southbound_departure": "22:43", "northbound_departure": "23:26"},
-        "Shaw Blvd": {"southbound_departure": "22:48", "northbound_departure": "23:27"},
-        "Boni Ave": {"southbound_departure": "22:48", "northbound_departure": "23:22"},
-        "Guadalupe": {"southbound_departure": "22:50", "northbound_departure": "23:20"},
-        "Buendia": {"southbound_departure": "22:56", "northbound_departure": "23:19"},
-        "Ayala Ave": {"southbound_departure": "22:55", "northbound_departure": "23:15"},
-        "Magallanes": {"southbound_departure": "22:58", "northbound_departure": "23:14"},
-        "Taft": {"southbound_departure": None, "northbound_departure": "23:09"}
-    },
-    "weekend": {
-        "North Ave": {"southbound_departure": "21:30", "northbound_entrance_close": None},
-        "Quezon Ave": {"southbound_departure": "21:32", "northbound_departure": "22:37"},
-        "Kamuning": {"southbound_departure": "21:34", "northbound_departure": "22:35"},
-        "Cubao": {"southbound_departure": "21:38", "northbound_departure": "22:32"},
-        "Santolan": {"southbound_departure": "21:40", "northbound_departure": "22:29"},
-        "Ortigas": {"southbound_departure": "21:44", "northbound_departure": "22:26"},
-        "Shaw Blvd": {"southbound_departure": "21:45", "northbound_departure": "22:26"},
-        "Boni Ave": {"southbound_departure": "21:48", "northbound_departure": "22:22"},
-        "Guadalupe": {"southbound_departure": "21:49", "northbound_departure": "22:20"},
-        "Buendia": {"southbound_departure": "21:53", "northbound_departure": "22:16"},
-        "Ayala Ave": {"southbound_departure": "21:55", "northbound_departure": "22:26"},
-        "Magallanes": {"southbound_departure": "21:57", "northbound_departure": "22:12"},
-        "Taft": {"southbound_departure": None, "northbound_departure": "22:09"}
-    }
-}
-
-# First train departure times
-FIRST_TRAINS = {
-    "weekday": {
-        "northbound": "05:18",  # From Taft
-        "southbound": "04:36"   # From North Ave
-    },
-    "saturday": {
-        "northbound": "05:18",  # From Taft
-        "southbound": "04:37"   # From North Ave
-    },
-    "sunday": {
-        "northbound": "05:19",  # From Taft
-        "southbound": "04:38"   # From North Ave
-    }
-}
-
-def get_day_type() -> str:
-    """Determine if today is weekday, Saturday, or Sunday/holiday"""
-    now = datetime.now()
-    weekday = now.weekday()
+# Helper function to convert time string to minutes since midnight
+def time_to_minutes(time_str):
+    """Convert time string (e.g., '04:30 AM') to minutes since midnight"""
+    time_str = time_str.strip()
+    parts = time_str.split()
+    time_part = parts[0]
+    period = parts[1] if len(parts) > 1 else ''
     
-    if weekday == 5:  # Saturday
-        return "saturday"
-    elif weekday == 6:  # Sunday
-        return "sunday"
-    else:  # Monday to Friday
-        return "weekday"
+    hour, minute = map(int, time_part.split(':'))
+    
+    if period == 'PM' and hour != 12:
+        hour += 12
+    elif period == 'AM' and hour == 12:
+        hour = 0
+    
+    return hour * 60 + minute
 
-def get_day_schedule_type() -> str:
-    """Get schedule type for headway lookup"""
-    day_type = get_day_type()
-    if day_type == "weekday":
-        return "weekday"
-    elif day_type == "saturday":
-        return "saturday"
+# Function to get current headway based on time and day
+def get_current_headway(current_time, day_type='weekday'):
+    """
+    Get the headway for the current time
+    current_time: datetime.time object or string in 'HH:MM AM/PM' format
+    day_type: 'weekday' or 'weekend'
+    Returns: headway string (e.g., '3.5 Minutes')
+    """
+    if isinstance(current_time, str):
+        current_minutes = time_to_minutes(current_time)
     else:
-        return "sunday"
-
-def time_to_seconds(time_str: str) -> int:
-    """Convert HH:MM or HH:MM:SS to seconds since midnight"""
-    parts = time_str.split(':')
+        current_minutes = current_time.hour * 60 + current_time.minute
     
-    if len(parts) == 2:
-        h, m = map(int, parts)
-        s = 0
-    elif len(parts) == 3:
-        h, m, s = map(int, parts)
-    else:
-        raise ValueError(f"Invalid time format: {time_str}")
+    schedule = WEEKDAY_TRAIN_SCHEDULE if day_type == 'weekday' else WEEKEND_TRAIN_SCHEDULE
     
-    return h * 3600 + m * 60 + s
-
-def seconds_to_time(seconds: int) -> str:
-    """Convert seconds since midnight to HH:MM string"""
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    return f"{h:02d}:{m:02d}"
-
-def get_current_headway() -> int:
-    """Get current headway in seconds based on day type and time of day"""
-    now = datetime.now()
-    current_seconds = now.hour * 3600 + now.minute * 60
-    day_schedule = get_day_schedule_type()
-    
-    # Select headway schedule based on day type
-    if day_schedule == "weekday":
-        headway_schedule = WEEKDAY_HEADWAY
-    elif day_schedule == "saturday":
-        headway_schedule = SATURDAY_HEADWAY
-    else:  # sunday
-        headway_schedule = SUNDAY_HEADWAY
-    
-    # Find current period
-    for period in headway_schedule:
-        start_seconds = time_to_seconds(period["start"])
-        end_seconds = time_to_seconds(period["end"])
+    for period, details in schedule.items():
+        start_min = time_to_minutes(details['start'])
+        end_min = time_to_minutes(details['end'])
         
-        if start_seconds <= current_seconds < end_seconds:
-            return period["headway"]
+        if start_min <= current_minutes <= end_min:
+            return details['headway']
     
-    # Default fallback
-    return 300  # 5 minutes
+    # Default if outside operating hours
+    return "Service not available"
 
-def get_headway_info() -> dict:
-    """Get current headway info with status and period details"""
-    now = datetime.now()
-    current_seconds = now.hour * 3600 + now.minute * 60
-    day_schedule = get_day_schedule_type()
+# Function to get next train time
+def get_next_train_time(current_time, station, direction, day_type='weekday'):
+    """
+    Get the next train time from a specific station
+    Returns: string with next train time
+    """
+    # This is a simplified version - you can expand this based on your needs
+    entrance_schedule = WEEKDAY_ENTRANCE_SCHEDULE if day_type == 'weekday' else WEEKEND_ENTRANCE_SCHEDULE
     
-    # Get operating hours based on day type
-    if day_schedule == "weekday":
-        opening_time = time_to_seconds("04:30")
-        closing_time = time_to_seconds("22:30")  # Last train from North Ave
+    if station in entrance_schedule:
+        if direction.lower() == 'southbound':
+            return entrance_schedule[station]['southbound']
+        else:
+            return entrance_schedule[station]['northbound']
+    return "Schedule not available"
+
+# Function to check if station is open
+def is_station_open(current_time, station, day_type='weekday'):
+    """
+    Check if a station entrance is open at the given time
+    Returns: boolean
+    """
+    if isinstance(current_time, str):
+        current_minutes = time_to_minutes(current_time)
     else:
-        opening_time = time_to_seconds("04:30")
-        closing_time = time_to_seconds("21:30")  # Earlier closing on weekends
+        current_minutes = current_time.hour * 60 + current_time.minute
     
-    # Check if operating
-    if current_seconds < opening_time or current_seconds >= closing_time:
-        return {
-            "headway": None,
-            "status": "CLOSED",
-            "message": f"MRT-3 is closed. Operating hours: 4:30 AM - {seconds_to_time(closing_time)}"
-        }
+    entrance_schedule = get_entrance_schedule(day_type)
     
-    # Get current period
-    if day_schedule == "weekday":
-        headway_schedule = WEEKDAY_HEADWAY
-    elif day_schedule == "saturday":
-        headway_schedule = SATURDAY_HEADWAY
-    else:
-        headway_schedule = SUNDAY_HEADWAY
-    
-    for period in headway_schedule:
-        start_seconds = time_to_seconds(period["start"])
-        end_seconds = time_to_seconds(period["end"])
+    if station in entrance_schedule:
+        south_min = time_to_minutes(entrance_schedule[station]['southbound'])
+        # Assume stations close at 11:40 PM (last train)
+        close_min = time_to_minutes('11:40 PM')
         
-        if start_seconds <= current_seconds < end_seconds:
-            headway_min = period["headway"] / 60
+        return south_min <= current_minutes <= close_min
+    
+    return False
+
+# Helper function to get train schedule based on day type and time
+def get_train_schedule(day_type='weekday'):
+    """Returns the appropriate train schedule based on day type"""
+    if day_type.lower() == 'weekday':
+        return WEEKDAY_TRAIN_SCHEDULE
+    else:
+        return WEEKEND_TRAIN_SCHEDULE
+
+# Helper function to get entrance schedule based on day type
+def get_entrance_schedule(day_type='weekday'):
+    """Returns the appropriate entrance schedule based on day type"""
+    if day_type.lower() == 'weekday':
+        return WEEKDAY_ENTRANCE_SCHEDULE
+    else:
+        return WEEKEND_ENTRANCE_SCHEDULE
+    
+    # Add this function to your mrt_schedule.py file
+
+def get_headway_info(period_key, day_type='weekday'):
+    """
+    Get headway information for a specific period
+    period_key: e.g., 'Morning', 'AM Peak', 'Off Peak', 'PM Peak', 'Night', 'Extended'
+    day_type: 'weekday' or 'weekend'
+    Returns: dict with headway info or None if not found
+    """
+    schedule = WEEKDAY_TRAIN_SCHEDULE if day_type == 'weekday' else WEEKEND_TRAIN_SCHEDULE
+    
+    # Handle different period naming conventions
+    period_mapping = {
+        'Morning': ['Morning', 'Saturday Morning'],
+        'AM Peak': ['AM Peak'],
+        'Off Peak': ['Off Peak', 'Saturday Afternoon'],
+        'PM Peak': ['PM Peak'],
+        'Night': ['Night', 'Saturday Evening'],
+        'Extended': ['Extended'],
+        'Sunday/Holidays': ['Sunday/Holidays']
+    }
+    
+    # Find matching period
+    possible_keys = period_mapping.get(period_key, [period_key])
+    
+    for key in possible_keys:
+        if key in schedule:
+            info = schedule[key]
             return {
-                "headway": period["headway"],
-                "status": "PEAK HOUR" if "Peak" in period["period"] else "NORMAL",
-                "message": f"{period['period']} service - trains every {headway_min:.1f} minutes",
-                "period": period["period"]
+                'period': key,
+                'start': info['start'],
+                'end': info['end'],
+                'trains': info['trains'],
+                'headway': info['headway']
             }
     
-    return {
-        "headway": 300,
-        "status": "NORMAL",
-        "message": "Normal service - trains every 5 minutes",
-        "period": "Normal"
-    }
+    return None
 
-def get_station_entrance_status(station_name: str, direction: str) -> dict:
-    """Check if station entrance is open for specific direction"""
-    now = datetime.now()
-    current_seconds = now.hour * 3600 + now.minute * 60
-    day_type = get_day_type()
-    schedule_type = "weekday" if day_type == "weekday" else "weekend"
-    
-    # Get opening time for this station/direction
-    opening_info = ENTRANCE_OPENING[schedule_type].get(station_name, {})
-    opening_time_str = opening_info.get(direction, "04:30")
-    opening_seconds = time_to_seconds(opening_time_str)
-    
-    # Get closing time
-    last_train_info = LAST_TRAINS[schedule_type].get(station_name, {})
-    if direction == "southbound":
-        closing_time_str = last_train_info.get("southbound_departure")
-    else:
-        closing_time_str = last_train_info.get("northbound_departure")
-    
-    if not closing_time_str:
-        # Terminal stations have different rules
-        if station_name == "North Ave" and direction == "northbound":
-            return {"is_open": False, "message": "North Ave northbound entrance not available"}
-        if station_name == "Taft" and direction == "southbound":
-            return {"is_open": False, "message": "Taft southbound entrance not available"}
-        closing_seconds = opening_seconds + 15 * 3600  # Default 15 hours later
-    else:
-        closing_seconds = time_to_seconds(closing_time_str)
-    
-    is_open = opening_seconds <= current_seconds < closing_seconds
-    
-    return {
-        "is_open": is_open,
-        "opens_at": opening_time_str,
-        "closes_at": closing_time_str if closing_time_str else "N/A",
-        "message": "Open" if is_open else f"Opens at {opening_time_str}"
-    }
-
-def calculate_next_trains(station_name: str, direction: str = None) -> dict:
+# Also keep your existing get_current_headway function
+def get_current_headway(current_time, day_type='weekday'):
     """
-    Calculate next train arrivals for a station using complete schedule.
+    Get the headway for the current time
+    current_time: datetime.time object or string in 'HH:MM AM/PM' format
+    day_type: 'weekday' or 'weekend'
+    Returns: headway string (e.g., '3.5 Minutes')
     """
-    now = datetime.now()
-    current_seconds = now.hour * 3600 + now.minute * 60 + now.second
-    day_type = get_day_type()
-    
-    # Get station index
-    try:
-        station_idx = STATIONS.index(station_name)
-    except ValueError:
-        station_idx = 6
-    
-    # Check if station entrance is open
-    north_entrance = get_station_entrance_status(station_name, "northbound")
-    south_entrance = get_station_entrance_status(station_name, "southbound")
-    
-    # ========== NORTHBOUND (Taft → North Ave) ==========
-    # Get first train time based on day type
-    if day_type == "weekday":
-        first_train_taft = time_to_seconds(FIRST_TRAINS["weekday"]["northbound"])
-    elif day_type == "saturday":
-        first_train_taft = time_to_seconds(FIRST_TRAINS["saturday"]["northbound"])
+    if isinstance(current_time, str):
+        current_minutes = time_to_minutes(current_time)
     else:
-        first_train_taft = time_to_seconds(FIRST_TRAINS["sunday"]["northbound"])
+        current_minutes = current_time.hour * 60 + current_time.minute
     
-    # Calculate travel time from Taft to this station
-    travel_from_taft = 0
-    for i in range(12, station_idx, -1):
-        station_pair = (STATIONS[i], STATIONS[i-1])
-        travel_from_taft += TRAVEL_TIMES.get(station_pair, 180) + DWELL_TIME
+    schedule = WEEKDAY_TRAIN_SCHEDULE if day_type == 'weekday' else WEEKEND_TRAIN_SCHEDULE
     
-    first_northbound_arrival = first_train_taft + travel_from_taft
-    
-    # Get last northbound train
-    schedule_type = "weekday" if day_type == "weekday" else "weekend"
-    last_northbound_info = LAST_TRAINS[schedule_type].get(station_name, {})
-    last_northbound_str = last_northbound_info.get("northbound_departure")
-    
-    if last_northbound_str:
-        last_northbound_seconds = time_to_seconds(last_northbound_str)
-    else:
-        last_northbound_seconds = first_northbound_arrival + 12 * 3600
-    
-    # Calculate next northbound
-    if current_seconds < first_northbound_arrival:
-        next_north_seconds = first_northbound_arrival
-    elif current_seconds >= last_northbound_seconds:
-        next_north_seconds = None
-    else:
-        headway = get_current_headway()
-        elapsed = current_seconds - first_northbound_arrival
-        trains_passed = elapsed // headway
-        next_north_seconds = first_northbound_arrival + (trains_passed + 1) * headway
-    
-    # ========== SOUTHBOUND (North Ave → Taft) ==========
-    if day_type == "weekday":
-        first_train_north = time_to_seconds(FIRST_TRAINS["weekday"]["southbound"])
-    elif day_type == "saturday":
-        first_train_north = time_to_seconds(FIRST_TRAINS["saturday"]["southbound"])
-    else:
-        first_train_north = time_to_seconds(FIRST_TRAINS["sunday"]["southbound"])
-    
-    # Calculate travel time from North Ave to this station
-    travel_from_north = 0
-    for i in range(0, station_idx):
-        station_pair = (STATIONS[i], STATIONS[i+1])
-        travel_from_north += TRAVEL_TIMES.get(station_pair, 180) + DWELL_TIME
-    
-    first_southbound_arrival = first_train_north + travel_from_north
-    
-    # Get last southbound train
-    last_southbound_str = last_northbound_info.get("southbound_departure")
-    if last_southbound_str:
-        last_southbound_seconds = time_to_seconds(last_southbound_str)
-    else:
-        last_southbound_seconds = first_southbound_arrival + 12 * 3600
-    
-    # Calculate next southbound
-    if current_seconds < first_southbound_arrival:
-        next_south_seconds = first_southbound_arrival
-    elif current_seconds >= last_southbound_seconds:
-        next_south_seconds = None
-    else:
-        headway = get_current_headway()
-        elapsed = current_seconds - first_southbound_arrival
-        trains_passed = elapsed // headway
-        next_south_seconds = first_southbound_arrival + (trains_passed + 1) * headway
-    
-    # Calculate minutes
-    north_minutes = None
-    south_minutes = None
-    
-    if next_north_seconds and north_entrance["is_open"]:
-        north_minutes = max(1, (next_north_seconds - current_seconds) // 60)
-        north_minutes = min(north_minutes, 15)  # Cap at 15 minutes
-        north_source_idx = station_idx - 1 if station_idx > 0 else 0
-        north_source = STATIONS[north_source_idx]
-    else:
-        north_source = "Taft"
-    
-    if next_south_seconds and south_entrance["is_open"]:
-        south_minutes = max(1, (next_south_seconds - current_seconds) // 60)
-        south_minutes = min(south_minutes, 15)  # Cap at 15 minutes
-        south_source_idx = station_idx + 1 if station_idx < 12 else 12
-        south_source = STATIONS[south_source_idx]
-    else:
-        south_source = "North Ave"
-    
-    # Terminal station adjustments
-    if station_name == "North Ave":
-        if north_minutes:
-            north_minutes = max(6, north_minutes)
-        if south_minutes:
-            south_minutes = min(3, south_minutes)
-    elif station_name == "Taft":
-        if north_minutes:
-            north_minutes = min(3, north_minutes)
-        if south_minutes:
-            south_minutes = max(6, south_minutes)
-    
-    # Ensure reasonable values
-    if north_minutes:
-        north_minutes = max(2, min(12, north_minutes))
-    if south_minutes:
-        south_minutes = max(2, min(12, south_minutes))
-    
-    # Default fallbacks if no train found
-    if not north_minutes:
-        north_minutes = 5
-        north_source = "Taft"
-    if not south_minutes:
-        south_minutes = 5
-        south_source = "North Ave"
-    
-    headway_seconds = get_current_headway()
-    
-    result = {
-        "northbound": {
-            "minutes": north_minutes,
-            "time": (now + timedelta(minutes=north_minutes)).strftime("%I:%M %p"),
-            "from_station": north_source,
-            "status": "on_time",
-            "entrance_open": north_entrance["is_open"]
-        },
-        "southbound": {
-            "minutes": south_minutes,
-            "time": (now + timedelta(minutes=south_minutes)).strftime("%I:%M %p"),
-            "from_station": south_source,
-            "status": "on_time",
-            "entrance_open": south_entrance["is_open"]
-        },
-        "headway": headway_seconds // 60,
-        "is_operating": True
-    }
-    
-    if direction == "north":
-        return result["northbound"]
-    elif direction == "south":
-        return result["southbound"]
-    else:
-        return result
-
-def get_all_trains_for_station(station_name: str, limit: int = 5) -> dict:
-    """Get next N trains for both directions"""
-    result = calculate_next_trains(station_name)
-    
-    if not result.get("is_operating", True):
-        return {"error": "Station closed", "status": "closed"}
-    
-    north_trains = []
-    south_trains = []
-    now = datetime.now()
-    headway = result["headway"] * 60
-    
-    for i in range(limit):
-        # Northbound
-        north_minutes = result["northbound"]["minutes"] + i * (headway // 60)
-        north_trains.append({
-            "time": (now + timedelta(minutes=north_minutes)).strftime("%I:%M %p"),
-            "minutes": north_minutes,
-            "from_station": result["northbound"]["from_station"]
-        })
+    for period, details in schedule.items():
+        start_min = time_to_minutes(details['start'])
+        end_min = time_to_minutes(details['end'])
         
-        # Southbound
-        south_minutes = result["southbound"]["minutes"] + i * (headway // 60)
-        south_trains.append({
-            "time": (now + timedelta(minutes=south_minutes)).strftime("%I:%M %p"),
-            "minutes": south_minutes,
-            "from_station": result["southbound"]["from_station"]
-        })
+        if start_min <= current_minutes <= end_min:
+            return details['headway']
+    
+    # Default if outside operating hours
+    return "Service not available"
+
+# Add this function to your mrt_schedule.py file
+
+def calculate_next_trains(current_time, station, direction='southbound', day_type='weekday'):
+    """
+    Calculate the next train times from a specific station
+    current_time: datetime.time object or string in 'HH:MM AM/PM' format
+    station: station name (e.g., 'North Avenue')
+    direction: 'southbound' or 'northbound'
+    day_type: 'weekday' or 'weekend'
+    Returns: list of next train times (up to 3)
+    """
+    if isinstance(current_time, str):
+        current_minutes = time_to_minutes(current_time)
+    else:
+        current_minutes = current_time.hour * 60 + current_time.minute
+    
+    # Get the entrance schedule
+    entrance_schedule = get_entrance_schedule(day_type)
+    
+    if station not in entrance_schedule:
+        return ["Station not found"]
+    
+    # Get the first train time for this station and direction
+    if direction.lower() == 'southbound':
+        first_train_str = entrance_schedule[station]['southbound']
+    else:
+        first_train_str = entrance_schedule[station]['northbound']
+    
+    first_train_minutes = time_to_minutes(first_train_str)
+    
+    # If current time is before first train, first train is the next
+    if current_minutes < first_train_minutes:
+        next_times = [first_train_str]
+    else:
+        # Get current headway to calculate subsequent trains
+        headway_str = get_current_headway(current_time, day_type)
+        
+        # Parse headway (handle ranges like '7 - 4 Minutes' or simple like '3.5 Minutes')
+        if ' - ' in headway_str:
+            # For ranges, use the average or the lower value
+            parts = headway_str.split(' - ')
+            headway_min = float(parts[0].split()[0])
+        elif ' ' in headway_str:
+            headway_min = float(headway_str.split()[0])
+        else:
+            headway_min = 5  # default fallback
+        
+        # Calculate minutes after first train
+        minutes_elapsed = current_minutes - first_train_minutes
+        trains_passed = int(minutes_elapsed / headway_min) if headway_min > 0 else 0
+        
+        # Calculate next train times
+        next_times = []
+        for i in range(1, 4):  # Get next 3 trains
+            next_train_minutes = first_train_minutes + (trains_passed + i) * headway_min
+            
+            # Check if within operating hours (until 11:40 PM)
+            if next_train_minutes > time_to_minutes('11:40 PM'):
+                next_times.append("Last train passed")
+            else:
+                # Convert back to time string
+                hours = next_train_minutes // 60
+                minutes = next_train_minutes % 60
+                period = "AM" if hours < 12 else "PM"
+                if hours > 12:
+                    hours -= 12
+                elif hours == 0:
+                    hours = 12
+                
+                time_str = f"{hours:02d}:{minutes:02d} {period}"
+                next_times.append(time_str)
+    
+    return next_times
+
+
+def get_headway_info(period_key, day_type='weekday'):
+    """
+    Get headway information for a specific period
+    period_key: e.g., 'Morning', 'AM Peak', 'Off Peak', 'PM Peak', 'Night', 'Extended'
+    day_type: 'weekday' or 'weekend'
+    Returns: dict with headway info or None if not found
+    """
+    schedule = WEEKDAY_TRAIN_SCHEDULE if day_type == 'weekday' else WEEKEND_TRAIN_SCHEDULE
+    
+    # Handle different period naming conventions
+    period_mapping = {
+        'Morning': ['Morning', 'Saturday Morning'],
+        'AM Peak': ['AM Peak'],
+        'Off Peak': ['Off Peak', 'Saturday Afternoon'],
+        'PM Peak': ['PM Peak'],
+        'Night': ['Night', 'Saturday Evening'],
+        'Extended': ['Extended'],
+        'Sunday/Holidays': ['Sunday/Holidays']
+    }
+    
+    # Find matching period
+    possible_keys = period_mapping.get(period_key, [period_key])
+    
+    for key in possible_keys:
+        if key in schedule:
+            info = schedule[key]
+            return {
+                'period': key,
+                'start': info['start'],
+                'end': info['end'],
+                'trains': info['trains'],
+                'headway': info['headway']
+            }
+    
+    return None
+
+# Add this function to your mrt_schedule.py file
+
+def get_trip_schedule(origin_station, destination_station, current_time, day_type='weekday'):
+    """
+    Get the trip schedule between two stations
+    origin_station: starting station
+    destination_station: ending station  
+    current_time: current time (datetime.time object or string)
+    day_type: 'weekday' or 'weekend'
+    Returns: dict with trip information including estimated travel time and next trains
+    """
+    if isinstance(current_time, str):
+        current_minutes = time_to_minutes(current_time)
+    else:
+        current_minutes = current_time.hour * 60 + current_time.minute
+    
+    # Check if stations exist
+    if origin_station not in STATIONS or destination_station not in STATIONS:
+        return {"error": "Station not found"}
+    
+    # Get indices for travel time calculation
+    origin_index = STATIONS.index(origin_station)
+    dest_index = STATIONS.index(destination_station)
+    
+    # Calculate number of stations between (assuming southbound direction)
+    stations_between = abs(dest_index - origin_index)
+    
+    # Estimate travel time (approx 2-3 minutes per station including stops)
+    # Average travel time between stations: ~2.5 minutes
+    estimated_travel_minutes = stations_between * 2.5
+    
+    # Get next train times from origin station
+    next_trains = calculate_next_trains(current_time, origin_station, 'southbound', day_type)
+    
+    # Get current headway
+    current_headway = get_current_headway(current_time, day_type)
+    
+    # Get entrance schedule for origin station
+    entrance_schedule = get_entrance_schedule(day_type)
+    first_train = entrance_schedule.get(origin_station, {}).get('southbound', 'Unknown')
     
     return {
-        "station": station_name,
-        "trains": {
-            "northbound": north_trains,
-            "southbound": south_trains
-        },
-        "headway": result["headway"],
-        "status": "normal",
-        "is_operating": True
+        'origin': origin_station,
+        'destination': destination_station,
+        'stations_between': stations_between,
+        'estimated_travel_time': f"{estimated_travel_minutes:.1f} minutes",
+        'estimated_travel_time_minutes': estimated_travel_minutes,
+        'next_trains': next_trains,
+        'current_headway': current_headway,
+        'first_train': first_train,
+        'day_type': day_type
     }
 
-# For debugging
-if __name__ == "__main__":
-    print("=" * 60)
-    print("MRT-3 Schedule Test")
-    print("=" * 60)
-    
-    test_stations = ["North Ave", "Cubao", "Ayala Ave", "Taft"]
-    
-    for station in test_stations:
-        print(f"\n📍 {station}")
-        result = calculate_next_trains(station)
-        print(f"   Northbound: {result['northbound']['minutes']} min (from {result['northbound']['from_station']})")
-        print(f"   Southbound: {result['southbound']['minutes']} min (from {result['southbound']['from_station']})")
-        print(f"   Headway: {result['headway']} minutes")
-        
-# Add this to the END of your mrt_schedule.py file
 
-def get_trip_schedule(from_station: str, to_station: str, target_time: datetime = None) -> dict:
+def calculate_next_trains(current_time, station, direction='southbound', day_type='weekday'):
     """
-    Get schedule for a trip between two stations
+    Calculate the next train times from a specific station
+    current_time: datetime.time object or string in 'HH:MM AM/PM' format
+    station: station name (e.g., 'North Avenue')
+    direction: 'southbound' or 'northbound'
+    day_type: 'weekday' or 'weekend'
+    Returns: list of next train times (up to 3)
     """
-    if target_time is None:
-        target_time = datetime.now()
-    
-    try:
-        from_idx = STATIONS.index(from_station)
-        to_idx = STATIONS.index(to_station)
-    except ValueError:
-        return {"error": "Invalid station name"}
-    
-    # Determine direction
-    if from_idx < to_idx:
-        direction = "southbound"  # Going towards Taft
-        travel_direction = "south"
+    if isinstance(current_time, str):
+        current_minutes = time_to_minutes(current_time)
     else:
-        direction = "northbound"  # Going towards North Ave
-        travel_direction = "north"
+        current_minutes = current_time.hour * 60 + current_time.minute
     
-    # Get next train from origin station
-    train_info = calculate_next_trains(from_station, direction=travel_direction)
+    # Get the entrance schedule
+    entrance_schedule = get_entrance_schedule(day_type)
     
-    if not train_info.get("minutes"):
-        return {
-            "error": "No trains available or station closed",
-            "from_station": from_station,
-            "to_station": to_station
+    if station not in entrance_schedule:
+        return ["Station not found"]
+    
+    # Get the first train time for this station and direction
+    if direction.lower() == 'southbound':
+        first_train_str = entrance_schedule[station]['southbound']
+    else:
+        first_train_str = entrance_schedule[station]['northbound']
+    
+    first_train_minutes = time_to_minutes(first_train_str)
+    
+    # If current time is before first train, first train is the next
+    if current_minutes < first_train_minutes:
+        next_times = [first_train_str]
+        # Add subsequent trains based on headway
+        headway_str = get_current_headway(first_train_str, day_type)
+    else:
+        # Get current headway to calculate subsequent trains
+        headway_str = get_current_headway(current_time, day_type)
+        
+        # Parse headway (handle ranges like '7 - 4 Minutes' or simple like '3.5 Minutes')
+        if ' - ' in headway_str:
+            # For ranges, use the average or the lower value
+            parts = headway_str.split(' - ')
+            headway_min = float(parts[0].split()[0])
+        elif ' ' in headway_str:
+            headway_min = float(headway_str.split()[0])
+        else:
+            headway_min = 5  # default fallback
+        
+        # Calculate minutes after first train
+        minutes_elapsed = current_minutes - first_train_minutes
+        trains_passed = int(minutes_elapsed / headway_min) if headway_min > 0 else 0
+        
+        # Calculate next train times
+        next_times = []
+        for i in range(1, 4):  # Get next 3 trains
+            next_train_minutes = first_train_minutes + (trains_passed + i) * headway_min
+            
+            # Check if within operating hours (until 11:40 PM)
+            if next_train_minutes > time_to_minutes('11:40 PM'):
+                next_times.append("Last train passed")
+            else:
+                # Convert back to time string
+                hours = next_train_minutes // 60
+                minutes = next_train_minutes % 60
+                period = "AM" if hours < 12 else "PM"
+                if hours > 12:
+                    hours -= 12
+                elif hours == 0:
+                    hours = 12
+                
+                time_str = f"{hours:02d}:{minutes:02d} {period}"
+                next_times.append(time_str)
+        
+        return next_times
+    
+    # If we got here (current time before first train), calculate based on first train
+    headway_min = 5  # default
+    if ' - ' in headway_str:
+        headway_min = float(headway_str.split(' - ')[0].split()[0])
+    elif ' ' in headway_str:
+        headway_min = float(headway_str.split()[0])
+    
+    next_times = [first_train_str]
+    for i in range(1, 3):
+        next_minutes = first_train_minutes + (i * headway_min)
+        if next_minutes <= time_to_minutes('11:40 PM'):
+            hours = next_minutes // 60
+            minutes = next_minutes % 60
+            period = "AM" if hours < 12 else "PM"
+            if hours > 12:
+                hours -= 12
+            elif hours == 0:
+                hours = 12
+            time_str = f"{hours:02d}:{minutes:02d} {period}"
+            next_times.append(time_str)
+    
+    return next_times
+
+
+def get_headway_info(period_key, day_type='weekday'):
+    """
+    Get headway information for a specific period
+    period_key: e.g., 'Morning', 'AM Peak', 'Off Peak', 'PM Peak', 'Night', 'Extended'
+    day_type: 'weekday' or 'weekend'
+    Returns: dict with headway info or None if not found
+    """
+    schedule = WEEKDAY_TRAIN_SCHEDULE if day_type == 'weekday' else WEEKEND_TRAIN_SCHEDULE
+    
+    # Handle different period naming conventions
+    period_mapping = {
+        'Morning': ['Morning', 'Saturday Morning'],
+        'AM Peak': ['AM Peak'],
+        'Off Peak': ['Off Peak', 'Saturday Afternoon'],
+        'PM Peak': ['PM Peak'],
+        'Night': ['Night', 'Saturday Evening'],
+        'Extended': ['Extended'],
+        'Sunday/Holidays': ['Sunday/Holidays']
+    }
+    
+    # Find matching period
+    possible_keys = period_mapping.get(period_key, [period_key])
+    
+    for key in possible_keys:
+        if key in schedule:
+            info = schedule[key]
+            return {
+                'period': key,
+                'start': info['start'],
+                'end': info['end'],
+                'trains': info['trains'],
+                'headway': info['headway']
+            }
+    
+    return None
+
+
+# Also keep your existing get_current_headway function
+def get_current_headway(current_time, day_type='weekday'):
+    """
+    Get the headway for the current time
+    current_time: datetime.time object or string in 'HH:MM AM/PM' format
+    day_type: 'weekday' or 'weekend'
+    Returns: headway string (e.g., '3.5 Minutes')
+    """
+    if isinstance(current_time, str):
+        current_minutes = time_to_minutes(current_time)
+    else:
+        current_minutes = current_time.hour * 60 + current_time.minute
+    
+    schedule = WEEKDAY_TRAIN_SCHEDULE if day_type == 'weekday' else WEEKEND_TRAIN_SCHEDULE
+    
+    for period, details in schedule.items():
+        start_min = time_to_minutes(details['start'])
+        end_min = time_to_minutes(details['end'])
+        
+        if start_min <= current_minutes <= end_min:
+            return details['headway']
+    
+    # Default if outside operating hours
+    return "Service not available"
+
+# Add this function to your mrt_schedule.py file
+
+def get_all_trains_for_station(station, day_type='weekday'):
+    """
+    Get all train schedules for a specific station for the entire day
+    station: station name
+    day_type: 'weekday' or 'weekend'
+    Returns: dict with all train times throughout the day
+    """
+    entrance_schedule = get_entrance_schedule(day_type)
+    
+    if station not in entrance_schedule:
+        return {"error": "Station not found"}
+    
+    # Get first and last train times for this station
+    first_train_sb = entrance_schedule[station]['southbound']
+    first_train_nb = entrance_schedule[station]['northbound']
+    
+    # Last train from Taft (southbound end) is 9:30 PM for weekdays? 
+    # Based on schedule, last train from North Ave is 9:30 PM (Night period ends)
+    last_train_sb = "9:30 PM"  # Last southbound train from North Ave
+    last_train_nb = "11:40 PM"  # Last northbound train from Taft (Extended period)
+    
+    # Get all train periods with their headways
+    schedule = get_train_schedule(day_type)
+    
+    # Calculate approximate train times throughout the day
+    all_trains = {
+        'station': station,
+        'day_type': day_type,
+        'first_train': {
+            'southbound': first_train_sb,
+            'northbound': first_train_nb
+        },
+        'last_train': {
+            'southbound': last_train_sb,
+            'northbound': last_train_nb
+        },
+        'periods': [],
+        'estimated_train_frequency': {}
+    }
+    
+    # Add period information
+    for period, details in schedule.items():
+        period_info = {
+            'period': period,
+            'start': details['start'],
+            'end': details['end'],
+            'headway': details['headway'],
+            'trains_per_hour': calculate_trains_per_hour(details['headway'])
         }
+        all_trains['periods'].append(period_info)
+        all_trains['estimated_train_frequency'][period] = period_info['trains_per_hour']
     
-    # Calculate travel time between stations
-    travel_seconds = 0
-    if from_idx < to_idx:  # Southbound
-        for i in range(from_idx, to_idx):
-            station_pair = (STATIONS[i], STATIONS[i + 1])
-            travel_seconds += TRAVEL_TIMES.get(station_pair, 180) + DWELL_TIME
-    else:  # Northbound
-        for i in range(from_idx, to_idx, -1):
-            station_pair = (STATIONS[i], STATIONS[i - 1])
-            travel_seconds += TRAVEL_TIMES.get(station_pair, 180) + DWELL_TIME
+    return all_trains
+
+
+def calculate_trains_per_hour(headway_str):
+    """
+    Calculate approximate number of trains per hour based on headway
+    headway_str: e.g., '3.5 Minutes', '5 - 5.5 Minutes'
+    Returns: float (trains per hour)
+    """
+    # Parse headway string to get minutes
+    if ' - ' in headway_str:
+        # For ranges, use the average
+        parts = headway_str.split(' - ')
+        min_minutes = float(parts[0].split()[0])
+        max_minutes = float(parts[1].split()[0])
+        avg_minutes = (min_minutes + max_minutes) / 2
+    else:
+        avg_minutes = float(headway_str.split()[0])
     
-    # Calculate departure and arrival times
-    departure_time = target_time + timedelta(minutes=train_info["minutes"])
-    arrival_time = departure_time + timedelta(seconds=travel_seconds)
+    # Calculate trains per hour (60 minutes / headway in minutes)
+    if avg_minutes > 0:
+        trains_per_hour = 60 / avg_minutes
+        return round(trains_per_hour, 1)
+    return 0
+
+
+def get_trip_schedule(origin_station, destination_station, current_time, day_type='weekday'):
+    """
+    Get the trip schedule between two stations
+    origin_station: starting station
+    destination_station: ending station  
+    current_time: current time (datetime.time object or string)
+    day_type: 'weekday' or 'weekend'
+    Returns: dict with trip information including estimated travel time and next trains
+    """
+    if isinstance(current_time, str):
+        current_minutes = time_to_minutes(current_time)
+    else:
+        current_minutes = current_time.hour * 60 + current_time.minute
+    
+    # Check if stations exist
+    if origin_station not in STATIONS or destination_station not in STATIONS:
+        return {"error": "Station not found"}
+    
+    # Get indices for travel time calculation
+    origin_index = STATIONS.index(origin_station)
+    dest_index = STATIONS.index(destination_station)
+    
+    # Calculate number of stations between (assuming southbound direction)
+    stations_between = abs(dest_index - origin_index)
+    
+    # Estimate travel time (approx 2-3 minutes per station including stops)
+    # Average travel time between stations: ~2.5 minutes
+    estimated_travel_minutes = stations_between * 2.5
+    
+    # Get next train times from origin station
+    next_trains = calculate_next_trains(current_time, origin_station, 'southbound', day_type)
+    
+    # Get current headway
+    current_headway = get_current_headway(current_time, day_type)
+    
+    # Get entrance schedule for origin station
+    entrance_schedule = get_entrance_schedule(day_type)
+    first_train = entrance_schedule.get(origin_station, {}).get('southbound', 'Unknown')
     
     return {
-        "from_station": from_station,
-        "to_station": to_station,
-        "direction": direction,
-        "departure_time": departure_time.strftime("%I:%M %p"),
-        "arrival_time": arrival_time.strftime("%I:%M %p"),
-        "travel_time_minutes": travel_seconds // 60,
-        "stops_between": abs(to_idx - from_idx),
-        "next_train_minutes": train_info["minutes"],
-        "status": "scheduled"
+        'origin': origin_station,
+        'destination': destination_station,
+        'stations_between': stations_between,
+        'estimated_travel_time': f"{estimated_travel_minutes:.1f} minutes",
+        'estimated_travel_time_minutes': estimated_travel_minutes,
+        'next_trains': next_trains,
+        'current_headway': current_headway,
+        'first_train': first_train,
+        'day_type': day_type
     }
+
+
+def calculate_next_trains(current_time, station, direction='southbound', day_type='weekday'):
+    """
+    Calculate the next train times from a specific station
+    current_time: datetime.time object or string in 'HH:MM AM/PM' format
+    station: station name (e.g., 'North Avenue')
+    direction: 'southbound' or 'northbound'
+    day_type: 'weekday' or 'weekend'
+    Returns: list of next train times (up to 3)
+    """
+    if isinstance(current_time, str):
+        current_minutes = time_to_minutes(current_time)
+    else:
+        current_minutes = current_time.hour * 60 + current_time.minute
+    
+    # Get the entrance schedule
+    entrance_schedule = get_entrance_schedule(day_type)
+    
+    if station not in entrance_schedule:
+        return ["Station not found"]
+    
+    # Get the first train time for this station and direction
+    if direction.lower() == 'southbound':
+        first_train_str = entrance_schedule[station]['southbound']
+    else:
+        first_train_str = entrance_schedule[station]['northbound']
+    
+    first_train_minutes = time_to_minutes(first_train_str)
+    
+    # If current time is before first train, first train is the next
+    if current_minutes < first_train_minutes:
+        next_times = [first_train_str]
+        # Add subsequent trains based on headway from the first period
+        # Find headway for the first period of the day
+        schedule = get_train_schedule(day_type)
+        first_period = list(schedule.keys())[0]
+        headway_str = schedule[first_period]['headway']
+    else:
+        # Get current headway to calculate subsequent trains
+        headway_str = get_current_headway(current_time, day_type)
+    
+    # Parse headway (handle ranges like '7 - 4 Minutes' or simple like '3.5 Minutes')
+    if headway_str == "Service not available":
+        return ["No more trains today"]
+    
+    if ' - ' in headway_str:
+        # For ranges, use the average or the lower value
+        parts = headway_str.split(' - ')
+        headway_min = float(parts[0].split()[0])
+    elif ' ' in headway_str:
+        headway_min = float(headway_str.split()[0])
+    else:
+        headway_min = 5  # default fallback
+    
+    if current_minutes < first_train_minutes:
+        # Calculate subsequent trains from first train
+        next_times = [first_train_str]
+        for i in range(1, 3):
+            next_minutes = first_train_minutes + (i * headway_min)
+            if next_minutes <= time_to_minutes('11:40 PM'):
+                hours = next_minutes // 60
+                minutes = next_minutes % 60
+                period = "AM" if hours < 12 else "PM"
+                if hours > 12:
+                    hours -= 12
+                elif hours == 0:
+                    hours = 12
+                time_str = f"{hours:02d}:{minutes:02d} {period}"
+                next_times.append(time_str)
+        return next_times
+    else:
+        # Calculate minutes after first train
+        minutes_elapsed = current_minutes - first_train_minutes
+        trains_passed = int(minutes_elapsed / headway_min) if headway_min > 0 else 0
+        
+        # Calculate next train times
+        next_times = []
+        for i in range(1, 4):  # Get next 3 trains
+            next_train_minutes = first_train_minutes + (trains_passed + i) * headway_min
+            
+            # Check if within operating hours (until 11:40 PM)
+            if next_train_minutes > time_to_minutes('11:40 PM'):
+                next_times.append("Last train passed")
+            else:
+                # Convert back to time string
+                hours = next_train_minutes // 60
+                minutes = next_train_minutes % 60
+                period = "AM" if hours < 12 else "PM"
+                if hours > 12:
+                    hours -= 12
+                elif hours == 0:
+                    hours = 12
+                
+                time_str = f"{hours:02d}:{minutes:02d} {period}"
+                next_times.append(time_str)
+        
+        return next_times
+
+
+def get_headway_info(period_key, day_type='weekday'):
+    """
+    Get headway information for a specific period
+    period_key: e.g., 'Morning', 'AM Peak', 'Off Peak', 'PM Peak', 'Night', 'Extended'
+    day_type: 'weekday' or 'weekend'
+    Returns: dict with headway info or None if not found
+    """
+    schedule = WEEKDAY_TRAIN_SCHEDULE if day_type == 'weekday' else WEEKEND_TRAIN_SCHEDULE
+    
+    # Handle different period naming conventions
+    period_mapping = {
+        'Morning': ['Morning', 'Saturday Morning'],
+        'AM Peak': ['AM Peak'],
+        'Off Peak': ['Off Peak', 'Saturday Afternoon'],
+        'PM Peak': ['PM Peak'],
+        'Night': ['Night', 'Saturday Evening'],
+        'Extended': ['Extended'],
+        'Sunday/Holidays': ['Sunday/Holidays']
+    }
+    
+    # Find matching period
+    possible_keys = period_mapping.get(period_key, [period_key])
+    
+    for key in possible_keys:
+        if key in schedule:
+            info = schedule[key]
+            return {
+                'period': key,
+                'start': info['start'],
+                'end': info['end'],
+                'trains': info['trains'],
+                'headway': info['headway']
+            }
+    
+    return None
