@@ -1174,7 +1174,7 @@ let isUpdating = false;
 
 function setDirection(dir) {
     if (isUpdating) return; // Prevent multiple rapid clicks
-    if (currentDirection === dir) return; // Don't switch to same direction
+    if (currentDirection === dir) return;
     
     isUpdating = true;
     
@@ -1312,7 +1312,7 @@ function setDirection(dir) {
             const station = getStationValue();
             
             if (!name || !email) {
-                showToast('⚠️', 'Please fill in name and email');
+                showToast('', 'Please fill in name and email');
                 return;
             }
             
@@ -1338,11 +1338,11 @@ function setDirection(dir) {
                     document.getElementById('opStation').value = 'all';
                     loadOperators();
                 } else {
-                    showToast('⚠️', data.error || 'Failed to generate invite');
+                    showToast('', data.error || 'Failed to generate invite');
                 }
             } catch (error) {
                 console.error('Error generating invite:', error);
-                showToast('⚠️', 'Failed to generate invite');
+                showToast('', 'Failed to generate invite');
             }
         }
 

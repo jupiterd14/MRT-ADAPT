@@ -1026,22 +1026,22 @@ async function getCongestionAlerts() {
                     });
                 }
                 
-                // SOUTHBOUND - ALL congestion levels, NO ICONS
+                // SOUTHBOUND 
                 if (southData && southData.congestion > 0) {
-                    let icon = '';  // ← NO ICON for ALL levels
+                    let icon = '';  
                     let icon_color = 'green';
                     let titlePrefix = 'LIGHT';
                     
                     if (southData.congestion > 80) {
-                        icon = '';  // ← NO ICON
+                        icon = '';  
                         icon_color = 'red';
                         titlePrefix = 'SEVERE';
                     } else if (southData.congestion > 60) {
-                        icon = '';  // ← NO ICON
+                        icon = '';  
                         icon_color = 'orange';
                         titlePrefix = 'CONGESTED';
                     } else if (southData.congestion > 30) {
-                        icon = '';  // ← NO ICON
+                        icon = ''; 
                         icon_color = 'yellow';
                         titlePrefix = 'MODERATE';
                     }
