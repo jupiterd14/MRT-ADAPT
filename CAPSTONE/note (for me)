@@ -1,0 +1,30 @@
+"""
+   Algorithm:
+        1. Check if directional LSTM model exists
+        2. Extract 24-hour feature sequence
+        3. Scale features using pre-fitted scaler
+        4. Predict and inverse transform
+        5. Apply time-based clamping (closed station = 0%)
+        6. Fallback to rule-based if model fails
+    
+    Note:
+        Models trained on 2022-2024 data. Accuracy decreases beyond 6 hours.
+        Operating hours: 4:30 AM - 10:30 PM
+        
+        
+        
+        # Features order (29 total):
+        #   0-2:   Base features (hour, weekday, month)
+        #   3-8:   Cyclical features (sin/cos for hour, dow, month)
+        #   9-14:  Operating flags (morning_rush, evening_rush, etc.)
+        #   15-20: Time-based features (minutes_until_closing, etc.)
+        #   21-26: Calendar features (weekend, holiday, christmas)
+        #   27-28: Data quality flags
+        #   29:    Target (congestion)
+        
+        
+        
+
+
+
+"""

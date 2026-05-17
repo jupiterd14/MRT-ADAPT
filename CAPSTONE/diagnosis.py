@@ -1,4 +1,13 @@
-# DIAGNOSIS SCRIPT - FOR 2023-2024 MODELS (with consistent scaling)
+# TESTING SCRIPT
+"""
+
+How to use?
+
+--open 2025.csv(raw data from mrt)
+--input STATION_NAME, DIRECTION, target-time
+
+"""
+
 import pandas as pd
 import tensorflow as tf
 import pickle
@@ -10,10 +19,11 @@ def rmse(y_true, y_pred):
     return tf.sqrt(tf.reduce_mean(tf.square(y_true - y_pred)))
 
 # ========== CONFIG ==========
-MODEL_PATH = 'models_2023-2024'          # <-- CHANGED to 2023-2024 folder
+MODEL_PATH = 'models_2023-2024'         
 DATA_FOLDER = 'data (2022-2024)'
 DATA_FILE = os.path.join(DATA_FOLDER, '2025.csv')
 
+"""       MODIFY HERE   """
 STATION_NAME = "North Ave"
 DIRECTION = "Northbound"
 target_time = pd.to_datetime('2025-09-29 15:00:00')
