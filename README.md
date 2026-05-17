@@ -11,7 +11,7 @@ python -m venv venv
 # 3. Activate venv (Windows)
 .\venv\Scripts\activate
 
-MAC
+# pag naka MAC
 source venv/bin/activate
 
 # 4. Install requirements
