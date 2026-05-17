@@ -1435,7 +1435,7 @@ function renderStations() {
     container.appendChild(fragment);
 }
 
-// ========== OPTIMIZED: Update All Stations ==========
+// ==========  Update All Stations ==========
 async function updateAllStations() {
     const data = await fetchStationData();
     if (data) {
@@ -1444,7 +1444,7 @@ async function updateAllStations() {
         updateAlertBadges(data);
     }
 }
-// OPTIMIZED: Cache alert count and reuse
+// Cache alert count and reuse
 let cachedAlertCount = null;
 let cachedAlertCountTime = 0;
 const ALERT_CACHE_DURATION = 30000; // 30 seconds cache for alerts too
@@ -1468,7 +1468,6 @@ async function fetchAlertCount() {
             readAlerts = new Set(JSON.parse(saved));
         }
         
-        // REUSE the existing station data instead of fetching again
         let congestionData = directionData;
         
         // Only fetch if we don't have cached data
@@ -1585,7 +1584,7 @@ async function fetchAlertCount() {
     }
 }
 
-// Add this function to check and clear invalid read alerts
+
 function cleanOldReadAlerts() {
     const saved = localStorage.getItem('readAlerts');
     if (saved) {
@@ -1602,7 +1601,7 @@ function cleanOldReadAlerts() {
     }
 }
 
-// Also update the updateAlertBadges function to not call fetchAlertCount twice:
+
 async function updateAlertBadges(data) {
     // Only update if we haven't already set the badge
     const badge = document.getElementById('alertBadge');

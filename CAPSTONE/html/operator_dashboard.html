@@ -38,7 +38,6 @@
             font-family: 'Inter', sans-serif;
         }
 
-        /* FORCE PAGES TO BE VISIBLE - ADD AT END OF STYLE TAG */
 .page {
     display: none;
 }
@@ -46,13 +45,11 @@
     display: block !important;
 }
 
-/* Specifically for broadcast */
 #broadcast.active {
     display: block !important;
     visibility: visible !important;
 }
 
-/* Make stat cards clickable */
 .stat-card {
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
@@ -2274,7 +2271,6 @@ function updateStatCardsClickable() {
     });
 }
     // ========== DASHBOARD FUNCTIONS ==========
-   // ========== DASHBOARD FUNCTIONS ==========
 async function loadCongestionData() {
     console.log("Loading congestion data...");
     try {
