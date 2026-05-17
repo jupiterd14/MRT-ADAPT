@@ -4,230 +4,264 @@ from typing import Dict, List, Tuple, Optional
 
 api_schedule_bp = Blueprint('api_schedule', __name__)
 
-# ========== MRT-3 SCHEDULE FUNCTIONS ==========
-
 STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-            "Ayala Ave", "Magallanes", "Taft"]
+            "Ortigas", "Shaw Blvd", "Boni", "Guadalupe", "Buendia", 
+            "Ayala", "Magallanes", "Taft"]
 
-# Weekday Headway Schedule
-WEEKDAY_HEADWAY = {
-    "early_morning": (time(4, 30), time(7, 0), 7, 4),
-    "am_peak": (time(7, 1), time(9, 0), 3.5, 3.5),
-    "off_peak": (time(9, 1), time(17, 0), 5, 5.5),
-    "pm_peak": (time(17, 1), time(19, 0), 3.5, 3.5),
-    "night": (time(19, 1), time(21, 30), 5, 8),
-    "extended": (time(21, 31), time(23, 40), 15, 15)
+# ========== WEEKDAY ENTRANCE OPENING (SB / NB) ==========
+WEEKDAY_OPENING_SB = {
+    "North Ave": time(4, 20), "Quezon Ave": time(4, 22), "Kamuning": time(4, 24),
+    "Cubao": time(4, 27), "Santolan": time(4, 30), "Ortigas": time(4, 33),
+    "Shaw Blvd": time(4, 36), "Boni": time(4, 38), "Guadalupe": time(4, 40),
+    "Buendia": time(4, 43), "Ayala": time(4, 45), "Magallanes": time(4, 47),
+    "Taft": time(4, 50)
 }
 
-# Weekend Headway Schedule
-WEEKEND_HEADWAY = {
-    "saturday_morning": (time(4, 30), time(17, 0), 5.5, 6),
-    "saturday_afternoon": (time(17, 1), time(19, 0), 5, 5.5),
-    "saturday_night": (time(19, 1), time(22, 40), 6.5, 7),
-    "sunday": (time(4, 30), time(22, 40), 6.5, 7)
+WEEKDAY_OPENING_NB = {
+    "North Ave": time(5, 24), "Quezon Ave": time(5, 23), "Kamuning": time(5, 21),
+    "Cubao": time(5, 17), "Santolan": time(5, 14), "Ortigas": time(5, 11),
+    "Shaw Blvd": time(5, 10), "Boni": time(5, 7), "Guadalupe": time(5, 6),
+    "Buendia": time(5, 2), "Ayala": time(5, 0), "Magallanes": time(4, 58),
+    "Taft": time(4, 55)
 }
 
-STATION_BASE_CAPACITY = {
-    "North Ave": 12000, "Quezon Ave": 9000, "Kamuning": 7500, "Cubao": 15000,
-    "Santolan": 8000, "Ortigas": 9500, "Shaw Blvd": 11000, "Boni Ave": 8500,
-    "Guadalupe": 10000, "Buendia": 9000, "Ayala Ave": 14000, "Magallanes": 9000, "Taft": 16000
+# ========== WEEKEND ENTRANCE OPENING ==========
+WEEKEND_OPENING_SB = {
+    "North Ave": time(4, 20), "Quezon Ave": time(4, 22), "Kamuning": time(4, 24),
+    "Cubao": time(4, 28), "Santolan": time(4, 31), "Ortigas": time(4, 34),
+    "Shaw Blvd": time(4, 36), "Boni": time(4, 38), "Guadalupe": time(4, 40),
+    "Buendia": time(4, 44), "Ayala": time(4, 46), "Magallanes": time(4, 49),
+    "Taft": time(4, 52)
 }
 
-def get_station_prediction(station_name):
-    from flask import current_app
-    if hasattr(current_app, 'config') and 'GET_STATION_PREDICTION' in current_app.config:
-        return current_app.config['GET_STATION_PREDICTION'](station_name)
-    return STATION_BASE_CAPACITY.get(station_name, 10000) * 0.5
+WEEKEND_OPENING_NB = {
+    "North Ave": time(5, 27), "Quezon Ave": time(5, 25), "Kamuning": time(5, 22),
+    "Cubao": time(5, 19), "Santolan": time(5, 15), "Ortigas": time(5, 12),
+    "Shaw Blvd": time(5, 10), "Boni": time(5, 8), "Guadalupe": time(5, 6),
+    "Buendia": time(5, 3), "Ayala": time(5, 1), "Magallanes": time(4, 58),
+    "Taft": time(4, 55)
+}
 
-def get_current_period() -> Tuple[str, bool]:
+# ========== LAST TRAIN DEPARTURES ==========
+# Southbound last train from each station (weekday)
+WEEKDAY_LAST_SB = {
+    "North Ave": time(22, 30), "Quezon Ave": time(22, 33), "Kamuning": time(22, 35),
+    "Cubao": time(22, 38), "Santolan": time(22, 40), "Ortigas": time(22, 43),
+    "Shaw Blvd": time(22, 48), "Boni": time(22, 48), "Guadalupe": time(22, 50),
+    "Buendia": time(22, 56), "Ayala": time(22, 55), "Magallanes": time(22, 58),
+    "Taft": None  # Terminal
+}
+
+# Northbound last train from each station (weekday)
+WEEKDAY_LAST_NB = {
+    "North Ave": None, "Quezon Ave": time(23, 37), "Kamuning": time(23, 35),
+    "Cubao": time(23, 33), "Santolan": time(23, 35), "Ortigas": time(23, 26),
+    "Shaw Blvd": time(23, 27), "Boni": time(23, 22), "Guadalupe": time(23, 20),
+    "Buendia": time(23, 19), "Ayala": time(23, 15), "Magallanes": time(23, 14),
+    "Taft": time(23, 9)
+}
+
+# Weekend last trains
+WEEKEND_LAST_SB = {
+    "North Ave": time(21, 30), "Quezon Ave": time(21, 32), "Kamuning": time(21, 34),
+    "Cubao": time(21, 38), "Santolan": time(21, 40), "Ortigas": time(21, 44),
+    "Shaw Blvd": time(21, 45), "Boni": time(21, 48), "Guadalupe": time(21, 49),
+    "Buendia": time(21, 53), "Ayala": time(21, 55), "Magallanes": time(21, 57),
+    "Taft": None
+}
+
+WEEKEND_LAST_NB = {
+    "North Ave": None, "Quezon Ave": time(22, 37), "Kamuning": time(22, 35),
+    "Cubao": time(22, 32), "Santolan": time(22, 29), "Ortigas": time(22, 26),
+    "Shaw Blvd": time(22, 26), "Boni": time(22, 22), "Guadalupe": time(22, 20),
+    "Buendia": time(22, 16), "Ayala": time(22, 26), "Magallanes": time(22, 12),
+    "Taft": time(22, 9)
+}
+
+# ========== HEADWAY SCHEDULES ==========
+# Format: (start_time, end_time, min_headway_seconds, max_headway_seconds, description)
+WEEKDAY_HEADWAY = [
+    (time(4, 30), time(7, 0), 7*60, 4*60, "Morning", "7-4 minutes"),
+    (time(7, 1), time(9, 0), 210, 210, "AM Peak", "3.5 minutes"),
+    (time(9, 1), time(17, 0), 5*60, 5.5*60, "Off Peak", "5-5.5 minutes"),
+    (time(17, 1), time(19, 0), 210, 210, "PM Peak", "3.5 minutes"),
+    (time(19, 1), time(21, 30), 5*60, 8*60, "Night", "5-8 minutes"),
+    (time(21, 31), time(23, 40), 15*60, 15*60, "Extended", "15 minutes"),
+]
+
+WEEKEND_HEADWAY = [
+    (time(4, 30), time(17, 0), 5.5*60, 6*60, "Saturday Morning", "5.5-6 minutes"),
+    (time(17, 1), time(19, 0), 5*60, 5.5*60, "Saturday Afternoon", "5-5.5 minutes"),
+    (time(19, 1), time(22, 40), 6.5*60, 7*60, "Saturday Night", "6.5-7 minutes"),
+]
+
+SUNDAY_HEADWAY = [
+    (time(4, 30), time(22, 40), 6.5*60, 7*60, "Sunday/Holiday", "6.5-7 minutes"),
+]
+
+def is_weekend() -> bool:
+    return datetime.now().weekday() >= 5
+
+def is_sunday() -> bool:
+    return datetime.now().weekday() == 6
+
+def get_station_opening_hours(station: str, direction: str) -> Tuple[time, time]:
+    """Returns (opening_time, last_train_time) for a station and direction"""
+    now = datetime.now()
+    weekend = is_weekend()
+    sunday = is_sunday()
+    
+    if direction == "southbound":
+        opening = WEEKEND_OPENING_SB.get(station) if weekend else WEEKDAY_OPENING_SB.get(station)
+        last = WEEKEND_LAST_SB.get(station) if weekend else WEEKDAY_LAST_SB.get(station)
+    else:  # northbound
+        opening = WEEKEND_OPENING_NB.get(station) if weekend else WEEKDAY_OPENING_NB.get(station)
+        last = WEEKEND_LAST_NB.get(station) if weekend else WEEKDAY_LAST_NB.get(station)
+    
+    return opening, last
+
+def get_current_headway() -> Dict:
+    """Get current headway based on time of day"""
     now = datetime.now()
     current_time = now.time()
-    is_weekend = now.weekday() >= 5
-    is_sunday = now.weekday() == 6
     
-    if not is_weekend:
-        for period, (start, end, min_h, max_h) in WEEKDAY_HEADWAY.items():
-            if start <= current_time < end:
-                return period, False
+    if is_sunday():
+        schedule = SUNDAY_HEADWAY
+    elif is_weekend():
+        schedule = WEEKEND_HEADWAY
     else:
-        if is_sunday:
-            return "sunday", True
-        else:
-            for period, (start, end, min_h, max_h) in WEEKEND_HEADWAY.items():
-                if start <= current_time < end:
-                    return period, True
-        return "saturday_night", True
-    return "night", False
-
-def get_headway_info(period_key: str = None) -> Dict:
-    period, is_weekend = get_current_period()
+        schedule = WEEKDAY_HEADWAY
     
-    if not is_weekend:
-        if period == "early_morning":
-            return {"headway": 420, "status": "normal", "message": "Early morning service: trains every 7 minutes"}
-        elif period == "am_peak":
-            return {"headway": 210, "status": "peak", "message": "AM Peak hour: trains every 3.5 minutes"}
-        elif period == "off_peak":
-            return {"headway": 300, "status": "normal", "message": "Off-peak: trains every 5-5.5 minutes"}
-        elif period == "pm_peak":
-            return {"headway": 210, "status": "peak", "message": "PM Peak hour: trains every 3.5 minutes"}
-        elif period == "night":
-            return {"headway": 360, "status": "normal", "message": "Night service: trains every 5-8 minutes"}
-        else:
-            return {"headway": 900, "status": "limited", "message": "Extended hours: trains every 15 minutes"}
-    else:
-        if period == "saturday_morning":
-            return {"headway": 330, "status": "normal", "message": "Saturday morning: trains every 5.5-6 minutes"}
-        elif period == "saturday_afternoon":
-            return {"headway": 300, "status": "normal", "message": "Saturday afternoon: trains every 5-5.5 minutes"}
-        else:
-            return {"headway": 390, "status": "normal", "message": "Weekend service: trains every 6.5-7 minutes"}
+    for start, end, min_h, max_h, period, desc in schedule:
+        if start <= current_time < end:
+            return {
+                "headway_min": int(min_h // 60),
+                "headway_max": int(max_h // 60),
+                "headway_avg": int((min_h + max_h) // 120),
+                "period": period,
+                "description": desc,
+                "is_peak": "Peak" in period
+            }
+    
+    # After operating hours
+    return {"is_operating": False, "headway_avg": 0, "description": "Station closed"}
 
-def calculate_next_trains(station_name: str, target_time: datetime = None) -> Dict:
+def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
+    """Calculate next train arrival times for a station"""
     if target_time is None:
         target_time = datetime.now()
     
     current_time = target_time.time()
     
-    if current_time < time(4, 30) or current_time >= time(23, 40):
-        return {"is_operating": False, "next_open": "4:30 AM"}
+    # Check if station is open for each direction
+    sb_open, sb_last = get_station_opening_hours(station, "southbound")
+    nb_open, nb_last = get_station_opening_hours(station, "northbound")
     
-    headway_info = get_headway_info()
-    headway_minutes = max(2, headway_info["headway"] // 60)
+    headway_info = get_current_headway()
     
-    try:
-        station_idx = STATIONS.index(station_name)
-    except ValueError:
-        station_idx = 0
-    
-    southbound_travel_time = station_idx * 3
-    southbound_next = (headway_minutes - (target_time.minute % headway_minutes)) % headway_minutes
-    southbound_minutes = max(1, southbound_next + southbound_travel_time)
-    
-    northbound_travel_time = (len(STATIONS) - 1 - station_idx) * 3
-    northbound_next = (headway_minutes - (target_time.minute % headway_minutes)) % headway_minutes
-    northbound_minutes = max(1, northbound_next + northbound_travel_time)
-    
-    return {
-        "is_operating": True,
-        "headway": headway_minutes,
-        "northbound": {"minutes": northbound_minutes, "from_station": "Taft" if station_idx < len(STATIONS)-1 else "North Ave"},
-        "southbound": {"minutes": southbound_minutes, "from_station": "North Ave" if station_idx > 0 else "Taft"}
+    result = {
+        "station": station,
+        "is_operating": headway_info.get("is_operating", True),
+        "headway": headway_info.get("headway_avg", 5),
+        "headway_description": headway_info.get("description", ""),
+        "period": headway_info.get("period", ""),
+        "southbound": {"available": True, "minutes": None, "last_train": None},
+        "northbound": {"available": True, "minutes": None, "last_train": None}
     }
-
-def get_trip_schedule(from_station: str, to_station: str, departure_time: datetime = None) -> Dict:
-    if departure_time is None:
-        departure_time = datetime.now()
     
+    if not result["is_operating"]:
+        return result
+    
+    headway_min = headway_info["headway_avg"]
+    if headway_min < 1:
+        headway_min = 5
+    
+    # Get station index
     try:
-        from_idx = STATIONS.index(from_station)
-        to_idx = STATIONS.index(to_station)
+        station_idx = STATIONS.index(station)
     except ValueError:
-        return {"error": "Invalid station name"}
+        return result
     
-    if from_idx == to_idx:
-        return {"error": "Start and destination stations are the same"}
-    
-    num_stops = abs(to_idx - from_idx)
-    base_travel_time = num_stops * 3 + 2
-    
-    headway_info = get_headway_info()
-    headway = headway_info["headway"] // 60
-    
-    minute = departure_time.minute
-    wait_time = (headway - (minute % headway)) % headway
-    wait_time = max(2, wait_time)
-    
-    total_duration = wait_time + base_travel_time
-    arrival_time = departure_time + timedelta(minutes=total_duration)
-    
-    return {
-        "from_station": from_station,
-        "to_station": to_station,
-        "stops": num_stops,
-        "wait_time": wait_time,
-        "travel_time": base_travel_time,
-        "total_duration": total_duration,
-        "departure": departure_time.strftime("%I:%M %p"),
-        "arrival": arrival_time.strftime("%I:%M %p"),
-        "headway": headway,
-        "status": headway_info["status"]
-    }
-
-def get_all_trains_for_station(station_name: str) -> Dict:
-    next_trains = calculate_next_trains(station_name)
-    
-    if not next_trains.get("is_operating", True):
-        return {"is_operating": False, "error": "Station closed"}
-    
-    north_trains = []
-    south_trains = []
-    headway = next_trains["headway"]
-    now = datetime.now()
-    
-    for i in range(3):
-        north_minutes = next_trains["northbound"]["minutes"] + (i * headway)
-        north_trains.append({
-            "minutes": north_minutes,
-            "time": (now + timedelta(minutes=north_minutes)).strftime("%I:%M %p"),
-            "from_station": next_trains["northbound"]["from_station"]
-        })
+    # Southbound calculation (to Taft)
+    if sb_last and current_time > sb_last:
+        result["southbound"]["available"] = False
+        result["southbound"]["last_train"] = sb_last.strftime("%I:%M %p")
+    elif sb_open and current_time < sb_open:
+        # Station not open yet
+        open_delta = (datetime.combine(target_time.date(), sb_open) - target_time).total_seconds() / 60
+        result["southbound"]["minutes"] = int(open_delta) + 2
+    else:
+        # Calculate next train
+        travel_to_station = station_idx * 3  # 3 min per station from North Ave
+        minutes_since_midnight = target_time.hour * 60 + target_time.minute
         
-        south_minutes = next_trains["southbound"]["minutes"] + (i * headway)
-        south_trains.append({
-            "minutes": south_minutes,
-            "time": (now + timedelta(minutes=south_minutes)).strftime("%I:%M %p"),
-            "from_station": next_trains["southbound"]["from_station"]
-        })
+        # First train from North Ave at ~4:30
+        first_train_minutes = 4 * 60 + 30
+        if minutes_since_midnight < first_train_minutes:
+            minutes_since_midnight = first_train_minutes
+        
+        cycle_pos = (minutes_since_midnight - first_train_minutes) % headway_min
+        wait_time = 0 if cycle_pos == 0 else headway_min - cycle_pos
+        
+        total_minutes = wait_time + travel_to_station
+        result["southbound"]["minutes"] = max(1, int(total_minutes))
     
-    return {
-        "station": station_name,
-        "is_operating": True,
-        "headway": headway,
-        "trains": {"northbound": north_trains, "southbound": south_trains},
-        "status": get_headway_info()["status"]
-    }
+    # Northbound calculation (to North Ave)
+    if nb_last and current_time > nb_last:
+        result["northbound"]["available"] = False
+        result["northbound"]["last_train"] = nb_last.strftime("%I:%M %p")
+    elif nb_open and current_time < nb_open:
+        open_delta = (datetime.combine(target_time.date(), nb_open) - target_time).total_seconds() / 60
+        result["northbound"]["minutes"] = int(open_delta) + 2
+    else:
+        # Calculate next train
+        travel_to_station = (len(STATIONS) - 1 - station_idx) * 3
+        minutes_since_midnight = target_time.hour * 60 + target_time.minute
+        
+        # First northbound train from Taft at ~4:55
+        first_train_minutes = 4 * 60 + 55
+        if minutes_since_midnight < first_train_minutes:
+            minutes_since_midnight = first_train_minutes
+        
+        cycle_pos = (minutes_since_midnight - first_train_minutes) % headway_min
+        wait_time = 0 if cycle_pos == 0 else headway_min - cycle_pos
+        
+        total_minutes = wait_time + travel_to_station
+        result["northbound"]["minutes"] = max(1, int(total_minutes))
+    
+    return result
 
 # ========== ROUTES ==========
 
 @api_schedule_bp.route('/schedule/headway')
 def get_headway_route():
-    try:
-        headway_info = get_headway_info()
-        return jsonify({
-            "headway": headway_info["headway"] // 60,
-            "status": headway_info["status"],
-            "message": headway_info["message"]
-        })
-    except Exception as e:
-        return jsonify({"headway": 5, "status": "normal", "message": "Normal service"})
+    headway = get_current_headway()
+    return jsonify(headway)
 
 @api_schedule_bp.route('/schedule/next-trains/<station_name>')
 def get_next_trains_route(station_name):
     name = station_name.replace('%20', ' ')
+    result = calculate_next_trains(name)
+    return jsonify(result)
+
+@api_schedule_bp.route('/schedule/station-info/<station_name>')
+def station_info_route(station_name):
+    name = station_name.replace('%20', ' ')
+    now = datetime.now()
+    weekend = is_weekend()
     
-    try:
-        trains = calculate_next_trains(name)
-        
-        if not trains.get("is_operating"):
-            return jsonify({
-                "is_operating": False,
-                "northbound": {"minutes": None, "origin": None},
-                "southbound": {"minutes": None, "origin": None},
-                "headway": 0
-            })
-        
-        return jsonify({
-            "is_operating": True,
-            "northbound": {"minutes": trains["northbound"]["minutes"], "origin": trains["northbound"]["from_station"]},
-            "southbound": {"minutes": trains["southbound"]["minutes"], "origin": trains["southbound"]["from_station"]},
-            "headway": trains["headway"]
-        })
-    except Exception as e:
-        return jsonify({
-            "is_operating": True,
-            "northbound": {"minutes": 5, "origin": "Taft"},
-            "southbound": {"minutes": 3, "origin": "North Ave"},
-            "headway": 5
-        })
+    sb_open, sb_last = get_station_opening_hours(name, "southbound")
+    nb_open, nb_last = get_station_opening_hours(name, "northbound")
+    
+    return jsonify({
+        "station": name,
+        "date_type": "Weekend" if weekend else "Weekday",
+        "southbound": {
+            "entrance_opens": sb_open.strftime("%I:%M %p") if sb_open else None,
+            "last_train": sb_last.strftime("%I:%M %p") if sb_last else "Terminal"
+        },
+        "northbound": {
+            "entrance_opens": nb_open.strftime("%I:%M %p") if nb_open else None,
+            "last_train": nb_last.strftime("%I:%M %p") if nb_last else "Terminal"
+        }
+    })
