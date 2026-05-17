@@ -110,7 +110,7 @@ app.config['TYPE_ICONS'] = typeIcons
 
 
 
-DIRECTIONAL_MODELS_PATH = 'models_2022-2024_NEW_v2w'
+DIRECTIONAL_MODELS_PATH = 'models_2022-2024_NEW_v2w/openclose'
 load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH)
 
 
