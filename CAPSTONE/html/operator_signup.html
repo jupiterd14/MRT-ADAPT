@@ -13,12 +13,13 @@
             --card-fill: rgba(255, 255, 255, 0.03);
             --card-border: rgba(255, 255, 255, 0.08);
             --input-bg: rgba(0, 0, 0, 0.2);
-            --btn-blue: #3b82f6; 
+            --btn-blue: #3b82f6;
+            --btn-hover: #2563eb;
             --text-gray: #94a3b8;
             --success-green: #10b981;
             --error-red: #ef4444;
             --warning-yellow: #f59e0b;
-            --purple: #3B82F6;
+            --accent-blue: #3b82f6;
         }
 
         body, html {
@@ -49,7 +50,7 @@
 
         .brand-icon {
             width: 55px; height: 55px;
-            background: var(--purple);
+            background: var(--accent-blue);
             border-radius: 14px;
             display: flex;
             justify-content: center;
@@ -74,8 +75,8 @@
         }
 
         .invite-badge {
-            background: rgba(139, 92, 246, 0.15);
-            border: 1px solid var(--purple);
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid var(--accent-blue);
             border-radius: 28px;
             padding: 10px 18px;
             margin-bottom: 18px;
@@ -87,12 +88,12 @@
         }
 
         .invite-badge i {
-            color: var(--purple);
+            color: var(--accent-blue);
             font-size: 15px;
         }
 
         .invite-badge strong {
-            color: var(--purple);
+            color: var(--accent-blue);
             font-weight: 600;
         }
 
@@ -168,7 +169,7 @@
         }
 
         input:focus, select:focus {
-            border-color: var(--purple);
+            border-color: var(--accent-blue);
         }
 
         .toggle-eye {
@@ -198,73 +199,89 @@
             color: var(--success-green);
         }
 
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            color: var(--text-gray);
+            font-size: 11px;
+        }
+        
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid var(--card-border);
+        }
+        
+        .divider span {
+            padding: 0 15px;
+        }
+
+        .btn-google {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid var(--card-border);
+            padding: 12px;
+            border-radius: 18px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-google:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-google i {
+            font-size: 18px;
+        }
+
         .btn-register {
             width: 100%;
-            background: var(--purple);
-            color: white; border: none;
-            padding: 12px; border-radius: 18px;
-            font-size: 15px; font-weight: 600;
-            cursor: pointer; display: flex;
-            align-items: center; justify-content: center; gap: 8px;
+            background: var(--accent-blue);
+            color: white; 
+            border: none;
+            padding: 12px; 
+            border-radius: 18px;
+            font-size: 15px; 
+            font-weight: 600;
+            cursor: pointer; 
+            display: flex;
+            align-items: center; 
+            justify-content: center; 
+            gap: 8px;
             transition: 0.3s ease;
-            margin-top: 20px;
+            margin-top: 10px;
         }
-        .btn-register:hover { background: #7c3aed; }
+        
+        .btn-register:hover { 
+            background: var(--btn-hover); 
+        }
 
         .btn-register:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
 
-        .divider {
-            display: flex;
-            align-items: center;
-            text-align: center;
-            color: var(--text-gray);
-            font-size: 0.75rem;
-            margin: 1rem 0 1.2rem;
-            gap: 12px;
+        .login-link { 
+            text-align: center; 
+            margin-top: 18px; 
+            font-size: 13px; 
+            color: var(--text-gray); 
         }
-
-        .divider::before,
-        .divider::after {
-            content: "";
-            flex: 1;
-            height: 1px;
-            background: rgba(255, 255, 255, 0.2);
+        
+        .login-link a { 
+            color: var(--accent-blue); 
+            text-decoration: none; 
+            font-weight: 600; 
         }
-
-        .btn-google {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            border-radius: 18px;
-            padding: 10px;
-            font-size: 14px;
-            font-weight: 500;
-            color: white;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            transition: all 0.3s ease;
-            margin-top: 8px;
-        }
-
-        .btn-google:hover {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: var(--purple);
-            transform: translateY(-1px);
-        }
-
-        .btn-google img {
-            width: 18px;
-            height: 18px;
-        }
-
-        .login-link { text-align: center; margin-top: 18px; font-size: 13px; color: var(--text-gray); }
-        .login-link a { color: var(--purple); text-decoration: none; font-weight: 600; }
 
         .modal-overlay {
             position: fixed;
@@ -327,23 +344,23 @@
         }
 
         .modal-btn.primary {
-            background: var(--purple);
+            background: var(--accent-blue);
             color: white;
         }
 
         .modal-btn.primary:hover {
-            background: #7c3aed;
+            background: var(--btn-hover);
         }
 
         .modal-btn.secondary {
             background: transparent;
-            border: 1px solid var(--purple);
-            color: var(--purple);
+            border: 1px solid var(--accent-blue);
+            color: var(--accent-blue);
         }
 
         .info-note {
             background: rgba(59, 130, 246, 0.1);
-            border-left: 3px solid var(--purple);
+            border-left: 3px solid var(--accent-blue);
             padding: 10px 12px;
             border-radius: 12px;
             font-size: 12px;
@@ -355,7 +372,7 @@
         }
 
         .info-note i {
-            color: var(--purple);
+            color: var(--accent-blue);
             font-size: 14px;
         }
 
@@ -369,7 +386,7 @@
     <div class="modal-overlay" id="successModal">
         <div class="modal-content success">
             <i class="fa-solid fa-circle-check success"></i>
-            <h2>Account Created!</h2>
+            <h2>Account Created! </h2>
             <p>Your operator account has been created successfully. You will be redirected to the dashboard.</p>
             <button class="modal-btn primary" onclick="redirectToDashboard()">Go to Dashboard</button>
         </div>
@@ -381,18 +398,6 @@
             <h2 id="errorTitle">Oops!</h2>
             <p id="errorMessage">Please check your information and try again.</p>
             <button class="modal-btn primary" style="background: var(--error-red);" onclick="closeModal('errorModal')">Try Again</button>
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="googleLinkModal">
-        <div class="modal-content info">
-            <i class="fa-solid fa-google" style="color: #4285f4;"></i>
-            <h2>Link Google Account?</h2>
-            <p>Would you like to link your Google account for faster login in the future?</p>
-            <div class="modal-actions">
-                <button class="modal-btn secondary" onclick="closeModal('googleLinkModal'); redirectToDashboard();">Skip for now</button>
-                <button class="modal-btn primary" onclick="linkGoogleAfterSignup()">Link Google Account</button>
-            </div>
         </div>
     </div>
 
@@ -427,7 +432,6 @@
                 <input type="hidden" name="email" value="{{ email }}">
                 <input type="hidden" name="temp_password" value="{{ temp_password }}">
                 <input type="hidden" name="station" value="{{ assigned_station }}">
-                <input type="hidden" name="link_google" id="linkGoogle" value="false">
                 
                 <span class="input-label">Full Name</span>
                 <div class="field-wrap" id="name-field">
@@ -463,23 +467,22 @@
                     <i class="fa-solid fa-location-dot"></i>
                     <input type="text" name="station_display" id="station_display" value="{{ assigned_station }}" readonly disabled style="background: rgba(0,0,0,0.3); color: white;">
                 </div>
+                <div class="info-note">
+                    <i class="fa-solid fa-info-circle"></i>
+                    <span>Your station has been assigned by the administrator and cannot be changed.</span>
+                </div>
 
                 <button type="submit" class="btn-register" id="registerBtn">
                     <i class="fa-solid fa-user-check"></i> CREATE ACCOUNT
                 </button>
-
-                <div class="divider"><span>OR</span></div>
-
-                <button type="button" class="btn-google" onclick="signupWithGoogle()">
-                    <img src="https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png" alt="Google">
-                    Sign up with Google
-                </button>
             </form>
 
-            <div class="info-note" style="margin-top: 15px;">
-                <i class="fa-solid fa-shield-alt"></i>
-                <span>After creating your account, you'll be able to link your Google account for quick login.</span>
-            </div>
+            <div class="divider"><span>OR</span></div>
+
+            <!-- FIXED: Use the correct Google signup route -->
+            <button class="btn-google" onclick="window.location.href='/login/google/operator?email={{ email }}&station={{ assigned_station }}'">
+                <i class="fab fa-google"></i> Sign up with Google
+            </button>
 
             <div class="login-link">
                 Already have an account? <a href="/login">Log in</a>
@@ -488,8 +491,6 @@
     </div>
 
     <script>
-        let pendingUserData = null;
-
         function togglePass(id, el) {
             const input = document.getElementById(id);
             input.type = input.type === "password" ? "text" : "password";
@@ -503,22 +504,6 @@
 
         function redirectToDashboard() {
             window.location.href = "/operator-dashboard";
-        }
-
-        function linkGoogleAfterSignup() {
-            if (pendingUserData) {
-                // Store user data and redirect to Google linking
-                sessionStorage.setItem('pending_operator_email', pendingUserData.email);
-                sessionStorage.setItem('pending_operator_temp_password', pendingUserData.temp_password);
-                window.location.href = `/login/google?link=true&email=${encodeURIComponent(pendingUserData.email)}`;
-            } else {
-                redirectToDashboard();
-            }
-        }
-
-        function signupWithGoogle() {
-            // Redirect to Google OAuth for signup
-            window.location.href = '/login/google?signup=true';
         }
 
         function checkPasswordMatch() {
@@ -591,14 +576,10 @@
             })
             .then(data => {
                 if (data.success) {
-                    // Store user data for potential Google linking
-                    pendingUserData = {
-                        email: formData.get('email'),
-                        temp_password: formData.get('temp_password')
-                    };
-                    
-                    document.getElementById('successModal').style.display = 'none';
-                    document.getElementById('googleLinkModal').style.display = 'flex';
+                    document.getElementById('successModal').style.display = 'flex';
+                    setTimeout(() => {
+                        window.location.href = data.redirect || '/operator-dashboard';
+                    }, 2000);
                 } else {
                     throw new Error(data.error || 'Signup failed');
                 }
@@ -611,26 +592,8 @@
             });
         };
 
-        // Check for Google signup callback
-        window.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const googleSignup = urlParams.get('google_signup');
-            const error = urlParams.get('error');
-            
-            if (googleSignup === 'success') {
-                document.getElementById('successModal').style.display = 'flex';
-                setTimeout(() => {
-                    window.location.href = '/operator-dashboard';
-                }, 2000);
-            } else if (error) {
-                document.getElementById('errorTitle').innerText = "Google Signup Failed";
-                document.getElementById('errorMessage').innerText = decodeURIComponent(error);
-                document.getElementById('errorModal').style.display = 'flex';
-            }
-        });
-
         window.onclick = (event) => {
-            ['errorModal', 'successModal', 'googleLinkModal'].forEach(id => {
+            ['errorModal', 'successModal'].forEach(id => {
                 if (event.target == document.getElementById(id)) {
                     document.getElementById(id).style.display = 'none';
                 }

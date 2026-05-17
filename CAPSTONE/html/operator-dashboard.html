@@ -38,6 +38,20 @@
             font-family: 'Inter', sans-serif;
         }
 
+        /* FORCE PAGES TO BE VISIBLE - ADD AT END OF STYLE TAG */
+.page {
+    display: none;
+}
+.page.active {
+    display: block !important;
+}
+
+/* Specifically for broadcast */
+#broadcast.active {
+    display: block !important;
+    visibility: visible !important;
+}
+
         body {
             display: flex;
             height: 100vh;
@@ -252,9 +266,10 @@
             transition: all 0.2s;
         }
 
-        .btn-primary { background: var(--purple); color: white; }
+        .btn-primary { background: var(--purple); color: white;padding: 12px; border-radius: 10px; }
         .btn-primary:hover { background: #7C3AED; transform: translateY(-1px); }
-        .btn-ghost { background: transparent; color: var(--text-light); border: 1px solid var(--border); }
+        .btn-ghost { background: transparent; color: var(--text-light); border-radius:10px; padding: 12px; border: 1px solid var(--border); }
+        .btn-ghost:hover { background: var(--border); transform: translate(1px, 2px); }
         .btn-sm { padding: 6px 12px; font-size: 12px; }
 
         .content-body { padding: 24px 28px; }
@@ -331,12 +346,12 @@
         .btn-override:hover { background: var(--purple); color: white; }
 
         .forecast-card {
-            background: white;
-            border-radius: 20px;
-            padding: 24px;
-            border: 1px solid var(--border);
-            margin-top: 20px;
-        }
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    border: 1px solid var(--border);
+    margin-top: 20px;
+}
 
         .station-selector select {
             padding: 8px 16px;
@@ -415,15 +430,233 @@
 
         .live-preview { background: #F8FAFC; border: 1px dashed var(--border); border-radius: 12px; padding: 15px; margin-top: 20px; }
         .preview-card { padding: 15px; border-left: 4px solid var(--purple); background: white; border-radius: 8px; }
+/* INCIDENT LOG - BALANCED SIZE */
+.incident-log-container { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px; 
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    padding-right: 8px;
+}
 
-        .incident-log-container { display: flex; flex-direction: column; gap: 20px; }
-        .incident-card { background: white; border-radius: 20px; padding: 20px; border-left: 5px solid var(--purple); }
+/* Scrollbar styling */
+.incident-log-container::-webkit-scrollbar {
+    width: 6px;
+}
 
-        .reports-list { display: flex; flex-direction: column; gap: 16px; max-height: 65vh; overflow-y: auto; padding-right: 8px; }
-        .report-card { background: white; border-radius: 20px; padding: 20px; border-left: 4px solid; transition: transform 0.2s, box-shadow 0.2s; }
-        .report-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); }
+.incident-log-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
 
-        .empty-state { text-align: center; padding: 60px 40px; background: white; border-radius: 24px; border: 2px dashed var(--border); }
+.incident-log-container::-webkit-scrollbar-thumb {
+    background: var(--purple);
+    border-radius: 4px;
+}
+
+.incident-card { 
+    background: white; 
+    border-radius: 12px; 
+    padding: 14px 18px; 
+    border-left: 4px solid var(--purple); 
+    transition: all 0.2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.incident-card:hover {
+    background: #fafafa;
+    transform: translateX(2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Header row */
+.incident-card > div:first-child {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 10px !important;
+}
+
+.incident-card > div:first-child span:first-child {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+}
+
+.incident-card > div:first-child span:first-child i {
+    font-size: 14px;
+}
+
+.incident-card > div:first-child span:first-child strong {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Severity badge */
+.incident-card > div:first-child span:first-child span {
+    padding: 3px 10px !important;
+    border-radius: 20px !important;
+    font-size: 10px !important;
+    font-weight: 600;
+}
+
+/* Timestamp */
+.incident-card > div:first-child span:last-child {
+    font-size: 11px !important;
+    color: #64748B;
+}
+
+/* Direction badge row */
+.incident-card > div:first-child + div {
+    margin: 8px 0 !important;
+}
+
+.incident-card > div:first-child + div span {
+    background: #EDE9FE !important;
+    padding: 4px 12px !important;
+    border-radius: 20px !important;
+    font-size: 11px !important;
+    font-weight: 500;
+}
+
+/* Title */
+.incident-card h3 {
+    margin: 8px 0 6px 0 !important;
+    font-size: 15px !important;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+/* Message */
+.incident-card p {
+    margin-bottom: 10px !important;
+    font-size: 12px !important;
+    line-height: 1.4;
+    color: #475569;
+}
+
+/* Stations list */
+.incident-card > div:last-child {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    margin-top: 8px !important;
+}
+
+.incident-card > div:last-child span {
+    background: #F1F5F9 !important;
+    padding: 4px 12px !important;
+    border-radius: 20px !important;
+    font-size: 11px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.incident-card > div:last-child span i {
+    font-size: 10px;
+}
+
+/* Empty state */
+.incident-log-container .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    background: white;
+    border-radius: 12px;
+    border: 1px dashed var(--border);
+}
+
+.incident-log-container .empty-state i {
+    font-size: 36px;
+    margin-bottom: 10px;
+    opacity: 0.5;
+}
+
+.incident-log-container .empty-state h3 {
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+.incident-log-container .empty-state p {
+    font-size: 12px;
+    color: var(--text-light);
+}
+        /* ========== USER REPORT STYLES (from user page) ========== */
+        .reports-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .report-item {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 18px;
+            transition: 0.2s;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .report-menu {
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .report-menu div:hover { background: #F8FAFC; }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 40px;
+            background: white;
+            border-radius: 24px;
+            border: 2px dashed var(--border);
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 34, 77, 0.45);
+            backdrop-filter: blur(6px);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            width: 400px;
+            text-align: center;
+            position: relative;
+        }
+        .close-btn {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            cursor: pointer;
+            background: #F1F5F9;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
         .toast {
             position: fixed;
@@ -544,18 +777,784 @@
         .btn-cancel { background: #fff; border: 1px solid var(--border-light); color: #333; padding: 12px 32px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 15px; }
         .btn-apply { background: #0084ff; color: white; border: none; padding: 12px 32px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 15px; }
         .btn-cancel:hover, .btn-apply:hover { transform: translateY(-1px); }
+        /* Centered empty state */
+.no-reports {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    background: var(--white);
+    border-radius: 16px;
+    border: 1px dashed var(--border);
+    color: var(--text-light);
+}
 
-        /* Filter chips */
-        .filter-chip {
-            transition: all 0.2s ease;
-        }
-        .filter-chip:hover {
-            background: rgba(59, 130, 246, 0.2) !important;
-            color: var(--accent-blue) !important;
-        }
+.no-reports i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: var(--text-light);
+}
+
+.no-reports h3 {
+    font-size: 18px;
+    margin-bottom: 8px;
+    color: var(--text-dark);
+}
+
+.no-reports p {
+    font-size: 13px;
+}
+
+/* ===== OPERATOR PANEL SPECIFIC FILTER STYLES ===== */
+/* This CSS implements the exact filter dropdown design from your reference,
+   including date chips, congestion level badges, station toggles, and an apply button.
+   It is designed to integrate seamlessly with the existing MRT-3 Operator Panel layout. */
+
+/* --- Filter Container & Header --- */
+.reports-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.filter-container {
+    position: relative;
+}
+
+.filter-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1.5px solid var(--accent-blue);
+    border-radius: 25px;
+    padding: 5px 14px;
+    background: white;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-dark);
+    transition: all 0.2s;
+}
+
+.filter-header:hover {
+    background: var(--blue-bg);
+}
+
+/* --- Dropdown Card (The Filter Panel) --- */
+.dropdown-card {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    width: 280px;
+    background: white;
+    border: 1px solid var(--accent-blue);
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    z-index: 100;
+    display: none;
+}
+
+.dropdown-card.show {
+    display: block;
+}
+
+.dropdown-card h3 {
+    margin: 0 0 8px 0;
+    color: var(--text-light);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.dropdown-card hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 10px 0;
+}
+
+/* --- Date Chips --- */
+.date-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.chip {
+    padding: 4px 10px;
+    border-radius: 16px;
+    background: #EFEFEF;
+    color: #999;
+    font-size: 11px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: 0.2s;
+}
+
+.chip.active {
+    background: white;
+    border: 1px solid var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: 250px;
+    margin-top: 10px;
+}
+
+#forecastChart {
+    width: 100% !important;
+    height: 100% !important;
+}
+/* --- Congestion Level Badges (Filter Version) --- */
+.congestion-grid-filter {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.badge-filter {
+    padding: 5px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+/* Color mapping for each level (adjust variables as needed) */
+.badge-filter.severe {
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
+}
+.badge-filter.congested {
+    background: #FFEDD5;
+    color: #9A3412;
+    border: 1px solid #FDBA74;
+}
+.badge-filter.moderate {
+    background: #FEF9C3;
+    color: #854D0E;
+    border: 1px solid #FDE047;
+}
+.badge-filter.light {
+    background: #DCFCE7;
+    color: #166534;
+    border: 1px solid #86EFAC;
+}
+
+.badge-filter.active-filter {
+    background: var(--accent-blue);
+    color: white;
+    border-color: var(--accent-blue);
+}
+
+/* --- Stations Selection --- */
+.stations-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+}
+
+.select-all {
+    color: var(--green) !important;  /* Force green color */
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.select-all:hover {
+    color: #16A34A !important;  /* Darker green on hover */
+    text-decoration: underline;
+}
+
+.stations-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.station-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #333;
+}
+
+
+
+/* Custom toggle switch */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 28px;
+    height: 16px;
+    border: 2px solid #ccc;
+    border-radius: 16px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #66e742;
+    transition: .3s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
+    background-color:  #2c7548; /* Light green background (20% opacity) */
+   
+    transition: .3s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--green);
+}
+
+input:checked + .slider:before {
+    transform: translateX(12px);
+}
+
+/* --- Apply Button --- */
+.apply-filter-btn {
+    width: 100%;
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    padding: 8px;
+    border-radius: 25px;
+    margin-top: 12px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 12px;
+    transition: 0.2s;
+}
+
+.apply-filter-btn:hover {
+    background: #2563EB;
+    transform: translateY(-1px);
+}
+
+/* --- Reports List (Consistent with Filter) --- */
+.reports-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.report-item {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 18px;
+    transition: 0.2s;
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 40px;
+    background: white;
+    border-radius: 24px;
+    border: 2px dashed var(--border);
+}
+
+.no-reports {
+    text-align: center;
+    padding: 60px 20px;
+    background: var(--white);
+    border-radius: 16px;
+    border: 1px dashed var(--border);
+    color: var(--text-light);
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-light);
+}
+
+/* --- Toast Notification (Optional Consistency) --- */
+.toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #1E293B;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 12px;
+    z-index: 2000;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* Direction Selector for Broadcast */
+.direction-filter {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 6px 2px;
+    background: #F8FAFC;
+    border-radius: 10px;
+}
+
+
+.direction-option-broadcast {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+    font-weight: 500;
+}
+
+.direction-option-broadcast:hover {
+    background: var(--purple-light);
+    border-color: var(--purple);
+}
+
+.direction-option-broadcast i {
+    font-size: 16px;
+    color: var(--purple);
+}
+
+.direction-option-broadcast.selected {
+    background: var(--purple);
+    border-color: var(--purple);
+    color: white;
+}
+
+.direction-option-broadcast.selected i {
+    color: white;
+}
+
+/* Station pills styling - PILL SHAPE NOT CIRCULAR */
+.stations-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 12px;
+    background: #F8FAFC;
+    border-radius: 12px;
+    min-height: 120px;
+}
+
+.station-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: 40px !important;  /* Pill shape */
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1.5px solid var(--border);
+    background: white;
+    color: var(--text-dark);
+    gap: 6px;
+}
+
+.station-pill i {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.station-pill:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    border-color: var(--purple);
+}
+
+.station-pill.selected {
+    background: var(--purple);
+    border-color: var(--purple);
+    color: white;
+}
+
+.station-pill.selected i {
+    color: white;
+    opacity: 1;
+}
+
+.station-pill.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #F1F5F9;
+    filter: grayscale(0.2);
+}
+
+.station-pill.disabled:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--border);
+}
+/* Quick select buttons */
+.quick-select {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.quick-select-btn {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    background: #F1F5F9;
+    border: none;
+    color: var(--text-light);
+    transition: 0.2s;
+}
+
+.quick-select-btn:hover {
+    background: var(--purple);
+    color: white;
+}
+
+/* Remove Override Modal specific styles */
+#removeOverrideModal .modal-container {
+    animation: modalSlideIn 0.3s ease;
+}
+
+#removeOverrideModal .btn-apply {
+    transition: all 0.2s;
+}
+
+#removeOverrideModal .btn-apply:hover {
+    background: #DC2626 !important;
+    transform: translateY(-2px);
+}
+
+#removeOverrideModal .btn-cancel {
+    transition: all 0.2s;
+}
+
+#removeOverrideModal .btn-cancel:hover {
+    background: #F1F5F9;
+    transform: translateY(-2px);
+}
+
+/* Forecast Toggle Button Styles - Add to your existing CSS */
+.forecast-toggle-btn {
+    padding: 8px 24px;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    background: #f1f5f9;
+    color: #64748B;
+    font-family: 'Inter', sans-serif;
+}
+
+.forecast-toggle-btn i {
+    margin-right: 6px;
+    font-size: 12px;
+}
+
+.forecast-toggle-btn.active {
+    background: var(--purple, #8B5CF6);
+    color: white;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+.forecast-toggle-btn:hover:not(.active) {
+    background: #e2e8f0;
+    transform: translateY(-1px);
+}
+
+/* Forecast Card Header */
+.forecast-card {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    border: 1px solid var(--border);
+    margin-top: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.forecast-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.forecast-header h3 i {
+    font-size: 18px;
+    color: var(--purple);
+}
+
+#forecastStationName {
+    color: var(--purple);
+    font-weight: 700;
+}
+
+/* Station Select Dropdown */
+#forecastStationSelect {
+    padding: 8px 16px;
+    border: 2px solid var(--border);
+    border-radius: 30px;
+    font-size: 13px;
+    font-weight: 500;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Inter', sans-serif;
+}
+
+#forecastStationSelect:hover {
+    border-color: var(--purple);
+    transform: translateY(-1px);
+}
+
+#forecastStationSelect:focus {
+    outline: none;
+    border-color: var(--purple);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+/* Toggle container */
+.forecast-toggle-container {
+    display: flex;
+    gap: 10px;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 40px;
+    width: fit-content;
+    margin: 15px 0;
+}
+
+/* Date text */
+.forecast-date {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.forecast-date i {
+    font-size: 12px;
+    color: var(--purple);
+}
+
+/* Chart Container */
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: 250px;
+    margin-top: 10px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .forecast-toggle-btn {
+        padding: 6px 16px;
+        font-size: 11px;
+    }
+    
+    .forecast-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    #forecastStationSelect {
+        width: 100%;
+        margin-top: 8px;
+    }
+}
+
+/* Force pages to be visible */
+.page {
+    display: none;
+}
+.page.active {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* FORCE ALL PAGE CONTENT TO BE VISIBLE */
+.page.active {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-height: 400px;
+}
+
+#broadcast.active,
+#log.active,
+#userReports.active {
+    display: block !important;
+    visibility: visible !important;
+    background: #F8FAFC;
+    padding: 20px;
+}
+
+/* Make sure all inner elements are visible */
+.page.active * {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
     </style>
 </head>
 <body>
+
+    <!-- Remove Override Confirmation Modal -->
+<div id="removeOverrideModal" class="modal-overlay">
+    <div class="modal-container" style="max-width: 400px;">
+        <div class="modal-header">
+            <div style="width: 48px; height: 48px; background: #FEE2E2; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-exclamation-triangle" style="color: #EF4444; font-size: 24px;"></i>
+            </div>
+            <h2 style="margin-left: 12px;">Remove Override</h2>
+        </div>
+        
+        <div class="modal-subtitle" id="removeOverrideMessage" style="margin-bottom: 20px;">
+            Remove manual override for <strong id="removeOverrideStationName">North Ave</strong>? This will revert to automatic congestion data.
+        </div>
+        
+        <div style="background: #FEF3C7; border-radius: 12px; padding: 12px; margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+                <i class="fas fa-info-circle" style="color: #D97706; margin-top: 2px;"></i>
+                <div style="font-size: 12px; color: #92400E;">
+                    <strong>What happens next?</strong><br>
+                    The system will use real-time predictions and historical data to determine congestion levels for this station.
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-actions" style="justify-content: space-between; gap: 12px;">
+            <button class="btn-cancel" onclick="closeRemoveOverrideModal()" style="flex: 1;">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+            <button class="btn-apply" id="confirmRemoveOverrideBtn" style="background: #EF4444; flex: 1;">
+                <i class="fas fa-trash"></i> Remove Override
+            </button>
+        </div>
+    </div>
+</div>
+
+
+    <!-- Review Report Modal -->
+    <div id="reviewModal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 500px;">
+            <div class="modal-header">
+                <i class="fas fa-flag" style="color: #F59E0B; font-size: 24px;"></i>
+                <h2>Review Flagged Report</h2>
+            </div>
+            <div id="reviewReportDetails" style="margin-bottom: 20px;">
+                <div style="background: #FEF3C7; padding: 12px; border-radius: 12px; margin-bottom: 16px;">
+                    <p><strong><i class="fas fa-exclamation-triangle"></i> This report has been flagged by users</strong></p>
+                </div>
+            </div>
+            <div class="field-group">
+                <label>Action Reason (optional but recommended)</label>
+                <input type="text" id="reviewReason" placeholder="e.g., Spam, Inaccurate, Duplicate...">
+            </div>
+            <div class="modal-actions" style="justify-content: space-between;">
+                <button class="btn-cancel" onclick="closeReviewModal()">Cancel</button>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn-ghost" id="keepReportBtn" style="background: #DCFCE7; color: #166534; border-color: #86EFAC;">
+                        <i class="fas fa-check"></i> Keep & Remove Flag
+                    </button>
+                    <button class="btn-apply" id="deleteReportBtn" style="background: #EF4444;">
+                        <i class="fas fa-trash"></i> Delete Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flag Report Confirmation Modal -->
+    <div id="flagModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-btn" onclick="closeFlagModal()"><i class="fas fa-times"></i></span>
+            <div style="text-align: center; margin-bottom: 16px;">
+                <div style="width: 60px; height: 60px; background: #FEF3C7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                    <i class="fas fa-flag" style="color: #F59E0B; font-size: 28px;"></i>
+                </div>
+                <h2 style="font-size: 20px; font-weight: 700; color: var(--text-dark); margin-bottom: 8px;">Flag this report?</h2>
+                <p style="color: var(--text-light); font-size: 14px; margin-bottom: 16px;" id="flagModalMessage">Flag report from <strong>North Ave</strong> as inappropriate?</p>
+            </div>
+            <div style="background: #FEF2F2; border-radius: 12px; padding: 12px; margin-bottom: 20px;">
+                <div style="display: flex; gap: 10px; align-items: flex-start;">
+                    <i class="fas fa-info-circle" style="color: #DC2626; margin-top: 2px;"></i>
+                    <div style="font-size: 12px; color: #991B1B;">
+                        <strong>Why flag?</strong><br>
+                        Flagged reports will be reviewed by operators and may be removed if inappropriate.
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button onclick="closeFlagModal()" style="background: white; border: 1px solid var(--border); padding: 10px 24px; border-radius: 30px; cursor: pointer; font-weight: 500;">
+                    Cancel
+                </button>
+                <button id="confirmFlagBtn" style="background: #F59E0B; border: none; padding: 10px 24px; border-radius: 30px; cursor: pointer; font-weight: 500; color: white; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-flag"></i> Yes, Flag Report
+                </button>
+            </div>
+        </div>
+    </div>
 
     <div class="sidebar">
         <div class="logo-section">
@@ -604,79 +1603,156 @@
                     <div class="stat-card"><h2 id="light-count">0</h2><p>Light Stations</p></div>
                 </div>
                 <div class="status-tables">
-                    <div class="table-card"><h4><i class="fas fa-arrow-down"></i> Southbound</h4><div class="table-scroll-container"><table class="data-table"><thead> <th>STATION</th><th>STATUS</th><th>ACTION</th> </thead><tbody id="southbound-body"></tbody> </table></div></div>
-                    <div class="table-card"><h4><i class="fas fa-arrow-up"></i> Northbound</h4><div class="table-scroll-container"><table class="data-table"><thead> <th>STATION</th><th>STATUS</th><th>ACTION</th> </thead><tbody id="northbound-body"></tbody> </table></div></div>
+                    <div class="table-card"><h4><i class="fas fa-arrow-down"></i> Southbound</h4><div class="table-scroll-container"><table class="data-table"><thead><th>STATION</th><th>STATUS</th><th>ACTION</th></thead><tbody id="southbound-body"></tbody></table></div></div>
+                    <div class="table-card"><h4><i class="fas fa-arrow-up"></i> Northbound</h4><div class="table-scroll-container"><table class="data-table"><thead><th>STATION</th><th>STATUS</th><th>ACTION</th></thead><tbody id="northbound-body"></tbody></table></div></div>
                 </div>
-                <div class="forecast-card">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                        <h4 id="forecastStationName">FORECAST</h4>
-                        <div class="station-selector"><i class="fas fa-map-marker-alt"></i><select id="forecastStationSelect" onchange="updateForecast()"></select></div>
-                    </div>
-                    <canvas id="forecastChart" height="100"></canvas>
-                </div>
-            </div>
+               <!-- Forecast Card with Direction Toggle - FIXED VERSION -->
+<div class="forecast-card">
+    <div class="forecast-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+        <h3><i class="fas fa-chart-line" style="color: var(--purple);"></i> <span id="forecastStationName">{{ managed_stations[0] if managed_stations else 'North Ave' }}</span>: NEXT 6 HOURS</h3>
+        <select id="forecastStationSelect" class="station-select" onchange="changeForecastStation(this.value)" style="position: relative; z-index: 100;">
+            {% for station in managed_stations %}
+            <option value="{{ station }}">{{ station }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <!-- Direction Toggle Buttons -->
+    <div style="display: flex; gap: 10px; background: #f1f5f9; padding: 4px; border-radius: 30px; width: fit-content; margin: 15px 0;">
+        <button id="forecastToggleNorth" class="forecast-toggle-btn active" onclick="setForecastDirection('north')">
+            <i class="fas fa-arrow-up"></i> Northbound
+        </button>
+        <button id="forecastToggleSouth" class="forecast-toggle-btn" onclick="setForecastDirection('south')">
+            <i class="fas fa-arrow-down"></i> Southbound
+        </button>
+    </div>
+    
+    <h3 style="font-size: 11px; color: var(--text-light); margin-bottom: 15px;">
+        <i class="far fa-calendar"></i> Predict crowd for {{ now.strftime('%B %d, %Y') }}
+    </h3>
+    
+    <div class="chart-container" style="position: relative; height: 250px; width: 100%;">
+        <canvas id="forecastChart"></canvas>
+    </div>
+</div>
 
-            <div id="broadcast" class="page">
-                <div class="broadcast-layout">
-                    <div>
-                        <div class="form-card">
-                            <h3 style="margin-bottom:16px;">Disruption Type</h3>
-                            <div class="disruption-grid" id="disruptionGrid"></div>
-                            <label>Select Stations</label>
-                            <div class="stations-grid" id="stationsGrid"></div>
-                            <div class="selected-stations-list" id="selectedStationsList"></div>
-                        </div>
+           <div id="broadcast" class="page">
+    <div class="broadcast-layout">
+        <div>
+            <div class="form-card">
+                <h3 style="margin-bottom:16px;">Disruption Type</h3>
+                <div class="disruption-grid" id="disruptionGrid"></div>
+                
+                <!-- NEW: Direction Selector -->
+                <label style="margin-top: 16px; margin-bottom: 8px; display: block;">Affected Direction</label>
+                <div class="direction-filter">
+                    <div class="direction-option-broadcast" onclick="selectBroadcastDirection('northbound')" id="broadcast-dir-north">
+                        <i class="fas fa-arrow-up"></i> Northbound
                     </div>
-                    <div>
-                        <div class="form-card">
-                            <h3><i class="fa-regular fa-envelope"></i> Message</h3>
-                            <div class="input-group"><label>Alert Title</label><input type="text" id="alertTitle" oninput="updatePreview()" placeholder="e.g., Train Malfunction"></div>
-                            <div class="input-group"><label>Message</label><textarea id="alertMessage" oninput="updatePreview()" rows="4" placeholder="Describe situation..."></textarea></div>
-                            <div class="input-group"><label>Severity</label><select id="severityLevel"><option value="advisory">Advisory</option><option value="warning">Warning</option><option value="critical">Critical</option></select></div>
-                            <div class="live-preview"><div class="preview-card"><strong id="previewTitle">Alert Title</strong><p id="previewText">Message preview</p></div></div>
-                            <div style="display:flex; gap:12px; margin-top:20px;"><button class="btn-ghost" onclick="clearBroadcastForm()">Clear</button><button class="btn-primary" onclick="sendBroadcast()"><i class="fa-solid fa-paper-plane"></i> Send</button></div>
-                        </div>
+                    <div class="direction-option-broadcast" onclick="selectBroadcastDirection('southbound')" id="broadcast-dir-south">
+                        <i class="fas fa-arrow-down"></i> Southbound
+                    </div>
+                    <div class="direction-option-broadcast" onclick="selectBroadcastDirection('both')" id="broadcast-dir-both">
+                        <i class="fas fa-exchange-alt"></i> Both
                     </div>
                 </div>
+                
+                <!-- Station pills based on direction -->
+                <label>Select Stations <span id="stationHint" style="color: #64748B; font-size: 11px;">(click to select/unselect)</span></label>
+                <div class="quick-select">
+                    <button class="quick-select-btn" onclick="selectAllStations()">Select All</button>
+                    <button class="quick-select-btn" onclick="deselectAllStations()">Deselect All</button>
+                </div>
+                <div id="stationsPills" class="stations-pills">
+                    <!-- Stations will be populated here as pills -->
+                </div>
+                <div class="selected-stations-list" id="selectedStationsList"></div>
             </div>
+        </div>
+        <div>
+            <div class="form-card">
+                <h3><i class="fa-regular fa-envelope"></i> Message</h3>
+                <div class="input-group"><label>Alert Title</label><input type="text" id="alertTitle" oninput="updatePreview()" placeholder="e.g., Train Malfunction"></div>
+                <div class="input-group"><label>Message</label><textarea id="alertMessage" oninput="updatePreview()" rows="4" placeholder="Describe situation..."></textarea></div>
+                <div class="input-group"><label>Severity</label><select id="severityLevel"><option value="advisory">Advisory</option><option value="warning">Warning</option><option value="critical">Critical</option></select></div>
+                <div class="live-preview"><div class="preview-card"><strong id="previewTitle">Alert Title</strong><p id="previewText">Message preview</p></div></div>
+                <div style="display:flex; gap:12px; margin-top:20px;"><button class="btn-ghost" onclick="clearBroadcastForm()">Clear</button><button class="btn-primary" onclick="sendBroadcast()"><i class="fa-solid fa-paper-plane"></i> Send</button></div>
+            </div>
+        </div>
+    </div>
+</div>
 
             <div id="log" class="page"><div id="incident-log-container" class="incident-log-container"><div class="empty-state"><i class="fas fa-clipboard-list fa-3x"></i><h3>No incidents logged yet</h3></div></div></div>
             
-            <div id="userReports" class="page">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                    <div class="card-title" style="margin: 0;">
-                        <i class="fas fa-flag-checkered"></i> User Submitted Reports
+            <!-- USER REPORTS SECTION - EXACT COPY FROM USER PAGE -->
+          <div id="userReports" class="page">
+    <div class="reports-view">
+        <!-- Filter Bar - EXACT COPY FROM USER PAGE -->
+        <div class="reports-header">
+            <div style="display: flex; gap: 10px;">
+                <div class="filter-container">
+                    <div class="filter-header" onclick="toggleFilterDropdown()">
+                        <i class="fas fa-filter"></i>
+                        <span>Filter</span>
+                        <i class="fas fa-chevron-down"></i>
                     </div>
-                    <button class="btn-ghost btn-sm" onclick="fetchUserReports()">
-                        <i class="fas fa-sync-alt"></i> Refresh
-                    </button>
-                </div>
-                
-                <!-- Filter Bar -->
-                <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
-                    <div style="display: flex; gap: 8px; background: #F1F5F9; padding: 4px; border-radius: 40px;">
-                        <button class="filter-chip" data-filter="all" onclick="filterReports('all')" style="padding: 6px 16px; border-radius: 30px; border: none; background: var(--accent-blue); color: white; cursor: pointer; font-size: 12px; font-weight: 600;">All</button>
-                        <button class="filter-chip" data-filter="severe" onclick="filterReports('severe')" style="padding: 6px 16px; border-radius: 30px; border: none; background: transparent; color: var(--text-light); cursor: pointer; font-size: 12px; font-weight: 600;">Severe</button>
-                        <button class="filter-chip" data-filter="congested" onclick="filterReports('congested')" style="padding: 6px 16px; border-radius: 30px; border: none; background: transparent; color: var(--text-light); cursor: pointer; font-size: 12px; font-weight: 600;">Congested</button>
-                        <button class="filter-chip" data-filter="moderate" onclick="filterReports('moderate')" style="padding: 6px 16px; border-radius: 30px; border: none; background: transparent; color: var(--text-light); cursor: pointer; font-size: 12px; font-weight: 600;">Moderate</button>
-                        <button class="filter-chip" data-filter="light" onclick="filterReports('light')" style="padding: 6px 16px; border-radius: 30px; border: none; background: transparent; color: var(--text-light); cursor: pointer; font-size: 12px; font-weight: 600;">Light</button>
-                    </div>
-                    
-                    <div style="flex: 1; max-width: 300px; position: relative;">
-                        <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94A3B8; font-size: 12px;"></i>
-                        <input type="text" id="reportSearchInput" placeholder="Search by station..." 
-                               style="width: 100%; padding: 8px 12px 8px 32px; border: 1.5px solid var(--border); border-radius: 30px; font-size: 13px; outline: none;">
-                    </div>
-                </div>
-                
-                <div id="reportsList" class="reports-list">
-                    <div class="empty-state">
-                        <i class="fas fa-flag-checkered fa-3x" style="color: var(--text-light); margin-bottom: 12px;"></i>
-                        <h3>No reports for your stations</h3>
-                        <p style="color: var(--text-light); margin-top: 8px;">User reports will appear here</p>
+                    <div id="filterDropdown" class="dropdown-card">
+                        <h3>Date</h3>
+                        <div class="date-chips">
+                            <div class="chip" data-date="today">Today</div>
+                            <div class="chip" data-date="yesterday">Yesterday</div>
+                            <div class="chip" data-date="week">7 days</div>
+                            <div class="chip" data-date="month">30 days</div>
+                        </div>
+
+                        <hr>
+
+                        <h3>Congestion Level</h3>
+                        <div class="congestion-grid-filter">
+                            <div class="badge-filter severe" data-level="severe">Severe</div>
+                            <div class="badge-filter congested" data-level="congested">Congested</div>
+                            <div class="badge-filter moderate" data-level="moderate">Moderate</div>
+                            <div class="badge-filter light" data-level="light">Light</div>
+                        </div>
+
+                        <hr>
+
+                        <div class="stations-header">
+                            <h3>Stations</h3>
+                            <span class="select-all">Select all</span>
+                        </div>
+
+                        <div class="stations-grid" id="stationsGridFilter">
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="North Ave" checked><span class="slider"></span></label> North Ave</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Quezon Ave" checked><span class="slider"></span></label> Quezon Ave</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Kamuning" checked><span class="slider"></span></label> Kamuning</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Cubao" checked><span class="slider"></span></label> Cubao</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Santolan" checked><span class="slider"></span></label> Santolan</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Ortigas" checked><span class="slider"></span></label> Ortigas</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Shaw Blvd" checked><span class="slider"></span></label> Shaw Blvd</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Boni Ave" checked><span class="slider"></span></label> Boni Ave</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Guadalupe" checked><span class="slider"></span></label> Guadalupe</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Buendia" checked><span class="slider"></span></label> Buendia</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Ayala Ave" checked><span class="slider"></span></label> Ayala Ave</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Magallanes" checked><span class="slider"></span></label> Magallanes</div>
+                            <div class="station-item"><label class="switch"><input type="checkbox" value="Taft" checked><span class="slider"></span></label> Taft</div>
+                        </div>
+
+                        <button class="apply-filter-btn" onclick="applyOperatorFilters()">Apply Filters</button>
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Reports List -->
+        <div id="operatorReportsList" class="reports-list">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading reports...</p>
+            </div>
+        </div>
+    </div>
+</div>
         </div>
     </div>
 
@@ -733,513 +1809,382 @@
         </div>
     </div>
 
-    <div class="toast" id="toast"><span id="toastIcon">✅</span><span id="toastMsg"></span></div>
-
-    <script>
-    // ========== DATA FROM FLASK BACKEND ==========
+    <div class="toast" id="toast"><span id="toastIcon"></span><span id="toastMsg"></span></div>
+<script>
+    console.log("🚇 Operator Dashboard Initializing...");
+    console.log("Managed Stations:", {{ managed_stations | tojson }});
+    
+    // ========== GLOBAL VARIABLES ==========
     const managedStations = {{ managed_stations | tojson }};
     const allStations = {{ all_stations | tojson }};
     const operatorName = "{{ session.get('username', 'Operator') }}";
     
     let selectedDisruptionType = "";
-    let selectedStationsSet = new Set();
     let broadcasts = [];
     let currentSelectedLevel = "";
     let currentSelectedCongestion = 0;
     let currentStation = "";
     let forecastChart = null;
-    
-    // Report filtering variables
+    let currentForecastDirection = 'north';
+    let currentForecastStation = managedStations[0] || 'North Ave';
     let allReportsData = [];
-    let currentReportFilter = 'all';
-    let currentReportSearch = '';
+    let broadcastDirection = 'both';
+    let selectedStationSet = new Set();
     
-    const disruptionTypes = ["Train Breakdown", "Overcrowding", "Maintenance", "Signal Issue", "Gate Closure", "General Notice"];
-    const typeIcons = {"Train Breakdown":"fa-train","Overcrowding":"fa-users","Maintenance":"fa-wrench","Signal Issue":"fa-satellite-dish","Gate Closure":"fa-door-closed","General Notice":"fa-bullhorn"};
+    // ========== HELPER FUNCTIONS ==========
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
     
     function showToast(icon, msg) {
         const toast = document.getElementById('toast');
-        document.getElementById('toastIcon').textContent = icon;
+        if (!toast) return;
+        document.getElementById('toastIcon').textContent = icon || '';
         document.getElementById('toastMsg').textContent = msg;
         toast.classList.add('show');
         setTimeout(() => toast.classList.remove('show'), 3000);
     }
     
     function updateDate() {
-        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    }
-    
-    function showPage(pageId, element) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
-        element.classList.add('active');
-        const titles = { dashboard: 'Dashboard', broadcast: 'Broadcast Alerts', log: 'Incident Log', userReports: 'User Reports' };
-        document.getElementById('pageTitle').textContent = titles[pageId];
-        if (pageId === 'log') loadIncidentLogs();
-        if (pageId === 'userReports') fetchUserReports();
-    }
-    
-    function canManageStation(station) {
-        return managedStations.includes(station);
-    }
-    
-    function getStatusInfo(congestion) {
-        if (congestion > 80) {
-            return { class: 'severe', text: 'Severe' };
-        } else if (congestion > 60) {
-            return { class: 'congested', text: 'Congested' };
-        } else if (congestion > 30) {
-            return { class: 'moderate', text: 'Moderate' };
-        } else {
-            return { class: 'light', text: 'Light' };
-        }
-    }
-    
-   async function loadCongestionData() {
-    try {
-        const response = await fetch('/api/live-map/directions');
-        const data = await response.json();
-        
-        // 🔧 Check for active overrides and their expiry
-        if (data.active_overrides && data.active_overrides > 0) {
-            console.log(`🔧 ${data.active_overrides} active override(s) on the system`);
-            
-            // Optional: Show a toast notification for active overrides
-            if (data.active_overrides_details) {
-                const overriddenStations = Object.keys(data.active_overrides_details).join(', ');
-                console.log(`   Stations: ${overriddenStations}`);
-                // Uncomment below to show toast (optional)
-                // showToast('🔧', `${data.active_overrides} station(s) have active overrides`);
-            }
-        }
-        
-        let severeCount = 0, congestedCount = 0, moderateCount = 0, lightCount = 0;
-        
-        const southboundBody = document.getElementById('southbound-body');
-        const southRows = [];
-        for (const station of allStations) {
-            const stationData = data.southbound?.[station];
-            if (stationData) {
-                const congestion = stationData.congestion;
-                const statusInfo = getStatusInfo(congestion);
-                const isOverridden = stationData.overridden || false;
-                
-                if (statusInfo.class === 'severe') severeCount++;
-                else if (statusInfo.class === 'congested') congestedCount++;
-                else if (statusInfo.class === 'moderate') moderateCount++;
-                else lightCount++;
-                
-                const canManage = canManageStation(station);
-                const buttonHtml = canManage 
-                    ? `<button class="btn-override" onclick="openOverrideModal('${station}')">Override</button>` 
-                    : `<button class="btn-override" disabled style="opacity:0.5; cursor:not-allowed;"><i class="fas fa-lock"></i> Not Allowed</button>`;
-                
-                const overrideBadge = isOverridden ? ' <span style="font-size:10px; background:#8B5CF6; color:white; padding:2px 6px; border-radius:10px; margin-left:5px;">OVERRIDDEN</span>' : '';
-                
-                southRows.push(`
-                    <tr>
-                        <td style="font-weight:500;">${station}${overrideBadge}</td>
-                        <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
-                        <td>${buttonHtml}</td>
-                    </tr>
-                `);
-            }
-        }
-        southboundBody.innerHTML = southRows.join('');
-        
-        const northboundBody = document.getElementById('northbound-body');
-        const northRows = [];
-        for (const station of allStations) {
-            const stationData = data.northbound?.[station];
-            if (stationData) {
-                const congestion = stationData.congestion;
-                const statusInfo = getStatusInfo(congestion);
-                const isOverridden = stationData.overridden || false;
-                
-                const canManage = canManageStation(station);
-                const buttonHtml = canManage 
-                    ? `<button class="btn-override" onclick="openOverrideModal('${station}')">Override</button>` 
-                    : `<button class="btn-override" disabled style="opacity:0.5; cursor:not-allowed;"><i class="fas fa-lock"></i> Not Allowed</button>`;
-                
-                const overrideBadge = isOverridden ? ' <span style="font-size:10px; background:#8B5CF6; color:white; padding:2px 6px; border-radius:10px; margin-left:5px;">OVERRIDDEN</span>' : '';
-                
-                northRows.push(`
-                    <tr>
-                        <td style="font-weight:500;">${station}${overrideBadge}</td>
-                        <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
-                        <td>${buttonHtml}</td>
-                    </tr>
-                `);
-            }
-        }
-        northboundBody.innerHTML = northRows.join('');
-        
-        document.getElementById('severe-count').textContent = severeCount;
-        document.getElementById('congested-count').textContent = congestedCount;
-        document.getElementById('moderate-count').textContent = moderateCount;
-        document.getElementById('light-count').textContent = lightCount;
-        
-        // Optional: Log when an override expires (compare with previous data)
-        if (window.previousOverrides) {
-            const currentOverrides = data.active_overrides_details || {};
-            for (const [station, level] of Object.entries(window.previousOverrides)) {
-                if (!currentOverrides[station]) {
-                    console.log(`⏰ Override EXPIRED for ${station} (was set to ${level})`);
-                    showToast('⏰', `${station} override has expired, returning to normal prediction`);
-                }
-            }
-        }
-        window.previousOverrides = data.active_overrides_details || {};
-        
-    } catch (error) {
-        console.error('Error loading congestion data:', error);
-        showToast('⚠️', 'Failed to load congestion data');
-    }
-}
-
-async function applyOverride() {
-    if (!currentSelectedLevel) { 
-        showToast('⚠️', 'Select a congestion level'); 
-        return; 
-    }
-    
-    const duration = document.getElementById('overrideDuration').value;
-    const reason = document.getElementById('overrideReason').value;
-    
-    let durationText = '';
-    let expiryMessage = '';
-    if (duration === '30') {
-        durationText = '30 minutes';
-        expiryMessage = 'Will expire in 30 minutes';
-    } else if (duration === '60') {
-        durationText = '1 hour';
-        expiryMessage = 'Will expire in 1 hour';
-    } else if (duration === '120') {
-        durationText = '2 hours';
-        expiryMessage = 'Will expire in 2 hours';
-    } else {
-        durationText = 'until manually changed';
-        expiryMessage = 'Will remain until manually cleared';
-    }
-    
-    const applyBtn = document.querySelector('.btn-apply');
-    const originalText = applyBtn.textContent;
-    applyBtn.disabled = true;
-    applyBtn.textContent = 'Applying...';
-    
-    try {
-        const response = await fetch('/api/operator/override-congestion', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                station: currentStation,
-                level: currentSelectedLevel,
-                congestion_value: currentSelectedCongestion,
-                duration: duration,
-                reason: reason
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showToast('✅', `${currentStation} set to ${currentSelectedLevel} (Duration: ${durationText}) - ${expiryMessage}`);
-            closeModal();
-            await loadCongestionData();
-            
-            const forecastSelect = document.getElementById('forecastStationSelect');
-            if (forecastSelect.value === currentStation) {
-                await updateForecast();
-            }
-        } else {
-            showToast('⚠️', data.error || 'Failed to override');
-        }
-    } catch (error) {
-        console.error('Error applying override:', error);
-        showToast('⚠️', 'Failed to apply override');
-    } finally {
-        applyBtn.disabled = false;
-        applyBtn.textContent = originalText;
-    }
-}
-    // Report Filtering Functions
-    function filterReports(level) {
-        currentReportFilter = level;
-        document.querySelectorAll('.filter-chip').forEach(chip => {
-            chip.style.background = 'transparent';
-            chip.style.color = 'var(--text-light)';
-            if (chip.getAttribute('data-filter') === level) {
-                chip.style.background = 'var(--accent-blue)';
-                chip.style.color = 'white';
-            }
-        });
-        applyReportFilters();
-    }
-    
-    function searchReports() {
-        currentReportSearch = document.getElementById('reportSearchInput').value.toLowerCase();
-        applyReportFilters();
-    }
-    
-    function applyReportFilters() {
-        let filtered = [...allReportsData];
-        
-        if (currentReportFilter !== 'all') {
-            filtered = filtered.filter(r => {
-                if (currentReportFilter === 'severe') return r.reported_congestion > 80;
-                if (currentReportFilter === 'congested') return r.reported_congestion > 60 && r.reported_congestion <= 80;
-                if (currentReportFilter === 'moderate') return r.reported_congestion > 30 && r.reported_congestion <= 60;
-                if (currentReportFilter === 'light') return r.reported_congestion <= 30;
-                return true;
+        const dateEl = document.getElementById('currentDate');
+        if (dateEl) {
+            dateEl.textContent = new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
             });
         }
-        
-        if (currentReportSearch) {
-            filtered = filtered.filter(r => r.station.toLowerCase().includes(currentReportSearch));
-        }
-        
-        displayFilteredReports(filtered);
     }
     
-    async function fetchUserReports() {
-        try {
-            const response = await fetch('/api/reports');
-            const reports = await response.json();
-            allReportsData = reports.filter(r => canManageStation(r.station));
-            applyReportFilters();
-        } catch (error) {
-            console.error('Error fetching reports:', error);
-            showToast('⚠️', 'Failed to load reports');
-        }
-    }
-    
-    function displayFilteredReports(reports) {
-        const container = document.getElementById('reportsList');
-        if (!reports.length) { 
-            container.innerHTML = '<div class="empty-state"><i class="fas fa-flag-checkered fa-3x"></i><h3>No reports for your stations</h3><p style="color: var(--text-light); margin-top: 8px;">Try changing your filters</p></div>'; 
-            return; 
-        }
+    // ========== PAGE NAVIGATION - FIXED VERSION ==========
+    window.showPage = function(pageId, element) {
+        console.log("Switching to page:", pageId);
         
-        container.innerHTML = reports.map(r => {
-            const statusInfo = getStatusInfo(r.reported_congestion);
-            const reportTime = new Date(r.timestamp).toLocaleString();
-            const borderColor = statusInfo.class === 'severe' ? 'var(--sev-red)' : 
-                               statusInfo.class === 'congested' ? 'var(--cong-orange)' : 
-                               statusInfo.class === 'moderate' ? 'var(--mod-yellow)' : 'var(--success-green)';
-            
-            let photos = [];
-            if (r.photo_path) {
-                try {
-                    photos = JSON.parse(r.photo_path);
-                } catch(e) {
-                    if (r.photo_path) photos = [r.photo_path];
-                }
+        // Hide all pages
+        document.querySelectorAll('.page').forEach(p => {
+            p.classList.remove('active');
+            p.style.display = 'none';
+        });
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        
+        // Show selected page
+        const page = document.getElementById(pageId);
+        if (page) {
+            page.classList.add('active');
+            page.style.display = 'block';
+            page.style.visibility = 'visible';
+            console.log(`Activated ${pageId}, display set to block`);
+        }
+        if (element) element.classList.add('active');
+        
+        const titles = { dashboard: 'Dashboard', broadcast: 'Broadcast Alerts', log: 'Incident Log', userReports: 'User Reports' };
+        const titleEl = document.getElementById('pageTitle');
+        if (titleEl) titleEl.textContent = titles[pageId];
+        
+        // Load content based on page
+        if (pageId === 'log') {
+            loadIncidentLogs();
+        } else if (pageId === 'userReports') {
+            fetchOperatorReports();
+        } else if (pageId === 'broadcast') {
+            initBroadcast();
+            renderStationPills();
+        } else if (pageId === 'dashboard') {
+            loadCongestionData();
+            if (forecastChart) {
+                forecastChart.update();
+            } else {
+                updateForecastChart();
             }
-            
-            const hasPhotos = photos.length > 0;
-            
-            return `
-                <div class="report-card" style="border-left-color: ${borderColor};">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px;">
-                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                            <div style="width: 40px; height: 40px; background: var(--purple-light); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-subway" style="color: var(--purple); font-size: 18px;"></i>
-                            </div>
-                            <div>
-                                <h4 style="font-size: 16px; font-weight: 700; color: var(--text-dark); margin-bottom: 4px;">${r.station}</h4>
-                                <div style="display: flex; gap: 8px; align-items: center;">
-                                    <span class="badge ${statusInfo.class}" style="font-size: 11px;">${statusInfo.text}</span>
-                                    <span style="font-size: 11px; color: var(--text-light);">
-                                        <i class="far fa-clock"></i> ${reportTime}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <div style="font-size: 12px; color: var(--text-light);">
-                                <i class="fas fa-user"></i> ${r.anonymous ? 'Anonymous' : (r.username || 'Commuter')}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    ${r.remarks ? `
-                        <div style="margin: 16px 0; background: #F8FAFC; padding: 12px 16px; border-radius: 12px;">
-                            <i class="fas fa-comment" style="color: var(--purple); margin-right: 8px; font-size: 12px;"></i>
-                            <span style="font-size: 13px; color: var(--text-dark);">${escapeHtml(r.remarks)}</span>
-                        </div>
-                    ` : ''}
-                    
-                    ${hasPhotos ? `
-                        <div style="margin-top: 12px;">
-                            <div style="font-size: 12px; font-weight: 600; margin-bottom: 10px; color: var(--text-dark); display: flex; align-items: center; gap: 6px;">
-                                <i class="fas fa-camera" style="color: var(--purple);"></i> 
-                                ${photos.length} photo(s) attached
-                            </div>
-                            <div class="photo-gallery">
-                                ${photos.map(photo => `
-                                    <div class="gallery-image" onclick="viewFullImage('${photo}')">
-                                        <img src="${photo}" alt="Report photo" 
-                                             onerror="this.src='https://via.placeholder.com/100?text=Image+Error'">
-                                        <div class="overlay"><i class="fas fa-search-plus"></i> Click to enlarge</div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    ` : ''}
-                    
-                    ${r.direction ? `
-                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-light); display: flex; align-items: center; gap: 6px;">
-                            <i class="fas fa-arrow-${r.direction === 'northbound' ? 'up' : 'down'}"></i>
-                            Direction: ${r.direction === 'northbound' ? 'Northbound' : 'Southbound'}
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        }).join('');
-    }
+        }
+    };
     
-    function viewFullImage(imageUrl) {
-        const modal = document.createElement('div');
-        modal.style.position = 'fixed';
-        modal.style.top = '0';
-        modal.style.left = '0';
-        modal.style.width = '100%';
-        modal.style.height = '100%';
-        modal.style.backgroundColor = 'rgba(0,0,0,0.95)';
-        modal.style.zIndex = '9999';
-        modal.style.display = 'flex';
-        modal.style.alignItems = 'center';
-        modal.style.justifyContent = 'center';
-        modal.style.cursor = 'pointer';
-        
-        const img = document.createElement('img');
-        img.src = imageUrl;
-        img.style.maxWidth = '90%';
-        img.style.maxHeight = '90%';
-        img.style.borderRadius = '8px';
-        img.style.boxShadow = '0 0 30px rgba(0,0,0,0.5)';
-        
-        modal.appendChild(img);
-        modal.onclick = () => modal.remove();
-        
-        document.body.appendChild(modal);
-    }
-    
-    async function updateForecast() {
-        const select = document.getElementById('forecastStationSelect');
-        const station = select.value;
-        if (!station) return;
-        
-        document.getElementById('forecastStationName').innerHTML = `${station.toUpperCase()}: NEXT 6 HOURS`;
-        
+    // ========== DASHBOARD FUNCTIONS ==========
+    async function loadCongestionData() {
+        console.log("Loading congestion data...");
         try {
-            const response = await fetch(`/api/station-forecast/${encodeURIComponent(station)}`);
+            const response = await fetch('/api/live-map/directions');
             const data = await response.json();
+            console.log("Congestion data received:", data);
             
-            if (forecastChart) forecastChart.destroy();
+            let severeCount = 0, congestedCount = 0, moderateCount = 0, lightCount = 0;
             
-            const ctx = document.getElementById('forecastChart').getContext('2d');
-            forecastChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.intervals || ['+1h', '+2h', '+3h', '+4h', '+5h', '+6h'],
-                    datasets: [{
-                        data: data.forecast || [0,0,0,0,0,0],
-                        borderColor: '#8B5CF6',
-                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                        borderWidth: 3,
-                        pointRadius: 6,
-                        pointBackgroundColor: (context) => {
-                            const value = context.raw;
-                            if (value > 80) return '#EF4444';
-                            if (value > 60) return '#F97316';
-                            if (value > 30) return '#EAB308';
-                            return '#22C55E';
-                        },
-                        pointBorderColor: 'white',
-                        pointBorderWidth: 2,
-                        tension: 0.2,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.raw;
-                                    if (value === 0) return 'CLOSED';
-                                    let level = 'LIGHT';
-                                    if (value > 80) level = 'SEVERE';
-                                    else if (value > 60) level = 'CONGESTED';
-                                    else if (value > 30) level = 'MODERATE';
-                                    return `${level}: ${value}`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { 
-                            beginAtZero: true, 
-                            max: 100, 
-                            title: { display: true, text: 'Congestion' },
-                            ticks: { callback: function(value) { return value; } }
-                        }
+            const getStatusInfo = (congestion) => {
+                if (congestion > 80) return { class: 'severe', text: 'Severe' };
+                if (congestion > 60) return { class: 'congested', text: 'Congested' };
+                if (congestion > 30) return { class: 'moderate', text: 'Moderate' };
+                return { class: 'light', text: 'Light' };
+            };
+            
+            // Southbound table
+            const southboundBody = document.getElementById('southbound-body');
+            if (southboundBody) {
+                const southRows = [];
+                for (const station of allStations) {
+                    const stationData = data.southbound?.[station];
+                    if (stationData) {
+                        const statusInfo = getStatusInfo(stationData.congestion);
+                        if (statusInfo.class === 'severe') severeCount++;
+                        else if (statusInfo.class === 'congested') congestedCount++;
+                        else if (statusInfo.class === 'moderate') moderateCount++;
+                        else lightCount++;
+                        
+                        const isOverridden = stationData.overridden === true;
+                        const canManage = managedStations.includes(station);
+                        
+                        const buttonHtml = canManage 
+                            ? (isOverridden
+                                ? `<button class="btn-override" style="background:#EF4444; color:white;" onclick="removeOverride('${station}')">
+                                     <i class="fas fa-trash"></i> Remove
+                                   </button>`
+                                : `<button class="btn-override" onclick="openOverrideModal('${station}')">
+                                     <i class="fas fa-edit"></i> Override
+                                   </button>`)
+                            : `<button class="btn-override" disabled style="opacity:0.5;">
+                                 <i class="fas fa-lock"></i> No Access
+                               </button>`;
+                        
+                        southRows.push(`
+                            <tr><td style="font-weight:500;">${station}${isOverridden ? ' <span style="font-size:10px; background:#8B5CF6; color:white; padding:2px 6px; border-radius:10px;">OVERRIDDEN</span>' : ''}</td><td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td><td>${buttonHtml}</td></tr>
+                        `);
                     }
                 }
-            });
+                southboundBody.innerHTML = southRows.join('');
+            }
+            
+            // Northbound table - similar structure
+            const northboundBody = document.getElementById('northbound-body');
+            if (northboundBody) {
+                const northRows = [];
+                for (const station of allStations) {
+                    const stationData = data.northbound?.[station];
+                    if (stationData) {
+                        const statusInfo = getStatusInfo(stationData.congestion);
+                        const isOverridden = stationData.overridden === true;
+                        const canManage = managedStations.includes(station);
+                        
+                        const buttonHtml = canManage 
+                            ? (isOverridden
+                                ? `<button class="btn-override" style="background:#EF4444; color:white;" onclick="removeOverride('${station}')">
+                                     <i class="fas fa-trash"></i> Remove
+                                   </button>`
+                                : `<button class="btn-override" onclick="openOverrideModal('${station}')">
+                                     <i class="fas fa-edit"></i> Override
+                                   </button>`)
+                            : `<button class="btn-override" disabled style="opacity:0.5;">
+                                 <i class="fas fa-lock"></i> No Access
+                               </button>`;
+                        
+                        northRows.push(`
+                            <tr><td style="font-weight:500;">${station}${isOverridden ? ' <span style="font-size:10px; background:#8B5CF6; color:white; padding:2px 6px; border-radius:10px;">OVERRIDDEN</span>' : ''}</td><td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td><td>${buttonHtml}</td></tr>
+                        `);
+                    }
+                }
+                northboundBody.innerHTML = northRows.join('');
+            }
+            
+            // Update stat cards
+            const severeEl = document.getElementById('severe-count');
+            const congestedEl = document.getElementById('congested-count');
+            const moderateEl = document.getElementById('moderate-count');
+            const lightEl = document.getElementById('light-count');
+            
+            if (severeEl) severeEl.textContent = severeCount;
+            if (congestedEl) congestedEl.textContent = congestedCount;
+            if (moderateEl) moderateEl.textContent = moderateCount;
+            if (lightEl) lightEl.textContent = lightCount;
+            
         } catch (error) {
-            console.error('Error loading forecast:', error);
+            console.error('Error loading congestion data:', error);
         }
     }
     
-    function initForecastSelect() {
-        const select = document.getElementById('forecastStationSelect');
-        select.innerHTML = allStations.map(s => `<option value="${s}" ${managedStations.includes(s) ? 'selected' : ''}>${s}</option>`).join('');
-        if (allStations.length > 0) updateForecast();
-    }
-    
-    function renderStationsGrid() {
-        const grid = document.getElementById('stationsGrid');
-        grid.innerHTML = allStations.map(station => {
-            const canManage = canManageStation(station);
-            const isSelected = selectedStationsSet.has(station);
-            const disabledClass = !canManage ? 'disabled' : '';
-            return `<div class="station-btn ${isSelected ? 'selected' : ''} ${disabledClass}" 
-                onclick="${canManage ? `toggleStation('${station}')` : 'showToast(\'🔒\', \'You do not have permission for this station\')'}">
-                ${station}
+    // ========== INCIDENT LOG FUNCTIONS ==========
+    async function loadIncidentLogs() {
+        console.log("Loading incident logs...");
+        const container = document.getElementById('incident-log-container');
+        if (!container) {
+            console.error("Incident log container not found!");
+            return;
+        }
+        
+        container.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading incidents...</p></div>';
+        
+        try {
+            const response = await fetch('/api/operator/broadcasts');
+            const data = await response.json();
+            console.log("Broadcasts response:", data);
+            
+            if (data.success && data.broadcasts && data.broadcasts.length > 0) {
+                container.innerHTML = data.broadcasts.map(b => {
+                    let directionIcon = '', directionText = '';
+                    if (b.direction === 'northbound') { 
+                        directionIcon = '<i class="fas fa-arrow-up"></i>'; 
+                        directionText = 'Northbound'; 
+                    } else if (b.direction === 'southbound') { 
+                        directionIcon = '<i class="fas fa-arrow-down"></i>'; 
+                        directionText = 'Southbound'; 
+                    } else { 
+                        directionIcon = '<i class="fas fa-exchange-alt"></i>'; 
+                        directionText = 'Both Directions'; 
+                    }
+                    
+                    const severityColor = b.severity === 'critical' ? '#EF4444' : b.severity === 'warning' ? '#F59E0B' : '#10B981';
+                    const severityText = b.severity ? b.severity.toUpperCase() : 'INFO';
+                    
+                    return `
+                        <div class="incident-card" style="border-left-color: ${severityColor};">
+                            <div>
+                                <span>
+                                    <i class="fas ${b.icon || 'fa-bullhorn'}"></i> 
+                                    <strong>${escapeHtml(b.disruption_type || 'Announcement')}</strong>
+                                    <span style="background: ${severityColor}20; color: ${severityColor}; padding: 2px 8px; border-radius: 12px; margin-left: 8px;">
+                                        ${severityText}
+                                    </span>
+                                </span>
+                                <span>${new Date(b.created_at).toLocaleString()}</span>
+                            </div>
+                            <div style="margin: 8px 0;">
+                                <span style="background: #EDE9FE; padding: 4px 12px; border-radius: 20px; font-size: 11px;">
+                                    ${directionIcon} ${directionText}
+                                </span>
+                            </div>
+                            <h3 style="margin: 8px 0 6px 0; font-size: 15px;">${escapeHtml(b.title)}</h3>
+                            <p style="margin-bottom: 10px; font-size: 12px;">${escapeHtml(b.message)}</p>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                                ${b.stations.map(s => `<span style="background: #F1F5F9; padding: 4px 12px; border-radius: 20px; font-size: 11px;">
+                                    <i class="fas fa-subway"></i> ${escapeHtml(s)}
+                                </span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                container.innerHTML = `<div class="empty-state">
+                    <i class="fas fa-clipboard-list fa-3x"></i>
+                    <h3>No incidents logged yet</h3>
+                    <p>Broadcast alerts will appear here</p>
+                </div>`;
+            }
+        } catch (error) {
+            console.error('Error loading incidents:', error);
+            container.innerHTML = `<div class="empty-state">
+                <i class="fas fa-exclamation-triangle fa-3x"></i>
+                <h3>Failed to load incidents</h3>
+                <p>${error.message}</p>
             </div>`;
-        }).join('');
-    }
-    
-    function toggleStation(station) {
-        if (selectedStationsSet.has(station)) selectedStationsSet.delete(station);
-        else selectedStationsSet.add(station);
-        renderStationsGrid();
-        updateSelectedDisplay();
-    }
-    
-    function removeStation(station) {
-        selectedStationsSet.delete(station);
-        renderStationsGrid();
-        updateSelectedDisplay();
-    }
-    
-    function updateSelectedDisplay() {
-        const container = document.getElementById('selectedStationsList');
-        if (selectedStationsSet.size === 0) { 
-            container.innerHTML = '<p style="color: var(--text-light); font-size:12px;">No stations selected</p>'; 
-            return; 
         }
-        container.innerHTML = Array.from(selectedStationsSet).map(s => `<div class="selected-station-tag">${s} <i class="fas fa-times" onclick="removeStation('${s}')"></i></div>`).join('');
     }
+    
+    // ========== USER REPORTS FUNCTIONS ==========
+    async function fetchOperatorReports() {
+        console.log("Fetching operator reports...");
+        const container = document.getElementById('operatorReportsList');
+        if (!container) {
+            console.error("Reports container not found!");
+            return;
+        }
+        
+        container.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading reports...</p></div>`;
+        
+        try {
+            const response = await fetch('/api/reports');
+            const data = await response.json();
+            console.log("Reports response:", data.length, "reports");
+            
+            let reports = Array.isArray(data) ? data : [];
+            allReportsData = reports;
+            displayOperatorReports(reports);
+        } catch (error) {
+            console.error('Error fetching reports:', error);
+            container.innerHTML = `<div class="no-reports">
+                <i class="fas fa-exclamation-circle"></i>
+                <h3>Failed to load reports</h3>
+                <p>${error.message}</p>
+            </div>`;
+        }
+    }
+    
+    function displayOperatorReports(reports) {
+        const container = document.getElementById('operatorReportsList');
+        if (!container) return;
+        
+        if (!reports || reports.length === 0) {
+            container.innerHTML = `<div class="no-reports">
+                <i class="fas fa-edit"></i>
+                <h3>No reports yet</h3>
+                <p>User reports will appear here</p>
+            </div>`;
+            return;
+        }
+        
+        let html = '';
+        reports.forEach((report, idx) => {
+            let levelText = '', levelColor = '', borderColor = '';
+            if (report.reported_congestion > 80) { levelText = 'Severe'; levelColor = '#EF4444'; borderColor = '#EF4444'; }
+            else if (report.reported_congestion > 60) { levelText = 'Congested'; levelColor = '#F97316'; borderColor = '#F97316'; }
+            else if (report.reported_congestion > 30) { levelText = 'Moderate'; levelColor = '#EAB308'; borderColor = '#EAB308'; }
+            else { levelText = 'Light'; levelColor = '#22C55E'; borderColor = '#22C55E'; }
+            
+            const diffMins = Math.floor((new Date() - new Date(report.timestamp)) / 60000);
+            let timeAgo = diffMins < 1 ? 'just now' : diffMins < 60 ? `${diffMins} min ago` : `${Math.floor(diffMins / 60)} hour ago`;
+            
+            let displayName = 'Anonymous';
+            let avatarLetter = 'A';
+            if (!report.anonymous && report.username && report.username !== 'Commuter') {
+                displayName = report.username.includes('@') ? report.username.split('@')[0] : report.username;
+                avatarLetter = displayName.charAt(0).toUpperCase();
+            }
+            
+            html += `
+                <div class="report-item" style="border-left: 4px solid ${borderColor}; background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                        <div style="width: 36px; height: 36px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">${avatarLetter}</div>
+                        <div><strong>${escapeHtml(displayName)}</strong> <span style="font-size: 12px; color: #64748B;">${timeAgo}</span></div>
+                        ${report.flagged ? '<span style="background:#FEE2E2; color:#DC2626; padding:2px 8px; border-radius:12px; font-size:10px;"><i class="fas fa-flag"></i> Flagged</span>' : ''}
+                    </div>
+                    <div><strong>${escapeHtml(report.station)}</strong> - <span style="color: ${levelColor};">${levelText} (${Math.round(report.reported_congestion)}%)</span></div>
+                    ${report.remarks ? `<div style="background: #F8FAFC; padding: 10px; border-radius: 8px; margin-top: 10px;">${escapeHtml(report.remarks)}</div>` : ''}
+                    <div style="margin-top: 10px;">
+                        <button class="btn-override" onclick="flagReport(${report.id}, '${escapeHtml(report.station)}')">
+                            <i class="fas fa-flag"></i> Flag Report
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+    
+    async function flagReport(reportId, stationName) {
+        if (confirm(`Flag report from ${stationName} as inappropriate?`)) {
+            try {
+                const response = await fetch(`/api/reports/${reportId}/flag`, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    showToast('🚩', `Report from ${stationName} flagged`);
+                    fetchOperatorReports();
+                } else {
+                    showToast('❌', data.error || 'Failed to flag');
+                }
+            } catch (error) {
+                console.error('Error flagging report:', error);
+                showToast('❌', 'Error flagging report');
+            }
+        }
+    }
+    
+    // ========== BROADCAST FUNCTIONS ==========
+    const disruptionTypes = ["Train Breakdown", "Overcrowding", "Maintenance", "Signal Issue", "Gate Closure", "General Notice"];
+    const typeIcons = {"Train Breakdown":"fa-train","Overcrowding":"fa-users","Maintenance":"fa-wrench","Signal Issue":"fa-satellite-dish","Gate Closure":"fa-door-closed","General Notice":"fa-bullhorn"};
     
     function initDisruptionGrid() {
         const grid = document.getElementById('disruptionGrid');
+        if (!grid) return;
         grid.innerHTML = disruptionTypes.map(type => `
             <div class="dist-opt" onclick="selectDisruption('${type}', this)">
                 <i class="fas ${typeIcons[type]}"></i>
@@ -1248,130 +2193,513 @@ async function applyOverride() {
         `).join('');
     }
     
-    function selectDisruption(type, el) {
+    window.selectDisruption = function(type, el) {
         selectedDisruptionType = type;
         document.querySelectorAll('.dist-opt').forEach(opt => opt.classList.remove('selected'));
         el.classList.add('selected');
         updatePreview();
-    }
+    };
     
     function updatePreview() {
-        document.getElementById('previewTitle').textContent = document.getElementById('alertTitle').value || "Alert Title";
-        document.getElementById('previewText').textContent = document.getElementById('alertMessage').value || "Message preview";
+        const titleEl = document.getElementById('previewTitle');
+        const textEl = document.getElementById('previewText');
+        if (titleEl) titleEl.textContent = document.getElementById('alertTitle')?.value || "Alert Title";
+        if (textEl) textEl.textContent = document.getElementById('alertMessage')?.value || "Message preview";
     }
     
-    function clearBroadcastForm() {
-        document.getElementById('alertTitle').value = '';
-        document.getElementById('alertMessage').value = '';
-        document.getElementById('severityLevel').value = 'advisory';
-        selectedStationsSet.clear();
+    window.clearBroadcastForm = function() {
+        const titleInput = document.getElementById('alertTitle');
+        const messageInput = document.getElementById('alertMessage');
+        const severitySelect = document.getElementById('severityLevel');
+        
+        if (titleInput) titleInput.value = '';
+        if (messageInput) messageInput.value = '';
+        if (severitySelect) severitySelect.value = 'advisory';
+        
+        selectedStationSet.clear();
         selectedDisruptionType = '';
+        
         document.querySelectorAll('.dist-opt').forEach(opt => opt.classList.remove('selected'));
-        renderStationsGrid();
+        
+        broadcastDirection = 'both';
+        const northBtn = document.getElementById('broadcast-dir-north');
+        const southBtn = document.getElementById('broadcast-dir-south');
+        const bothBtn = document.getElementById('broadcast-dir-both');
+        
+        if (northBtn) northBtn.classList.remove('selected');
+        if (southBtn) southBtn.classList.remove('selected');
+        if (bothBtn) bothBtn.classList.add('selected');
+        
+        renderStationPills();
         updateSelectedDisplay();
         updatePreview();
+    };
+    
+    function getAllStationsWithAccess() {
+        return allStations.map(station => ({
+            name: station,
+            canManage: managedStations.includes(station)
+        }));
     }
     
-    async function sendBroadcast() {
-        if (!selectedDisruptionType) { showToast('⚠️', 'Select disruption type'); return; }
-        if (selectedStationsSet.size === 0) { showToast('⚠️', 'Select affected stations'); return; }
+    function renderStationPills() {
+        const container = document.getElementById('stationsPills');
+        if (!container) return;
         
-        for (let station of selectedStationsSet) {
-            if (!canManageStation(station)) {
-                showToast('🔒', `You don't have permission for ${station}`);
-                return;
-            }
-        }
+        const stations = getAllStationsWithAccess();
         
-        const title = document.getElementById('alertTitle').value;
-        const message = document.getElementById('alertMessage').value;
-        if (!title || !message) { showToast('⚠️', 'Fill all fields'); return; }
-        
-        const newBroadcast = {
-            id: Date.now(),
-            type: selectedDisruptionType,
-            icon: typeIcons[selectedDisruptionType],
-            title: title,
-            message: message,
-            stations: Array.from(selectedStationsSet),
-            time: new Date().toLocaleString(),
-            severity: document.getElementById('severityLevel').value,
-            active: true
-        };
-        
-        const stored = localStorage.getItem('mrt_broadcasts');
-        const existing = stored ? JSON.parse(stored) : [];
-        existing.unshift(newBroadcast);
-        localStorage.setItem('mrt_broadcasts', JSON.stringify(existing));
-        
-        showToast('✅', 'Broadcast sent successfully!');
-        clearBroadcastForm();
-        loadIncidentLogs();
-        
-        try {
-            await fetch('/api/operator/send-broadcast', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: title,
-                    message: message,
-                    disruption_type: selectedDisruptionType,
-                    stations: Array.from(selectedStationsSet),
-                    severity: document.getElementById('severityLevel').value
-                })
-            });
-        } catch (error) {
-            console.log('Backend broadcast endpoint not available, saved locally only');
-        }
-    }
-    
-    function loadIncidentLogs() {
-        const stored = localStorage.getItem('mrt_broadcasts');
-        const allBroadcasts = stored ? JSON.parse(stored) : [];
-        const filtered = allBroadcasts.filter(b => b.stations.some(s => managedStations.includes(s)));
-        
-        const container = document.getElementById('incident-log-container');
-        if (filtered.length === 0) {
-            container.innerHTML = `<div class="empty-state"><i class="fas fa-clipboard-list fa-3x"></i><h3>No incidents logged yet</h3></div>`;
+        if (stations.length === 0) {
+            container.innerHTML = '<div style="padding: 20px; text-align: center; color: #64748B;">No stations available</div>';
             return;
         }
-        container.innerHTML = filtered.map(b => `
-            <div class="incident-card">
-                <div style="display:flex; justify-content:space-between;">
-                    <span><i class="fas ${b.icon}"></i> ${b.type}</span>
-                    <span>${b.time}</span>
+        
+        container.innerHTML = stations.map(({ name, canManage }) => {
+            const isSelected = selectedStationSet.has(name);
+            const isDisabled = !canManage;
+            
+            return `
+                <div class="station-pill ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}" 
+                     onclick="${isDisabled ? '' : `toggleStationPill('${name}')`}"
+                     style="${isDisabled ? 'cursor: not-allowed;' : ''}">
+                    <i class="fas fa-subway"></i>
+                    ${name}
+                    ${isDisabled ? '<i class="fas fa-lock" style="font-size: 10px; margin-left: 4px;"></i>' : ''}
+                    ${isSelected ? '<i class="fas fa-check-circle" style="font-size: 12px;"></i>' : ''}
                 </div>
-                <h3 style="margin:10px 0;">${escapeHtml(b.title)}</h3>
-                <p>${escapeHtml(b.message)}</p>
-                <div style="display:flex; flex-wrap:wrap; gap:8px; margin:12px 0;">
-                    ${b.stations.map(s => `<span style="background:#F1F5F9; padding:4px 12px; border-radius:20px;">${escapeHtml(s)}</span>`).join('')}
-                </div>
+            `;
+        }).join('');
+    }
+    
+    window.toggleStationPill = function(station) {
+        if (!managedStations.includes(station)) {
+            showToast('🔒', `You don't have permission for ${station}`);
+            return;
+        }
+        
+        if (selectedStationSet.has(station)) {
+            selectedStationSet.delete(station);
+        } else {
+            selectedStationSet.add(station);
+        }
+        renderStationPills();
+        updateSelectedDisplay();
+    };
+    
+    window.selectAllStations = function() {
+        managedStations.forEach(station => selectedStationSet.add(station));
+        renderStationPills();
+        updateSelectedDisplay();
+        showToast('✅', `Selected ${selectedStationSet.size} station(s)`);
+    };
+    
+    window.deselectAllStations = function() {
+        selectedStationSet.clear();
+        renderStationPills();
+        updateSelectedDisplay();
+        showToast('🗑️', 'All stations deselected');
+    };
+    
+    function updateSelectedDisplay() {
+        const container = document.getElementById('selectedStationsList');
+        if (!container) return;
+        
+        if (selectedStationSet.size === 0) {
+            container.innerHTML = '<p style="color: var(--text-light); font-size:12px;">No stations selected</p>';
+            return;
+        }
+        
+        container.innerHTML = Array.from(selectedStationSet).map(s => `
+            <div class="selected-station-tag">
+                <i class="fas fa-subway" style="font-size: 10px;"></i>
+                ${s} 
+                <i class="fas fa-times" onclick="toggleStationPill('${s}')" style="cursor: pointer;"></i>
             </div>
         `).join('');
     }
     
+    window.selectBroadcastDirection = function(direction) {
+        broadcastDirection = direction;
+        
+        const northBtn = document.getElementById('broadcast-dir-north');
+        const southBtn = document.getElementById('broadcast-dir-south');
+        const bothBtn = document.getElementById('broadcast-dir-both');
+        
+        if (northBtn) northBtn.classList.remove('selected');
+        if (southBtn) southBtn.classList.remove('selected');
+        if (bothBtn) bothBtn.classList.remove('selected');
+        
+        if (direction === 'northbound' && northBtn) northBtn.classList.add('selected');
+        else if (direction === 'southbound' && southBtn) southBtn.classList.add('selected');
+        else if (direction === 'both' && bothBtn) bothBtn.classList.add('selected');
+        
+        showToast('', `Direction set to ${direction}`);
+    };
+    
+    async function sendBroadcast() {
+        if (!selectedDisruptionType) { showToast('⚠️', 'Select disruption type'); return; }
+        if (selectedStationSet.size === 0) { showToast('⚠️', 'Select affected stations'); return; }
+        
+        const title = document.getElementById('alertTitle')?.value;
+        const message = document.getElementById('alertMessage')?.value;
+        if (!title || !message) { showToast('⚠️', 'Fill all fields'); return; }
+        
+        const sendBtn = document.querySelector('.btn-primary');
+        const originalText = sendBtn.innerHTML;
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        
+        try {
+            const response = await fetch('/api/operator/send-broadcast', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    title: title, 
+                    message: message, 
+                    disruption_type: selectedDisruptionType, 
+                    stations: Array.from(selectedStationSet),
+                    direction: broadcastDirection,
+                    severity: document.getElementById('severityLevel')?.value || 'advisory'
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('✅', `Broadcast sent to ${selectedStationSet.size} station(s)`);
+                clearBroadcastForm();
+                await loadIncidentLogs();
+            } else {
+                showToast('❌', result.error || 'Failed to send broadcast');
+            }
+        } catch (error) {
+            console.error('Error sending broadcast:', error);
+            showToast('❌', 'Failed to send broadcast');
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = originalText;
+        }
+    }
+    
+    function initBroadcast() {
+        renderStationPills();
+        updateSelectedDisplay();
+        const bothBtn = document.getElementById('broadcast-dir-both');
+        if (bothBtn) bothBtn.classList.add('selected');
+        broadcastDirection = 'both';
+    }
+    
+    // ========== FORECAST FUNCTIONS ==========
+    async function updateForecastChart() {
+        const canvas = document.getElementById('forecastChart');
+        if (!canvas) return;
+        
+        const station = currentForecastStation;
+        console.log(`Fetching forecast for ${station}`);
+        
+        try {
+            const response = await fetch(`/api/directional-forecast/${encodeURIComponent(station)}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log("Forecast data:", data);
+            
+            let forecastValues = [];
+            if (data.forecasts && Array.isArray(data.forecasts)) {
+                forecastValues = data.forecasts.map(f => 
+                    currentForecastDirection === 'north' ? (f.northbound || 0) : (f.southbound || 0)
+                );
+            }
+            
+            let currentCongestion = 0;
+            if (data.current) {
+                currentCongestion = currentForecastDirection === 'north' 
+                    ? (data.current.northbound || 0)
+                    : (data.current.southbound || 0);
+            }
+            
+            const chartData = [currentCongestion, ...forecastValues];
+            
+            const now = new Date();
+            const labels = ['NOW'];
+            for (let i = 1; i <= 6; i++) {
+                const futureTime = new Date(now.getTime() + i * 60 * 60 * 1000);
+                const hour = futureTime.getHours();
+                const hour12 = hour % 12 || 12;
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                labels.push(`${hour12}:00 ${ampm}`);
+            }
+            
+            if (forecastChart) {
+                forecastChart.destroy();
+                forecastChart = null;
+            }
+            
+            const ctx = canvas.getContext('2d');
+            const lineColor = currentForecastDirection === 'north' ? '#8B5CF6' : '#10B981';
+            const bgColor = currentForecastDirection === 'north' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+            
+            forecastChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: currentForecastDirection === 'north' ? 'Northbound Congestion' : 'Southbound Congestion',
+                        data: chartData,
+                        borderColor: lineColor,
+                        backgroundColor: bgColor,
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 2,
+                        pointBackgroundColor: (context) => {
+                            const value = chartData[context.dataIndex];
+                            if (value > 80) return '#EF4444';
+                            if (value > 60) return '#F97316';
+                            if (value > 30) return '#F59E0B';
+                            return '#22C55E';
+                        },
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    let level = 'LIGHT';
+                                    if (value > 80) level = 'SEVERE';
+                                    else if (value > 60) level = 'CONGESTED';
+                                    else if (value > 30) level = 'MODERATE';
+                                    return `${level}: ${Math.round(value)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: { display: true, text: 'Congestion (%)', font: { size: 11 } },
+                            grid: { color: '#e2e8f0' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+            
+        } catch (error) {
+            console.error('Error loading forecast:', error);
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '14px Inter';
+            ctx.fillStyle = '#64748B';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Error loading forecast`, canvas.width/2, canvas.height/2);
+        }
+    }
+    
+    function setForecastDirection(direction) {
+        currentForecastDirection = direction;
+        
+        const northBtn = document.getElementById('forecastToggleNorth');
+        const southBtn = document.getElementById('forecastToggleSouth');
+        
+        if (direction === 'north') {
+            if (northBtn) northBtn.classList.add('active');
+            if (southBtn) southBtn.classList.remove('active');
+        } else {
+            if (southBtn) southBtn.classList.add('active');
+            if (northBtn) northBtn.classList.remove('active');
+        }
+        
+        updateForecastChart();
+    }
+    
+    function changeForecastStation(station) {
+        currentForecastStation = station;
+        const nameEl = document.getElementById('forecastStationName');
+        if (nameEl) nameEl.innerHTML = station;
+        updateForecastChart();
+    }
+    
+    function initForecastSelect() {
+        const select = document.getElementById('forecastStationSelect');
+        if (select && managedStations.length > 0) {
+            select.value = managedStations[0];
+            currentForecastStation = managedStations[0];
+            const nameEl = document.getElementById('forecastStationName');
+            if (nameEl) nameEl.innerHTML = managedStations[0];
+        }
+        updateForecastChart();
+    }
+    
+    // ========== OVERRIDE FUNCTIONS ==========
     function openOverrideModal(station) {
-        if (!canManageStation(station)) {
-            showToast('🔒', 'You do not have permission to override this station');
-            return;
+        if (!managedStations.includes(station)) { 
+            showToast('🔒', 'No permission'); 
+            return; 
         }
         currentStation = station;
-        document.getElementById('modalStationName').textContent = station;
         currentSelectedLevel = "";
         currentSelectedCongestion = 0;
+        const stationNameEl = document.getElementById('modalStationName');
+        if (stationNameEl) stationNameEl.textContent = station;
         document.querySelectorAll('.status-card').forEach(card => card.classList.remove('selected'));
-        document.getElementById('overrideDuration').value = '60';
-        document.getElementById('overrideReason').value = '';
-        document.getElementById('overrideModal').style.display = 'flex';
+        const modal = document.getElementById('overrideModal');
+        if (modal) modal.style.display = 'flex';
     }
     
     function closeModal() { 
-        document.getElementById('overrideModal').style.display = 'none'; 
+        const modal = document.getElementById('overrideModal');
+        if (modal) modal.style.display = 'none';
     }
     
+    async function applyOverride() {
+        if (!currentSelectedLevel) { showToast('⚠️', 'Select a level'); return; }
+        const duration = document.getElementById('overrideDuration')?.value;
+        const reason = document.getElementById('overrideReason')?.value;
+        
+        try {
+            const response = await fetch('/api/operator/override-congestion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    station: currentStation, 
+                    level: currentSelectedLevel, 
+                    congestion_value: currentSelectedCongestion, 
+                    duration, 
+                    reason 
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                showToast('✅', `${currentStation} set to ${currentSelectedLevel}`);
+                closeModal();
+                await loadCongestionData();
+                if (currentForecastStation === currentStation) {
+                    await updateForecastChart();
+                }
+            } else { 
+                showToast('⚠️', data.error || 'Failed'); 
+            }
+        } catch (error) { 
+            showToast('⚠️', 'Failed to override'); 
+        }
+    }
+    
+    async function removeOverride(station) {
+        if (!managedStations.includes(station)) {
+            showToast('🔒', 'You do not have permission to modify this station');
+            return;
+        }
+        
+        if (confirm(`Remove override for ${station}?`)) {
+            try {
+                const response = await fetch('/api/operator/remove-override', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ station: station })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('✅', `Override removed for ${station}`);
+                    await loadCongestionData();
+                    if (currentForecastStation === station) {
+                        await updateForecastChart();
+                    }
+                } else {
+                    showToast('❌', data.error || 'Failed to remove override');
+                }
+            } catch (error) {
+                console.error('Error removing override:', error);
+                showToast('❌', 'Failed to remove override');
+            }
+        }
+    }
+    
+    // ========== FILTER FUNCTIONS ==========
+    function toggleFilterDropdown() {
+        const dropdown = document.getElementById('filterDropdown');
+        if (dropdown) dropdown.classList.toggle('show');
+    }
+    
+    function initFilters() {
+        const chips = document.querySelectorAll('.chip');
+        if (chips.length > 0) chips[0].classList.add('active');
+        
+        chips.forEach(chip => {
+            chip.addEventListener('click', function() {
+                chips.forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+        
+        document.querySelectorAll('.badge-filter').forEach(badge => {
+            badge.addEventListener('click', function() {
+                this.classList.toggle('active-filter');
+            });
+        });
+        
+        const selectAllBtn = document.querySelector('.select-all');
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', function() {
+                const checkboxes = document.querySelectorAll('#stationsGridFilter input');
+                const allChecked = Array.from(checkboxes).every(c => c.checked);
+                checkboxes.forEach(c => c.checked = !allChecked);
+            });
+        }
+    }
+    
+    function applyOperatorFilters() {
+        const selectedLevels = [];
+        document.querySelectorAll('.badge-filter.active-filter').forEach(badge => {
+            selectedLevels.push(badge.dataset.level);
+        });
+        
+        const selectedStations = [];
+        document.querySelectorAll('#stationsGridFilter input:checked').forEach(cb => {
+            selectedStations.push(cb.value);
+        });
+        
+        let filteredReports = [...allReportsData];
+        
+        if (selectedStations.length > 0) {
+            filteredReports = filteredReports.filter(report => 
+                selectedStations.includes(report.station)
+            );
+        }
+        
+        if (selectedLevels.length > 0) {
+            filteredReports = filteredReports.filter(report => {
+                let level = '';
+                if (report.reported_congestion > 80) level = 'severe';
+                else if (report.reported_congestion > 60) level = 'congested';
+                else if (report.reported_congestion > 30) level = 'moderate';
+                else level = 'light';
+                return selectedLevels.includes(level);
+            });
+        }
+        
+        displayOperatorReports(filteredReports);
+        toggleFilterDropdown();
+    }
+    
+    // ========== SELECTION HANDLERS ==========
     document.addEventListener('click', function(e) {
         const statusCard = e.target.closest('.status-card');
-        if (statusCard && document.getElementById('overrideModal').style.display === 'flex') {
+        if (statusCard && document.getElementById('overrideModal')?.style.display === 'flex') {
             document.querySelectorAll('.status-card').forEach(card => card.classList.remove('selected'));
             statusCard.classList.add('selected');
             currentSelectedLevel = statusCard.getAttribute('data-level');
@@ -1379,121 +2707,61 @@ async function applyOverride() {
         }
     });
     
-    async function applyOverride() {
-        if (!currentSelectedLevel) { 
-            showToast('⚠️', 'Select a congestion level'); 
-            return; 
+    document.addEventListener('click', function(event) {
+        const filterContainer = document.querySelector('.filter-container');
+        const dropdown = document.getElementById('filterDropdown');
+        if (filterContainer && !filterContainer.contains(event.target) && dropdown) {
+            dropdown.classList.remove('show');
         }
-        
-        const duration = document.getElementById('overrideDuration').value;
-        const reason = document.getElementById('overrideReason').value;
-        
-        let durationText = '';
-        if (duration === '30') durationText = '30 minutes';
-        else if (duration === '60') durationText = '1 hour';
-        else if (duration === '120') durationText = '2 hours';
-        else durationText = 'until manually changed';
-        
-        const applyBtn = document.querySelector('.btn-apply');
-        const originalText = applyBtn.textContent;
-        applyBtn.disabled = true;
-        applyBtn.textContent = 'Applying...';
-        
-        try {
-            const response = await fetch('/api/operator/override-congestion', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    station: currentStation,
-                    level: currentSelectedLevel,
-                    congestion_value: currentSelectedCongestion,
-                    duration: duration,
-                    reason: reason
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showToast('✅', `${currentStation} set to ${currentSelectedLevel} (Duration: ${durationText})`);
-                closeModal();
-                await loadCongestionData();
-                
-                const forecastSelect = document.getElementById('forecastStationSelect');
-                if (forecastSelect.value === currentStation) {
-                    await updateForecast();
-                }
-            } else {
-                showToast('⚠️', data.error || 'Failed to override');
-            }
-        } catch (error) {
-            console.error('Error applying override:', error);
-            showToast('⚠️', 'Failed to apply override');
-        } finally {
-            applyBtn.disabled = false;
-            applyBtn.textContent = originalText;
-        }
-    }
+    });
     
-    function escapeHtml(text) { 
-        if (!text) return ''; 
-        return text.replace(/[&<>]/g, function(m) { 
-            if (m === '&') return '&amp;'; 
-            if (m === '<') return '&lt;'; 
-            if (m === '>') return '&gt;'; 
-            return m; 
-        }); 
-    }
+    // ========== EXPOSE FUNCTIONS GLOBALLY ==========
+    window.sendBroadcast = sendBroadcast;
+    window.applyOverride = applyOverride;
+    window.closeModal = closeModal;
+    window.openOverrideModal = openOverrideModal;
+    window.removeOverride = removeOverride;
+    window.setForecastDirection = setForecastDirection;
+    window.changeForecastStation = changeForecastStation;
+    window.applyOperatorFilters = applyOperatorFilters;
+    window.toggleFilterDropdown = toggleFilterDropdown;
+    window.flagReport = flagReport;
+    window.clearBroadcastForm = clearBroadcastForm;
+    window.selectAllStations = selectAllStations;
+    window.deselectAllStations = deselectAllStations;
+    window.toggleStationPill = toggleStationPill;
+    window.selectBroadcastDirection = selectBroadcastDirection;
     
-    let refreshInterval = null;
-    function startAutoRefresh() {
-        if (refreshInterval) clearInterval(refreshInterval);
-        refreshInterval = setInterval(() => {
-            if (document.getElementById('dashboard').classList.contains('active')) {
-                loadCongestionData();
-            }
-            if (document.getElementById('userReports').classList.contains('active')) {
-                fetchUserReports();
-            }
-        }, 60000);
-    }
-    
+    // ========== INITIALIZE ==========
     document.addEventListener('DOMContentLoaded', () => {
+        console.log("DOM fully loaded, initializing...");
+        
         updateDate();
         setInterval(updateDate, 1000);
+        
         initDisruptionGrid();
-        renderStationsGrid();
-        updateSelectedDisplay();
-        initForecastSelect();
+        initFilters();
         loadCongestionData();
         loadIncidentLogs();
-        fetchUserReports();
-        startAutoRefresh();
+        fetchOperatorReports();
+        initBroadcast();
+        initForecastSelect();
         
-        document.getElementById('operatorName').textContent = operatorName;
-        document.getElementById('operatorAvatar').textContent = operatorName.charAt(0).toUpperCase();
+        // Set operator info
+        const operatorNameEl = document.getElementById('operatorName');
+        const operatorAvatarEl = document.getElementById('operatorAvatar');
+        if (operatorNameEl) operatorNameEl.textContent = operatorName;
+        if (operatorAvatarEl) operatorAvatarEl.textContent = operatorName.charAt(0).toUpperCase();
         
-        // Add search input event listener
-        const searchInput = document.getElementById('reportSearchInput');
-        if (searchInput) {
-            searchInput.addEventListener('keyup', searchReports);
-        }
+        // Set station badges
+        const badgeEls = document.querySelectorAll('#managedStationsBadge, #managedStationsBadgeTop');
+        badgeEls.forEach(el => {
+            if (el) el.innerHTML = `<i class="fas fa-map-marker-alt"></i> ${managedStations.length} Station(s) Assigned`;
+        });
         
-        window.toggleStation = toggleStation;
-        window.removeStation = removeStation;
-        window.selectDisruption = selectDisruption;
-        window.sendBroadcast = sendBroadcast;
-        window.clearBroadcastForm = clearBroadcastForm;
-        window.openOverrideModal = openOverrideModal;
-        window.closeModal = closeModal;
-        window.applyOverride = applyOverride;
-        window.showPage = showPage;
-        window.fetchUserReports = fetchUserReports;
-        window.updateForecast = updateForecast;
-        window.filterReports = filterReports;
-        window.searchReports = searchReports;
-        window.viewFullImage = viewFullImage;
+        console.log("Initialization complete!");
     });
-    </script>
+</script>
 </body>
+
 </html>

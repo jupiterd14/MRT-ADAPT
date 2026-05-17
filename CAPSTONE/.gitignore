@@ -1,6 +1,7 @@
-venv/
-.venv/
-__pycache__/
-*.keras
-*.pkl
-.env 
+# Create .gitignore
+echo venv/ > .gitignore
+echo .venv/ >> .gitignore
+echo *.csv >> .gitignore
+echo __pycache__/ >> .gitignore
+echo *.dll >> .gitignore
+echo *.pyc >> .gitignore

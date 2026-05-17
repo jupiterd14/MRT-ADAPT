@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-    /* ... keep all your existing styles ... */
     :root {
         --sidebar-bg: #00224D;
         --main-bg: #F8FAFC;
@@ -61,7 +60,7 @@
         background: white;
         border-radius: 24px;
         padding: 28px;
-        max-width: 450px;
+        max-width: 500px;
         width: 90%;
         animation: modalSlideIn 0.3s ease;
     }
@@ -126,6 +125,69 @@
         gap: 6px;
     }
 
+    .modal-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .modal-header i {
+        font-size: 28px;
+    }
+
+    .modal-header h2 {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+    }
+
+    .modal-subtitle {
+        font-size: 14px;
+        color: var(--text-light);
+        line-height: 1.5;
+        margin-bottom: 20px;
+    }
+
+    .modal-footer {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 8px;
+    }
+
+    .btn-cancel {
+        background: #F1F5F9;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--text-dark);
+        transition: all 0.2s;
+    }
+
+    .btn-cancel:hover {
+        background: #E2E8F0;
+    }
+
+    .btn-apply {
+        background: var(--purple);
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-apply:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
     .btn-success:hover {
         background: #22C55E;
         color: white;
@@ -157,6 +219,54 @@
         padding: 24px 12px; 
         flex: 1;
     }
+
+    .status-moderate {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #FEF3C7;
+    color: #D97706;
+}
+
+.status-light {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #DCFCE7;
+    color: #166534;
+}
+
+.status-severe {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #FEE2E2;
+    color: #DC2626;
+}
+
+.status-congested {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #FFEDD5;
+    color: #EA580C;
+}
 
     .nav-item { 
         padding: 12px 16px; 
@@ -594,6 +704,7 @@
         font-size: 14px;
         outline: none;
         background: white;
+        cursor: pointer;
     }
     .form-input:focus, .form-select:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 
@@ -619,6 +730,23 @@
 
     .toast.show { transform: translateY(0); opacity: 1; }
 
+    /* Access Level Info Text */
+    .access-level-info {
+        font-size: 11px;
+        color: var(--text-light);
+        margin-top: 8px;
+        padding: 8px 12px;
+        background: #F8FAFC;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .access-level-info i {
+        color: var(--accent-blue);
+    }
+
     @media (max-width: 1200px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 768px) {
         .sidebar { width: 80px; }
@@ -640,7 +768,7 @@
                 <i class="fas fa-exclamation-triangle" style="color: var(--danger-red);"></i>
                 <h2>Deactivate Operator</h2>
             </div>
-            <p class="modal-subtitle" style="margin-bottom: 20px;">Are you sure you want to deactivate this operator? They will not be able to log in until reactivated.</p>
+            <p class="modal-subtitle">Are you sure you want to deactivate this operator? They will not be able to log in until reactivated.</p>
             <div style="background: #FEF3C7; border-radius: 12px; padding: 12px; margin-bottom: 24px;">
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <i class="fas fa-user-tie" style="color: #F59E0B;"></i>
@@ -664,7 +792,7 @@
                 <i class="fas fa-check-circle" style="color: var(--success-green);"></i>
                 <h2>Reactivate Operator</h2>
             </div>
-            <p class="modal-subtitle" style="margin-bottom: 20px;">Are you sure you want to reactivate this operator? They will be able to log in again.</p>
+            <p class="modal-subtitle">Are you sure you want to reactivate this operator? They will be able to log in again.</p>
             <div style="background: #DCFCE7; border-radius: 12px; padding: 12px; margin-bottom: 24px;">
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <i class="fas fa-user-tie" style="color: #22C55E;"></i>
@@ -731,7 +859,7 @@
                         <div class="table-scroll-container">
                             <table class="data-table">
                                 <thead><tr><th>STATION</th><th>STATUS</th></tr></thead>
-                                <tbody id="stationStatusBody"><tr><td colspan="2" style="text-align:center;">Loading...</td></tr></tbody>
+                                <tbody id="stationStatusBody"><tr><td colspan="2" style="text-align:center;">Loading...</tbody>
                             </table>
                         </div>
                     </div>
@@ -740,7 +868,7 @@
                         <div class="table-scroll-container" id="mostReportedContainer">
                             <table class="data-table">
                                 <thead><tr><th>STATION</th><th>REPORTS</th><th>DOMINANT LEVEL</th></tr></thead>
-                                <tbody id="mostReportedBody"><tr><td colspan="3" style="text-align:center;">Loading...</td></tr></tbody>
+                                <tbody id="mostReportedBody"><tr><td colspan="3" style="text-align:center;">Loading...</tbody>
                             </table>
                         </div>
                     </div>
@@ -760,11 +888,11 @@
                         <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="opName" placeholder="e.g. Juan Dela Cruz"></div>
                         <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="opEmail" placeholder="operator@mrt3.gov.ph" type="email"></div>
                         
-                        <!-- ALL 13 STATIONS DROPDOWN -->
+                        <!-- Assigned Station Dropdown - Individual Stations Only -->
                         <div class="form-group">
-                            <label class="form-label">Assigned Station(s)</label>
+                            <label class="form-label">Assigned Station</label>
                             <select class="form-select" id="opStation">
-                                <option value="All Stations (Line-Wide)">All Stations (Line-Wide) - Full Access</option>
+                                <option value="all">All Stations</option>
                                 <option value="North Ave">North Ave</option>
                                 <option value="Quezon Ave">Quezon Ave</option>
                                 <option value="Kamuning">Kamuning</option>
@@ -781,27 +909,48 @@
                             </select>
                         </div>
                         
+                        <!-- Access Level Dropdown -->
                         <div class="form-group">
                             <label class="form-label">Access Level</label>
-                            <select class="form-select" id="opAccessLevel">
-                                <option value="standard">Standard - Broadcast and Override</option>
+                            <select class="form-select" id="accessLevel" onchange="updateAccessLevelInfo()">
+                                <option value="standard">Standard - Broadcast & Override</option>
                                 <option value="limited">Limited - Broadcast only</option>
                                 <option value="full">Full - All Operator Features</option>
                             </select>
+                            <div class="access-level-info" id="accessLevelInfo">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Standard: Can send broadcasts AND override congestion levels</span>
+                            </div>
                         </div>
-
+                        
                         <button class="btn btn-purple" style="width:100%;" onclick="generateInvite()"><i class="fas fa-key"></i> Generate Invite Link</button>
-                        <div id="linkResult" style="display:none;"><div class="link-box" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;margin-top:16px;"><div class="link-text" id="generatedLink" style="flex:1;font-size:14px;color:var(--accent-blue);word-break:break-all;"></div><button class="link-copy-btn" onclick="copyLink()" style="background:var(--accent-blue);color:white;border:none;padding:8px 20px;border-radius:10px;cursor:pointer;">Copy</button></div><p style="font-size:12px; margin-top:12px;"><i class="far fa-clock"></i> Expires in 24h</p></div>
+                        <div id="linkResult" style="display:none; margin-top: 16px;">
+                            <div class="link-box" style="background:#F8FAFC;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">
+                                <div class="link-text" id="generatedLink" style="flex:1;font-size:14px;color:var(--accent-blue);word-break:break-all;"></div>
+                                <button class="link-copy-btn" onclick="copyLink()" style="background:var(--accent-blue);color:white;border:none;padding:8px 20px;border-radius:10px;cursor:pointer;">Copy</button>
+                            </div>
+                            <p style="font-size:12px; margin-top:12px;"><i class="far fa-clock"></i> Expires in 24h</p>
+                        </div>
                     </div>
                     <div class="card">
-                        <div class="card-title"><i class="fas fa-user-tie"></i> Active Operators</div>
-                        <div class="table-scroll-container">
-                            <table class="data-table">
-                                <thead><tr><th>Operator</th><th>Zone/Station</th><th>Last Login</th><th>Status</th><th></th></tr></thead>
-                                <tbody id="operatorsBody"><tr><td colspan="5" style="text-align:center;">Loading...</td></tr></tbody>
-                            </table>
-                        </div>
-                    </div>
+    <div class="card-title"><i class="fas fa-user-tie"></i> Active Operators</div>
+    <div class="table-scroll-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>OPERATOR NAME</th>
+                    <th>Assigned Station</th>
+                    <th>Last Login</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="operatorsBody">
+                <tr><td colspan="5" style="text-align:center;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
                 </div>
             </div>
 
@@ -830,8 +979,8 @@
                 <div class="card" style="padding: 0; overflow: hidden;">
                     <div class="table-scroll-container" style="max-height: 520px;">
                         <table class="data-table" style="width: 100%;">
-                            <thead> <tr><th>USER</th><th>ACTION</th><th>TARGET</th><th style="text-align: right;">TIMESTAMP</th></tr> </thead>
-                            <tbody id="auditLogBody"><tr><td colspan="4" style="text-align:center;">Loading...</td></tr></tbody>
+                            <thead><tr><th>USER</th><th>ACTION</th><th>TARGET</th><th style="text-align: right;">TIMESTAMP</th></tr></thead>
+                            <tbody id="auditLogBody"><td><td colspan="4" style="text-align:center;">Loading...</tbody>
                         </table>
                     </div>
                 </div>
@@ -849,8 +998,6 @@
         let currentOperatorToDeactivate = null;
         let currentOperatorToReactivate = null;
 
-        const allStations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
-
         function showToast(icon, msg) {
             const toast = document.getElementById('toast');
             document.getElementById('toastIcon').innerText = icon;
@@ -863,6 +1010,24 @@
             document.getElementById('currentDate').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         }
 
+        // Update access level info text
+        function updateAccessLevelInfo() {
+            const accessLevel = document.getElementById('accessLevel').value;
+            const infoDiv = document.getElementById('accessLevelInfo');
+            if (accessLevel === 'standard') {
+                infoDiv.innerHTML = '<i class="fas fa-info-circle"></i><span>Standard: Can send broadcasts AND override congestion levels</span>';
+            } else if (accessLevel === 'limited') {
+                infoDiv.innerHTML = '<i class="fas fa-info-circle"></i><span>Limited: Can send broadcasts only (cannot override congestion)</span>';
+            } else {
+                infoDiv.innerHTML = '<i class="fas fa-info-circle"></i><span>Full: All operator features including broadcasts, overrides, and advanced controls</span>';
+            }
+        }
+
+        function getStationValue() {
+            return document.getElementById('opStation').value;
+        }
+
+        // ========== DASHBOARD DATA FROM BACKEND ==========
         async function loadDashboardStats() {
             try {
                 const response = await fetch('/api/admin/dashboard-stats');
@@ -875,71 +1040,168 @@
                 console.error('Error loading dashboard stats:', error);
             }
         }
+// Cache for station data to avoid repeated API calls
+let cachedStationData = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 30000; // Cache for 30 seconds
+
 async function loadStationStatus() {
+    const tbody = document.getElementById('stationStatusBody');
+    
+    // Show loading state
+    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Loading...</td></tr>';
+    
     try {
-        // Fetch real congestion data from the live-map endpoint instead
-        const response = await fetch('/api/live-map/directions');
-        const data = await response.json();
+        // Check if we have cached data that's still fresh
+        const now = Date.now();
+        if (!cachedStationData || (now - lastFetchTime) > CACHE_DURATION) {
+            // Fetch fresh data (both directions at once)
+            const response = await fetch('/api/admin/station-status');
+            const data = await response.json();
+            
+            if (!data.stations || data.stations.length === 0) {
+                throw new Error('No station data received');
+            }
+            
+            cachedStationData = data;
+            lastFetchTime = now;
+        }
         
-        const tbody = document.getElementById('stationStatusBody');
+        const stations = cachedStationData.stations;
+        const stationOrder = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
+                              "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+                              "Ayala Ave", "Magallanes", "Taft"];
         
-        // Get the correct direction data
-        const directionData = currentDirection === 'north' ? data.northbound : data.southbound;
+        // Get data for current direction with proper error checking
+        let stationList = stations.map(s => {
+            // Check if the direction data exists
+            if (currentDirection === 'north') {
+                if (!s.northbound) {
+                    console.warn(`Missing northbound data for ${s.name}`);
+                    return {
+                        name: s.name,
+                        status_text: 'LIGHT',
+                        status_class: 'status-light',
+                        congestion: 0
+                    };
+                }
+                return {
+                    name: s.name,
+                    status_text: s.northbound.status_text || 'LIGHT',
+                    status_class: s.northbound.status_class || 'status-light',
+                    congestion: s.northbound.congestion || 0
+                };
+            } else {
+                if (!s.southbound) {
+                    console.warn(`Missing southbound data for ${s.name}`);
+                    return {
+                        name: s.name,
+                        status_text: 'LIGHT',
+                        status_class: 'status-light',
+                        congestion: 0
+                    };
+                }
+                return {
+                    name: s.name,
+                    status_text: s.southbound.status_text || 'LIGHT',
+                    status_class: s.southbound.status_class || 'status-light',
+                    congestion: s.southbound.congestion || 0
+                };
+            }
+        });
         
-        if (!directionData) {
-            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No data available</td></tr>';
+        // Sort stations based on direction
+        if (currentDirection === 'south') {
+            stationList.sort((a, b) => {
+                const indexA = stationOrder.indexOf(a.name);
+                const indexB = stationOrder.indexOf(b.name);
+                return indexB - indexA;
+            });
+        } else {
+            stationList.sort((a, b) => {
+                const indexA = stationOrder.indexOf(a.name);
+                const indexB = stationOrder.indexOf(b.name);
+                return indexA - indexB;
+            });
+        }
+        
+        // Render the table
+        if (stationList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No station data available</td></tr>';
             return;
         }
         
-        const rows = [];
-        for (const station of allStations) {
-            const stationData = directionData[station];
-            if (stationData) {
-                const congestion = stationData.congestion || 0;
-                
-                // Determine status text and class based on congestion
-                let statusText = 'Light';
-                let statusClass = 'status-active';
-                
-                if (congestion > 80) {
-                    statusText = 'Severe';
-                    statusClass = 'status-severe';
-                } else if (congestion > 60) {
-                    statusText = 'Congested';
-                    statusClass = 'status-congested';
-                } else if (congestion > 30) {
-                    statusText = 'Moderate';
-                    statusClass = 'status-active';  // Reuse active class for moderate
-                } else if (congestion === 0) {
-                    statusText = 'Closed';
-                    statusClass = 'status-deactivated';
-                } else {
-                    statusText = 'Light';
-                    statusClass = 'status-active';
-                }
-                
-                rows.push(`
-                    <tr>
-                        <td style="font-weight:500;">${station}</td>
-                        <td><span class="${statusClass}">${statusText}</span></td>
-                    </tr>
-                `);
-            }
+        tbody.innerHTML = stationList.map(s => `
+            <tr>
+                <td style="font-weight:500;">
+                    ${s.name}
+                    <span style="font-size:11px; color:#64748B; margin-left:8px;">${s.congestion}%</span>
+                </td>
+                <td><span class="${s.status_class}">${s.status_text}</span></td>
+            </tr>
+        `).join('');
+        
+        // Update button states
+        const northBtn = document.getElementById('northBtn');
+        const southBtn = document.getElementById('southBtn');
+        if (northBtn && southBtn) {
+            northBtn.classList.toggle('active', currentDirection === 'north');
+            southBtn.classList.toggle('active', currentDirection === 'south');
         }
         
-        tbody.innerHTML = rows.join('');
-        
-        // Update toggle buttons
-        document.getElementById('northBtn').classList.toggle('active', currentDirection === 'north');
-        document.getElementById('southBtn').classList.toggle('active', currentDirection === 'south');
-        document.getElementById('currentDirLabel').innerText = currentDirection === 'north' ? 'Northbound' : 'Southbound';
+        const currentDirLabel = document.getElementById('currentDirLabel');
+        if (currentDirLabel) {
+            currentDirLabel.innerHTML = currentDirection === 'north' ? 'Northbound' : 'Southbound';
+        }
         
     } catch (error) {
         console.error('Error loading station status:', error);
-        const tbody = document.getElementById('stationStatusBody');
-        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Error loading data</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:red;">Error loading data. Please refresh.</td></tr>';
     }
 }
+
+// Optional: Add a refresh button or auto-refresh every 30 seconds
+setInterval(() => {
+    const dashboardPage = document.getElementById('page-dashboard');
+    if (dashboardPage && dashboardPage.classList.contains('active')) {
+        // Only refresh if on dashboard page
+        lastFetchTime = 0; // Force refresh
+        loadStationStatus();
+    }
+}, 30000);
+
+let isUpdating = false;
+
+function setDirection(dir) {
+    if (isUpdating) return; // Prevent multiple rapid clicks
+    if (currentDirection === dir) return; // Don't switch to same direction
+    
+    isUpdating = true;
+    
+    // Disable buttons briefly to prevent spam
+    const northBtn = document.getElementById('northBtn');
+    const southBtn = document.getElementById('southBtn');
+    if (northBtn) northBtn.disabled = true;
+    if (southBtn) southBtn.disabled = true;
+    
+    currentDirection = dir;
+    
+    // Add visual feedback
+    const container = document.querySelector('.card .table-scroll-container');
+    if (container) container.style.opacity = '0.6';
+    
+    // Update display (instant from cache)
+    loadStationStatus();
+    
+    setTimeout(() => {
+        if (northBtn) northBtn.disabled = false;
+        if (southBtn) southBtn.disabled = false;
+        if (container) container.style.opacity = '1';
+        isUpdating = false;
+    }, 300);
+}
+
+
         async function loadMostReportedStations() {
             try {
                 const response = await fetch('/api/reports');
@@ -949,7 +1211,11 @@ async function loadStationStatus() {
                 const sorted = Object.entries(stationCounts).sort((a,b) => b[1] - a[1]).slice(0, 4);
                 const tbody = document.getElementById('mostReportedBody');
                 tbody.innerHTML = sorted.map(([station, count]) => `
-                    <tr><td>${station}</td><td>${count}</td><td style="color:#f59e0b;">● Moderate</td></tr>
+                    <tr>
+                        <td>${station}</td>
+                        <td>${count}</td>
+                        <td style="color:#f59e0b;">● Moderate</td>
+                    </tr>
                 `).join('');
                 if (sorted.length === 0) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No reports yet</td></tr>';
             } catch (error) {
@@ -977,25 +1243,43 @@ async function loadStationStatus() {
             }
         }
 
+        // ========== OPERATORS DATA FROM BACKEND ==========
         async function loadOperators() {
-            try {
-                const response = await fetch('/api/admin/operator-list');
-                const operators = await response.json();
-                const tbody = document.getElementById('operatorsBody');
-                tbody.innerHTML = operators.map(op => `
-                    <tr>
-                        <td><div style="font-weight:600;">${op.name}</div><div style="font-size:12px;color:#64748B;">${op.email}</div></td>
-                        <td>${op.zone}</td>
-                        <td>${op.last_login}</td>
-                        <td><span class="${op.active ? 'status-active' : 'status-deactivated'}"><i class="fas ${op.active ? 'fa-circle' : 'fa-ban'}" style="font-size:8px;"></i> ${op.active ? 'Active' : 'Deactivated'}</span></td>
-                        <td>${op.active ? `<button class="btn btn-danger btn-sm" onclick="deactivateOperator(${op.id}, '${op.name.replace(/'/g, "\\'")}', '${op.email}')"><i class="fas fa-ban"></i> Deactivate</button>` : `<button class="btn btn-success btn-sm" onclick="reactivateOperator(${op.id}, '${op.name.replace(/'/g, "\\'")}', '${op.email}')"><i class="fas fa-check-circle"></i> Reactivate</button>`}</td>
-                    </tr>
-                `).join('');
-                if (operators.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;">No operators found</td></tr>';
-            } catch (error) {
-                console.error('Error loading operators:', error);
-            }
-        }
+    try {
+        const response = await fetch('/api/admin/operator-list');
+        const operators = await response.json();
+        const tbody = document.getElementById('operatorsBody');
+        tbody.innerHTML = operators.map(op => `
+            <tr>
+                <td>
+                    <div style="font-weight:600;">${op.name}</div>
+                    <div style="font-size:11px;color:#64748B;">${op.email}</div>
+                </td>
+                <td>${op.zone || op.station || 'All Stations'}</td>
+                <td>${op.last_login}</td>
+                <td>
+                    <span class="${op.active ? 'status-active' : 'status-deactivated'}">
+                        <i class="fas ${op.active ? 'fa-circle' : 'fa-ban'}" style="font-size:8px;"></i>
+                        ${op.active ? 'Active' : 'Deactivated'}
+                    </span>
+                </td>
+                <td>
+                    ${op.active ? 
+                        `<button class="btn btn-danger btn-sm" onclick="deactivateOperator(${op.id}, '${op.name.replace(/'/g, "\\'")}', '${op.email}')">
+                            <i class="fas fa-ban"></i> Deactivate
+                        </button>` : 
+                        `<button class="btn btn-success btn-sm" onclick="reactivateOperator(${op.id}, '${op.name.replace(/'/g, "\\'")}', '${op.email}')">
+                            <i class="fas fa-check-circle"></i> Reactivate
+                        </button>`
+                    }
+                </td>
+            </tr>
+        `).join('');
+        if (operators.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;">No operators found</td></tr>';
+    } catch (error) {
+        console.error('Error loading operators:', error);
+    }
+}
 
         async function deactivateOperator(id, name, email) {
             currentOperatorToDeactivate = { id, name, email };
@@ -1024,24 +1308,35 @@ async function loadStationStatus() {
         async function generateInvite() {
             const name = document.getElementById('opName').value;
             const email = document.getElementById('opEmail').value;
-            const station = document.getElementById('opStation').value;
-            const accessLevel = document.getElementById('opAccessLevel').value;
+            const accessLevel = document.getElementById('accessLevel').value;
+            const station = getStationValue();
             
-            if (!name || !email) return showToast('⚠️', 'Fill name & email');
+            if (!name || !email) {
+                showToast('⚠️', 'Please fill in name and email');
+                return;
+            }
             
             try {
                 const response = await fetch('/api/admin/generate-invite', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, station, access_level: accessLevel })
+                    body: JSON.stringify({ 
+                        name, 
+                        email, 
+                        station: station,
+                        access_level: accessLevel,
+                        auth_method: 'password'
+                    })
                 });
                 const data = await response.json();
                 if (data.success) {
                     document.getElementById('generatedLink').innerText = data.link;
                     document.getElementById('linkResult').style.display = 'block';
-                    showToast('🔑', `Invite for ${name}`);
+                    showToast('', `Invite generated for ${name}`);
                     document.getElementById('opName').value = '';
                     document.getElementById('opEmail').value = '';
+                    document.getElementById('opStation').value = 'all';
+                    loadOperators();
                 } else {
                     showToast('⚠️', data.error || 'Failed to generate invite');
                 }
@@ -1054,9 +1349,10 @@ async function loadStationStatus() {
         function copyLink() {
             const link = document.getElementById('generatedLink').innerText;
             navigator.clipboard.writeText(link);
-            showToast('📋', 'Link copied');
+            showToast('', 'Link copied to clipboard');
         }
 
+        // ========== AUDIT LOG FROM BACKEND ==========
         async function loadAuditLog() {
             try {
                 const response = await fetch('/api/admin/audit-log');
@@ -1083,16 +1379,14 @@ async function loadStationStatus() {
         }
 
         function getActionClass(action) {
-    if (action.includes('login') && !action.includes('failed')) return 'action-login';
-    if (action.includes('login_failed')) return 'action-failed';
-    if (action.includes('archived') || action.includes('report')) return 'action-archive';
-    if (action.includes('logout')) return 'action-logout';
-    if (action.includes('override')) return 'action-override';
-    if (action.includes('created') || action.includes('generated')) return 'action-create';
-    if (action.includes('broadcast')) return 'action-login';
-    if (action.includes('report_failed')) return 'action-failed';
-    return 'action-login';
-}
+            if (action.includes('login') && !action.includes('failed')) return 'action-login';
+            if (action.includes('report')) return 'action-report';
+            if (action.includes('logout')) return 'action-logout';
+            if (action.includes('override')) return 'action-override';
+            if (action.includes('create') || action.includes('generate')) return 'action-create';
+            if (action.includes('broadcast')) return 'action-login';
+            return 'action-login';
+        }
 
         function formatTimestamp(dateStr) {
             const date = new Date(dateStr);
@@ -1151,7 +1445,7 @@ async function loadStationStatus() {
             a.download = `audit_log_${new Date().toISOString().slice(0,19)}.csv`;
             a.click();
             URL.revokeObjectURL(url);
-            showToast('📊', 'Audit log exported');
+            showToast('', 'Audit log exported');
         }
 
         function setDirection(dir) {
@@ -1170,6 +1464,7 @@ async function loadStationStatus() {
             if (id === 'audit') loadAuditLog();
         }
 
+        // Set up modal confirm buttons after DOM is loaded
         document.addEventListener('DOMContentLoaded', () => {
             updateDate();
             setInterval(updateDate, 1000);
@@ -1179,7 +1474,9 @@ async function loadStationStatus() {
             loadRecentActivities();
             loadOperators();
             loadAuditLog();
+            updateAccessLevelInfo();
             
+            // Set up modal confirm buttons
             const confirmDeactivateBtn = document.getElementById('confirmDeactivateBtn');
             const confirmReactivateBtn = document.getElementById('confirmReactivateBtn');
             
@@ -1190,11 +1487,11 @@ async function loadStationStatus() {
                             const response = await fetch(`/api/admin/deactivate-operator/${currentOperatorToDeactivate.id}`, { method: 'POST' });
                             const data = await response.json();
                             if (data.success) {
-                                showToast('✅', `Operator ${currentOperatorToDeactivate.name} deactivated successfully`);
+                                showToast('✓', `Operator ${currentOperatorToDeactivate.name} deactivated`);
                                 loadOperators();
                                 closeDeactivateModal();
                             } else {
-                                showToast('⚠️', data.error || 'Failed to deactivate operator');
+                                showToast('⚠️', data.error || 'Failed to deactivate');
                             }
                         } catch (error) {
                             console.error('Error deactivating operator:', error);
@@ -1211,11 +1508,11 @@ async function loadStationStatus() {
                             const response = await fetch(`/api/admin/reactivate-operator/${currentOperatorToReactivate.id}`, { method: 'POST' });
                             const data = await response.json();
                             if (data.success) {
-                                showToast('✅', `Operator ${currentOperatorToReactivate.name} reactivated successfully`);
+                                showToast('✓', `Operator ${currentOperatorToReactivate.name} reactivated`);
                                 loadOperators();
                                 closeReactivateModal();
                             } else {
-                                showToast('⚠️', data.error || 'Failed to reactivate operator');
+                                showToast('⚠️', data.error || 'Failed to reactivate');
                             }
                         } catch (error) {
                             console.error('Error reactivating operator:', error);
@@ -1225,6 +1522,7 @@ async function loadStationStatus() {
                 };
             }
             
+            // Get admin name from session
             fetch('/api/admin/profile')
                 .then(res => res.json())
                 .then(data => {
