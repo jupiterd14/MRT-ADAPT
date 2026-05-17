@@ -101,8 +101,6 @@ def get_fallback_directional_prediction_for_features(station_name, direction, ta
     return min(100, int((ridership / capacity) * 100))
 
 
-# Add these functions at the top of feature_engineering.py
-
 def is_holiday(date, holidays_list):
     """Check if a date is a holiday"""
     date_str = date.strftime('%Y-%m-%d')
@@ -134,8 +132,7 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime,
     from datetime import timedelta
     import numpy as np
     
-    # Define holidays and events (you'll need to pass these or import them)
-    # For now, we'll create empty dictionaries - you should import from your training config
+  
     holidays_list = [
         '2023-01-01', '2023-04-06', '2023-04-07', '2023-05-01', '2023-06-12',
         '2023-08-28', '2023-11-27', '2023-12-08', '2023-12-25', '2023-12-30',
@@ -160,12 +157,10 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime,
     for h in range(24, 0, -1):  # 24 hours back
         past_time = target_datetime - timedelta(hours=h)
         
-        # Use fallback for missing historical data
         congestion = get_fallback_directional_prediction_for_features(
             station_name, direction, past_time, historical_entry
         )
         
-        # V2 Feature extraction
         hour = past_time.hour
         minute = past_time.minute
         weekday = past_time.weekday()
@@ -232,7 +227,6 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime,
         ]
         sequence.append(features)
     
-    # Convert to numpy array with float32 - ONLY ONE RETURN
     result = np.array(sequence, dtype=np.float32)
     print(f"✅ Generated sequence for {station_name} {direction}: shape={result.shape}")
     return result

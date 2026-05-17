@@ -1,10 +1,7 @@
-# services/model_loader.py - COMPLETE FIXED VERSION
-
 import os
 import pickle
 import tensorflow as tf
 
-# Global state - these are the actual variables that get imported
 directional_models = {}
 directional_scalers = {}
 historical_entry = {}
@@ -16,27 +13,21 @@ dow_avg_exit = {}
 direction_counts = {}
 station_time_series = {}
 
-
-def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_NEW_v3'):
-    """
-    Load directional LSTM models for all stations
-    Updates the GLOBAL directional_models and directional_scalers
-    """
-    global directional_models, directional_scalers  # ← CRITICAL: Must be here
+def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_NEW_v2'):
+    global directional_models, directional_scalers
     
-    # Clear existing
     directional_models = {}
     directional_scalers = {}
     
-    print(f"\n🚇 LOADING DIRECTIONAL MODELS (2023-2024 REAL DATA)...")
-    print(f"📁 Looking in: {DIRECTIONAL_MODELS_PATH}")
+    print(f"\nLOADING DIRECTIONAL MODELS...")
+    print(f"Looking in: {DIRECTIONAL_MODELS_PATH}")
     
     if not os.path.exists(DIRECTIONAL_MODELS_PATH):
-        print(f"❌ Directory {DIRECTIONAL_MODELS_PATH} not found!")
-        print(f"   Current working directory: {os.getcwd()}")
+        print(f"Directory {DIRECTIONAL_MODELS_PATH} not found!")
+        print(f"Current working directory: {os.getcwd()}")
         return directional_models, directional_scalers
     
-    print(f"📂 Found directory. Looking for model files...")
+    print(f"Found directory. Looking for model files...")
     
     models_loaded = 0
     
@@ -46,7 +37,6 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
             station_underscore = station.replace(' ', '_')
             model_key_underscore = f"{station_underscore}_{direction}"
             
-            # Try different possible model paths
             possible_model_paths = [
                 f'{DIRECTIONAL_MODELS_PATH}/{model_key}_lstm_enhanced.keras',
                 f'{DIRECTIONAL_MODELS_PATH}/{model_key}_best.keras',
@@ -59,13 +49,12 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
             for path in possible_model_paths:
                 if os.path.exists(path):
                     model_path = path
-                    print(f"  ✅ Found model: {os.path.basename(path)}")
+                    print(f"  Found model: {os.path.basename(path)}")
                     break
             
             if model_path is None:
                 continue
             
-            # Look for feature scaler
             possible_scaler_paths = [
                 f'{DIRECTIONAL_MODELS_PATH}/{model_key}_feature_scaler.pkl',
                 f'{DIRECTIONAL_MODELS_PATH}/{model_key_underscore}_feature_scaler.pkl',
@@ -75,17 +64,16 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
             for path in possible_scaler_paths:
                 if os.path.exists(path):
                     feature_scaler_path = path
-                    print(f"  ✅ Found feature scaler: {os.path.basename(path)}")
+                    print(f"  Found feature scaler: {os.path.basename(path)}")
                     break
             
-            # Look for target scaler
             target_scaler_path = f'{DIRECTIONAL_MODELS_PATH}/{model_key}_target_scaler.pkl'
             if not os.path.exists(target_scaler_path):
                 target_scaler_path = None
             
             if feature_scaler_path:
                 try:
-                    print(f"  🔧 Loading {model_key}...")
+                    print(f"  Loading {model_key}...")
                     directional_models[model_key] = tf.keras.models.load_model(
                         model_path, 
                         compile=False
@@ -98,29 +86,24 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
                             directional_scalers[f'{model_key}_target'] = pickle.load(f)
                     
                     models_loaded += 1
-                    print(f"  ✅ Loaded: {model_key}")
+                    print(f"  Loaded: {model_key}")
                 except Exception as e:
-                    print(f"  ⚠️ Error loading {model_key}: {e}")
+                    print(f"  Error loading {model_key}: {e}")
             else:
-                print(f"  ⚠️ Missing scaler for {model_key}, skipping")
+                print(f"  Missing scaler for {model_key}, skipping")
     
-    print(f"\n📊 Loaded {models_loaded} directional models")
-    print(f"📊 Global directional_models now has {len(directional_models)} models")
+    print(f"\nLoaded {models_loaded} directional models")
+    print(f"Global directional_models now has {len(directional_models)} models")
     
     return directional_models, directional_scalers
 
-
 def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY, 
                                historical_cache='historical_data_cache_2023_2024.pkl'):
-    """
-    Load real historical ridership data
-    """
     global historical_entry, historical_exit, hourly_avg_entry, hourly_avg_exit
     global dow_avg_entry, dow_avg_exit, direction_counts
     
-    print(f"\n📊 LOADING HISTORICAL DATA...")
+    print(f"\nLOADING HISTORICAL DATA...")
     
-    # Try to load from cache
     if os.path.exists(historical_cache):
         try:
             with open(historical_cache, 'rb') as f:
@@ -134,7 +117,7 @@ def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY,
             dow_avg_entry = cache_data.get('dow_avg_entry', {})
             dow_avg_exit = cache_data.get('dow_avg_exit', {})
             
-            print(f"✅ Loaded cached historical data: {len(historical_entry)} stations")
+            print(f"Loaded cached historical data: {len(historical_entry)} stations")
             
             if historical_entry:
                 return {
@@ -147,10 +130,9 @@ def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY,
                     'direction_counts': direction_counts
                 }
         except Exception as e:
-            print(f"⚠️ Cache error: {e}")
+            print(f"Cache error: {e}")
     
-    # Generate synthetic data as fallback
-    print("⚠️ No cache found, generating synthetic historical data...")
+    print("No cache found, generating synthetic historical data...")
     _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY)
     
     return {
@@ -163,9 +145,7 @@ def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY,
         'direction_counts': direction_counts
     }
 
-
 def _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY):
-    """Generate synthetic historical data as fallback"""
     global historical_entry, historical_exit, hourly_avg_entry, hourly_avg_exit, direction_counts
     
     for station in STATIONS:
@@ -184,7 +164,6 @@ def _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY):
         historical_entry[station] = capacity * entry_factor
         historical_exit[station] = capacity * exit_factor
     
-    # Generate hourly patterns
     for hour in range(24):
         if 7 <= hour <= 9:
             hourly_avg_entry[hour] = 8000 + (hour - 7) * 500
@@ -209,4 +188,4 @@ def _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY):
             hourly_avg_exit[hour] = 3000
     
     direction_counts = {'northbound': 4500000, 'southbound': 3800000}
-    print("✅ Generated synthetic historical data")
+    print("Generated synthetic historical data")
