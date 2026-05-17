@@ -1385,6 +1385,36 @@ nav {
 
 /* Extra small devices */
 @media screen and (max-width: 480px) {
+
+    
+.help-btn {
+    background: var(--blue-bg);
+    color: var(--accent-blue);
+    border: none;
+    padding:5px 10px;
+    border: 1px solid var(--accent-blue);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+
+
+.help-btn h3 {
+    font-size: 13px;
+}
+
+.help-btn:hover {
+    background: var(--accent-blue);
+    color: white;
+    transform: translateY(-2px);
+}
+
     .datetime-input {
         height: 36px !important;
         font-size: 10px !important;
@@ -1446,10 +1476,246 @@ nav {
     font-size: 11px;
 }
 
+.help-btn {
+    background: var(--blue-bg);
+    color: var(--accent-blue);
+    border: none;
+    padding:12px 15px;
+    border: 1px solid var(--accent-blue);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+
+
+.help-btn h3 {
+    font-size: 13px;
+}
+
+.help-btn:hover {
+    background: var(--accent-blue);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 24px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.modal-header h3 i {
+    color: var(--accent-blue);
+    font-size: 20px;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-light);
+    transition: color 0.2s;
+}
+
+.modal-close:hover {
+    color: var(--red);
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.modal-step {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.step-number {
+    width: 32px;
+    height: 32px;
+    background: var(--blue-bg);
+    color: var(--accent-blue);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.step-content h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 5px;
+}
+
+.step-content p {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.5;
+}
+
+.modal-tip {
+    background: #FEF3C7;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.modal-tip i {
+    color: #F59E0B;
+    font-size: 18px;
+}
+
+.modal-tip span {
+    font-size: 12px;
+    color: #92400E;
+    line-height: 1.4;
+}
+
+.help-btn {
+    position: relative;
+}
+
+.help-btn::after {
+    content: "Click for travel guide";
+    position: absolute;
+    bottom: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text-dark);
+    color: white;
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.help-btn:hover::after {
+    opacity: 1;
+}
+
 
 </style>
 </head>
 <body>
+
+    <!-- Modal -->
+<div class="modal" id="travelGuideModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>
+                <i class="fas fa-route"></i>
+                Travel Plan Guide
+            </h3>
+            <button class="modal-close" onclick="closeTravelGuide()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h4>Select Your Stations</h4>
+                    <p>Choose your departure station (FROM) and destination station (TO). The congestion level will be displayed below each dropdown.</p>
+                </div>
+            </div>
+            
+            <div class="modal-step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h4>Set Your Travel Time</h4>
+                    <p>Pick your travel date and departure time. The system will show congestion forecasts for your selected time.</p>
+                </div>
+            </div>
+            
+            <div class="modal-step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h4>Plan Your Route</h4>
+                    <p>Click the PLAN button to get travel advisories, estimated travel time, and congestion levels for your chosen route.</p>
+                </div>
+            </div>
+            
+            <div class="modal-step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <h4>Read the Advisories</h4>
+                    <p>Three advisory cards will show: boarding station status, travel recommendations, and ETA with congestion alerts.</p>
+                </div>
+            </div>
+            
+            <div class="modal-tip">
+                <i class="fas fa-lightbulb"></i>
+                <span>Tip: Use the swap button to quickly exchange FROM and TO stations. Click CANCEL to reset all selections.</span>
+            </div>
+        </div>
+    </div>
+</div>
+
 
     <!-- Mobile Bottom Navigation -->
 <div class="bottom-nav">
@@ -1522,9 +1788,9 @@ nav {
                     <i class="fa-solid fa-location-dot" style="color: var(--accent-blue);"></i>
                     Where do you plan to go?
                 </div>
-                <div class="route-badge">
-                    <i class="fas fa-route"></i> Plan your journey
-                </div>
+                <button class="help-btn" onclick="showTravelGuide()">
+                <i class="fas fa-question-circle"></i> <h3>How to use</h3>
+            </button>
             </div>
             
             <div class="input-row">
@@ -1786,6 +2052,32 @@ try {
         
         showToast('Form reset to defaults');
     }
+
+    function showTravelGuide() {
+    const modal = document.getElementById('travelGuideModal');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeTravelGuide() {
+    const modal = document.getElementById('travelGuideModal');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('travelGuideModal');
+    if (event.target === modal) {
+        closeTravelGuide();
+    }
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeTravelGuide();
+    }
+});
 
     function updateDateTime() {
         const now = new Date();
