@@ -65,8 +65,6 @@ google = oauth.register(
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
     client_kwargs={'scope': 'openid email profile'}
 )
-# REMOVED the line that was causing the error:
-# app.extensions['authlib.client']['google'] = google
 
 app.config['GOOGLE_CLIENT'] = google
 
