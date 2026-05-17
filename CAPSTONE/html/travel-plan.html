@@ -434,7 +434,7 @@ nav {
 .card {
     background: var(--white);
     border-radius: 20px;
-    padding: 25px 30px;
+    padding: 30px 30px 20px 20px;
     margin-bottom: 25px;
     border: 1px solid var(--border);
     transition: all 0.3s ease;
@@ -458,7 +458,7 @@ nav {
 }
 
 .planner-title {
-    font-size: 15px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--text-dark);
     display: flex;
@@ -1432,6 +1432,20 @@ nav {
         font-size: 16px;
     }
 }
+.congestion-indicator {
+    min-height: 24px;
+    margin-top: 4px;
+}
+
+.congestion-indicator.visible {
+    display: block;
+}
+
+.congestion-indicator span {
+    font-weight: 600;
+    font-size: 11px;
+}
+
 
 </style>
 </head>
@@ -1502,7 +1516,6 @@ nav {
             </div>
         </div>
 
-        <!-- IMPROVED PLANNER CARD -->
         <div class="card planner-card">
             <div class="planner-header">
                 <div class="planner-title">
@@ -1595,17 +1608,11 @@ nav {
 
     <script>
 let stations = [];
+
 // ========== DYNAMIC MESSAGE ARRAYS ==========
 const messageArrays = {
-    // Light congestion messages (0-20%)
     light: {
-        titles: [
-            "Light Traffic",
-            "Smooth Sailing",
-            "Clear Skies Ahead",
-            "Quick Journey",
-            "Easy Commute"
-        ],
+        titles: ["Light Traffic", "Smooth Sailing", "Clear Skies Ahead", "Quick Journey", "Easy Commute"],
         recommendations: [
             "Great time to travel! Expect minimal delays.",
             "Perfect conditions for a stress-free commute.",
@@ -1620,16 +1627,8 @@ const messageArrays = {
             "Regular arrival time is fine for this trip."
         ]
     },
-    
-    // Moderate congestion messages (20-40%)
     moderate: {
-        titles: [
-            "Moderate Traffic",
-            "Steady Flow",
-            "Manageable Crowds",
-            "Normal Conditions",
-            "Typical Commute"
-        ],
+        titles: ["Moderate Traffic", "Steady Flow", "Manageable Crowds", "Normal Conditions", "Typical Commute"],
         recommendations: [
             "Normal travel conditions expected. Allow standard travel time.",
             "Steady flow with moderate crowds. Expect typical wait times.",
@@ -1644,18 +1643,10 @@ const messageArrays = {
             "Standard arrival time is recommended."
         ]
     },
-    
-    // Busy/Congested messages (40-60%)
-    busy: {
-        titles: [
-            "Busy Conditions",
-            "Heavy Traffic",
-            "Crowded",
-            "High Volume",
-            "Peak Load"
-        ],
+    congested: {
+        titles: ["Congested", "Heavy Traffic", "Crowded", "High Volume", "Peak Load"],
         recommendations: [
-            "Busy conditions expected. Allow extra 5-10 minutes.",
+            "Congested conditions expected. Allow extra 5-10 minutes.",
             "Heavy passenger volume. Consider arriving a bit earlier.",
             "Crowded conditions typical for this time. Plan ahead.",
             "High congestion levels. Extra waiting time likely.",
@@ -1668,46 +1659,14 @@ const messageArrays = {
             "Early arrival recommended to avoid rush."
         ]
     },
-    
-    // Heavy congestion messages (60-80%)
-    heavy: {
-        titles: [
-            "Heavy Congestion",
-            "Severe Crowding",
-            "Intense Traffic",
-            "Critical Volume",
-            "Extremely Busy"
-        ],
-        recommendations: [
-            "Heavy congestion expected. Significant delays likely.",
-            "Very crowded conditions. Allow 10-15 extra minutes.",
-            "Severe passenger volume. Consider alternative timing.",
-            "Critical congestion levels. Expect longer wait times.",
-            "Extremely busy - major delays possible."
-        ],
-        actions: [
-            "Arrive at least 15-20 minutes early.",
-            "Strongly recommend arriving much earlier than usual.",
-            "Plan to be at the station with plenty of time to spare.",
-            "Early arrival is crucial for this trip."
-        ]
-    },
-    
-    // Severe congestion messages (80-100%)
     severe: {
-        titles: [
-            "SEVERE Congestion",
-            "CRITICAL Conditions",
-            "EXTREME Crowding",
-            "SERIOUS Delays",
-            "EMERGENCY Level"
-        ],
+        titles: ["Severe Congestion", "Critical Conditions", "Extreme Crowding", "Serious Delays", "Emergency Level"],
         recommendations: [
-            "⚠️ SEVERE congestion! Expect major delays of 15-20+ minutes.",
-            "CRITICAL crowding! Strongly consider postponing your trip.",
-            "EXTREME conditions! Significant delays are certain.",
-            "SERIOUS congestion! Alternative transportation recommended.",
-            "EMERGENCY level crowding! Avoid if possible."
+            "Severe congestion! Expect major delays of 15-20+ minutes.",
+            "Critical crowding! Strongly consider postponing your trip.",
+            "Extreme conditions! Significant delays are certain.",
+            "Serious congestion! Alternative transportation recommended.",
+            "Emergency level crowding! Avoid if possible."
         ],
         actions: [
             "Postpone your trip if possible.",
@@ -1719,7 +1678,7 @@ const messageArrays = {
     }
 };
 
-// Add this function BEFORE DOMContentLoaded
+
 function cleanOldReadAlerts() {
     const saved = localStorage.getItem('readAlerts');
     if (saved) {
@@ -1744,9 +1703,8 @@ function getRandomMessage(arr) {
 // Helper function to determine congestion level
 function getCongestionLevel(congestion) {
     if (congestion > 80) return 'severe';
-    if (congestion > 60) return 'heavy';
-    if (congestion > 40) return 'busy';
-    if (congestion > 20) return 'moderate';
+    if (congestion > 60) return 'congested';
+    if (congestion > 40) return 'moderate';
     return 'light';
 }
 try {
@@ -1899,6 +1857,95 @@ try {
     
     showToast('Stations swapped');
 }
+
+// Load congestion for selected stations - Show LEVELS only (no emojis, no percentages)
+async function updateStationCongestion() {
+    const fromStation = document.getElementById('fromStation').value;
+    const toStation = document.getElementById('toStation').value;
+    const date = document.getElementById('travelDate').value;
+    const time = document.getElementById('departureTime').value;
+    
+    // Function to get level from percentage
+    function getLevel(congestion) {
+        if (congestion > 80) return 'SEVERE';
+        if (congestion > 60) return 'CONGESTED';
+        if (congestion > 40) return 'MODERATE';
+        if (congestion > 20) return 'LIGHT';
+        return 'LIGHT';
+    }
+    
+    // Function to get color for level
+    function getColor(level) {
+        if (level === 'SEVERE') return '#EF4444';
+        if (level === 'CONGESTED') return '#F97316';
+        if (level === 'MODERATE') return '#F59E0B';
+        return '#22C55E';
+    }
+    
+    // Fetch current congestion for FROM station
+    try {
+        const url = `/api/directional-forecast/${encodeURIComponent(fromStation)}?date=${date}&time=${time}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data && data.current) {
+            const fromCongestion = data.current.southbound || data.current.northbound || 0;
+            const fromDiv = document.getElementById('fromCongestion');
+            const level = getLevel(fromCongestion);
+            const color = getColor(level);
+            
+            if (fromCongestion > 0) {
+                fromDiv.innerHTML = `<span style="display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; color: ${color};">${level}</span>`;
+                fromDiv.classList.add('visible');
+            } else {
+                fromDiv.innerHTML = '';
+                fromDiv.classList.remove('visible');
+            }
+        }
+    } catch(e) {
+        console.log('Error fetching from congestion:', e);
+    }
+    
+    // Fetch for TO station
+    try {
+        const url = `/api/directional-forecast/${encodeURIComponent(toStation)}?date=${date}&time=${time}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data && data.current) {
+            const toCongestion = data.current.southbound || data.current.northbound || 0;
+            const toDiv = document.getElementById('toCongestion');
+            const level = getLevel(toCongestion);
+            const color = getColor(level);
+            
+            if (toCongestion > 0) {
+                toDiv.innerHTML = `<span style="display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; color: ${color};">${level}</span>`;
+                toDiv.classList.add('visible');
+            } else {
+                toDiv.innerHTML = '';
+                toDiv.classList.remove('visible');
+            }
+        }
+    } catch(e) {
+        console.log('Error fetching to congestion:', e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    
+    const fromSelect = document.getElementById('fromStation');
+    const toSelect = document.getElementById('toStation');
+    const dateInput = document.getElementById('travelDate');
+    const timeInput = document.getElementById('departureTime');
+    
+    fromSelect.addEventListener('change', updateStationCongestion);
+    toSelect.addEventListener('change', updateStationCongestion);
+    dateInput.addEventListener('change', updateStationCongestion);
+    timeInput.addEventListener('change', updateStationCongestion);
+    
+    // Initial load
+    updateStationCongestion();
+});
 function planRoute() {
     if (!validateDateTime()) {
         return;
@@ -2018,13 +2065,14 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     
     const adjustedTravelTime = baseTravelTime + etaAdjustment;
     
-    // Get status text and color
-    const getStatus = (cong) => {
-        if (cong > 80) return { text: 'SEVERE', color: '#EF4444', bg: '#FEE2E2' };
-        if (cong > 60) return { text: 'CONGESTED', color: '#F97316', bg: '#FFEDD5' };
-        if (cong > 30) return { text: 'MODERATE', color: '#F59E0B', bg: '#FEF3C7' };
-        return { text: 'LIGHT', color: '#22C55E', bg: '#DCFCE7' };
-    };
+    // Get status text and color (without emojis)
+const getStatus = (cong) => {
+    if (cong > 80) return { text: 'SEVERE', color: '#EF4444', bg: '#FEE2E2' };
+    if (cong > 60) return { text: 'CONGESTED', color: '#F97316', bg: '#FFEDD5' };
+    if (cong > 40) return { text: 'MODERATE', color: '#F59E0B', bg: '#FEF3C7' };
+    if (cong > 20) return { text: 'LIGHT', color: '#3B82F6', bg: '#EFF6FF' };
+    return { text: 'LIGHT', color: '#22C55E', bg: '#DCFCE7' };
+};
     
     const fromStatus = getStatus(fromCongestion);
     const toStatus = getStatus(toCongestion);
@@ -2070,8 +2118,9 @@ advisory1.innerHTML = `
             <i class="fas fa-arrow-up" style="color: #3B82F6; font-size: 18px; margin-bottom: 5px; display: block;"></i>
             <div style="font-size: 11px; color: #64748B;">NORTHBOUND</div>
             <div style="margin-top: 8px;">
+
                 <span style="display: inline-block; padding: 6px 16px; border-radius: 30px; font-size: 13px; font-weight: 600; background: ${getStatus(fromData?.northbound || 0).bg}; color: ${getStatus(fromData?.northbound || 0).color};">${getStatus(fromData?.northbound || 0).text}</span>
-            </div>
+                </div>
         </div>
         <div style="flex: 1; text-align: center; padding: 12px; background: #F8FAFC; border-radius: 12px;">
             <i class="fas fa-arrow-down" style="color: #3B82F6; font-size: 18px; margin-bottom: 5px; display: block;"></i>
@@ -2142,7 +2191,7 @@ console.log(`🎯 randomTitle being used: ${randomTitle}`);
             <h4 style="${cardClass === 'info' ? 'color: #1E40AF;' : cardClass === 'success' ? 'color: #166534;' : 'color: white;'}">${randomTitle}</h4>
         </div>
         <div class="advisory-content" style="${cardClass === 'info' || cardClass === 'success' ? 'color: #1E293B;' : 'color: white;'}">
-            <strong>${from}</strong> station: <strong>${fromCongestion.toFixed(0)}%</strong> congestion<br><br>
+<strong>${from}</strong> station: <strong>${getStatus(fromCongestion).text}</strong> congestion level<br><br>
             ${randomRecommendation}<br><br>
             📌 ${randomAction}
         </div>
@@ -2160,14 +2209,14 @@ console.log(`🎯 randomTitle being used: ${randomTitle}`);
     const isEveningRush = hour >= 17 && hour <= 20;
     
     if (isMorningRush) {
-        advisoryContent = ` MORNING RUSH HOUR: Due to ${fromStatus.text.toLowerCase()} congestion at ${from} station (${fromCongestion.toFixed(0)}%), your estimated arrival at ${to} is approximately ${adjustedTravelTime} minutes. Please arrive at ${from} station early to account for boarding delays.`;
-    } else if (isEveningRush) {
-        advisoryContent = ` EVENING RUSH HOUR: ${from} station has ${fromStatus.text.toLowerCase()} congestion (${fromCongestion.toFixed(0)}%). Your estimated travel time to ${to} is ${adjustedTravelTime} minutes. Consider arriving early.`;
-    } else if (hour >= 21) {
-        advisoryContent = ` LATE NIGHT: Service ends at 10:30 PM. ${from} station has ${fromStatus.text.toLowerCase()} congestion. Your ETA to ${to} is ${adjustedTravelTime} minutes.`;
-    } else {
-        advisoryContent = `${from} station has ${fromStatus.text.toLowerCase()} congestion (${fromCongestion.toFixed(0)}%). Your estimated arrival at ${to} is ${adjustedTravelTime} minutes (${baseTravelTime} min travel + ${etaAdjustment} min boarding delay).`;
-    }
+    advisoryContent = ` MORNING RUSH HOUR: Due to ${fromStatus.text.toLowerCase()} congestion at ${from} station, your estimated arrival at ${to} is approximately ${adjustedTravelTime} minutes. Please arrive at ${from} station early to account for boarding delays.`;
+} else if (isEveningRush) {
+    advisoryContent = ` EVENING RUSH HOUR: ${from} station has ${fromStatus.text.toLowerCase()} congestion. Your estimated travel time to ${to} is ${adjustedTravelTime} minutes. Consider arriving early.`;
+} else if (hour >= 21) {
+    advisoryContent = ` LATE NIGHT: Service ends at 10:30 PM. ${from} station has ${fromStatus.text.toLowerCase()} congestion. Your ETA to ${to} is ${adjustedTravelTime} minutes.`;
+} else {
+    advisoryContent = `${from} station has ${fromStatus.text.toLowerCase()} congestion. Your estimated arrival at ${to} is ${adjustedTravelTime} minutes (${baseTravelTime} min travel + ${etaAdjustment} min boarding delay).`;
+}
     
     advisory3.className = `advisory-card info`;
     advisory3.innerHTML = `
