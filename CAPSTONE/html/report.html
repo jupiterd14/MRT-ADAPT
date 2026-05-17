@@ -1,0 +1,3103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MRT-ADAPT | Report Congestion</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+         @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
+
+:root {
+    --sidebar-bg: #00224D;
+    --main-bg: #F8FAFC;
+    --accent-blue: #3B82F6;
+    --text-dark: #1E293B;
+    --text-light: #64748B;
+    --white: #FFFFFF;
+    --border: #E2E8F0;
+    --red: #EF4444;
+    --orange: #F97316;
+    --yellow: #EAB308;
+    --green: #22C55E;
+    --light-green-bg: #F0FDF4;
+    --blue-bg: #EFF6FF;
+    --purple: #8B5CF6;
+    --rail-color: #00224D;
+}
+
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Bricolage Grotesque", sans-serif;        
+}
+
+
+body {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    background-color: var(--main-bg);
+    overflow: hidden;
+}
+
+
+/* ========== SIDEBAR - RESPONSIVE (MOVED OUTSIDE MOBILE MEDIA QUERY) ========== */
+.sidebar {
+    width: 300px;
+    background-color: var(--sidebar-bg);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    padding: 20px 0;
+    transition: width 0.3s ease;
+}
+
+.remark-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dark);
+}
+
+.remark-text i {
+    font-size: 12px;
+}
+
+@media screen and (max-width: 380px) {
+    .report-item > div:first-child {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }
+    
+    .report-item > div:first-child > div:first-child {
+        margin-bottom: 4px !important;
+    }
+    
+    .report-item > div:first-child > div:last-child {
+        align-self: flex-start !important;
+    }
+}
+
+/* Desktop: 1024px - 1440px */
+@media (min-width: 1024px) and (max-width: 1440px) {
+    .sidebar {
+        width: 260px;
+    }
+}
+
+
+/* Large Desktop: 1440px+ */
+@media (min-width: 1440px) {
+    .sidebar {
+        width: 320px;
+    }
+}
+
+
+.logo-section {
+    padding: 10px 25px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+
+.logo-icon {
+    background: #38BDF8;
+    padding: 10px 13px;
+    border-radius: 8px;
+    font-size: 18px;
+}
+
+
+.logo-text h2 {
+    font-size: 16px;
+    margin: 0;
+    color: white;
+}
+.logo-text p {
+    font-size: 10px;
+    opacity: 0.6;
+    letter-spacing: 1px;
+    color: white;
+}
+
+
+nav {
+    padding: 40px 5px 5px 10px;
+    flex: 1;
+}
+
+        .nav-item {
+            padding: 12px 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            cursor: pointer;
+            transition: 0.3s;
+            color: #CBD5E1;
+            text-decoration: none;
+            font-size: 15px;
+            position: relative;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: rgb(148, 207, 255);
+            border-left: 4px solid var(--accent-blue);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 25px 40px;
+            overflow-y: auto;
+        }
+
+        .greeting { 
+            font-size: 11px; 
+            color: var(--text-light); 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            margin-bottom: 5px; 
+            letter-spacing: 0.5px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .header-title {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .header-top h1 {
+            font-size: 1.25rem;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 0;
+        }
+
+        .header-subtitle {
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        .header-icons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .action-btn {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            padding: 8px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            color: var(--text-dark);
+            text-decoration: none;
+        }
+
+        .action-btn i {
+            font-size: 14px;
+            color: var(--accent-blue);
+        }
+
+        .action-btn:hover {
+            background: var(--blue-bg);
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+
+        .action-btn.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .action-btn.active i {
+            color: white;
+        }
+
+        .icon-btn {
+            background: #F1F5F9;
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            position: relative;
+            color: var(--text-dark);
+            transition: 0.3s;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover {
+            background: #E2E8F0;
+        }
+
+        .badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: var(--red);
+            color: white;
+            font-size: 10px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            font-size: 16px;
+            color: var(--text-dark);
+        }
+
+        .section-header i {
+            color: var(--accent-blue);
+            font-size: 18px;
+        }
+
+        .station-selector {
+            width: 300px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .report-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            min-height: 160px;
+        }
+
+        .report-card i { 
+            font-size: 36px; 
+            margin-bottom: 4px;
+        }
+        
+        .report-card h3 { 
+            font-size: 18px; 
+            font-weight: 700; 
+            margin-bottom: 2px;
+        }
+        
+        .report-card p { 
+            font-size: 12px; 
+            color: var(--text-light);
+            line-height: 1.4;
+        }
+
+        .card-low { border-color: var(--green); }
+        .card-low i, .card-low h3 { color: var(--green); }
+        .card-low.selected { background: var(--green); border-color: var(--green); }
+        .card-low.selected i, .card-low.selected h3, .card-low.selected p { color: white; }
+
+        .card-moderate { border-color: var(--yellow); }
+        .card-moderate i, .card-moderate h3 { color: #dec100; }
+        .card-moderate.selected { background: var(--yellow); border-color: var(--yellow); }
+        .card-moderate.selected i, .card-moderate.selected h3, .card-moderate.selected p { color: white; }
+
+        .card-congested { border-color: var(--orange); }
+        .card-congested i, .card-congested h3 { color: #f07a00; }
+        .card-congested.selected { background: var(--orange); border-color: var(--orange); }
+        .card-congested.selected i, .card-congested.selected h3, .card-congested.selected p { color: white; }
+
+        .card-severe { border-color: var(--red); }
+        .card-severe i, .card-severe h3 { color: #c90000; }
+        .card-severe.selected { background: var(--red); border-color: var(--red); }
+        .card-severe.selected i, .card-severe.selected h3, .card-severe.selected p { color: white; }
+
+        .direction-option.selected {
+    background: var(--accent-blue) !important;
+    border-color: var(--accent-blue) !important;
+    color: white !important;
+}
+
+.direction-option.selected i {
+    color: white !important;
+}
+
+.direction-option.selected small {
+    color: rgba(255,255,255,0.8) !important;
+}
+
+        .photo-upload { 
+            border: 2px dashed var(--accent-blue); 
+            border-radius: 12px; 
+            padding: 16px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 12px; 
+            cursor: pointer;
+            transition: 0.2s;
+            margin-bottom: 15px;
+            background: var(--main-bg);
+        }
+        
+        .photo-upload:hover { 
+            border-color: var(--accent-blue); 
+            background: var(--blue-bg);
+        }
+
+        .report-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 15px;
+            border: 1px solid var(--accent-blue);
+            border-radius: 12px;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.3s;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .submit-btn:hover {
+            background: #2563EB;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 34, 77, 0.45);
+            backdrop-filter: blur(6px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            width: 400px;
+            text-align: center;
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            cursor: pointer;
+            background: #F1F5F9;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .report-summary {
+            background: var(--blue-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            text-align: left;
+            border: 1px solid var(--accent-blue);
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .report-summary strong {
+            color: var(--accent-blue);
+            width: 90px;
+            display: inline-block;
+        }
+
+        .view-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        .reports-view {
+            margin-top: 20px;
+        }
+
+        .reports-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+/* Remove the old .reports-header styles and replace with this */
+        
+
+        /* Smaller Filter Dropdown Styles */
+        .filter-container {
+            position: relative;
+        }
+
+        .filter-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1.5px solid var(--accent-blue);
+            border-radius: 25px;
+            padding: 5px 14px;
+            background: white;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 13px;
+            color: var(--text-dark);
+            transition: all 0.2s;
+        }
+
+        .filter-header:hover {
+            background: var(--blue-bg);
+        }
+
+        .dropdown-card {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            width: 280px;
+            background: white;
+            border: 1px solid var(--accent-blue);
+            border-radius: 16px;
+            padding: 14px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: none;
+        }
+
+        .dropdown-card.show {
+            display: block;
+        }
+
+        .dropdown-card h3 {
+            margin: 0 0 8px 0;
+            color: var(--text-light);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .dropdown-card hr {
+            border: 0;
+            border-top: 1px solid var(--border);
+            margin: 10px 0;
+        }
+
+        .date-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .chip {
+            padding: 4px 10px;
+            border-radius: 16px;
+            background: #EFEFEF;
+            color: #999;
+            font-size: 11px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: 0.2s;
+        }
+
+        .chip.active {
+            background: white;
+            border: 1px solid var(--accent-blue);
+            color: var(--accent-blue);
+        }
+
+        .congestion-grid-filter {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .badge-filter {
+            padding: 5px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .badge-filter.severe { background: var(--severe); color: var(--severe-text); border: 1px solid var(--severe-text); }
+        .badge-filter.congested { background: var(--congested); color: var(--congested-text); border: 1px solid var(--congested-text); }
+        .badge-filter.moderate { background: var(--moderate); color: var(--moderate-text); border: 1px solid var(--moderate-text); }
+        .badge-filter.light { background: var(--light); color: var(--light-text); border: 1px solid var(--light-text); }
+        .badge-filter.active-filter { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+
+        .stations-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+
+        .select-all {
+            color: var(--accent-blue);
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .stations-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        .station-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #333;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 28px;
+            height: 16px;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .3s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: var(--green); }
+        input:checked + .slider:before { transform: translateX(12px); }
+
+        .apply-filter-btn {
+            width: 100%;
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 25px;
+            margin-top: 12px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 12px;
+        }
+
+        .reports-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .report-item {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 18px;
+            transition: 0.2s;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .no-reports {
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--white);
+            border-radius: 16px;
+            border: 1px dashed var(--border);
+            color: var(--text-light);
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+        }
+
+        .info-text {
+            font-size: 13px;
+            color: var(--text-light);
+            margin-top: 4px;
+        }
+
+        .success-message {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--green);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            animation: slideIn 0.3s ease;
+            z-index: 1000;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* ========== MOBILE BOTTOM NAVIGATION BAR ========== */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+    border-radius: 20px 20px 0 0;
+    z-index: 1000;
+    padding: 10px 16px 20px;
+    transition: all 0.3s ease;
+}
+
+.bottom-nav-items {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 8px;
+}
+
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    color: var(--text-light);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 30px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    flex: 1;
+    white-space: nowrap;
+}
+
+.bottom-nav-item i {
+    font-size: 20px;
+    transition: transform 0.2s ease;
+}
+
+.bottom-nav-item.active {
+    color: var(--accent-blue);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.bottom-nav-item:hover:not(.active) {
+    color: var(--azureblue);
+    background: rgba(0, 133, 255, 0.05);
+}
+
+.bottom-nav-item:active i {
+    transform: scale(0.95);
+}
+
+.bottom-nav-item .nav-badge-mobile {
+    position: absolute;
+    top: 2px;
+    right: 20%;
+    background: var(--red);
+    color: white;
+    font-size: 9px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.bottom-nav-item {
+    position: relative;
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .bottom-nav {
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+}
+
+.bottom-nav::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20px;
+    right: 20px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.bottom-nav {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+/* Mobile responsive */
+@media screen and (max-width: 768px) {
+     .remark-text {
+        font-size: 11px;
+        line-height: 1.4;
+        padding: 10px;
+    }
+
+     .reports-list {
+        gap: 12px;
+        max-height: calc(100vh - 200px);
+        padding-right: 5px;
+    }
+    
+    /* Individual report card - more compact */
+       .report-item {
+        display: block !important;
+        overflow: visible !important;
+    }
+    
+    /* Fix the header section to allow proper wrapping */
+    .report-item > div:first-child {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        margin-bottom: 10px !important;
+    }
+    
+    /* Station and level section - allow wrapping */
+    .report-item > div:nth-child(3) {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    /* Station name and level container */
+    .report-item > div:nth-child(3) > div:first-child {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 6px !important;
+        flex: 1 !important;
+    }
+    
+    /* View more button - ensure it stays on its own line if needed */
+    .report-item > div:nth-child(3) > button {
+        flex-shrink: 0 !important;
+        margin-left: auto !important;
+    }
+    
+    /* Remove the 3-dot menu button on mobile (optional) or make it smaller */
+    .report-item > div[style*="position: absolute"] {
+        top: 12px !important;
+        right: 1px !important;
+    }
+    
+    .report-item button[onclick*="toggleReportMenu"] {
+        padding: 2px !important;
+    }
+    
+    .report-item button[onclick*="toggleReportMenu"] i {
+        font-size: 14px !important;
+    }
+    
+    /* Header section of report (avatar + name + time) */
+    .report-item > div:first-child {
+        margin-bottom: 8px !important;
+        padding-right: 35px !important;
+    }
+    
+    .report-item > div:first-child > div:first-child {
+        gap: 8px !important;
+    }
+    
+    .report-item > div:first-child .avatar {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 12px !important;
+    }
+    
+    .report-item > div:first-child .username {
+        font-size: 12px !important;
+    }
+    
+    .report-item > div:first-child .time-ago {
+        font-size: 9px !important;
+    }
+    
+    /* Station name and level */
+    .report-item > div:nth-child(3) > div:first-child {
+        flex-wrap: wrap;
+        gap: 6px !important;
+    }
+    
+    .report-item .station-name {
+        font-size: 15px !important;
+    }
+    
+    .report-item .level-text {
+        font-size: 11px !important;
+    }
+    
+    .report-item .direction-badge {
+        margin-left: 0 !important;
+        padding: 2px 8px !important;
+        font-size: 9px !important;
+    }
+    
+    /* View more button */
+    .report-item button[onclick*="toggleReportContent"] {
+        font-size: 10px !important;
+        padding: 4px 8px !important;
+    }
+    
+    /* Expanded content */
+    .report-item > div:last-child {
+        margin-top: 8px !important;
+        padding-top: 8px !important;
+    }
+    
+    /* Remarks section */
+    .report-item .remarks {
+        padding: 8px !important;
+        font-size: 11px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    /* Photos grid */
+    .report-item .photos-grid {
+        gap: 6px !important;
+    }
+    
+    .report-item .photos-grid img {
+        border-radius: 6px !important;
+    }
+    
+    /* Flagged badge */
+    .report-item .flagged-badge {
+        font-size: 8px !important;
+        padding: 2px 6px !important;
+    }
+
+
+    /* Hide sidebar on mobile */
+    .sidebar {
+        display: none !important;
+    }
+    
+    /* Show bottom navigation */
+    .bottom-nav {
+        display: block;
+    }
+
+    
+    
+    /* Adjust main content */
+    .main-content {
+        padding: 15px 15px !important;
+        margin-bottom: 70px !important;
+        overflow-y: auto !important;
+        height: calc(100vh - 70px) !important;
+    }
+    
+    body {
+        display: block !important;
+        overflow-y: auto !important;
+        height: auto !important;
+    }
+    
+    /* Adjust header for mobile */
+    .header-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .header-top h1 {
+        font-size: 20px;
+    }
+    
+    .header-subtitle {
+        font-size: 11px;
+    }
+    
+    /* Adjust station selector */
+    .station-selector {
+        width: 100%;
+        padding: 10px 14px;
+        font-size: 13px;
+    }
+    
+    /* Adjust report grid - 2 columns but smaller */
+    .report-grid {
+        gap: 10px;
+    }
+    
+    .report-card {
+        padding: 20px 12px;
+        min-height: 130px;
+    }
+    
+    .report-card i {
+        font-size: 28px;
+    }
+    
+    .report-card h3 {
+        font-size: 15px;
+    }
+    
+    .report-card p {
+        font-size: 10px;
+    }
+    
+    /* Adjust direction options */
+    .direction-option {
+        padding: 10px !important;
+        font-size: 12px;
+    }
+    
+    .direction-option i {
+        font-size: 14px;
+    }
+    
+    .direction-option small {
+        font-size: 9px;
+    }
+    
+    /* Adjust photo upload */
+    .photo-upload {
+        padding: 12px;
+    }
+    
+    .photo-upload span {
+        font-size: 12px;
+    }
+    
+    /* Adjust textarea */
+    .report-textarea {
+        min-height: 80px;
+        font-size: 13px;
+        padding: 12px;
+    }
+    
+    /* Adjust submit button */
+    .submit-btn {
+        padding: 12px;
+        font-size: 14px;
+    }
+    
+    /* Adjust reports view */
+    .reports-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-header {
+        width: fit-content;
+    }
+    
+    /* Adjust report items */
+    .report-item {
+        padding: 14px !important;
+    }
+    
+    .report-item > div:first-child {
+        padding-right: 35px;
+    }
+    
+    /* Adjust greeting */
+    .greeting {
+        font-size: 9px;
+    }
+    
+    /* Adjust action buttons */
+    .action-btn {
+        padding: 6px 16px;
+        font-size: 12px;
+    }
+    
+    .icon-btn {
+        width: 32px;
+        height: 32px;
+    }
+    
+    /* Adjust filter dropdown for mobile */
+    .dropdown-card {
+        position: fixed;
+        top: auto;
+        bottom: 80px;
+        right: 15px;
+        left: 15px;
+        width: auto;
+        max-width: none;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .stations-grid {
+        max-height: 200px;
+    }
+}
+
+/* Extra small devices */
+@media screen and (max-width: 480px) {
+
+    .remark-none {
+        font-size: 10px;
+    }
+     .remark-text {
+        font-size: 10px;
+        line-height: 1.4;
+        padding: 8px;
+    }
+
+     .report-item {
+        padding: 10px !important;
+    }
+    
+    .report-item .station-name {
+        font-size: 14px !important;
+    }
+    
+    .report-item .level-text {
+        font-size: 10px !important;
+    }
+
+      .report-item > div:nth-child(3) {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+        }
+        
+        .report-item > div:nth-child(3) > button {
+            margin-left: 0 !important;
+            margin-top: 6px !important;
+        }
+    }
+    
+    /* Photos grid fix for mobile */
+    .report-item .photos-grid,
+    .report-item > div:last-child > div:last-child > div {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)) !important;
+        gap: 6px !important;
+        margin-top: 10px !important;
+    }
+    
+    /* Photo container fix */
+    .report-item .photos-grid > div,
+    .report-item > div:last-child > div:last-child > div > div {
+        aspect-ratio: 1 !important;
+        width: 100% !important;
+    }
+    
+    /* Photos grid images */
+    .report-item .photos-grid img,
+    .report-item > div:last-child > div:last-child img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+    
+    /* Expanded content area */
+    .report-item > div:last-child {
+        margin-top: 12px !important;
+        padding-top: 12px !important;
+        clear: both !important;
+    }
+    
+    /* Remarks section */
+    .report-item .remarks {
+        margin-bottom: 10px !important;
+    }
+}
+
+    
+    .report-item > div:first-child .avatar {
+        width: 24px !important;
+        height: 24px !important;
+        font-size: 10px !important;
+    }
+    
+    .report-item > div:first-child .username {
+        font-size: 11px !important;
+    }
+    
+    .report-item .remarks {
+        font-size: 10px !important;
+        padding: 6px !important;
+    }
+    
+    .report-item .direction-badge {
+        font-size: 8px !important;
+        padding: 2px 6px !important;
+    }
+    
+    .report-item .photos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
+        gap: 5px !important;
+    }
+
+     .direction-btn {
+        display: flex;
+        flex-direction: row !important;
+        gap: 8px !important;
+        
+    }
+
+     .direction-option {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center;
+        padding: 10px 6px !important;
+        gap: 4px !important;
+    }
+
+      .direction-option i {
+        font-size: 18px !important;
+        margin-bottom: 2px;
+    }
+    
+    .direction-option span {
+        font-size: 11px !important;
+        font-weight: 600;
+    }
+    
+    .direction-option small {
+        display: block !important;
+        font-size: 8px !important;
+        margin-top: 2px;
+        white-space: normal;
+        line-height: 1.2;
+    }
+
+    .station-selector {
+        height: 40px;
+        font-size: 12px;
+    }
+    .report-grid {
+        gap: 8px;
+    }
+    
+    .report-card {
+        padding: 15px 8px;
+        min-height: 110px;
+    }
+    
+    .report-card i {
+        font-size: 24px;
+    }
+    
+    .report-card h3 {
+        font-size: 13px;
+    }
+    
+    .report-card p {
+        font-size: 9px;
+    }
+    
+    .direction-option {
+        padding: 8px !important;
+        font-size: 11px;
+        gap: 6px;
+    }
+    
+    .direction-option i {
+        font-size: 12px;
+    }
+    
+    .bottom-nav-items {
+        gap: 4px;
+    }
+    
+    .bottom-nav-item {
+        padding: 4px 6px;
+        font-size: 9px;
+    }
+    
+    .bottom-nav-item i {
+        font-size: 16px;
+    }
+    
+    .report-item > div:first-child {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+     .section-header h3 {
+    font-size: 14px;
+    }
+
+
+/* Mobile responsive - make everything smaller */
+@media screen and (max-width: 768px) {
+    /* Hide sidebar on mobile */
+    .sidebar {
+        display: none !important;
+    }
+    
+    /* Show bottom navigation */
+    .bottom-nav {
+        display: block;
+    }
+    
+    /* Adjust main content */
+    .main-content {
+        padding: 12px 12px !important;
+        margin-bottom: 70px !important;
+        overflow-y: auto !important;
+        height: calc(100vh - 70px) !important;
+    }
+    
+    body {
+        display: block !important;
+        overflow-y: auto !important;
+        height: auto !important;
+    }
+    
+    /* Smaller header */
+      /* Adjust header */
+    .header-top {
+        margin-bottom: 20px;
+    }
+    
+    .header-top h1 {
+        font-size: 1rem;
+    }
+    
+    .header-subtitle {
+        font-size: 11px !important;
+    }
+    
+    .greeting {
+        font-size: 10px !important;
+    }
+    
+    /* Smaller station selector */
+    .station-selector {
+        width: 100% !important;
+        padding: 10px 14px !important;
+        font-size: 13px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    /* Smaller section headers */
+    .section-header {
+        font-size: 14px !important;
+        margin-bottom: 10px !important;
+    }
+
+    
+    
+    .section-header i {
+        font-size: 13px !important;
+    }
+    
+    /* Smaller report cards - 2 columns but smaller */
+    .report-grid {
+        gap: 10px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .report-card {
+        padding: 12px 8px !important;
+        min-height: 100px !important;
+    }
+    
+    .report-card i {
+        font-size: 24px !important;
+    }
+    
+    .report-card h3 {
+        font-size: 13px !important;
+    }
+    
+    .report-card p {
+        font-size: 9px !important;
+    }
+    
+    /* Smaller direction options */
+    .direction-option {
+        padding: 8px 6px !important;
+        font-size: 11px !important;
+        gap: 5px !important;
+    }
+    
+    .direction-option i {
+        font-size: 12px !important;
+    }
+    
+    .direction-option small {
+        font-size: 8px !important;
+    }
+    
+    /* Smaller textarea */
+    .report-textarea {
+        min-height: 70px !important;
+        font-size: 12px !important;
+        padding: 10px !important;
+    }
+    
+    /* Smaller photo upload */
+    .photo-upload {
+        padding: 5px !important;
+       
+    }
+    
+    .photo-upload i {
+        font-size: 12px !important;
+    }
+    
+    .photo-upload span {
+        font-size: 11px !important;
+    }
+    
+    /* Smaller submit button */
+    .submit-btn {
+        padding: 10px !important;
+        font-size: 13px !important;
+        margin-top: 15px !important;
+    }
+    
+    /* Smaller action buttons */
+    .action-btn {
+        padding: 5px 12px !important;
+        font-size: 11px !important;
+    }
+    
+    .icon-btn {
+        width: 30px !important;
+        height: 30px !important;
+    }
+    
+    .icon-btn i {
+        font-size: 12px !important;
+    }
+    
+    /* Smaller badge */
+    .badge {
+        width: 16px !important;
+        height: 16px !important;
+        font-size: 9px !important;
+    }
+    
+    /* Smaller reports list items */
+    .report-item {
+        padding: 12px !important;
+        margin-bottom: 10px !important;
+    }
+    
+    .report-item > div:first-child {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    /* Smaller filter dropdown for mobile */
+    .dropdown-card {
+        position: fixed;
+        top: auto;
+        bottom: 80px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+        max-width: none;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+    
+    .stations-grid {
+        max-height: 180px !important;
+    }
+    
+    /* Smaller chips and badges */
+    .chip {
+        padding: 3px 8px !important;
+        font-size: 10px !important;
+    }
+    
+    .badge-filter {
+        padding: 4px !important;
+        font-size: 10px !important;
+    }
+    
+    .station-item {
+        font-size: 10px !important;
+    }
+    
+    /* Smaller modal */
+    .modal-content {
+        width: 90% !important;
+        padding: 20px !important;
+        margin: 20px !important;
+    }
+    
+    /* Smaller info text */
+    .info-text {
+        font-size: 10px !important;
+    }
+}
+
+/* Extra small devices */
+/* Extra small devices */
+@media screen and (max-width: 480px) {
+    /* Header alignment fix - title on left, icons on right */
+    .header-top {
+        display: flex;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .header-title {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .header-title h1 {
+        font-size: 15px !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .header-subtitle {
+        font-size: 10px !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .header-icons {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    
+    .header-icons .icon-btn {
+        width: 36px;
+        height: 36px;
+        background: #F1F5F9;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+     .section-header h3, span{
+        font-size: 10px !important;
+
+    }
+
+    
+    .header-icons .icon-btn .badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        min-width: 18px;
+        height: 18px;
+        font-size: 10px;
+    }
+    
+    .action-btn {
+        padding: 6px 12px !important;
+        font-size: 11px !important;
+        white-space: nowrap;
+    }
+    
+    .action-btn i {
+        font-size: 12px;
+    }
+    
+    /* Rest of your existing 480px styles */
+    .report-grid {
+        gap: 8px;
+    }
+    
+    .report-card {
+        padding: 5px 5px !important;
+        min-height: 85px !important;
+    }
+    
+    .report-card i {
+        font-size: 20px !important;
+    }
+    
+    .report-card h3 {
+        font-size: 12px !important;
+    }
+    
+    .report-card p {
+        font-size: 8px !important;
+    }
+    
+    .direction-option {
+        padding: 6px 4px !important;
+        font-size: 10px !important;
+    }
+    
+    .bottom-nav-items {
+        gap: 4px;
+    }
+    
+    .bottom-nav-item {
+        padding: 4px 6px;
+        font-size: 9px;
+    }
+    
+    .bottom-nav-item i {
+        font-size: 16px;
+    }
+    
+    .report-item > div:first-child {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
+    </style>
+</head>
+<body>
+
+    <!-- Mobile Bottom Navigation -->
+<div class="bottom-nav">
+    <div class="bottom-nav-items">
+        <a href="/user-dashboard" class="bottom-nav-item">
+            <i class="fas fa-th-large"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="/live-map" class="bottom-nav-item">
+            <i class="fas fa-map-marked-alt"></i>
+            <span>Live Map</span>
+        </a>
+        <a href="/travel-plan" class="bottom-nav-item">
+            <i class="fas fa-route"></i>
+            <span>Travel</span>
+        </a>
+        <a href="/alerts" class="bottom-nav-item">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>Alerts</span>
+            <span class="nav-badge-mobile" id="mobileAlertBadge" style="display: none;">0</span>
+        </a>
+        <a href="/report" class="bottom-nav-item active">
+            <i class="fas fa-chart-line"></i>
+            <span>Report</span>
+        </a>
+    </div>
+</div>
+    <div class="sidebar">
+        <div class="logo-section">
+            <div class="logo-icon"><i class="fas fa-subway"></i></div>
+            <div class="logo-text">
+                <h2>MRT-3</h2>
+                <p>CONGESTION TRACKER</p>
+            </div>
+        </div>
+        <nav>
+            <a href="/user-dashboard" class="nav-item"><i class="fas fa-th-large"></i> Dashboard</a>
+            <a href="/live-map" class="nav-item"><i class="fas fa-map-marked-alt"></i> Live Map</a>
+            <a href="/travel-plan" class="nav-item"><i class="fas fa-route"></i> Travel Status</a>
+            <a href="/alerts" class="nav-item"><i class="fas fa-exclamation-triangle"></i> Alerts</a>
+            <a href="/report" class="nav-item active"><i class="fas fa-chart-line"></i> Report</a>
+        </nav>
+    </div>
+
+    <div class="main-content">
+        <div class="greeting">GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, {{ username.upper() }}</div>
+
+       <div class="header-top">
+    <div class="header-title">
+        <h1>Report Congestion</h1>
+        <span class="header-subtitle">Help improve predictions by reporting what you actually see at the station.</span>
+    </div>
+    <div class="header-icons">
+          <button class="action-btn" id="viewReportsBtn" onclick="toggleReports()">
+            <i class="fas fa-eye"></i> <span id="viewReportsText">View Reports</span>
+        </button>
+        <span class="icon-btn" onclick="window.location.href='/alerts'" style="position: relative;">
+            <i class="fas fa-bell"></i>
+            <span class="badge" id="alertBadge">0</span>
+        </span>
+      
+    </div>
+</div>
+
+        <div class="view-container">
+            <div id="reportFormView" class="view active">
+                <select class="station-selector" id="stationSelect">
+                    <option value="" disabled selected>Choose a station...</option>
+                    <option value="North Ave">North Avenue</option>
+                    <option value="Quezon Ave">Quezon Avenue</option>
+                    <option value="Kamuning">Kamuning</option>
+                    <option value="Cubao">Cubao</option>
+                    <option value="Santolan">Santolan</option>
+                    <option value="Ortigas">Ortigas</option>
+                    <option value="Shaw Blvd">Shaw Boulevard</option>
+                    <option value="Boni Ave">Boni Avenue</option>
+                    <option value="Guadalupe">Guadalupe</option>
+                    <option value="Buendia">Buendia</option>
+                    <option value="Ayala Ave">Ayala Avenue</option>
+                    <option value="Magallanes">Magallanes</option>
+                    <option value="Taft">Taft Avenue</option>
+                </select>
+
+                <div class="section-header" style="margin-bottom: 12px;">
+                    <i class="fas fa-users"></i>
+                    <h3>CROWD DENSITY</h3>
+                </div>
+
+                <div class="report-grid">
+                    <div class="report-card card-low" onclick="selectLevel('low')" id="card-low">
+                        <i class="fas fa-smile"></i>
+                        <h3>Light</h3>
+                        <p>Plenty of seats available</p>
+                    </div>
+                    <div class="report-card card-moderate" onclick="selectLevel('moderate')" id="card-moderate">
+                        <i class="fas fa-walking"></i>
+                        <h3>Moderate</h3>
+                        <p>Standard flow, 5 min wait</p>
+                    </div>
+                    <div class="report-card card-congested" onclick="selectLevel('congested')" id="card-congested">
+                        <i class="fas fa-user-friends"></i>
+                        <h3>Congested</h3>
+                        <p>Heavy crowds, long queues</p>
+                    </div>
+                    <div class="report-card card-severe" onclick="selectLevel('severe')" id="card-severe">
+                        <i class="fas fa-skull-crossbones"></i>
+                        <h3>Severe</h3>
+                        <p>Extreme density at platform</p>
+                    </div>
+                </div>
+
+                
+
+                <div class="card attachment-card">
+                    <div class="section-header">
+                        <i class="fas fa-camera"></i>
+                        <span>Attach Photos <span style="color:grey;">(max 5 photos)</span></span>
+                    </div>
+                    
+                    <div class="photo-upload" onclick="document.getElementById('imageInput').click()">
+                        <i class="fas fa-images" style="color: var(--accent-blue); font-size: 20px;"></i>
+                        <span style="font-size: 13px; color: var(--text-light);">Click to select multiple photos (Max 5)</span>
+                        <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
+                    </div>
+                    
+                    <div id="imagePreviewGrid" style="display: none; margin-top: 15px;">
+                        <div class="section-header" style="margin-bottom: 10px;">
+                            <i class="fas fa-th"></i>
+                            <span>Selected Photos (<span id="photoCount">0</span>/5)</span>
+                        </div>
+                        <div id="previewContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; max-height: 200px; overflow-y: auto; padding: 5px;"></div>
+                    </div>
+                    
+                    <div class="section-header">
+                        <span>Additional Notes <span style="color:grey;">(optional)</span></span>
+                    </div>
+
+
+                <div class="direction-btn" style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                    <label class="direction-option" onclick="selectDirection('northbound')" id="dir-northbound" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px; border: 2px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 0.2s; background: white;">
+                        <i class="fas fa-arrow-up" style="color: var(--accent-blue);"></i>
+                        <span style="font-weight: 500;">Northbound</span>
+                        <small style="color: var(--text-light) ;">(to North Ave)</small>
+                    </label>
+                    <label class="direction-option" onclick="selectDirection('southbound')" id="dir-southbound" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px; border: 2px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 0.2s; background: white;">
+                        <i class="fas fa-arrow-down" style="color: var(--accent-blue);"></i>
+                        <span style="font-weight: 500;">Southbound</span>
+                        <small style="color: var(--text-light);">(to Taft)</small>
+                    </label>
+                    <label class="direction-option" onclick="selectDirection('both')" id="dir-both" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px; border: 2px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 0.2s; background: white;">
+                        <i class="fas fa-exchange-alt" style="color: var(--accent-blue);"></i>
+                        <span style="font-weight: 500;">Both</span>
+                        <small style="color: var(--text-light);">(entire station)</small>
+                    </label>
+                </div>
+                    
+                    <textarea class="report-textarea" id="remarks" placeholder="Add details (e.g., 'Broken train at North Ave', 'Elevator not working')"></textarea>
+                    <div class="info-text" style="margin-top: 8px;">
+                        <i class="fas fa-info-circle"></i> Your report helps other commuters
+                    </div>
+                </div>
+
+                <button class="submit-btn" onclick="submitReport()">
+                    <i class="fas fa-paper-plane"></i> Submit Report
+                </button>
+            </div>
+
+            <div id="reportsView" class="view reports-view">
+                <div class="reports-header">
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <div class="filter-container">
+                            <div class="filter-header" onclick="toggleFilterDropdown()">
+                                <i class="fas fa-filter"></i>
+                                <span>Filter</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div id="filterDropdown" class="dropdown-card">
+                                <h3>Date</h3>
+                                <div class="date-chips">
+                                    <div class="chip" data-date="today">Today</div>
+                                    <div class="chip" data-date="yesterday">Yesterday</div>
+                                    <div class="chip" data-date="week">7 days</div>
+                                    <div class="chip" data-date="month">30 days</div>
+                                </div>
+
+                                <hr>
+
+                                <h3>Congestion Level</h3>
+                                <div class="congestion-grid-filter">
+                                    <div class="badge-filter severe" data-level="severe">Severe</div>
+                                    <div class="badge-filter congested" data-level="congested">Congested</div>
+                                    <div class="badge-filter moderate" data-level="moderate">Moderate</div>
+                                    <div class="badge-filter light" data-level="light">Light</div>
+                                </div>
+
+                                <hr>
+
+                                <div class="stations-header">
+                                    <h3>Stations</h3>
+                                    <span class="select-all">Select all</span>
+                                </div>
+
+                                <div class="stations-grid" id="stationsGrid">
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="North Ave" checked><span class="slider"></span></label> North Ave</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Quezon Ave" checked><span class="slider"></span></label> Quezon Ave</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Kamuning" checked><span class="slider"></span></label> Kamuning</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Cubao" checked><span class="slider"></span></label> Cubao</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Santolan" checked><span class="slider"></span></label> Santolan</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Ortigas" checked><span class="slider"></span></label> Ortigas</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Shaw Blvd" checked><span class="slider"></span></label> Shaw Blvd</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Boni Ave" checked><span class="slider"></span></label> Boni Ave</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Guadalupe" checked><span class="slider"></span></label> Guadalupe</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Buendia" checked><span class="slider"></span></label> Buendia</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Ayala Ave" checked><span class="slider"></span></label> Ayala Ave</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Magallanes" checked><span class="slider"></span></label> Magallanes</div>
+                                    <div class="station-item"><label class="switch"><input type="checkbox" value="Taft" checked><span class="slider"></span></label> Taft</div>
+                                </div>
+
+                                <button class="apply-filter-btn" onclick="applyFilters()">Apply Filters</button>
+                            </div>
+                        </div>
+                       
+                    </div>
+                </div>
+                <div id="reportsList" class="reports-list">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading reports...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flag Report Confirmation Modal -->
+<div id="flagModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <span class="close-btn" onclick="closeFlagModal()"><i class="fas fa-times"></i></span>
+        <div style="text-align: center; margin-bottom: 16px;">
+            <div style="width: 60px; height: 60px; background: #FEF3C7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                <i class="fas fa-flag" style="color: #F59E0B; font-size: 28px;"></i>
+            </div>
+            <h2 style="font-size: 20px; font-weight: 700; color: var(--text-dark); margin-bottom: 8px;">Flag this report?</h2>
+            <p style="color: var(--text-light); font-size: 14px; margin-bottom: 16px;" id="flagModalMessage">Flag report from <strong>North Ave</strong> as inappropriate?</p>
+        </div>
+        <div style="background: #FEF2F2; border-radius: 12px; padding: 12px; margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+                <i class="fas fa-info-circle" style="color: #DC2626; margin-top: 2px;"></i>
+                <div style="font-size: 12px; color: #991B1B;">
+                    <strong>Why flag?</strong><br>
+                    Flagged reports will be reviewed by operators and may be removed if inappropriate.
+                </div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button onclick="closeFlagModal()" style="background: white; border: 1px solid var(--border); padding: 10px 24px; border-radius: 30px; cursor: pointer; font-weight: 500;">
+                Cancel
+            </button>
+            <button id="confirmFlagBtn" style="background: #F59E0B; border: none; padding: 10px 24px; border-radius: 30px; cursor: pointer; font-weight: 500; color: white; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-flag"></i> Yes, Flag Report
+            </button>
+        </div>
+    </div>
+</div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeConfirmModal()"><i class="fas fa-times"></i></span>
+            <div class="modal-icon">
+                <i class="fas fa-paper-plane" style="color: var(--accent-blue); font-size: 48px;"></i>
+            </div>
+            <h2 class="modal-title">Submit Report?</h2>
+            <div class="report-summary" id="reportSummary">
+    <strong>Station:</strong> <span id="summaryStation"></span><br>
+    <strong>Congestion:</strong> <span id="summaryLevel"></span><br>
+    <strong>Direction:</strong> <span id="summaryDirection"></span><br>
+    <strong>Photo:</strong> <span id="summaryPhoto">Not attached</span>
+</div>
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="confirmSubmit()" style="background: var(--accent-blue); color: white; padding: 12px 24px; border-radius: 30px; border: none; cursor: pointer;">
+                    <i class="fas fa-check"></i> Yes, Submit
+                </button>
+                <button class="modal-btn secondary" onclick="closeConfirmModal()" style="background: white; color: var(--text-dark); border: 1px solid var(--border); padding: 12px 24px; border-radius: 30px; cursor: pointer;">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+<script>
+    let selectedLevel = null;
+    let selectedFiles = [];
+    let reportsVisible = false;
+    let allReportsData = [];
+    let activeFilters = {
+        dateRange: null,
+        congestionLevels: [],
+        stations: []
+    };
+    // Spam protection variables
+    let isSubmitting = false;
+    let lastSubmitTime = 0;
+    const SUBMIT_COOLDOWN = 30000; // 30 seconds cooldown
+    let submitCount = 0;
+    let submitResetTimer = null;
+    let selectedDirection = null; // 'northbound', 'southbound', or 'both'
+    let currentFlagReportId = null;
+    let currentFlagStationName = null;
+
+    // Operating hours check functions - KEEP ONLY ONE COPY
+    function isOperatingHours() {
+        const now = new Date();
+        const hour = now.getHours();
+        const minute = now.getMinutes();
+        const currentTime = hour + minute / 60;
+        
+        const OPERATING_START = 4.5;   // 4:30 AM
+        const OPERATING_END = 22.5;    // 10:30 PM
+        
+        return currentTime >= OPERATING_START && currentTime < OPERATING_END;
+    }
+
+
+    // Add this function near other helper functions
+function syncMobileAlertBadge() {
+    const desktopBadge = document.getElementById('alertBadge');
+    const mobileBadge = document.getElementById('mobileAlertBadge');
+    if (desktopBadge && mobileBadge) {
+        const count = parseInt(desktopBadge.textContent) || 0;
+        if (count > 0) {
+            mobileBadge.textContent = count > 9 ? '9+' : count;
+            mobileBadge.style.display = 'flex';
+        } else {
+            mobileBadge.style.display = 'none';
+        }
+    }
+}
+
+    function getNextOpeningTime() {
+        const now = new Date();
+        const todayOpen = new Date(now);
+        todayOpen.setHours(4, 30, 0, 0);
+        
+        if (now < todayOpen) {
+            return todayOpen.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        } else {
+            const nextDayOpen = new Date(now);
+            nextDayOpen.setDate(nextDayOpen.getDate() + 1);
+            nextDayOpen.setHours(4, 30, 0, 0);
+            return nextDayOpen.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        }
+    }
+
+    function selectDirection(direction) {
+        selectedDirection = direction;
+        
+        // Update UI
+        document.querySelectorAll('.direction-option').forEach(option => {
+            option.classList.remove('selected');
+        });
+        document.getElementById(`dir-${direction}`).classList.add('selected');
+    }
+
+    // Load saved limits from localStorage on page load
+    function loadRateLimits() {
+        const savedCount = localStorage.getItem('submitCount');
+        const savedTime = localStorage.getItem('lastSubmitTime');
+        const savedResetTime = localStorage.getItem('submitResetTime');
+        
+        if (savedCount) submitCount = parseInt(savedCount);
+        if (savedTime) lastSubmitTime = parseInt(savedTime);
+        
+        // Check if the saved data is still within the hour
+        const now = Date.now();
+        if (lastSubmitTime && (now - lastSubmitTime) > 3600000) {
+            // Hour has passed, reset everything
+            submitCount = 0;
+            lastSubmitTime = 0;
+            localStorage.removeItem('submitCount');
+            localStorage.removeItem('lastSubmitTime');
+            localStorage.removeItem('submitResetTime');
+        }
+    }
+
+    // Save limits to localStorage
+    function saveRateLimits() {
+        localStorage.setItem('submitCount', submitCount);
+        localStorage.setItem('lastSubmitTime', lastSubmitTime);
+        if (submitResetTimer) {
+            localStorage.setItem('submitResetTime', submitResetTimer);
+        }
+    }
+
+    // Updated canSubmitReport with persistence
+    function canSubmitReport() {
+        const now = Date.now();
+        
+        // Load saved limits first
+        loadRateLimits();
+        
+        if (isSubmitting) {
+            showToast('Please wait, your report is being submitted...', 'warning');
+            return false;
+        }
+        
+        if (now - lastSubmitTime < SUBMIT_COOLDOWN) {
+            const remainingSeconds = Math.ceil((SUBMIT_COOLDOWN - (now - lastSubmitTime)) / 1000);
+            showToast(`Please wait ${remainingSeconds} seconds before submitting another report.`, 'warning');
+            return false;
+        }
+        
+        // Reset counter every hour
+        if (submitResetTimer === null) {
+            const savedResetTime = localStorage.getItem('submitResetTime');
+            if (savedResetTime) {
+                const timeLeft = parseInt(savedResetTime) - now;
+                if (timeLeft > 0) {
+                    submitResetTimer = setTimeout(() => {
+                        submitCount = 0;
+                        submitResetTimer = null;
+                        localStorage.removeItem('submitCount');
+                        localStorage.removeItem('submitResetTime');
+                    }, timeLeft);
+                }
+            } else {
+                submitResetTimer = setTimeout(() => {
+                    submitCount = 0;
+                    submitResetTimer = null;
+                    localStorage.removeItem('submitCount');
+                    localStorage.removeItem('submitResetTime');
+                }, 3600000);
+                localStorage.setItem('submitResetTime', now + 3600000);
+            }
+        }
+        
+        if (submitCount >= 3) {
+            showToast('You have reached the limit of 3 reports per hour. Please try again later.', 'error');
+            return false;
+        }
+        
+        return true;
+    }
+
+    // Toggle filter dropdown
+    function toggleFilterDropdown() {
+        const dropdown = document.getElementById('filterDropdown');
+        dropdown.classList.toggle('show');
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const filterContainer = document.querySelector('.filter-container');
+        const dropdown = document.getElementById('filterDropdown');
+        if (filterContainer && !filterContainer.contains(event.target) && dropdown) {
+            dropdown.classList.remove('show');
+        }
+    });
+
+    // Apply filters
+    function applyFilters() {
+        console.log("========== APPLYING FILTERS ==========");
+        
+        // Get selected congestion levels
+        const selectedLevels = [];
+        document.querySelectorAll('.badge-filter.active-filter').forEach(badge => {
+            selectedLevels.push(badge.dataset.level);
+        });
+        console.log("Selected congestion levels:", selectedLevels);
+        
+        // Get selected stations
+        const selectedStations = [];
+        document.querySelectorAll('#stationsGrid input:checked').forEach(cb => {
+            selectedStations.push(cb.value);
+        });
+        console.log("Selected stations from checkboxes:", selectedStations);
+        
+        // Get date range
+        let dateRange = null;
+        const activeChip = document.querySelector('.chip.active');
+        if (activeChip) {
+            dateRange = activeChip.dataset.date;
+            console.log("Selected date range:", dateRange);
+        }
+        
+        activeFilters = {
+            congestionLevels: selectedLevels,
+            stations: selectedStations,
+            dateRange: dateRange
+        };
+        
+        console.log("Active filters object:", activeFilters);
+        
+        // Apply filters
+        filterAndDisplayReports();
+        
+        // Close dropdown
+        toggleFilterDropdown();
+    }
+
+    // Filter and display reports
+    function filterAndDisplayReports() {
+        console.log("========== FILTERING REPORTS ==========");
+        console.log("Total reports before filter:", allReportsData.length);
+        
+        if (!allReportsData || allReportsData.length === 0) {
+            console.log("No reports data available");
+            const reportsList = document.getElementById('reportsList');
+            reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports available</h3></div>`;
+            return;
+        }
+        
+        let filteredReports = [...allReportsData];
+        
+        // Filter by station
+        if (activeFilters.stations.length > 0) {
+            console.log("Filtering by stations:", activeFilters.stations);
+            filteredReports = filteredReports.filter(report => {
+                return activeFilters.stations.includes(report.station);
+            });
+            console.log(`After station filter: ${filteredReports.length} reports remaining`);
+        } else {
+            console.log("⚠️ No stations selected - showing 0 reports");
+            filteredReports = [];
+        }
+        
+        // Filter by congestion level
+        if (activeFilters.congestionLevels.length > 0 && filteredReports.length > 0) {
+            console.log("Filtering by congestion levels:", activeFilters.congestionLevels);
+            filteredReports = filteredReports.filter(report => {
+                let level = '';
+                if (report.reported_congestion > 80) level = 'severe';
+                else if (report.reported_congestion > 60) level = 'congested';
+                else if (report.reported_congestion > 30) level = 'moderate';
+                else level = 'light';
+                return activeFilters.congestionLevels.includes(level);
+            });
+            console.log(`After congestion filter: ${filteredReports.length} reports remaining`);
+        }
+        
+        // Filter by date range
+        if (activeFilters.dateRange && filteredReports.length > 0) {
+            let startDate = null;
+            let endDate = null;
+            
+            switch(activeFilters.dateRange) {
+                case 'today':
+                    startDate = new Date();
+                    startDate.setHours(0, 0, 0, 0);
+                    endDate = new Date();
+                    endDate.setHours(23, 59, 59, 999);
+                    break;
+                case 'yesterday':
+                    startDate = new Date();
+                    startDate.setDate(startDate.getDate() - 1);
+                    startDate.setHours(0, 0, 0, 0);
+                    endDate = new Date();
+                    endDate.setDate(endDate.getDate() - 1);
+                    endDate.setHours(23, 59, 59, 999);
+                    break;
+                case 'week':
+                    startDate = new Date();
+                    startDate.setDate(startDate.getDate() - 7);
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+                case 'month':
+                    startDate = new Date();
+                    startDate.setDate(startDate.getDate() - 30);
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+            }
+            
+            if (startDate) {
+                filteredReports = filteredReports.filter(report => {
+                    const reportDate = new Date(report.timestamp);
+                    if (activeFilters.dateRange === 'today' || activeFilters.dateRange === 'yesterday') {
+                        return reportDate >= startDate && reportDate <= endDate;
+                    } else {
+                        return reportDate >= startDate;
+                    }
+                });
+                console.log(`After date filter: ${filteredReports.length} reports remaining`);
+            }
+        }
+        
+        console.log(`FINAL FILTERED COUNT: ${filteredReports.length}`);
+        displayReports(filteredReports);
+    }
+
+    function selectLevel(level) {
+        document.querySelectorAll('.report-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        document.getElementById(`card-${level}`).classList.add('selected');
+        selectedLevel = level;
+    }
+
+    document.getElementById('imageInput').addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        
+        if (selectedFiles.length + files.length > 5) {
+            showToast(`Maximum 5 photos allowed. You already have ${selectedFiles.length} selected.`, 'error');
+            return;
+        }
+        
+        files.forEach(file => {
+            if (file.type.startsWith('image/')) {
+                selectedFiles.push(file);
+            }
+        });
+        
+        updateImagePreview();
+        updatePhotoUploadText();
+    });
+
+    function updateImagePreview() {
+        const previewContainer = document.getElementById('previewContainer');
+        const previewGrid = document.getElementById('imagePreviewGrid');
+        const photoCountSpan = document.getElementById('photoCount');
+        
+        if (selectedFiles.length === 0) {
+            previewGrid.style.display = 'none';
+            return;
+        }
+        
+        previewGrid.style.display = 'block';
+        photoCountSpan.textContent = selectedFiles.length;
+        
+        previewContainer.innerHTML = '';
+        selectedFiles.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewDiv = document.createElement('div');
+                previewDiv.style.position = 'relative';
+                previewDiv.style.width = '100%';
+                previewDiv.style.aspectRatio = '1';
+                
+                previewDiv.innerHTML = `
+                    <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid var(--border);">
+                    <button onclick="removePhoto(${index})" style="position: absolute; top: -8px; right: -8px; background: var(--red); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 12px;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                previewContainer.appendChild(previewDiv);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function removePhoto(index) {
+        selectedFiles.splice(index, 1);
+        updateImagePreview();
+        updatePhotoUploadText();
+        document.getElementById('imageInput').value = '';
+    }
+
+    function updatePhotoUploadText() {
+        const uploadSpan = document.querySelector('.photo-upload span');
+        if (selectedFiles.length > 0) {
+            uploadSpan.textContent = `📸 ${selectedFiles.length} photo(s) selected`;
+            uploadSpan.style.color = 'var(--accent-blue)';
+        } else {
+            uploadSpan.textContent = 'Click to select multiple photos (Max 5)';
+            uploadSpan.style.color = 'var(--text-light)';
+        }
+    }
+
+    function toggleReports() {
+        const reportFormView = document.getElementById('reportFormView');
+        const reportsView = document.getElementById('reportsView');
+        const viewReportsBtn = document.getElementById('viewReportsBtn');
+        const viewReportsText = document.getElementById('viewReportsText');
+        
+        if (reportsVisible) {
+            reportFormView.classList.add('active');
+            reportsView.classList.remove('active');
+            viewReportsBtn.classList.remove('active');
+            viewReportsText.textContent = 'View Reports';
+            reportsVisible = false;
+        } else {
+            reportFormView.classList.remove('active');
+            reportsView.classList.add('active');
+            viewReportsBtn.classList.add('active');
+            viewReportsText.textContent = 'Hide Reports';
+            reportsVisible = true;
+            fetchReports();
+        }
+    }
+
+    function refreshReports() {
+        fetchReports();
+    }
+
+    // THE FIXED openConfirmModal - Operating hours check works here
+    function openConfirmModal() {
+        // Check if MRT is operating
+        if (!isOperatingHours()) {
+            const nextOpen = getNextOpeningTime();
+            showToast(`MRT-3 is currently closed. Operating hours: 4:30 AM - 10:30 PM. Please come back at ${nextOpen}.`, 'error');
+            return;
+        }
+        
+        const station = document.getElementById('stationSelect').value;
+        if (!station) {
+            showToast('Please select a station', 'error');
+            return;
+        }
+        
+        if (!selectedLevel) {
+            showToast('Please select congestion level', 'error');
+            return;
+        }
+        
+        if (!selectedDirection) {
+            showToast('Please select a direction (Northbound, Southbound, or Both)', 'error');
+            return;
+        }
+        
+        const stationName = station.replace(' Ave', ' Avenue').replace(' Blvd', ' Boulevard');
+        
+        const levelMap = {
+            'low': 'Light',
+            'moderate': 'Moderate',
+            'congested': 'Congested',
+            'severe': 'Severe'
+        };
+        
+        const directionMap = {
+            'northbound': 'Northbound (to North Ave)',
+            'southbound': 'Southbound (to Taft)',
+            'both': 'Both Directions'
+        };
+        
+        document.getElementById('summaryStation').textContent = stationName;
+        document.getElementById('summaryLevel').textContent = levelMap[selectedLevel];
+        document.getElementById('summaryDirection').textContent = directionMap[selectedDirection];
+        document.getElementById('summaryPhoto').textContent = selectedFiles.length > 0 ? `${selectedFiles.length} photo(s) attached` : 'Not attached';
+        
+        document.getElementById('confirmModal').classList.add('active');
+    }
+
+    function closeConfirmModal() {
+        const modal = document.getElementById('confirmModal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    // THE FIXED confirmSubmit - REMOVED THE BROKEN CONDITION
+    function confirmSubmit() {
+        if (!canSubmitReport()) {
+            return;
+        }
+        
+        closeConfirmModal();
+        
+        const station = document.getElementById('stationSelect').value;
+        const remarks = document.getElementById('remarks').value;
+        
+        // IMPORTANT: Make sure direction is included!
+        if (!selectedDirection) {
+            showToast('Please select a direction (Northbound, Southbound, or Both)', 'error');
+            return;
+        }
+        
+        let congestionValue = 0;
+        switch(selectedLevel) {
+            case 'low': congestionValue = 20; break;
+            case 'moderate': congestionValue = 45; break;
+            case 'congested': congestionValue = 70; break;
+            case 'severe': congestionValue = 90; break;
+            default:
+                showToast('Please select a congestion level', 'error');
+                return;
+        }
+        
+        isSubmitting = true;
+        const submitBtn = document.querySelector('.submit-btn');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+        submitBtn.disabled = true;
+        
+        showToast('Submitting report...', 'info');
+        
+        const formData = new FormData();
+        formData.append('station', station);
+        formData.append('direction', selectedDirection);
+        formData.append('congestion', congestionValue);
+        formData.append('remarks', remarks || '');
+        formData.append('anonymous', 'false');
+        
+        selectedFiles.forEach((file) => {
+            formData.append('images', file);
+        });
+        
+        fetch('/api/report-congestion', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            isSubmitting = false;
+            submitBtn.innerHTML = originalBtnText;
+            submitBtn.disabled = false;
+            
+            if (data.success) {
+                lastSubmitTime = Date.now();
+                submitCount++;
+                saveRateLimits();
+                const message = selectedFiles.length > 0 
+                    ? `Report with ${selectedFiles.length} photo(s) submitted!` 
+                    : 'Report submitted successfully!';
+                showToast(message, 'success');
+                resetForm();
+                if (reportsVisible) fetchReports();
+            } else {
+                showToast(data.error || 'Error submitting report', 'error');
+            }
+        })
+        .catch(error => {
+            isSubmitting = false;
+            submitBtn.innerHTML = originalBtnText;
+            submitBtn.disabled = false;
+            console.error('Error:', error);
+            showToast(`Failed: ${error.message}`, 'error');
+        });
+    }
+
+    function fetchReports() {
+        const reportsList = document.getElementById('reportsList');
+        reportsList.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading reports...</p></div>`;
+        
+        fetch('/api/reports')
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                console.log("========== FETCHED REPORTS ==========");
+                
+                let reports = [];
+                if (Array.isArray(data)) {
+                    reports = data;
+                    console.log("Total reports fetched:", reports.length);
+                } else {
+                    console.error("Unexpected response format:", data);
+                    reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Invalid response format from server</h3></div>`;
+                    return;
+                }
+                
+                if (reports.length === 0) {
+                    reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports yet</h3><p>Be the first to submit a report!</p></div>`;
+                    return;
+                }
+                
+                allReportsData = reports;
+                
+                // Reset filters to show all
+                activeFilters = {
+                    dateRange: null,
+                    congestionLevels: [],
+                    stations: []
+                };
+                
+                // Reset UI filter selections
+                document.querySelectorAll('.badge-filter').forEach(b => b.classList.remove('active-filter'));
+                document.querySelectorAll('#stationsGrid input').forEach(cb => cb.checked = true);
+                document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+                if (document.querySelector('.chip')) {
+                    document.querySelector('.chip').classList.add('active');
+                }
+                
+                displayReports(allReportsData);
+            })
+            .catch(error => {
+                console.error("Error fetching reports:", error);
+                reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Failed to load reports</h3><p>${error.message}</p></div>`;
+            });
+    }
+
+ // Remove the old fetchAlertCount and checkAlertCount functions, and replace with these:
+
+// OPTIMIZED: Cache alert count aggressively
+let cachedAlertCount = null;
+let cachedAlertCountTime = 0;
+let cachedCongestionData = null;
+let cachedCongestionTime = 0;
+const ALERT_CACHE_DURATION = 60000; // 60 seconds cache
+const CONGESTION_CACHE_DURATION = 120000; // 2 minutes for congestion data
+// Replace the fetchAlertCount function with this version that includes congestion alerts:
+async function fetchAlertCount() {
+    const now = Date.now();
+    
+    // Use cached alert count if still valid
+    if (cachedAlertCount !== null && (now - cachedAlertCountTime) < ALERT_CACHE_DURATION) {
+        console.log('📦 Using cached alert count:', cachedAlertCount);
+        return cachedAlertCount;
+    }
+    
+    try {
+        // Get read status from localStorage
+        let readAlerts = new Set();
+        const saved = localStorage.getItem('readAlerts');
+        if (saved) {
+            readAlerts = new Set(JSON.parse(saved));
+        }
+        
+        // Calculate base alerts (time-based, no API calls)
+        let allAlerts = [];
+        const nowDate = new Date();
+        const hour = nowDate.getHours();
+        
+        // 1. Rush Hour Alert
+        if ((hour >= 7 && hour <= 9)) {
+            allAlerts.push({ id: 'rush-morning-permanent' });
+        } else if ((hour >= 17 && hour <= 19)) {
+            allAlerts.push({ id: 'rush-evening-permanent' });
+        }
+        
+        // 2. Advisory Alert
+        if (hour >= 0 && hour < 5) {
+            allAlerts.push({ id: 'advisory-early-morning-permanent' });
+        } else if (hour >= 5 && hour < 7) {
+            allAlerts.push({ id: 'advisory-pre-rush-permanent' });
+        } else if (hour >= 10 && hour < 16) {
+            allAlerts.push({ id: 'advisory-midday-permanent' });
+        } else if (hour >= 20 && hour < 22.5) {
+            allAlerts.push({ id: 'advisory-late-evening-permanent' });
+        } else if (hour >= 22.5 || hour === 23) {
+            allAlerts.push({ id: 'advisory-service-ended-permanent' });
+        }
+        
+        // 3. Congestion Advisory
+        if (hour >= 21 || hour < 5) {
+            allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
+        } else if (hour >= 14 && hour < 17) {
+            allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
+        }
+        
+        // 4. Service Notices
+        const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
+        if (isWeekend) {
+            allAlerts.push({ id: 'service-weekend-permanent' });
+        }
+        if (hour >= 23 || hour <= 3) {
+            allAlerts.push({ id: 'service-maintenance-night-permanent' });
+        }
+        
+        // 5. Congestion alerts - fetch from API (with caching)
+        if (!cachedCongestionData || (now - cachedCongestionTime) > CONGESTION_CACHE_DURATION) {
+            try {
+                const response = await fetch('/api/live-map/directions/v2');
+                cachedCongestionData = await response.json();
+                cachedCongestionTime = now;
+                console.log('🔄 Fetched fresh congestion data');
+            } catch (e) {
+                console.log('Could not fetch congestion alerts:', e);
+                cachedCongestionData = { northbound: {}, southbound: {} };
+            }
+        } else {
+            console.log('📦 Using cached congestion data');
+        }
+        
+        // Add congestion alerts from cached data
+        const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
+            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+            "Ayala Ave", "Magallanes", "Taft"];
+        
+        if (cachedCongestionData && cachedCongestionData.northbound && cachedCongestionData.southbound) {
+            for (const station of STATIONS) {
+                const northData = cachedCongestionData.northbound[station];
+                const southData = cachedCongestionData.southbound[station];
+                
+                if (northData && northData.congestion > 0) {
+                    allAlerts.push({ id: `congestion-${station}-northbound` });
+                }
+                if (southData && southData.congestion > 0) {
+                    allAlerts.push({ id: `congestion-${station}-southbound` });
+                }
+            }
+        }
+        
+        // Count unread alerts
+        let unreadCount = 0;
+        for (const alert of allAlerts) {
+            if (!readAlerts.has(alert.id)) {
+                unreadCount++;
+            }
+        }
+        
+        // Cache the result
+        cachedAlertCount = unreadCount;
+        cachedAlertCountTime = now;
+        
+        console.log('Report page total alerts:', allAlerts.length);
+        console.log('Report page unread alert count:', unreadCount);
+        return unreadCount;
+        
+    } catch (error) {
+        console.error('Error calculating alert count:', error);
+        return 0;
+    }
+}
+
+// Simple checkAlertCount that uses the cached fetchAlertCount
+async function checkAlertCount() {
+    const alertCount = await fetchAlertCount();
+    
+    const badge = document.getElementById('alertBadge');
+    const mobileBadge = document.getElementById('mobileAlertBadge');
+    
+    // Bell badge: Show 9+ for counts > 9
+    const bellDisplayValue = alertCount > 9 ? '9+' : alertCount;
+    
+    if (badge) {
+        if (alertCount > 0) {
+            badge.textContent = bellDisplayValue;
+            badge.style.backgroundColor = 'var(--red)';
+        } else {
+            badge.textContent = '0';
+            badge.style.backgroundColor = '#94A3B8';
+        }
+    }
+    
+    if (mobileBadge) {
+        if (alertCount > 0) {
+            mobileBadge.textContent = bellDisplayValue;
+            mobileBadge.style.display = 'flex';
+        } else {
+            mobileBadge.style.display = 'none';
+        }
+    }
+}
+    // ========== DISPLAY REPORTS WITH 3-DOT MENU ==========
+    function displayReports(reports) {
+        const reportsList = document.getElementById('reportsList');
+        
+        if (!reports || reports.length === 0) {
+            reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports match your filters</h3><p>Try adjusting your filter criteria</p></div>`;
+            return;
+        }
+        
+        let html = '';
+        reports.forEach((report, idx) => {
+            let levelText = '';
+            let levelColor = '';
+            let borderColor = '';
+            
+            if (report.reported_congestion > 80) {
+                levelText = 'Severe Congestion';
+                levelColor = '#EF4444';
+                borderColor = '#EF4444';
+            } else if (report.reported_congestion > 60) {
+                levelText = 'Congested';
+                levelColor = '#F97316';
+                borderColor = '#F97316';
+            } else if (report.reported_congestion > 30) {
+                levelText = 'Moderate';
+                levelColor = '#EAB308';
+                borderColor = '#EAB308';
+            } else {
+                levelText = 'Light';
+                levelColor = '#22C55E';
+                borderColor = '#22C55E';
+            }
+            
+            const reportTime = new Date(report.timestamp);
+            const now = new Date();
+            const diffMs = now - reportTime;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
+            
+            let timeAgo = '';
+            if (diffMins < 1) {
+                timeAgo = 'just now';
+            } else if (diffMins < 60) {
+                timeAgo = `${diffMins} mins ago`;
+            } else if (diffHours < 24) {
+                timeAgo = `${diffHours} hours ago`;
+            } else {
+                timeAgo = `${diffDays} days ago`;
+            }
+            
+            let displayName = '';
+            let avatarLetter = '?';
+            
+            if (report.anonymous) {
+                displayName = 'Anonymous';
+                avatarLetter = 'A';
+            } else if (report.username) {
+                const username = report.username;
+                if (username.includes('@')) {
+                    displayName = username.split('@')[0];
+                } else {
+                    displayName = username;
+                }
+                avatarLetter = displayName.charAt(0).toUpperCase();
+            } else {
+                displayName = 'Commuter';
+                avatarLetter = 'C';
+            }
+            
+            const hasRemarks = report.remarks && report.remarks.trim() !== '';
+            
+            let hasPhotos = false;
+            let photoCount = 0;
+            let photoUrls = [];
+            
+            if (report.photo_paths && Array.isArray(report.photo_paths) && report.photo_paths.length > 0) {
+                photoUrls = report.photo_paths;
+                photoCount = photoUrls.length;
+                hasPhotos = true;
+            } 
+            else if (report.photo_path) {
+                try {
+                    if (typeof report.photo_path === 'string' && report.photo_path.startsWith('[')) {
+                        photoUrls = JSON.parse(report.photo_path);
+                        photoCount = photoUrls.length;
+                        hasPhotos = photoCount > 0;
+                    } else if (typeof report.photo_path === 'string' && report.photo_path.length > 0) {
+                        photoUrls = [report.photo_path];
+                        photoCount = 1;
+                        hasPhotos = true;
+                    } else if (Array.isArray(report.photo_path)) {
+                        photoUrls = report.photo_path;
+                        photoCount = photoUrls.length;
+                        hasPhotos = true;
+                    }
+                } catch(e) {
+                    if (report.photo_path && report.photo_path.length > 0) {
+                        photoUrls = [report.photo_path];
+                        photoCount = 1;
+                        hasPhotos = true;
+                    }
+                }
+            }
+            
+            const contentId = `content-${report.id}-${idx}`;
+            const menuId = `menu-${report.id}-${idx}`;
+            
+            html += `
+                <div class="report-item" style="border: 2px solid ${borderColor}; border-radius: 16px; padding: 18px; margin-bottom: 12px; background: white; position: relative;">
+                    <!-- 3-Dots Menu Button -->
+                    <div style="position: absolute; top: 18px; right: 18px;">
+                        <button onclick="toggleReportMenu('${menuId}', event)" style="background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%;">
+                            <i class="fas fa-ellipsis-v" style="color: #94A3B8; font-size: 18px;"></i>
+                        </button>
+                        <div id="${menuId}" class="report-menu" style="display: none; position: absolute; right: 0; top: 40px; background: white; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; min-width: 160px;">
+                            <div onclick="flagReport(${report.id}, '${escapeHtml(report.station)}')" style="padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-flag" style="color: #F59E0B; width: 18px;"></i>
+                                <span style="font-size: 13px;">Flag this report</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; padding-right: 45px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 36px; height: 36px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-weight: bold;">
+                                ${escapeHtml(avatarLetter)}
+                            </div>
+                            <div style="font-weight: 600; font-size: 14px;">${escapeHtml(displayName)}</div>
+                            ${report.flagged ? `<span style="background: #FEE2E2; color: #DC2626; padding: 2px 8px; border-radius: 12px; font-size: 10px;"><i class="fas fa-flag"></i> Flagged</span>` : ''}
+                        </div>
+                        <div style="font-size: 11px; color: #64748B;"><i class="far fa-clock"></i> ${timeAgo}</div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="font-weight: 700; font-size: 18px;">${escapeHtml(report.station)}</span>
+                            <span style="font-size: 13px; font-weight: 600; color: ${levelColor};"> - ${levelText}</span>
+                            ${report.direction ? `
+                                <span style="display: inline-block; margin-left: 10px; padding: 2px 8px; background: #EFF6FF; border-radius: 20px; font-size: 11px; font-weight: 500; color: #3B82F6;">
+                                    <i class="fas ${report.direction === 'northbound' ? 'fa-arrow-up' : (report.direction === 'southbound' ? 'fa-arrow-down' : 'fa-exchange-alt')}" style="font-size: 10px; margin-right: 4px;"></i>
+                                    ${report.direction === 'northbound' ? 'Northbound' : (report.direction === 'southbound' ? 'Southbound' : 'Both Directions')}
+                                </span>
+                            ` : ''}
+                        </div>
+                        
+                        <button onclick="toggleReportContent('${contentId}', this)" style="background: none; border: none; color: #3B82F6; cursor: pointer; font-size: 13px;">
+                            <i class="fas fa-chevron-down"></i> View more
+                        </button>
+                    </div>
+                    
+                    <div id="${contentId}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
+                      ${hasRemarks ? `<div class="remark-text" style="background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 12px;"><i class="fas fa-quote-left" style="color: #3B82F6; margin-right: 8px;"></i>${escapeHtml(report.remarks)}</div>` : ''}
+                        
+                        ${hasPhotos ? `
+                        <div style="margin-top: 10px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <i class="fas fa-camera" style="color: #3B82F6;"></i>
+                                <span style="font-size: 13px; font-weight: 500;">${photoCount} photo(s) attached</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px;">
+                                ${photoUrls.map(url => `
+                                    <div style="position: relative; aspect-ratio: 1; cursor: pointer;" onclick="window.open('${url}', '_blank')">
+                                        <img src="${url}" 
+                                             style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #E2E8F0;"
+                                             onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;background:#F1F5F9;border-radius:8px\'><i class=\'fas fa-image\' style=\'color:#94A3B8;font-size:24px\'></i></div>'">
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        ${!hasRemarks && !hasPhotos ? `<div class="remark-none" style="color: #94A3B8; text-align: center; padding: 12px;">No additional details</div>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        reportsList.innerHTML = html;
+    }
+
+    // Menu toggle function
+    function toggleReportMenu(menuId, event) {
+        event.stopPropagation();
+        const menu = document.getElementById(menuId);
+        
+        // Close all other menus
+        document.querySelectorAll('.report-menu').forEach(m => {
+            if (m.id !== menuId) m.style.display = 'none';
+        });
+        
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // Close menu when clicking outside
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.report-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    });
+
+    function flagReport(reportId, stationName) {
+        currentFlagReportId = reportId;
+        currentFlagStationName = stationName;
+        
+        // Update modal message
+        document.getElementById('flagModalMessage').innerHTML = `Flag report from <strong>${escapeHtml(stationName)}</strong> as inappropriate?`;
+        
+        // Show modal
+        document.getElementById('flagModal').classList.add('active');
+    }
+
+    function closeFlagModal() {
+        document.getElementById('flagModal').classList.remove('active');
+        currentFlagReportId = null;
+        currentFlagStationName = null;
+    }
+
+    function confirmFlagReport() {
+        if (!currentFlagReportId) return;
+        
+        // Close modal first
+        closeFlagModal();
+        
+        // Show loading toast
+        showToast('Flagging report...', 'info');
+        
+        fetch(`/api/reports/${currentFlagReportId}/flag`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`Report from ${currentFlagStationName} has been flagged for review`, 'success');
+                fetchReports(); // Refresh to show flagged badge
+            } else {
+                showToast(data.error || 'Failed to flag report', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error flagging report:', error);
+            showToast('Error flagging report', 'error');
+        });
+    }
+
+    function toggleReportContent(contentId, button) {
+        const content = document.getElementById(contentId);
+        const icon = button.querySelector('i');
+        
+        if (content.style.display === 'none' || content.style.display === '') {
+            content.style.display = 'block';
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+            button.innerHTML = '<i class="fas fa-chevron-up"></i> View less';
+        } else {
+            content.style.display = 'none';
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+            button.innerHTML = '<i class="fas fa-chevron-down"></i> View more';
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function submitReport() {
+        const station = document.getElementById('stationSelect').value;
+        if (!station) { showToast('Please select a station', 'error'); return; }
+        if (!selectedLevel) { showToast('Please select congestion level', 'error'); return; }
+        openConfirmModal();
+    }
+
+    function resetForm() {
+        document.getElementById('stationSelect').value = '';
+        document.querySelectorAll('.report-card').forEach(card => card.classList.remove('selected'));
+        selectedLevel = null;
+        selectedDirection = null;
+        selectedFiles = [];
+        document.getElementById('imageInput').value = '';
+        document.getElementById('imagePreviewGrid').style.display = 'none';
+        document.getElementById('previewContainer').innerHTML = '';
+        updatePhotoUploadText();
+        document.getElementById('remarks').value = '';
+        
+        document.querySelectorAll('.direction-option').forEach(option => {
+            option.classList.remove('selected');
+        });
+    }
+
+   
+
+    function showToast(message, type = 'success') {
+        const existingToast = document.querySelector('.success-message');
+        if (existingToast) existingToast.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = 'success-message';
+        
+        if (type === 'error') {
+            toast.style.background = 'var(--red)';
+            toast.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+        } else if (type === 'warning') {
+            toast.style.background = 'var(--orange)';
+            toast.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+        } else if (type === 'info') {
+            toast.style.background = 'var(--accent-blue)';
+            toast.innerHTML = `<i class="fas fa-info-circle"></i> ${message}`;
+        } else {
+            toast.style.background = 'var(--green)';
+            toast.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
+        }
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            if (toast && toast.parentNode) {
+                toast.remove();
+            }
+        }, 3000);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+          checkAlertCount();
+  
+    setInterval(checkAlertCount, 60000);
+        
+        const chips = document.querySelectorAll('.chip');
+        if (chips.length > 0) {
+            chips[0].classList.add('active');
+        }
+        
+        chips.forEach(chip => {
+            chip.addEventListener('click', function() {
+                chips.forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+        
+        document.querySelectorAll('.badge-filter').forEach(badge => {
+            badge.addEventListener('click', function() {
+                this.classList.toggle('active-filter');
+            });
+        });
+        
+        const selectAllBtn = document.querySelector('.select-all');
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', function() {
+                const checkboxes = document.querySelectorAll('#stationsGrid input');
+                const allChecked = Array.from(checkboxes).every(c => c.checked);
+                checkboxes.forEach(c => c.checked = !allChecked);
+            });
+        }
+
+        // Flag modal confirm button
+        const confirmFlagBtn = document.getElementById('confirmFlagBtn');
+        if (confirmFlagBtn) {
+            confirmFlagBtn.onclick = confirmFlagReport;
+        }
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const stationParam = urlParams.get('station');
+        if (stationParam) {
+            const stationName = decodeURIComponent(stationParam);
+            const stationSelect = document.getElementById('stationSelect');
+            for (let i = 0; i < stationSelect.options.length; i++) {
+                if (stationSelect.options[i].value === stationName) {
+                    stationSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        fetchReports();
+    });
+</script>
+</body>
+</html>
+
+

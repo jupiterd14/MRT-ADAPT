@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MRT-3 Tracker | Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        /* Global Box Sizing to prevent width issues */
+        * { box-sizing: border-box; }
+
+        :root {
+            --bg-dark: radial-gradient(circle at center, #1b314d 0%, #0d131f 100%);
+            --card-fill: rgba(255, 255, 255, 0.03);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --input-bg: rgba(0, 0, 0, 0.2);
+            --btn-blue: #3b82f6; 
+            --text-gray: #94a3b8;
+            --error-red: #ef4444;
+            --error-bg: rgba(239, 68, 68, 0.1);
+        }
+
+        body, html {
+            margin: 0; padding: 0; 
+            height: 100%; width: 100%;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            background-attachment: fixed;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            overflow: hidden; 
+        }
+
+        .page-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; 
+            align-items: center; 
+            padding: 20px;
+        }
+
+        .brand-header {
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        .brand-icon {
+            width: 60px; height: 60px;
+            background: #38bdf8;
+            border-radius: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 15px;
+        }
+
+        .brand-icon i { font-size: 30px; color: white; }
+        .brand-header h1 { font-size: 28px; margin: 0; font-weight: 700; }
+        .brand-header p { color: var(--text-gray); margin-top: 5px; font-size: 14px; }
+
+        .auth-card {
+            background: var(--card-fill);
+            border: 1px solid rgb(81, 125, 139);
+            border-radius: 40px;
+            width: 100%;
+            max-width: 510px;
+            padding: 30px 50px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+            backdrop-filter: blur(10px);
+        }
+
+        .input-label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-gray);
+            margin-bottom: 8px;
+        }
+
+        .field-wrap { 
+            position: relative; 
+            margin-bottom: 20px; 
+            border: 0.5px solid rgb(81, 125, 139);
+            border-radius: 15px;
+        }
+
+        .field-wrap i:not(.toggle-eye) {
+            position: absolute; left: 18px; top: 50%;
+            transform: translateY(-50%); color: var(--text-gray);
+        }
+
+        input {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 15px;
+            padding: 12px 20px 16px 50px;
+            color: white;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .toggle-eye {
+            position: absolute; right: 18px; top: 50%;
+            transform: translateY(-50%); cursor: pointer; color: var(--text-gray);
+        }
+
+        .divider {
+            display: flex; align-items: center;
+            margin: 25px 0; color: var(--text-gray); font-size: 11px;
+        }
+        .divider::before, .divider::after { content: ""; flex: 1; border-bottom: 1px solid var(--card-border); }
+        .divider span { padding: 0 15px; }
+
+        .social-row {
+            display: grid; 
+            gap: 15px; margin-bottom: 25px;
+        }
+
+        .btn-social {
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            color: white; padding: 12px;
+            border-radius: 15px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            font-size: 14px;
+        }
+
+        .btn-signin {
+            width: 100%;
+            background: var(--btn-blue);
+            color: white; border: none;
+            padding: 14px; border-radius: 15px;
+            font-size: 18px; font-weight: 700;
+            cursor: pointer; display: flex;
+            align-items: center; justify-content: center; gap: 10px;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+
+        .btn-signin:hover {
+            background: rgb(35, 35, 172);
+        }
+
+        .signup-link { text-align: center; margin-top: 25px; font-size: 14px; color: var(--text-gray); }
+        .signup-link a { color: #38bdf8; text-decoration: none; font-weight: 600; }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            background: #1a2634;
+            border: 1px solid var(--error-red);
+            border-radius: 30px;
+            padding: 30px 40px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            animation: slideUp 0.3s ease;
+            box-shadow: 0 20px 40px rgba(239, 68, 68, 0.2);
+        }
+
+        .modal-icon {
+            width: 70px;
+            height: 70px;
+            background: var(--error-bg);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            border: 2px solid var(--error-red);
+        }
+
+        .modal-icon i {
+            font-size: 35px;
+            color: var(--error-red);
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .modal-message {
+            color: var(--text-gray);
+            font-size: 16px;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+
+        .modal-btn {
+            background: var(--error-red);
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Shake animation for form */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        .shake {
+            animation: shake 0.5s ease;
+        }
+
+        /* MOBILE RESPONSIVE FIX */
+        @media (max-width: 600px) {
+            .page-container { padding: 5px; }
+            .auth-card {
+                background: rgba(255, 255, 255, 0.01);
+                border: 1px solid rgba(81, 125, 139, 0.3);
+                padding: 25px 30px; 
+                width: 90%;
+                max-width: 380px; 
+                border-radius: 24px;
+            }
+            .brand-header h1 { font-size: 20px; }
+            .brand-icon { width: 45px; height: 45px; }
+            input { padding: 12px 12px 12px 40px; }
+            .btn-signin {
+                padding: 13px;
+                font-size: 16px;
+            }
+            .modal-content {
+                padding: 25px 20px;
+                width: 95%;
+            }
+            .modal-icon {
+                width: 60px;
+                height: 60px;
+            }
+            .modal-icon i {
+                font-size: 30px;
+            }
+            .modal-title {
+                font-size: 22px;
+            }
+            .modal-message {
+                font-size: 14px;
+            }
+        }
+
+        /* Extra small screen height fix */
+        @media (max-height: 600px) {
+            .brand-header { margin-bottom: 10px; }
+            .auth-card { padding: 15px 30px; }
+            .divider, .social-row { margin-bottom: 10px; margin-top: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Error Modal -->
+    <div class="modal-overlay" id="errorModal">
+        <div class="modal-content">
+            <div class="modal-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h2 class="modal-title">Login Failed</h2>
+            <p class="modal-message" id="errorMessage">Invalid email or password. Please try again.</p>
+            <button class="modal-btn" onclick="closeModal()">Try Again</button>
+        </div>
+    </div>
+
+    <div class="page-container">
+        <div class="brand-header">
+            <div class="brand-icon"><i class="fa-solid fa-train-subway"></i></div>
+            <h1>MRT-3 Tracker</h1>
+            <p>Smart Congestion Prediction System</p>
+        </div>
+
+        <div class="auth-card">
+            <form id="loginForm" action="/login" method="POST">
+                <span class="input-label">Email</span>
+                <div class="field-wrap">
+                    <i class="fa-regular fa-envelope"></i>
+                    <input type="email" name="email" id="email" placeholder="you@email.com" required>
+                </div>
+
+                <span class="input-label">Password</span>
+                <div class="field-wrap">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" name="password" id="password" placeholder="••••••••••••" required>
+                    <i class="fa-solid fa-eye toggle-eye" id="toggleIcon"></i>
+                </div>
+<span style="display: flex; justify-content: flex-end; width: 100%;">
+    <a href="#" style="text-decoration:none; color:var(--btn-blue); font-size:12px; padding-right:20px;">Forgot Password?</a>
+</span>
+
+                <div class="divider"><span>OR</span></div>
+
+                <div class="social-row">
+                    <button type="button" class="btn-social" onclick="window.location.href='/login/google'">
+                        <img src="https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png" width="18" alt="Google"> Google
+                    </button>
+                </div>
+
+                <button type="submit" class="btn-signin"> Sign In</button>
+            </form>
+            <div class="signup-link" style="display:none;">No account? <a href="/signup">Create one</a></div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle password visibility
+        const togglePassword = document.querySelector('#toggleIcon');
+        const passwordInput = document.querySelector('#password');
+        
+        togglePassword.addEventListener('click', function () {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+
+        // Check for error parameter in URL
+        window.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const error = urlParams.get('error');
+            
+            {% if error %}
+                showModal("{{ error }}");
+            {% endif %}
+        });
+
+        // Modal functions
+        function showModal(message) {
+            const modal = document.getElementById('errorModal');
+            const messageElement = document.getElementById('errorMessage');
+            const form = document.getElementById('loginForm');
+            
+            messageElement.textContent = message;
+            modal.style.display = 'flex';
+            
+            // Add shake animation to form
+            form.classList.add('shake');
+            
+            // Remove shake after animation
+            setTimeout(() => {
+                form.classList.remove('shake');
+            }, 500);
+            
+            // Highlight the fields with error
+            document.querySelectorAll('input').forEach(input => {
+                input.style.borderColor = '#ef4444';
+                setTimeout(() => {
+                    input.style.borderColor = '';
+                }, 1000);
+            });
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('errorModal');
+            modal.style.display = 'none';
+            
+            // Focus on email field
+            document.getElementById('email').focus();
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('errorModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // Form submission handling
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                e.preventDefault();
+                showModal('Please fill in both email and password fields.');
+            }
+        });
+    </script>
+</body>
+</html>
