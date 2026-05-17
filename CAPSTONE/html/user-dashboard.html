@@ -4,13 +4,1514 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MRT-ADAPT | Dashboard</title>
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/user_dashboard.css') }}"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
+:root {
+    --sidebar-bg: #00224D;
+    --main-bg: #F8FAFC;
+    --dark-bluew:#0c437b;
+    --light-bluew: #f9fcff;
+    --azureblue:#0085ff;
+    --accent-blue: #3B82F6;
+    --text-dark: #1E293B;
+    --text-light: #64748B;
+    --white: #FFFFFF;
+    --border: #E2E8F0;
+    --red: #EF4444;
+    --orange: #F97316;
+    --yellow: #F59E0B;
+    --green: #22C55E;
+    --blue-navy: #1E3A8A;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Bricolage Grotesque", sans-serif;
+}
+
+body {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    background-color: var(--main-bg);
+    overflow: hidden;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width: 300px;
+    background-color: var(--sidebar-bg);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    padding: 20px 0;
+}
+
+.logo-section {
+    padding: 10px 25px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Location Banner Styles */
+.location-banner {
+    background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+    border: 2px solid var(--accent-blue);
+    border-radius: 12px;
+    padding: 12px 20px;
+    margin-bottom: 20px;
+    animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.location-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.location-text {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-dark);
+}
+
+.location-text strong {
+    color: var(--accent-blue);
+}
+
+.btn-use-location {
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-use-location:hover {
+    background: var(--dark-bluew);
+    transform: scale(1.02);
+}
+
+.btn-dismiss {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-light);
+    font-size: 18px;
+    padding: 5px;
+}
+
+.btn-dismiss:hover {
+    color: var(--red);
+}
+
+/* Location loading indicator */
+.location-loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--accent-blue);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Permission denied banner */
+.location-denied {
+    background: #FEE2E2;
+    border-color: var(--red);
+}
+
+.location-denied .location-text strong {
+    color: var(--red);
+}
+
+.logo-icon {
+    background: #38BDF8;
+    padding: 10px 13px;
+    border-radius: 8px;
+    font-size: 18px;
+}
+
+.logo-text h2 { 
+    font-size: 16px; 
+    margin: 0; 
+}
+
+.logo-text p { 
+    font-size: 10px; 
+    opacity: 0.6; 
+    letter-spacing: 1px; 
+}
+
+/* Closed state styling */
+.hero-card.closed {
+    opacity: 0.8;
+    filter: grayscale(0.3);
+}
+
+.closed-message {
+    background: #6B7280;
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 16px;
+}
+
+.closing-soon-warning {
+    background: #F97316;
+    color: white;
+    padding: 8px;
+    border-radius: 8px;
+    margin-top: 10px;
+    text-align: center;
+    font-size: 13px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
+nav { 
+    padding: 40px 5px 5px 10px; 
+}
+
+.nav-item {
+    padding: 12px 25px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    cursor: pointer;
+    transition: 0.3s;
+    color: #CBD5E1;
+    text-decoration: none;
+    font-size: 15px;
+    position: relative;
+}
+
+.nav-item:hover, .nav-item.active {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: rgb(148, 207, 255);
+    border-left: 4px solid var(--accent-blue);
+}
+
+.nav-badge {
+    position: absolute;
+    right: 25px;
+    background: var(--red);
+    color: white;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: bold;
+    display: none;
+}
+
+/* MAIN CONTENT */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 25px 40px;
+    overflow-y: auto;
+}
+
+.greeting { 
+    font-size: 11px; 
+    color: var(--text-light); 
+    font-weight: bold; 
+    text-transform: uppercase; 
+    letter-spacing: 0.5px;
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header-top h1 {
+    font-size: 1.25rem;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header-icons {
+    display: flex;
+    gap: 10px;
+}
+
+.icon-btn {
+    background: #F1F5F9;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    color: var(--text-dark);
+    transition: 0.3s;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-btn:hover { 
+    background: #E2E8F0; 
+}
+
+.badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--red);
+    color: white;
+    font-size: 10px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+/* RUSH HOUR ALERT */
+.rush-alert-banner {
+    background: #FFF;
+    border: 1px solid var(--orange);
+    border-radius: 10px;
+    padding: 12px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #7B341E;
+    font-size: 14px;
+}
+
+.rush-alert-banner strong { 
+    color: var(--red); 
+}
+
+/* HERO CARD */
+.hero-card {
+    background: var(--light-bluew);
+    border: 2px solid var(--dark-bluew);
+    border-radius: 15px;
+    padding: 25px;
+    color: white;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.hero-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.station-label-2 { 
+    font-size: 15px; 
+    opacity: 0.8; 
+    margin-bottom: 4px; 
+    text-align: center; 
+    align-items: center; 
+    gap: 8px; 
+    color: black;
+}
+
+.station-label {
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--azureblue);
+    flex-wrap: wrap;
+}
+
+.station-label i {
+    font-size: 20px;
+
+}
+
+.station-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: black;
+    display: inline-block;
+    margin-left: 0;
+}
+
+
+.train-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.train-direction-card {
+    border-radius: 12px;
+    padding: 10px;
+    text-align: center;
+    border: 1px solid lightgrey;
+}
+
+.north {
+    background: #f7f7f7;
+}
+
+.south {
+    background: #eefcff;
+}
+
+.direction-label {
+    font-size: 14px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--azureblue);
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+.arrival-timer { 
+    font-size: 48px; 
+    font-weight: bold; 
+    color: var(--accent-blue); 
+}
+
+.arrival-timer span { 
+    font-size: 18px; 
+    font-weight: normal; 
+    opacity: 0.7; 
+}
+
+.sub-arrival { 
+    font-size: 11px; 
+    opacity: 0.6; 
+    margin-top: 8px; 
+    color: black; 
+}
+
+/* BEST TIME CARD */
+.best-time-card {
+    background: white;
+    border: 1px solid var(--dark-bluew);
+    border-radius: 12px;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.best-time-info { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+}
+
+.best-time-info i { 
+    color: var(--green); 
+    letter-spacing: 10px;
+}
+
+.best-time-text {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+}
+
+.best-time-text > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap !important;
+    gap: 12px;
+    width: 100%;
+}
+
+.best-time-text > div > div:first-child {
+    flex-shrink: 0;
+    min-width: 140px;
+}
+
+.best-time-text > div > span {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Ensure the advice text stays on one line */
+.best-time-text span[style*="flex: 1"] {
+    white-space: nowrap !important;
+    overflow: visible !important;
+}
+.best-time-text strong { 
+    color: var(--text-dark); 
+}
+
+.btn-plan {
+    border: 1px solid var(--azureblue);
+    background: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--azureblue);
+  
+}
+
+.btn-plan:hover {
+    color: white;
+    background-color: var(--azureblue);
+}
+/* FORECAST CARD */
+.forecast-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    flex: 1;
+}
+
+/* DROPDOWN FIXES - FORCE ALWAYS VISIBLE */
+.station-select,
+#forecastStationSelect {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 9999 !important;
+    background-color: white !important;
+    pointer-events: auto !important;
+    border: 1px solid var(--border) !important;
+    padding: 5px 10px !important;
+    border-radius: 5px !important;
+    font-size: 12px !important;
+    color: var(--text-light) !important;
+    margin-left: 10px !important;
+    cursor: pointer !important;
+}
+
+/* FORECAST HEADER FIXES */
+.forecast-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    min-height: 40px !important;
+    position: relative !important;
+    z-index: 100 !important;
+    margin-bottom: 20px !important;
+}
+
+
+.congestion h3 {
+    font-size: 15px;
+    margin-bottom: 15px;
+}
+
+.congestion .forecast-toggle {
+    display: flex !important;
+    gap: 10px !important;
+    background: #f1f5f9 !important;
+    padding: 4px !important;
+    border-radius: 30px !important;
+    width: fit-content !important;
+    margin: 0 !important;
+}
+
+.station-select,
+#forecastStationSelect {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 99999 !important;
+    background: white !important;
+    border: 1px solid #ccc !important;
+    padding: 4px 8px !important;
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    width: auto !important;
+    min-width: 100px !important;
+    max-width: 130px !important;
+    font-weight: 500 !important;
+}
+
+/* Adjust the forecast card header to make dropdown smaller */
+.forecast-header > div:first-child {
+    font-size: 14px;
+    color: var(--text-dark);
+    font-weight: bold;
+    padding-bottom: 0 !important;
+}
+
+.forecast-header h3 { 
+    font-size: 14px; 
+    color: var(--text-dark); 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+    margin: 0 !important;
+}
+
+/* CHART CONTAINER FIXES - PREVENT OVERLAP */
+.chart-container { 
+    height: 250px; 
+    width: 100%; 
+    position: relative; 
+    margin-top: 10px;
+    z-index: 1 !important;
+    clear: both !important;
+}
+
+/* PREVENT CANVAS FROM COVERING DROPDOWN */
+canvas {
+    position: relative !important;
+    z-index: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* ENSURE DROPDOWN IS ABOVE EVERYTHING */
+#forecastStationSelect:hover,
+.station-select:hover {
+    z-index: 10000 !important;
+    background-color: #f0f0f0 !important;
+}
+
+/* CUSTOM BUTTON */
+.custom-btn {
+    background: white;
+    color: var(--azureblue);
+    border: 1px solid var(--azureblue);
+    padding: 5px 13px;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.custom-btn i {
+    font-size: 10px;
+}
+.custom-btn:hover {
+    background-color: var(--azureblue);
+    color: white;
+}
+
+/* PULSE ANIMATION */
+@keyframes pulse {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.05); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+ #forecastStationSelect,
+        .station-select {
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: relative !important;
+            z-index: 99999 !important;
+            background: white !important;
+            border: 1px solid #ccc !important;
+            padding: 5px 10px !important;
+            border-radius: 5px !important;
+            margin-left: 10px !important;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+        }
+        
+/* ADDITIONAL SAFETY - PREVENT ANY HIDING */
+.forecast-card,
+.forecast-header,
+#forecastStationSelect,
+.station-select {
+    overflow: visible !important;
+}
+
+/* FIX FOR ANY POTENTIAL HOVER ISSUES */
+.station-select option {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* Add to styles */
+.toggle-btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    background: transparent;
+    color: #64748B;
+}
+
+.toggle-btn.active {
+    background: var(--accent-blue);
+    color: white;
+    box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+}
+
+.toggle-btn:hover:not(.active) {
+    background: #e2e8f0;
+}
+
+
+.congestion {
+    font-size: 15px;
+}
+
+/* ========== MOBILE BOTTOM NAVIGATION BAR ========== */
+/* Add this CSS to your existing styles for mobile devices */
+
+/* Bottom Navigation Container - Hidden on desktop by default */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+    border-radius: 20px 20px 0 0;
+    z-index: 1000;
+    padding: 10px 16px 20px;
+    transition: all 0.3s ease;
+}
+
+/* Navigation Items Grid */
+.bottom-nav-items {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Individual Nav Item */
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    color: var(--text-light);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 30px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    flex: 1;
+    white-space: nowrap;
+}
+
+/* Icon Styling */
+.bottom-nav-item i {
+    font-size: 20px;
+    transition: transform 0.2s ease;
+}
+
+/* Active State */
+.bottom-nav-item.active {
+    color: var(--accent-blue);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+/* Hover Effect */
+.bottom-nav-item:hover:not(.active) {
+    color: var(--azureblue);
+    background: rgba(0, 133, 255, 0.05);
+}
+
+.bottom-nav-item:active i {
+    transform: scale(0.95);
+}
+
+/* Badge for Alerts */
+.bottom-nav-item .nav-badge-mobile {
+    position: absolute;
+    top: 2px;
+    right: 20%;
+    background: var(--red);
+    color: white;
+    font-size: 9px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+/* Adjust relative positioning for badge */
+.bottom-nav-item {
+    position: relative;
+}
+
+@media screen and (max-width: 640px) {
+
+   
+    .best-time-text > div {
+        flex-wrap: wrap !important;
+        gap: 8px;
+    }
+    
+    .best-time-text > div > div:first-child {
+        min-width: auto;
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .best-time-text > div > span {
+        white-space: normal !important;
+        width: 100%;
+        text-align: left !important;
+        padding-left: 26px;
+    }
+}
+
+/* Fix for the container itself */
+.best-time-info {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+}
+
+/* Update the media query for mobile - keep cards side by side */
+@media screen and (max-width: 768px) {
+
+    .custom-btn {
+    background: white;
+    color: var(--azureblue);
+    border: 1px solid var(--azureblue);
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 9px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+ .custom-btn i {
+   font-size: 8px;
+}
+    .chartTitle {
+        font-size: 12px;
+    }
+
+     #forecastStationSelect {
+        min-width: 50px !important;
+        max-width: 80px !important;
+        font-size: 10px !important;
+        padding: 3px 6px !important;
+        align-items: flex-end;
+    }
+    
+    .forecast-toggle {
+        margin: 0 !important;
+    }
+    
+    /* Hide desktop sidebar */
+    .sidebar {
+        display: none;
+    }
+    
+    /* Show bottom navigation */
+    .bottom-nav {
+        display: block;
+    }
+    
+.greeting { 
+    font-size: 9px; 
+
+}
+    
+    /* Adjust main content for mobile */
+    .main-content {
+        padding: 20px 16px;
+        margin-bottom: 70px;
+        overflow-y: auto;
+        height: calc(100vh - 70px);
+    }
+    
+    /* Keep train grid as 2 columns on mobile - SIDE BY SIDE */
+    .train-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    
+    /* Make cards slightly smaller on mobile */
+    .train-direction-card {
+        padding: 8px;
+    }
+    
+    .arrival-timer {
+        font-size: 28px;
+    }
+
+    .station-label i {
+        font-size: 15px;
+    }
+
+    .station-label-2 {
+        font-size: 13px;
+    }
+    
+    .arrival-timer span {
+        font-size: 12px;
+    }
+    
+    .direction-label {
+        font-size: 11px;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    
+    .sub-arrival {
+        font-size: 9px;
+    }
+    
+    /* Adjust pills on mobile */
+    .status-pill {
+        padding: 3px 5px;
+        font-size: 9px;
+    }
+    
+    /* Adjust hero card */
+    .hero-card {
+        padding: 15px;
+    }
+    
+    /* Adjust forecast card */
+    .forecast-card {
+        padding: 15px;
+    }
+    
+    .forecast-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 5px !important;
+    }
+    
+    /* Ensure dropdown is accessible */
+    #forecastStationSelect {
+        margin-left: 0 !important;
+        width: 100%;
+        max-width: 200px;
+    }
+    
+    /* Adjust best time card */
+    .best-time-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 15px;
+    }
+    
+    .best-time-info {
+        width: 100%;
+    }
+    
+    .btn-plan {
+        align-self: flex-start;
+    }
+    
+    /* Adjust header */
+    .header-top {
+        margin-bottom: 20px;
+    }
+    
+    .header-top h1 {
+        font-size: 1rem;
+    }
+    
+    /* Rush alert banner */
+    .rush-alert-banner {
+        padding: 10px 15px;
+        font-size: 12px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    /* Location banner */
+    .location-content {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .btn-use-location {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    /* Chart container */
+    .chart-container {
+        height: 200px;
+    }
+    
+    /* Congestion section */
+    .congestion {
+        margin-bottom: 15px;
+    }
+    
+    .forecast-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .toggle-btn {
+        padding: 6px 16px;
+        font-size: 12px;
+    }
+}
+
+/* Extra small devices (phones under 480px) */
+@media screen and (max-width: 480px) {
+    .bottom-nav-items {
+        gap: 4px;
+    }
+    
+    .bottom-nav-item {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+    
+    .bottom-nav-item i {
+        font-size: 18px;
+    }
+    
+    .main-content {
+        padding: 15px 12px;
+        margin-bottom: 65px;
+    }
+    
+    .arrival-timer {
+        font-size: 36px;
+    }
+    
+    .station-title {
+        font-size: 14px;
+    }
+}
+
+/* For devices with notch/home indicator */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .bottom-nav {
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+}
+
+/* Optional: Add a subtle top border to bottom nav */
+.bottom-nav::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20px;
+    right: 20px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+/* Animation for nav items when page loads */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.bottom-nav {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+
+/* ========== CONGESTION PILL STYLES ========== */
+/* Add these styles to your existing CSS to replace plain percentages with visual pills */
+
+
+/* Pill with icon */
+.congestion-pill i {
+    font-size: 11px;
+}
+
+
+
+/* Congestion Levels - Color Variants */
+.congestion-light {
+    background: #d4ffe4;
+    border: 1px solid #22C55E;
+    color: 22C55E;
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+}
+
+.congestion-moderate {
+    background: #fff6e6;
+    border: 1px solid #ffc765;
+    color: #ffc561;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+}
+
+.congestion-congested {
+    background: #ffe1b7;
+    border: 1px solid #d2851a;
+    color: #ffab35;
+    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.25);
+}
+
+.congestion-severe {
+    background: #ffb9b9;
+    border: 1px solid #e73030; 
+    color: #a70000;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+    animation: pulse-warning 1.5s infinite;
+}
+
+
+.status-pill i {
+    font-size: 10px;
+}
+
+/* Warning pulse animation for severe congestion */
+@keyframes pulse-warning {
+    0% {
+        opacity: 1;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+    }
+    50% {
+        opacity: 0.85;
+        box-shadow: 0 2px 12px rgba(239, 68, 68, 0.5);
+    }
+    100% {
+        opacity: 1;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+    }
+}
+
+/* Congestion Value Display (for best time card) */
+.congestion-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Best time card congestion pills */
+.best-time-congestion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+/* Small pill variant for tight spaces */
+.congestion-pill-sm {
+    padding: 2px 8px;
+    font-size: 10px;
+    gap: 4px;
+}
+
+.congestion-pill-sm i {
+    font-size: 9px;
+}
+
+/* Chart tooltip enhancement - already handled in JS */
+/* For any plain percentage text, convert to pill */
+
+/* Station status pills (replacing the old dots) */
+.station-status-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ========== ADDITIONAL UTILITIES ========== */
+
+/* Congestion level text colors */
+.text-congestion-light { color: #22C55E; }
+.text-congestion-moderate { color: #F59E0B; }
+.text-congestion-congested { color: #F97316; }
+.text-congestion-severe { color: #EF4444; }
+
+/* Background with opacity for subtle indicators */
+.bg-congestion-light-soft { background: rgba(34, 197, 94, 0.1); }
+.bg-congestion-moderate-soft { background: rgba(245, 158, 11, 0.1); }
+.bg-congestion-congested-soft { background: rgba(249, 115, 22, 0.1); }
+.bg-congestion-severe-soft { background: rgba(239, 68, 68, 0.1); }
+
+/* Mobile adjustments */
+@media screen and (max-width: 768px) {
+    .congestion-pill {
+        padding: 3px 10px;
+        font-size: 15px;
+    }
+    
+    .status-pill {
+        padding: 3px 20px;
+        font-size: 15px;
+    }
+    
+    .congestion-value {
+        gap: 6px;
+    }
+}
+
+/* ========== MOBILE-FRIENDLY CONGESTION PILLS - NO EMOJIS ========== */
+
+/* ========== ENLARGED STATUS PILLS - BETTER VISIBILITY ========== */
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 40px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.status-pill i {
+    font-size: 12px;
+}
+
+/* Congestion pill - larger */
+.congestion-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 18px;
+    border-radius: 40px;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+}
+
+.congestion-pill i {
+    font-size: 12px;
+}
+
+/* Extra small variant - still readable */
+.congestion-pill-xs {
+    padding: 3px 12px;
+    font-size: 12px;
+    gap: 2px;
+}
+
+.congestion-pill-xs i {
+    font-size: 11px;
+}
+
+/* Mobile adjustment - slightly smaller but still readable */
+@media screen and (max-width: 768px) {
+    
+   .best-time-card {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        gap: 12px;
+    }
+    
+    .best-time-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 
     
+    .best-time-text strong {
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+    }
+
+    .best-time-text i {
+        font-size: 1px;
+    }
+    
+    .best-time-text strong i {
+        font-size: 14px;
+    }
+    
+    .best-time-text br {
+        display: none;
+    }
+    
+    .btn-plan {
+        padding: 4px 12px;
+        font-size: 11px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+
+.btn-plan:hover {
+    background-color: var(--azureblue);
+    color: white;
+}
+
+.btn-plan i {
+    font-size: 10px;
+}
+    .direction-label {
+        font-size: 11px;
+        gap: 6px;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+    }
+
+    .status-pill {
+        padding: 2px 6px;
+        font-size: 8px;
+        gap: 3px;
+    }
+    
+    .status-pill i {
+        font-size: 7px;
+    }
+    
+    .congestion-pill-xs {
+        padding: 2px 6px;
+        font-size: 8px;
+        gap: 3px;
+    }
+    
+    .congestion-pill-xs i {
+        font-size: 7px;
+    }
+
+}
+
+@media screen and (max-width: 480px) {
+     .best-time-card {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+
+     .best-time-text strong {
+        font-size: 12px;
+    }
+    
+      .btn-plan {
+        padding: 3px 10px;
+        font-size: 10px;
+    }
+
+       .direction-label {
+        font-size: 9px;
+        gap: 4px;
+    }   
+    .status-pill {
+        padding: 1px 4px;
+        font-size: 7px;
+        gap: 2px;
+    }
+    
+    .status-pill i {
+        font-size: 6px;
+    }
+    
+    .congestion-pill-xs {
+        padding: 1px 4px;
+        font-size: 7px;
+        gap: 2px;
+    }
+    
+    .congestion-pill-xs i {
+        font-size: 6px;
+    }
+}
+
+#topStationDropdown {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-width: 120px !important;
+}
+
+.header-icons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: nowrap !important;
+}
+
+/* Loading overlay for dropdown */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
+    z-index: 99999;
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-spinner {
+    background: white;
+    padding: 20px 30px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    animation: fadeInScale 0.2s ease-out;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.loading-spinner i {
+    font-size: 32px;
+    color: var(--accent-blue);
+    animation: spin 1s linear infinite;
+}
+
+.loading-spinner span {
+    font-size: 14px;
+    color: var(--text-dark);
+    font-weight: 500;
+}
+
+/* Disable dropdown while loading */
+.station-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+</style>
 </head>
 <body>
+
+    <!-- Loading Overlay -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner">
+        <i class="fas fa-circle-notch"></i>
+        <span>Loading station data...</span>
+    </div>
+</div>
+
+    <!-- Mobile Bottom Navigation -->
+<div class="bottom-nav">
+    <div class="bottom-nav-items">
+        <a href="/user-dashboard" class="bottom-nav-item active">
+            <i class="fas fa-th-large"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="/live-map" class="bottom-nav-item">
+            <i class="fas fa-map-marked-alt"></i>
+            <span>Live Map</span>
+        </a>
+        <a href="/travel-plan" class="bottom-nav-item">
+            <i class="fas fa-route"></i>
+            <span>Travel</span>
+        </a>
+        <a href="/alerts" class="bottom-nav-item">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>Alerts</span>
+            <span class="nav-badge-mobile" id="mobileAlertBadge" style="display: none;">0</span>
+        </a>
+        <a href="/report" class="bottom-nav-item">
+            <i class="fas fa-chart-line"></i>
+            <span>Report</span>
+        </a>
+    </div>
+</div>
+    <!-- Add this inside the forecast-card, above the chart -->
+
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="logo-section">
@@ -36,20 +1537,44 @@
             GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, {{ username.upper() }}
         </div>
 
-        <div class="header-top">
-            <h1>Dashboard</h1>
-            <div class="header-icons">
-                <span class="icon-btn" onclick="refreshData()"><i class="fas fa-sync-alt"></i></span>
-                <span class="icon-btn" onclick="window.location.href='/alerts'">
-                    <i class="fas fa-bell"></i>
-                    <span class="badge" id="alertBadge">0</span>
-                </span>
-            </div>
+     
+
+        <!-- Location Detection Banner -->
+<div id="locationBanner" class="location-banner" style="display: none;">
+    <div class="location-content">
+        <i class="fas fa-map-marker-alt" style="color: var(--accent-blue); font-size: 20px;"></i>
+        <div class="location-text">
+            <strong> Nearest Station Detected:</strong>
+            <span id="nearestStationText">Loading...</span>
         </div>
+        <button class="btn-use-location" onclick="useNearestStation()">
+            <i class="fas fa-check"></i> Use This Station
+        </button>
+        <button class="btn-dismiss" onclick="dismissLocationBanner()">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div>
+
+
+      <div class="header-top">
+    <h1>Dashboard</h1>
+    <div class="header-icons">
+    
+        <span class="icon-btn" onclick="requestLocationPermission()" title="Find nearest station">
+            <i class="fas fa-location-dot"></i>
+        </span>
+        <span class="icon-btn" onclick="refreshData()"><i class="fas fa-sync-alt"></i></span>
+        <span class="icon-btn" onclick="window.location.href='/alerts'">
+            <i class="fas fa-bell"></i>
+            <span class="badge" id="alertBadge">0</span>
+        </span>
+    </div>
+</div>
 
         <!-- Rush Hour Alert -->
-        <div class="rush-alert-banner" id="rushAlert"> 
-            <span><i class="fas fa-exclamation-triangle" style="color: var(--orange);"></i> <span id="alertMessage">Peak hours: <strong>7:01 AM - 9:00 AM</strong> and <strong>5:01 PM - 7:00 PM</strong> with 3.5 min headway. Plan your trip.</span></span>
+        <div class="rush-alert-banner" id="rushAlert">
+            <span><i class="fas fa-exclamation-triangle"></i> <span id="alertMessage">Loading...</span></span>
             <i class="fas fa-times" style="cursor: pointer; opacity: 0.5;" onclick="dismissAlert()"></i>
         </div>
 
@@ -59,7 +1584,7 @@
                 <div>
                     <div class="station-label"><i class="fas fa-map-marker-alt" style="color:var(--azureblue);"></i> Nearest Station:  <div class="station-title" id="mainStationName">{{ (favorite_station if favorite_station else 'North Ave') }}</div></div>
                 </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
+                <div style="display: flex; gaap: 10px; align-items: center;">
                     <button class="custom-btn" onclick="window.location.href='/live-map'">
                         <i class="fas fa-map"></i> View Live Map
                     </button>
@@ -67,10 +1592,10 @@
             </div>
 
             <div class="station-label-2" style="margin-bottom: 15px;"><i class="fas fa-train"></i> Next train will arrive in :</div>
-            
+           
             <div class="train-grid">
                 <div class="train-direction-card north">
-                    <div class="direction-label"><i class="fas fa-arrow-circle-up"></i> Northbound <span class="status-pill" id="stationStatusBadge">● LOADING...</span></div>
+                    <div class="direction-label"><i class="fas fa-arrow-circle-up"></i> Northbound <span class="status-pill" id="stationStatusNorth">● LOADING...</span></div>
                     <div class="arrival-timer" id="northTime"><span>Calculating...</span></div>
                     <div class="sub-arrival" id="northOrigin">Based on official MRT-3 schedule</div>
                 </div>
@@ -85,573 +1610,556 @@
         <!-- Best Time Card -->
         <div class="best-time-card">
             <div class="best-time-info">
-                <i class="far fa-clock"></i>
                 <div class="best-time-text">
-                    Best time to arrive in <strong id="bestStationName">{{ favorite_station if favorite_station else 'North Ave' }}</strong> 
-                    <span id="bestTimeText"> Before 10:30 AM - congestion level lowers from <span id="StationStatus"></span></span>
+                   <strong id="bestStationName">    <i class="far fa-clock" style="padding-right:5px; padding-bottom: 20px;"></i>{{ favorite_station if favorite_station else 'North Ave' }}</strong> <br>
+                 <span id="bestTimeText" style="display: inline-block; white-space: nowrap;">
+    <span id="StationStatus">Please wait</span>
+</span>
+
                 </div>
             </div>
             <button class="btn-plan" onclick="window.location.href='/travel-plan'">Plan Route</button>
         </div>
 
-        <h3><i class="fas fa-chart-bar" style="color: var(--accent-blue);"></i> Congestion Forecast</h3>
-
-        <!-- Forecast Card with FIXED DROPDOWN -->
-<!-- Forecast Card with FIXED DROPDOWN -->
-<div class="forecast-card">
-    <!-- First row: Title on left, dropdown on right -->
-    <div class="forecast-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <div style="font-size: 14px; color: var(--text-dark); font-weight: bold;" id="chartTitle">
-            {{ (favorite_station if favorite_station else 'NORTH AVE') }}: NEXT 6 HOURS
-        </div>
-        <select class="station-select" id="forecastStationSelect" onchange="changeStation(this.value)">
-            {% for station in stations %}
-            <option value="{{ station }}" {% if station == (favorite_station if favorite_station else 'North Ave') %}selected{% endif %}>{{ station }}</option>
-            {% endfor %}
-        </select>
+     <div class="congestion">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
+        <h3 style="margin: 0;"><i class="fas fa-chart-bar" style="color: var(--accent-blue);"></i> Congestion Forecast</h3>
+      
     </div>
+    <div class="forecast-toggle" style="display: flex; gap: 10px; background: #f1f5f9; padding: 4px; border-radius: 30px; width: fit-content;">
+        <button id="toggleNorthBtn" class="toggle-btn active" onclick="setDirection('north')">
+            <i class="fas fa-arrow-up"></i> Northbound
+        </button>
+        <button id="toggleSouthBtn" class="toggle-btn" onclick="setDirection('south')">
+            <i class="fas fa-arrow-down"></i> Southbound
+        </button>
+    </div>
+</div>
     
-    <!-- Second row: Predict crowd h3 -->
-    <h3 style="font-size: 10px; color: var(--text-light); margin-top: -30px; margin-bottom: 20px;">
-        Predict crowd for {{ now.strftime('%B %d, %Y') }}
-    </h3>
-    
-    <!-- Chart container -->
-    <div class="chart-container">
+
+     
+
+          
+
+        <!-- Forecast Card -->
+      <!-- Forecast Card -->
+<!-- Forecast Card - Corrected Structure -->
+<!-- Forecast Card -->
+<div class="forecast-card">
+    <div class="forecast-header" style="margin-bottom: 5px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px;">
+            <div style="flex: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div class="chartTitle" style="font-size: 14px; color: var(--text-dark); font-weight: bold;">
+                        {{ (favorite_station if favorite_station else 'NORTH AVE') }}: NEXT 6 HOURS
+                    </div>
+                    <select class="station-select" id="forecastStationSelect" onchange="changeStation(this.value)" style="margin: 0 !important;">
+                        {% for station in stations %}
+                        <option value="{{ station }}" {% if station == (favorite_station if favorite_station else 'North Ave') %}selected{% endif %}>{{ station }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <h3 style="font-size: 10px; color: var(--text-light); margin-top: 8px; margin-bottom: 0; align-self: flex-end;">
+                    Predict crowd for {{ now.strftime('%B %d, %Y') }}
+                </h3>
+            </div>
+        </div>
+    </div>
+   
+    <div class="chart-container" style="margin-top: 15px;">
         <canvas id="forecastChart"></canvas>
     </div>
 </div>
-<script>
-    // At the very top of your script
+   
+
+           
+          
+        </div>
+    </div>
+
+  <script>
+// ========== OPTIMIZED DASHBOARD - FASTER LOADING ==========
 console.log('🚀 SCRIPT LOADED at:', new Date().toLocaleTimeString());
+
 let chart = null;
 let currentStation = '{{ favorite_station if favorite_station else "North Ave" }}';
 let updateInterval = null;
 let countdownInterval = null;
-let northTargetTime = null;
-let southTargetTime = null;
+let currentDirection = 'north';
+let cachedData = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 30000; // 30 seconds cache
 
-// ============================================
-// SECTION 1: GET DATA (Fetching from APIs)
-// ============================================
+// Station coordinates
+const stationCoordinates = {
+    "North Ave": { lat: 14.6556, lng: 121.0302 },
+    "Quezon Ave": { lat: 14.6390, lng: 121.0380 },
+    "Kamuning": { lat: 14.6249, lng: 121.0431 },
+    "Cubao": { lat: 14.6213, lng: 121.0529 },
+    "Santolan": { lat: 14.6135, lng: 121.0630 },
+    "Ortigas": { lat: 14.5864, lng: 121.0565 },
+    "Shaw Blvd": { lat: 14.5789, lng: 121.0532 },
+    "Boni Ave": { lat: 14.5716, lng: 121.0492 },
+    "Guadalupe": { lat: 14.5655, lng: 121.0446 },
+    "Buendia": { lat: 14.5547, lng: 121.0329 },
+    "Ayala Ave": { lat: 14.5497, lng: 121.0305 },
+    "Magallanes": { lat: 14.5450, lng: 121.0254 },
+    "Taft": { lat: 14.5378, lng: 121.0112 }
+};
 
-// GET: Station congestion forecast for th next 6 hours rom LSTM API
-function loadStationData(station, showLoading = true) {
-    console.log(` ${new Date().toLocaleTimeString()} - Function started`);
-    if (showLoading) {
-        document.body.classList.add('loading');
+// Sync mobile alert badge with desktop badge
+function syncMobileAlertBadge() {
+    const desktopBadge = document.getElementById('alertBadge');
+    const mobileBadge = document.getElementById('mobileAlertBadge');
+    if (desktopBadge && mobileBadge) {
+        const count = parseInt(desktopBadge.textContent) || 0;
+        if (count > 0) {
+            mobileBadge.textContent = count > 9 ? '9+' : count;
+            mobileBadge.style.display = 'flex';
+        } else {
+            mobileBadge.style.display = 'none';
+        }
     }
+}
 
-    const now = new Date();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
-    const currentTime = hour + minute/60;
+const validStations = {{ stations | tojson }};
+
+function validateStationName(station) {
+    return validStations.includes(station) ? station : 'North Ave';
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+function findNearestStation(userLat, userLng) {
+    let nearestStation = null;
+    let shortestDistance = Infinity;
+    for (const [station, coords] of Object.entries(stationCoordinates)) {
+        const distance = calculateDistance(userLat, userLng, coords.lat, coords.lng);
+        if (distance < shortestDistance) {
+            shortestDistance = distance;
+            nearestStation = station;
+        }
+    }
+    return { station: nearestStation, distance: shortestDistance };
+}
+
+// ========== OPTIMIZED: SINGLE API CALL FOR ALL DATA ==========
+async function fetchAllData() {
+    const now = Date.now();
     
+    // Check cache
+    if (cachedData && (now - lastFetchTime) < CACHE_DURATION) {
+        console.log('📦 Using cached data');
+        return cachedData;
+    }
+    
+    console.log('🌐 Fetching fresh data...');
+    
+    try {
+        // Parallel API calls for maximum speed
+        const [forecastData, scheduleData, alertData] = await Promise.all([
+            fetch(`/api/directional-forecast/${encodeURIComponent(currentStation)}`).then(res => res.json()),
+            fetch(`/api/schedule/next-trains/${encodeURIComponent(currentStation)}`).then(res => res.json()),
+            fetch('/api/alerts/count').then(res => res.json())
+        ]);
+        
+        cachedData = { forecastData, scheduleData, alertData };
+        lastFetchTime = now;
+        
+        return cachedData;
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        return cachedData || null;
+    }
+}
+
+// ========== UPDATE ALL UI COMPONENTS AT ONCE ==========
+async function updateAllUI() {
+    const data = await fetchAllData();
+    if (!data) return;
+    
+    // Update everything in one go
+    updateForecastUI(data.forecastData);
+    updateStationStatusUI(data.forecastData);
+    updateBestTimeUI(data.forecastData);
+    updateTrainScheduleUI(data.scheduleData);
+ 
+}
+
+function updateForecastUI(data) {
+    const currentCong = currentDirection === 'north' 
+        ? (data.current?.northbound || 0)
+        : (data.current?.southbound || 0);
+    
+    const futureForecasts = currentDirection === 'north' 
+        ? data.forecasts.map(f => f.northbound)
+        : data.forecasts.map(f => f.southbound);
+    
+    const forecastData = [currentCong, ...futureForecasts];
+    updateForecastChart(forecastData, currentDirection);
+}
+
+// ========== CONGESTION HELPER - NO EMOJIS, MOBILE FRIENDLY ==========
+function getCongestionLevel(percentage) {
+    if (percentage > 80) return { level: 'severe', text: 'SEVERE', icon:'' };
+    if (percentage > 60) return { level: 'congested', text: 'CONGESTED', icon: '' };
+    if (percentage > 30) return { level: 'moderate', text: 'MODERATE', icon: '' };
+    return { level: 'light', text: 'LIGHT', icon: '' };
+}
+
+function createCongestionPill(percentage, size = 'xs') {
+    const { level, text, icon } = getCongestionLevel(percentage);
+    const sizeClass = size === 'xs' ? 'congestion-pill-xs' : 'congestion-pill';
+    return `<span class="congestion-pill congestion-${level} ${sizeClass}"><i class="${icon}"></i> ${text}</span>`;
+}
+
+function updateStationStatusUI(data) {
+    const northEl = document.getElementById('stationStatusNorth');
+    const southEl = document.getElementById('stationStatusSouth');
+    
+    const now = new Date();
+    const currentTime = now.getHours() + now.getMinutes()/60;
     const OPERATING_START = 4.5;
     const OPERATING_END = 22.5;
     
- 
-    fetch(`/api/station-forecast/${encodeURIComponent(station)}`)
-        .then(res => {
-            if (!res.ok) throw new Error(`API returned ${res.status}`);
-            return res.json();
-        })
-        .then(data => {
-            console.log('📊 LSTM Forecast data:', data);
-            updateChart(data);
-        })
-        .catch(error => {
-            console.error('❌ Error loading LSTM forecast:', error);
-        })
-        .finally(() => {
-            if (showLoading) {
-                document.body.classList.remove('loading');
-            }
-        });
-}
-
-
-// GET: Station status badge data
-/* 1. get data north and south
-   2. kunin sa api (app.py)
-   3. return
-
-*/
-function updateMainStationInfo(station, showLoading = true) {
-
-
-    if (showLoading) {
-        document.body.classList.add('loading');
-    }
-    
-    let badge = document.getElementById('stationStatusBadge');
-    let south = document.getElementById('stationStatusSouth');
-
-    
-    if (!badge && !south) {
-        setTimeout(() => updateMainStationInfo(station), 100);
+    if (currentTime < OPERATING_START || currentTime >= OPERATING_END) {
+        northEl.innerHTML = '<span class="status-pill closed"><i class="fas fa-ban"></i> CLOSED</span>';
+        southEl.innerHTML = '<span class="status-pill closed"><i class="fas fa-ban"></i> CLOSED</span>';
         return;
     }
     
-    fetch(`/api/station-forecast-badge/${encodeURIComponent(station)}`)
-        .then(res => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-        })
-        .then(data => {
-           
-
-            
-
-            console.log(' WHAT DID I GET?', data);
-        console.log(' KEYS:', Object.keys(data));
-            const now = new Date();
-            const hour = now.getHours();
-            const minute = now.getMinutes();
-            const currentTime = hour + minute/60;
-            
-            const OPERATING_START = 0;
-            const OPERATING_END = 24;
-            
-            if (currentTime < OPERATING_START || currentTime >= OPERATING_END) {
-                badge.textContent = '● CLOSED';
-                badge.style.background = '#6B7280';
-                south.textContent = '● CLOSED';
-                south.style.background = '#6B7280';
-            } 
-            else if (data.status === 'closed' || data.current === 0) {
-                badge.textContent = '● CLOSED';
-                badge.style.background = '#6B7280';
-                south.textContent = '● CLOSED';
-                south.style.background = '#6B7280';
-            }
-            else {
-                const northCongestion = data.northbound.current;
-                const southCongestion = data.southbound.current;
-                
-                                // North badge uses no// North badge uses northCongestion ONLY
-                // North badge uses northCongestion ONLY
-                if (northCongestion > 80) {
-                    badge.textContent = '● SEVERELY CONGESTED';
-                    badge.style.background = '#EF4444';  // Red
-                } else if (northCongestion > 60) {
-                    badge.textContent = '● CONGESTED';
-                    badge.style.background = '#F97316';  // Orange
-                } else if (northCongestion > 30) {
-                    badge.textContent = '● MODERATE';
-                    badge.style.background = '#F59E0B';  // Yellow
-                } else {
-                    badge.textContent = '● LIGHT';
-                    badge.style.background = '#22C55E';  // Green
-                }
-
-                // South badge uses southCongestion ONLY
-                if (southCongestion > 80) {
-                    south.textContent = '● SEVERELY CONGESTED';
-                    south.style.background = '#EF4444';  // Red
-                } else if (southCongestion > 60) {
-                    south.textContent = '● CONGESTED';
-                    south.style.background = '#F97316';  // Orange
-                } else if (southCongestion > 30) {
-                    south.textContent = '● MODERATE';
-                    south.style.background = '#F59E0B';  // Yellow
-                } else {
-                    south.textContent = '● LIGHT';
-                    south.style.background = '#22C55E';  // Green
-                }
-            }
-        })
-        .catch(error => {
-            console.error('❌ Error fetching congestion:', error);
-            badge.textContent = 'OFFLINE';
-            badge.style.background = '#94A3B8';
-            south.textContent = 'OFFLINE';
-            south.style.background = '#94A3B8';
-        });
-}
-
-// GET: Station schedule - Fetches and logs full schedule data
-function loadStationSchedule(station) {
-    console.log('📅 Fetching full schedule for:', station);
+    const northCong = data.current?.northbound || 0;
+    const southCong = data.current?.southbound || 0;
     
-    fetch(`/api/schedule/station/${encodeURIComponent(station)}`)
-        .then(res => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-        })
-        .then(data => {
-            console.log('📅 Station schedule DATA:', data);
-            
-            // Log the actual train times
-            if (data.trains) {
-                console.log(' Northbound trains:', data.trains.northbound);
-                console.log(' Southbound trains:', data.trains.southbound);
-                console.log(` Headway: ${data.headway} minutes`);
-                console.log(` Status: ${data.status}`);
-            }
-            
-            
-            
-            // You can also update the hero card if you want to show more details
-            if (data.trains && data.trains.northbound && data.trains.northbound.length > 0) {
-                const nextNorth = data.trains.northbound[0];
-                console.log(` Next Northbound: ${nextNorth.minutes} min (from ${nextNorth.from_station})`);
-            }
-            
-            if (data.trains && data.trains.southbound && data.trains.southbound.length > 0) {
-                const nextSouth = data.trains.southbound[0];
-                console.log(` Next Southbound: ${nextSouth.minutes} min (from ${nextSouth.from_station})`);
-            }
-        })
-        .catch(err => {
-            console.error('❌ Error loading schedule:', err);
-            console.log('💡 Check if /api/schedule/station endpoint is working');
-        });
+    northEl.innerHTML = createCongestionPill(northCong, 'xs');
+    southEl.innerHTML = createCongestionPill(southCong, 'xs');
 }
 
-// GET: Next train arrivals
-// GET: Next train arrivals - with debug logging
-function loadNextTrains(station) {
-    console.log('🔄 Fetching next trains for:', station);
+// Replace your updateTrainScheduleUI function with this:
+function updateTrainScheduleUI(data) {
+    const northEl = document.getElementById('northTime');
+    const southEl = document.getElementById('southTime');
+    const northOriginEl = document.getElementById('northOrigin');
+    const southOriginEl = document.getElementById('southOrigin');
     
-    fetch(`/api/schedule/next-trains/${encodeURIComponent(station)}`)
-        .then(res => res.json())
-        .then(data => {
-            console.log('🚆 Train data received:', data);
-            
-            const northEl = document.getElementById('northTime');
-            const southEl = document.getElementById('southTime');
-            const northOriginEl = document.getElementById('northOrigin');
-            const southOriginEl = document.getElementById('southOrigin');
-            
-            if (data.is_operating === false || data.is_closed === true) {
-                northEl.innerHTML = `<span style="font-size: 24px;">CLOSED</span>`;
-                southEl.innerHTML = `<span style="font-size: 24px;">CLOSED</span>`;
-                northOriginEl.textContent = `Opens at 4:30 AM`;
-                southOriginEl.textContent = `Opens at 4:30 AM`;
-                if (window.countdownInterval) clearInterval(window.countdownInterval);
-                return;
-            }
-            
-            document.querySelector('.hero-card').style.opacity = '1';
-            
-            let northMinutes = data.northbound?.minutes || 5;
-            let southMinutes = data.southbound?.minutes || 3;
-            let northOrigin = data.northbound?.from_station || data.northbound?.origin || "Taft";
-            let southOrigin = data.southbound?.from_station || data.southbound?.origin || "North Ave";
-            
-            // CRITICAL: Set the target times for countdown
-            const now = new Date();
-            northTargetTime = new Date(now.getTime() + (northMinutes * 60 * 1000));
-            southTargetTime = new Date(now.getTime() + (southMinutes * 60 * 1000));
-            
-            console.log(`🎯 Target times set: North at ${northTargetTime.toLocaleTimeString()} (${northMinutes} min), South at ${southTargetTime.toLocaleTimeString()} (${southMinutes} min)`);
-            
-            // Update display
-            northEl.innerHTML = `${northMinutes} <span>min</span>`;
-            southEl.innerHTML = `${southMinutes} <span>min</span>`;
-            northOriginEl.textContent = `Arriving from ${northOrigin} Station`;
-            southOriginEl.textContent = `Arriving from ${southOrigin} Station`;
-            
-            northEl.style.color = '';
-            southEl.style.color = '';
-            northEl.style.fontWeight = '';
-            southEl.style.fontWeight = '';
-            
-            // Restart countdown with new times
-            if (window.countdownInterval) clearInterval(window.countdownInterval);
-            startCountdown();
-        })
-        .catch(err => {
-            console.error('❌ Error loading trains:', err);
-            // Fallback: set target times 5 and 3 minutes from now
-            const now = new Date();
-            northTargetTime = new Date(now.getTime() + (5 * 60 * 1000));
-            southTargetTime = new Date(now.getTime() + (3 * 60 * 1000));
-            
-            document.getElementById('northTime').innerHTML = `5 <span>min</span>`;
-            document.getElementById('southTime').innerHTML = `3 <span>min</span>`;
-            document.getElementById('northOrigin').textContent = `Arriving from Taft Station`;
-            document.getElementById('southOrigin').textContent = `Arriving from North Ave Station`;
-            
-            if (window.countdownInterval) clearInterval(window.countdownInterval);
-            startCountdown();
-        });
-}
-
-// GET: Alert count
-function checkAlertCount() {
-    fetch('/api/alerts/count')
-        .then(res => res.json())
-        .then(data => {
-            const badge = document.getElementById('alertBadge');
-            const sidebarBadge = document.getElementById('sidebarAlertCount');
-            
-            if (data.count > 0) {
-                badge.textContent = data.display || data.count;
-                if (sidebarBadge) {
-                    sidebarBadge.textContent = data.display || data.count;
-                    sidebarBadge.style.display = 'block';
-                }
-            } else {
-                badge.textContent = '0';
-                if (sidebarBadge) {
-                    sidebarBadge.style.display = 'none';
-                }
-            }
-        })
-        .catch(() => {
-            document.getElementById('alertBadge').textContent = '0';
-            const sidebarBadge = document.getElementById('sidebarAlertCount');
-            if (sidebarBadge) {
-                sidebarBadge.style.display = 'none';
-            }
-        });
-}
-
-// GET: Rush hour/headway data
-function updateRushAlert() {
-    const station = currentStation;
-    
-    fetch(`/api/schedule/headway`)
-        .then(res => res.json())
-        .then(data => {
-            const now = new Date();
-            const hour = now.getHours();
-            const minute = now.getMinutes();
-            const currentTime = hour + minute/60;
-            
-            const OPERATING_START = 4.5;
-            const OPERATING_END = 22.5;
-            const MORNING_RUSH_START = 7;
-            const MORNING_RUSH_END = 9;
-            const EVENING_RUSH_START = 17;
-            const EVENING_RUSH_END = 19;
-            
-            let stationDisplay = station;
-            if (station === "Cubao") stationDisplay = "Araneta Center - Cubao Station";
-            else if (station.includes("Ave")) stationDisplay = station + " Station";
-            else stationDisplay = station + " Station";
-            
-            let alertMessage = '';
-            let showAlert = true;
-            
-            if (currentTime < OPERATING_START) {
-                alertMessage = `<strong>MRT-3 IS CLOSED</strong> · Opens at 4:30 AM`;
-            } 
-            else if (currentTime >= OPERATING_END) {
-                alertMessage = `<strong>MRT-3 IS CLOSED</strong> · Resumes at 4:30 AM tomorrow`;
-            }
-            else {
-                const isMorningRush = (hour >= MORNING_RUSH_START && hour < MORNING_RUSH_END);
-                const isEveningRush = (hour >= EVENING_RUSH_START && hour < EVENING_RUSH_END);
-                
-                if (isMorningRush) {
-                    const minutesLeft = (MORNING_RUSH_END - hour - 1) * 60 + (60 - minute);
-                    alertMessage = `<strong> MORNING RUSH HOUR NOW</strong> at ${stationDisplay} · ${minutesLeft} minutes remaining · Expect 3.5 min intervals`;
-                }
-                else if (isEveningRush) {
-                    const minutesLeft = (EVENING_RUSH_END - hour - 1) * 60 + (60 - minute);
-                    alertMessage = `<strong>EVENING RUSH HOUR NOW</strong> at ${stationDisplay} · ${minutesLeft} minutes remaining · Expect 3.5 min intervals`;
-                }
-                else {
-                    showAlert = false;
-                }
-            }
-            
-            const rushAlertBanner = document.getElementById('rushAlert');
-            
-            if (showAlert && alertMessage) {
-                document.getElementById('alertMessage').innerHTML = alertMessage;
-                rushAlertBanner.style.display = 'flex';
-            } else {
-                rushAlertBanner.style.display = 'none';
-            }
-        })
-        .catch(() => {
-            const hour = new Date().getHours();
-            const isMorningRush = (hour >= 7 && hour < 9);
-            const isEveningRush = (hour >= 17 && hour < 19);
-            
-            const rushAlertBanner = document.getElementById('rushAlert');
-            
-            if (isMorningRush || isEveningRush) {
-                const period = isMorningRush ? 'MORNING' : 'EVENING';
-                document.getElementById('alertMessage').innerHTML = `<strong>${period} RUSH HOUR NOW</strong> · Expect 3.5 min train intervals`;
-                rushAlertBanner.style.display = 'flex';
-            } else {
-                rushAlertBanner.style.display = 'none';
-            }
-        });
-}
-
-// GET: Best time text data
-/*
-1. get yung id sa html
-3. kunin sa api yung data
-4. loop yung forecast
-5. ibase ang foreacast sa prediction
-6. 
-
-*/
-function updateBestTimeText(station) {
-    //1 get data
-    const currentStation = station
-    const bestStation    = document.getElementById('bestStationName') ;
-    const bestText = document.getElementById('bestTimeText');
-    const current = document.getElementById('StatusStation');
-
-    if (bestStation) bestStation.textContent = currentStation;
-
-
-
-    //2 get api
-    fetch('/api/station-forecast-badge/' + encodeURIComponent(station))
-        .then(res => {
-            if (!res.ok) throw new Error('${res.status}');
-            return res.json();
-        })
-        .then(data => {
-
-            console.log('2. Got data:', data);
-            console.log('3. Northbound:', data.northbound);
-            console.log('4. Forecast:', data.northbound?.forecast);
-          
-            //3. loop forecast
-            const currentCongestion = data.current;
-            const now = new Date()
-            const hour = now.getHours();
-            const minutes = now.getMinutes();
-            const currentTime = hour + minutes/60
-
-            const forecastNorth = data.northbound.forecast;
-            const forecastSouth = data.souuthbound.forecast;
-
-            const bothLow = {
-                north: data.northbound.forecast[0],
-                south: data.southbound.forecast[0]
-            };
-            let bestindex = 0;
-            
-
-
-            //4.create message based on forecast
-            for (let i = 1; i < bothLow.north.length; i++) {
-                if (bothLow.north[i] < lowCongestion) {
-
-                    bestindex = i;
-
-                    
-                    lowCongestion = forecastNorth[i];
-
-                }
-            }
-
-           
-            const currentHour = bestindex + 1; 
-            const hourNow = currentHour + hour;
-            const ampm = hourNow >= 12 ? 'PM' : 'AM';
-            const displayHour = hourNow % 12 || 12;
-
-            bestTimeText.textContent = 'Best time is ' + displayHour + ':00 ' + ampm + ' with only ' + lowCongestion + '% congestion';
-            
-
-             })
-            .catch(error => {
-
-            });
-            
-            
-
-
-
-       
-
-       
-}
-
-// ============================================
-// SECTION 2: ACTION (Process/Transform/Update UI)
-// ============================================
-
-// ACTION: Update chart with forecast data
-function updateChart(data) {
-    const ctx = document.getElementById('forecastChart').getContext('2d');
-    
-    if (chart) {
-        chart.destroy();
+    // Check if MRT is operating
+    if (data.is_operating === false || data.is_closed === true) {
+        northEl.innerHTML = '<span>CLOSED</span>';
+        southEl.innerHTML = '<span>CLOSED</span>';
+        northOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
+        southOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
+        return;
     }
     
-    let forecastData = [];
-    if (data.forecast && Array.isArray(data.forecast)) {
-        forecastData = data.forecast;
-    } else if (Array.isArray(data)) {
-        forecastData = data;
+    // Use the actual API response data
+    const northMinutes = data.northbound?.minutes || 5;
+    const southMinutes = data.southbound?.minutes || 3;
+    const northOrigin = data.northbound?.origin || data.northbound?.from_station || 'Taft';
+    const southOrigin = data.southbound?.origin || data.southbound?.from_station || 'North Ave';
+    
+    // Display the accurate times
+    northEl.innerHTML = `${northMinutes} <span>min</span>`;
+    southEl.innerHTML = `${southMinutes} <span>min</span>`;
+    
+    // Show where the train is coming from
+    northOriginEl.textContent = `Arriving from ${northOrigin}`;
+    southOriginEl.textContent = `Arriving from ${southOrigin}`;
+    
+    // Add warning if train is delayed or during off-peak
+    if (data.headway && data.headway > 6) {
+        northOriginEl.style.color = '#F97316';
+        southOriginEl.style.color = '#F97316';
     } else {
-        forecastData = [60, 65, 70, 68, 62, 55];
+        northOriginEl.style.color = 'var(--text-light)';
+        southOriginEl.style.color = 'var(--text-light)';
+    }
+}
+// Replace the fetchAlertCount function in your Dashboard with this:
+async function fetchAlertCount() {
+    try {
+        // Get read status from localStorage (same as Alerts page)
+        let readAlerts = new Set();
+        const saved = localStorage.getItem('readAlerts');
+        if (saved) {
+            readAlerts = new Set(JSON.parse(saved));
+        }
+        
+        // Generate alerts using the SAME logic as Alerts page
+        const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
+            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+            "Ayala Ave", "Magallanes", "Taft"];
+        
+        let allAlerts = [];
+        const now = new Date();
+        const hour = now.getHours();
+        
+        // 1. Rush Hour Alert
+        if ((hour >= 7 && hour <= 9)) {
+            allAlerts.push({ id: 'rush-morning-permanent' });
+        } else if ((hour >= 17 && hour <= 19)) {
+            allAlerts.push({ id: 'rush-evening-permanent' });
+        }
+        
+        // 2. Advisory Alert
+        if (hour >= 0 && hour < 5) {
+            allAlerts.push({ id: 'advisory-early-morning-permanent' });
+        } else if (hour >= 5 && hour < 7) {
+            allAlerts.push({ id: 'advisory-pre-rush-permanent' });
+        } else if (hour >= 10 && hour < 16) {
+            allAlerts.push({ id: 'advisory-midday-permanent' });
+        } else if (hour >= 20 && hour < 22.5) {
+            allAlerts.push({ id: 'advisory-late-evening-permanent' });
+        } else if (hour >= 22.5 || hour === 23) {
+            allAlerts.push({ id: 'advisory-service-ended-permanent' });
+        }
+        
+        // 3. Congestion Advisory
+        if (hour >= 21 || hour < 5) {
+            allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
+        } else if (hour >= 14 && hour < 17) {
+            allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
+        }
+        
+        // 4. Service Notices
+        const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+        if (isWeekend) {
+            allAlerts.push({ id: 'service-weekend-permanent' });
+        }
+        if (hour >= 23 || hour <= 3) {
+            allAlerts.push({ id: 'service-maintenance-night-permanent' });
+        }
+        
+        // 5. Congestion alerts - COUNT ALL LEVELS (>0%, same as Alerts page)
+        try {
+            const response = await fetch('/api/live-map/directions/v2');
+            const data = await response.json();
+            
+            if (data && data.northbound && data.southbound) {
+                for (const station of STATIONS) {
+                    const northData = data.northbound[station];
+                    const southData = data.southbound[station];
+                    
+                    // COUNT ALL congestion levels (>0%) to match Alerts page
+                    if (northData && northData.congestion > 0) {
+                        allAlerts.push({ id: `congestion-${station}-northbound` });
+                    }
+                    if (southData && southData.congestion > 0) {
+                        allAlerts.push({ id: `congestion-${station}-southbound` });
+                    }
+                }
+            }
+        } catch (e) {
+            console.log('Could not fetch congestion alerts:', e);
+        }
+        
+        // 6. Operator broadcasts
+        try {
+            const broadcastResponse = await fetch('/api/broadcasts/public');
+            const broadcastData = await broadcastResponse.json();
+            if (broadcastData.success && broadcastData.broadcasts) {
+                broadcastData.broadcasts.forEach(b => {
+                    allAlerts.push({ id: `broadcast-${b.id}` });
+                });
+            }
+        } catch (e) {
+            console.log('Could not fetch broadcasts:', e);
+        }
+        
+        // Count ONLY unread alerts
+        let unreadCount = 0;
+        for (const alert of allAlerts) {
+            if (!readAlerts.has(alert.id)) {
+                unreadCount++;
+            }
+        }
+        
+        console.log('Dashboard total alerts generated:', allAlerts.length);
+        console.log('Dashboard unread alert count:', unreadCount);
+        return unreadCount;
+        
+    } catch (error) {
+        console.error('Error calculating alert count:', error);
+        return 0;
+    }
+}
+
+// Add this function
+function cleanOldReadAlerts() {
+    const saved = localStorage.getItem('readAlerts');
+    if (saved) {
+        const readAlerts = JSON.parse(saved);
+        // Check if any alert ID doesn't match the new permanent format
+        const hasOldFormat = readAlerts.some(id => 
+            id.includes('-') && !id.includes('permanent') && !id.includes('congestion-') && !id.includes('broadcast-')
+        );
+        
+        if (hasOldFormat) {
+            console.log('Cleaning old readAlerts format...');
+            localStorage.removeItem('readAlerts');
+        }
+    }
+}
+
+// Add this line inside your DOMContentLoaded, before fetchAlertCount:
+cleanOldReadAlerts();
+
+function updateAlertBadgeUI(data) {
+    const badge = document.getElementById('alertBadge');
+    const sidebarBadge = document.getElementById('sidebarAlertCount');
+    
+    // Get count from data
+    let count = 0;
+    if (typeof data === 'number') {
+        count = data;
+    } else if (data && data.count !== undefined) {
+        count = data.count;
+    } else if (data && data.unread_count !== undefined) {
+        count = data.unread_count;
+    } else if (data && data.total !== undefined) {
+        count = data.total;
     }
     
-    while (forecastData.length < 6) {
-        forecastData.push(forecastData[forecastData.length - 1] || 50);
-    }
-    forecastData = forecastData.slice(0, 6);
+    console.log('Setting dashboard alert badge to:', count);
     
-    console.log('📈 Chart data (LSTM forecast):', forecastData);
+    // Bell badge: Show 9+ for counts > 9
+    const bellDisplayValue = count > 9 ? '9+' : count;
+    
+    // Sidebar badge: Show actual number (no truncation)
+    const sidebarDisplayValue = count;
+    
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = bellDisplayValue;
+            badge.style.backgroundColor = 'var(--red)';
+            badge.style.display = 'flex';
+        } else {
+            badge.textContent = '0';
+            badge.style.backgroundColor = '#94A3B8';
+            badge.style.display = 'flex';
+        }
+    }
+    
+    if (sidebarBadge) {
+        if (count > 0) { 
+            sidebarBadge.textContent = sidebarDisplayValue;
+            sidebarBadge.style.display = 'block'; 
+        } else { 
+            sidebarBadge.style.display = 'none'; 
+        }
+    }
+    
+    syncMobileAlertBadge();
+}
+function updateBestTimeUI(data) {
+    const northCong = data.current?.northbound || 0;
+    const southCong = data.current?.southbound || 0;
+    const bestTimeText = document.getElementById('bestTimeText');
+    
+    const severeMessages = [
+        "Expect 30-60 min delays",
+        "Heavy congestion - major delays expected",
+        "Allow at least 45 minutes extra travel time",
+        "Severe crowding - consider alternative routes",
+        "Expect significant wait times at platforms"
+    ];
+    
+    const congestedMessages = [
+        "Expect 15-30 min delays",
+        "Moderate to heavy traffic ahead",
+        "Allow extra 20-25 minutes for your trip",
+        "Crowded trains - prepare for standing room only",
+        "Expect longer queue times at ticket booths"
+    ];
+    
+    const moderateMessages = [
+        "Allow extra 5-10 min",
+        "Mild congestion - slight delays possible",
+        "Expect normal rush hour conditions",
+        "Allow 8-12 minutes of buffer time",
+        "Moderate crowd - manageable wait times"
+    ];
+    
+    const lightMessages = [
+        "Smooth travel expected",
+        "Light traffic - on-time arrival likely",
+        "Clear sailing - minimal delays",
+        "Great time to travel - low congestion",
+        "Express travel conditions ahead"
+    ];
+    
+    const getAdvice = (cong) => {
+        if (cong > 80) {
+            return severeMessages[Math.floor(Math.random() * severeMessages.length)];
+        }
+        if (cong > 60) {
+            return congestedMessages[Math.floor(Math.random() * congestedMessages.length)];
+        }
+        if (cong > 30) {
+            return moderateMessages[Math.floor(Math.random() * moderateMessages.length)];
+        }
+        return lightMessages[Math.floor(Math.random() * lightMessages.length)];
+    };
+    
+    const northAdvice = getAdvice(northCong);
+    const southAdvice = getAdvice(southCong);
+    
+    bestTimeText.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 140px;">
+                <i class="fas fa-arrow-up" style="color: #3B82F6; font-size: 13px; width: 16px;"></i>
+                <strong style="font-size: 13px; min-width: 85px;">NORTHBOUND</strong>
+                ${createCongestionPill(northCong, 'xs')}
+            </div>
+            <span style="font-size: 11px; color: var(--text-light); flex: 1; text-align: left;">${northAdvice}</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 140px;">
+                <i class="fas fa-arrow-down" style="color: #10B981; font-size: 13px; width: 16px;"></i>
+                <strong style="font-size: 13px; min-width: 85px;">SOUTHBOUND</strong>
+                ${createCongestionPill(southCong, 'xs')}
+            </div>
+            <span style="font-size: 11px; color: var(--text-light); flex: 1; text-align: left;">${southAdvice}</span>
+        </div>
+    `;
+}
+
+function updateForecastChart(forecastData, direction) {
+    const ctx = document.getElementById('forecastChart').getContext('2d');
+    if (chart) chart.destroy();
     
     const now = new Date();
-    const labels = [];
-    for (let i = 0; i < 6; i++) {
+    const labels = ['NOW'];
+    for (let i = 1; i <= 6; i++) {
         const hour = (now.getHours() + i) % 24;
         const ampm = hour >= 12 ? 'PM' : 'AM';
         const hour12 = hour % 12 || 12;
         labels.push(`${hour12}:00 ${ampm}`);
     }
     
-    const nowLinePlugin = {
-        id: 'nowLine',
-        afterDraw: (chart) => {
-            if (chart.tooltip?._active?.length) return;
-            const ctx = chart.ctx;
-            const nowIndex = 0;
-            
-            if (nowIndex >= 0 && chart.data.datasets[0].data.length > nowIndex) {
-                const meta = chart.getDatasetMeta(0);
-                if (meta.data && meta.data[nowIndex]) {
-                    const x = meta.data[nowIndex].x;
-                    const topY = chart.scales.y.top;
-                    const bottomY = chart.scales.y.bottom;
-
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.setLineDash([5, 5]);
-                    ctx.moveTo(x, topY);
-                    ctx.lineTo(x, bottomY);
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = '#22C55E';
-                    ctx.stroke();
-                    
-                    ctx.fillStyle = '#22C55E';
-                    ctx.font = 'bold 10px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('NOW', x, topY - 5);
-                    ctx.restore();
-                }
-            }
-        }
-    };
-
+    const lineColor = direction === 'north' ? '#3B82F6' : '#10B981';
+    const bgColor = direction === 'north' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+    
     chart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [{
+                label: direction === 'north' ? 'Northbound Congestion' : 'Southbound Congestion',
                 data: forecastData,
-                borderColor: '#3B82F6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderColor: lineColor,
+                backgroundColor: bgColor,
                 borderWidth: 3,
                 pointBackgroundColor: (context) => {
-                    const index = context.dataIndex;
-                    const value = forecastData[index];
+                    const value = forecastData[context.dataIndex];
                     if (value > 80) return '#EF4444';
                     if (value > 60) return '#F97316';
                     if (value > 30) return '#F59E0B';
@@ -659,17 +2167,15 @@ function updateChart(data) {
                 },
                 pointBorderColor: 'white',
                 pointBorderWidth: 2,
-                pointRadius: 8,
-                pointHoverRadius: 10,
-                tension: 0.2,
-                fill: true
+                pointRadius: 6,
+                fill: true,
+                tension: 0.3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { 
-                legend: { display: false },
+            plugins: {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
@@ -683,324 +2189,191 @@ function updateChart(data) {
                     }
                 }
             },
-            scales: {
+            scales: { 
                 y: { 
                     beginAtZero: true, 
                     max: 100, 
-                    ticks: { 
-                        stepSize: 20, 
-                        font: { size: 9 },
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    }, 
-                    grid: { color: '#f0f0f0' },
-                    title: {
-                        display: true,
-                        text: 'Congestion %',
-                        font: { size: 10 }
-                    }
-                },
-                x: { 
-                    ticks: { font: { size: 9 } }, 
-                    grid: { display: false } 
-                }
+                    title: { display: true, text: 'Congestion (%)', font: { size: 11 } } 
+                } 
             }
-        },
-        plugins: [nowLinePlugin]
+        }
     });
 }
 
-// ACTION: Start live countdown timer
-// ACTION: Start live countdown timer - FIXED VERSION
-function startCountdown() {
-    // Clear existing interval
-    if (window.countdownInterval) {
-        clearInterval(window.countdownInterval);
-        window.countdownInterval = null;
-    }
+// ========== EVENT HANDLERS ==========
+function setDirection(direction) {
+    currentDirection = direction;
+    document.getElementById('toggleNorthBtn').classList.toggle('active', direction === 'north');
+    document.getElementById('toggleSouthBtn').classList.toggle('active', direction === 'south');
     
-    const northEl = document.getElementById('northTime');
-    const southEl = document.getElementById('southTime');
-    
-    if (!northEl || !southEl) return;
-    
-    // Get the target times that were set in loadNextTrains()
-    if (!northTargetTime && !southTargetTime) {
-        console.log('⚠️ No target times set yet');
-        return;
-    }
-    
-    console.log('⏰ Starting countdown - North target:', northTargetTime, 'South target:', southTargetTime);
-    
-    window.countdownInterval = setInterval(() => {
-        const now = new Date();
-        let needsRefresh = false;
-        
-        // Update northbound
-        if (northTargetTime) {
-            const remainingMs = northTargetTime - now;
-            if (remainingMs <= 0) {
-                // Train has arrived!
-                northEl.innerHTML = `NOW <span>arriving</span>`;
-                northEl.style.color = '#22C55E';
-                northEl.style.fontWeight = 'bold';
-                northTargetTime = null;
-                needsRefresh = true;
-            } else {
-                const remainingMinutes = Math.floor(remainingMs / 60000);
-                const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
-                
-                // Show minutes and seconds for better UX
-                if (remainingMinutes >= 1) {
-                    northEl.innerHTML = `${remainingMinutes} <span>min ${remainingSeconds}s</span>`;
-                } else {
-                    northEl.innerHTML = `${remainingSeconds} <span>sec</span>`;
-                }
-                
-                // Change color when less than 2 minutes
-                northEl.style.color = remainingMinutes <= 2 ? '#F97316' : '';
-                northEl.style.fontWeight = remainingMinutes <= 2 ? 'bold' : '';
-            }
-        }
-        
-        // Update southbound
-        if (southTargetTime) {
-            const remainingMs = southTargetTime - now;
-            if (remainingMs <= 0) {
-                // Train has arrived!
-                southEl.innerHTML = `NOW <span>arriving</span>`;
-                southEl.style.color = '#22C55E';
-                southEl.style.fontWeight = 'bold';
-                southTargetTime = null;
-                needsRefresh = true;
-            } else {
-                const remainingMinutes = Math.floor(remainingMs / 60000);
-                const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
-                
-                if (remainingMinutes >= 1) {
-                    southEl.innerHTML = `${remainingMinutes} <span>min ${remainingSeconds}s</span>`;
-                } else {
-                    southEl.innerHTML = `${remainingSeconds} <span>sec</span>`;
-                }
-                
-                southEl.style.color = remainingMinutes <= 2 ? '#F97316' : '';
-                southEl.style.fontWeight = remainingMinutes <= 2 ? 'bold' : '';
-            }
-        }
-        
-        // Refresh train data if both trains have arrived
-        if (needsRefresh && !northTargetTime && !southTargetTime) {
-            console.log('🔄 Both trains arrived, refreshing...');
-            setTimeout(() => loadNextTrains(currentStation), 2000);
-        }
-    }, 1000); // Update every second
-}   
-
-function debugDropdown() {
-    const dropdown = document.getElementById('forecastStationSelect');
-    if (dropdown) {
-        console.log('Dropdown exists:', dropdown);
-        console.log('Dropdown display:', window.getComputedStyle(dropdown).display);
-        console.log('Dropdown visibility:', window.getComputedStyle(dropdown).visibility);
-        console.log('Dropdown opacity:', window.getComputedStyle(dropdown).opacity);
-        console.log('Dropdown position:', window.getComputedStyle(dropdown).position);
-        console.log('Dropdown zIndex:', window.getComputedStyle(dropdown).zIndex);
-        console.log('Parent element:', dropdown.parentElement);
-        console.log('Parent display:', window.getComputedStyle(dropdown.parentElement).display);
+    // Use cached data if available, otherwise fetch
+    if (cachedData) {
+        updateForecastUI(cachedData.forecastData);
     } else {
-        console.error('Dropdown completely removed from DOM!');
+        updateAllUI();
     }
 }
-
-
-// ACTION: Change selected station (triggers multiple GETs)
 function changeStation(station) {
-    console.log('🔄 Changing station to:', station);
-    currentStation = station;
+    // Show loading overlay
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const topDropdown = document.getElementById('topStationDropdown');
+    const forecastDropdown = document.getElementById('forecastStationSelect');
     
-    document.getElementById('chartTitle').textContent = currentStation.toUpperCase() + ': NEXT 6 HOURS';
-    document.getElementById('mainStationName').textContent = currentStation;
-
-    loadStationData(currentStation);
-    updateMainStationInfo(currentStation);
-    updateBestTimeText(currentStation);
-    loadStationSchedule(currentStation);
-    updateRushAlert();
-    loadNextTrains(currentStation);
+    // Disable dropdowns while loading
+    if (topDropdown) topDropdown.disabled = true;
+    if (forecastDropdown) forecastDropdown.disabled = true;
+    
+    if (loadingOverlay) loadingOverlay.classList.add('active');
+    
+    currentStation = validateStationName(station);
+    
+    // Update dropdown values
+    if (topDropdown && topDropdown.value !== currentStation) {
+        topDropdown.value = currentStation;
+    }
+    if (forecastDropdown && forecastDropdown.value !== currentStation) {
+        forecastDropdown.value = currentStation;
+    }
+    
+    // Update the chart title text
+    const chartTitleElements = document.querySelectorAll('.chartTitle');
+    chartTitleElements.forEach(el => {
+        el.textContent = currentStation.toUpperCase() + ': NEXT 6 HOURS';
+    });
+    
+    // Update other elements
+    const mainStationName = document.getElementById('mainStationName');
+    const bestStationName = document.getElementById('bestStationName');
+    
+    if (mainStationName) mainStationName.innerHTML = currentStation;
+    
+    // Preserve the clock icon when updating best station name
+    if (bestStationName) {
+        bestStationName.innerHTML = `<i class="far fa-clock" style="padding-right:5px;"></i>${currentStation}`;
+    }
+    
+    // Clear cache to force fresh data fetch
+    cachedData = null;
+    lastFetchTime = 0;
+    
+    // Fetch new data with loading indicator
+    updateAllUI().finally(() => {
+        // Hide loading overlay and re-enable dropdowns
+        setTimeout(() => {
+            if (loadingOverlay) loadingOverlay.classList.remove('active');
+            if (topDropdown) topDropdown.disabled = false;
+            if (forecastDropdown) forecastDropdown.disabled = false;
+        }, 300);
+    });
 }
 
-// ACTION: Dismiss alert banner
-function dismissAlert() {
-    const rush = document.getElementById('rushAlert');
-    rush.style.display = 'none';
+function refreshData() {
+    cachedData = null; // Force refresh
+    updateAllUI();
 }
 
-// ACTION: Start auto-refresh cycle (calls GET functions)
 function startAutoRefresh() {
     if (updateInterval) clearInterval(updateInterval);
-    
     updateInterval = setInterval(() => {
-        console.log('🔄 Auto-refreshing data at:', new Date().toLocaleTimeString());
-        
-        
-        loadStationData(currentStation, false);
-        checkAlertCount();
-        updateMainStationInfo(currentStation);
-        updateRushAlert();
-        updateBestTimeText(currentStation);
-        loadNextTrains(currentStation);
-        
+        cachedData = null;
+        updateAllUI();
     }, 60000);
 }
 
-// ACTION: Main refresh function (calls multiple GETs)
-function refreshData() {
-    console.log('🔄 Refreshing all data...');
-    document.body.classList.add('loading');
-    
-    Promise.all([
-        
-        loadStationData(currentStation, false),
-        loadStationSchedule(currentStation),
-        checkAlertCount(),
-        loadNextTrains(currentStation),
-        updateMainStationInfo(currentStation),
-        updateBestTimeText(currentStation),
-    ]).finally(() => {
-        setTimeout(() => {
-            
-            document.body.classList.remove('loading');
-        }, 500);
-    });
-}
-
-// ============================================
-// SECTION 3: OUTPUT (Page initialization)
-// ============================================
-
-// NUCLEAR OPTION - Force dropdown to exist and be visible AT ALL TIMES
-(function nuclearDropdownFix() {
-    console.log('💣 NUCLEAR DROPDOWN FIX ACTIVATED');
-    
-    // Function to recreate dropdown if missing
-    function ensureDropdownExists() {
-        let dropdown = document.getElementById('forecastStationSelect');
-        const forecastHeader = document.querySelector('.forecast-header');
-        
-        // If dropdown doesn't exist, recreate it
-        if (!dropdown && forecastHeader) {
-            console.warn('⚠️ Dropdown MISSING! Recreating...');
-            
-            // Get current station from global variable
-            const currentStationValue = window.currentStation || 'North Ave';
-            
-            // Get stations list (you have this from Flask template)
-            const stations = {{ stations | tojson }};
-            
-            // Create new dropdown
-            const newDropdown = document.createElement('select');
-            newDropdown.id = 'forecastStationSelect';
-            newDropdown.className = 'station-select';
-            newDropdown.setAttribute('onchange', 'changeStation(this.value)');
-            
-            // Add options
-            stations.forEach(station => {
-                const option = document.createElement('option');
-                option.value = station;
-                option.textContent = station;
-                if (station === currentStationValue) {
-                    option.selected = true;
-                }
-                newDropdown.appendChild(option);
-            });
-            
-            // Add to forecast header
-            forecastHeader.appendChild(newDropdown);
-            dropdown = newDropdown;
-            console.log('✅ Dropdown recreated successfully!');
-        }
-        
-        // Force visibility if it exists
-        if (dropdown) {
-            dropdown.style.display = 'inline-block';
-            dropdown.style.visibility = 'visible';
-            dropdown.style.opacity = '1';
-            dropdown.style.position = 'relative';
-            dropdown.style.zIndex = '99999';
-            dropdown.style.pointerEvents = 'auto';
-        }
+// ========== LOCATION FUNCTIONS ==========
+function requestLocationPermission() {
+    const banner = document.getElementById('locationBanner');
+    if (!navigator.geolocation) {
+        alert('Geolocation is not supported');
+        return;
     }
     
-    // Run every second (nuclear frequency)
-    setInterval(ensureDropdownExists, 1000);
+    banner.style.display = 'block';
+    document.getElementById('nearestStationText').innerHTML = '<span class="location-loading"></span> Detecting...';
     
-    // Also run after any potential DOM changes
-    if (window.MutationObserver) {
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.type === 'childList' || mutation.type === 'attributes') {
-                    ensureDropdownExists();
-                }
-            });
-        });
-        
-        // Observe the forecast card for changes
-        const forecastCard = document.querySelector('.forecast-card');
-        if (forecastCard) {
-            observer.observe(forecastCard, { 
-                childList: true, 
-                subtree: true,
-                attributes: true 
-            });
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { station, distance } = findNearestStation(position.coords.latitude, position.coords.longitude);
+            sessionStorage.setItem('nearestStation', station);
+            let distanceText = distance < 1 ? `${(distance * 1000).toFixed(0)} meters` : `${distance.toFixed(1)} km`;
+            document.getElementById('nearestStationText').innerHTML = `<strong>${station}</strong> (${distanceText} away)`;
+        },
+        (error) => {
+            document.getElementById('nearestStationText').innerHTML = 'Location permission denied';
+            setTimeout(() => banner.style.display = 'none', 3000);
         }
-    }
-})();
-
-// Override updateChart to ensure dropdown visibility
-const originalUpdateChart = window.updateChart;
-if (originalUpdateChart) {
-    window.updateChart = function(data) {
-        originalUpdateChart(data);
-        setTimeout(() => {
-            const dropdown = document.getElementById('forecastStationSelect');
-            if (dropdown) {
-                dropdown.style.display = 'inline-block';
-                dropdown.style.visibility = 'visible';
-            }
-        }, 50);
-    };
+    );
 }
 
-// OUTPUT: Initialize page on load
+function useNearestStation() {
+    const nearest = sessionStorage.getItem('nearestStation');
+    if (nearest) {
+        changeStation(nearest);
+        dismissLocationBanner();
+    }
+}
+
+function dismissLocationBanner() {
+    document.getElementById('locationBanner').style.display = 'none';
+    sessionStorage.setItem('locationBannerDismissed', 'true');
+}
+
+function updateRushAlert() {
+    const hour = new Date().getHours();
+    const rushAlert = document.getElementById('rushAlert');
+    if ((hour >= 7 && hour < 9) || (hour >= 17 && hour < 19)) {
+        rushAlert.style.display = 'flex';
+        document.getElementById('alertMessage').innerHTML = `<strong>RUSH HOUR NOW</strong> · Expect delays`;
+    } else {
+        rushAlert.style.display = 'none';
+    }
+}
+
+function dismissAlert() {
+    document.getElementById('rushAlert').style.display = 'none';
+}
+
+// ========== INITIALIZATION ==========
 document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Page loaded, initializing dashboard...');
-    console.log('📍 Current station:', currentStation);
-    console.log('Element exists?', document.getElementById('forecastStationSelect'));
-
-    const selector = document.getElementById('forecastStationSelect');
-    if (selector) selector.value = currentStation;
     
-    setTimeout(() => {
-        loadStationData(currentStation);
-        loadStationSchedule(currentStation);
-        loadNextTrains(currentStation);
-        startAutoRefresh();
-        checkAlertCount();
-        updateRushAlert();
-        updateBestTimeText(currentStation);
-        
-        setTimeout(() => {
-            updateMainStationInfo(currentStation);
-        }, 200);
-    }, 100);
+    // Set dropdown values
+    const topSelector = document.getElementById('topStationDropdown');
+    const forecastSelector = document.getElementById('forecastStationSelect');
+    
+    if (topSelector) topSelector.value = currentStation;
+    if (forecastSelector) forecastSelector.value = currentStation;
+    
+    // FIX: Ensure the clock icon is preserved on initial load
+    const bestStationName = document.getElementById('bestStationName');
+    if (bestStationName) {
+        bestStationName.innerHTML = `<i class="far fa-clock"></i>${currentStation}`;
+    }
+    
+    const mainStationName = document.getElementById('mainStationName');
+    if (mainStationName) mainStationName.textContent = currentStation;
+
+    // Fetch alert count properly
+   fetchAlertCount().then(count => {
+    console.log('Fetched alert count:', count);
+    updateAlertBadgeUI({ count: count });
+}).catch(() => {
+    updateAlertBadgeUI({ count: 0 });
+});
+    
+    updateAllUI();
+    startAutoRefresh();
+    updateRushAlert();
 });
 
-// OUTPUT: Cleanup on page unload
-window.addEventListener('beforeunload', function() {
-    if (updateInterval) clearInterval(updateInterval);
-    if (countdownInterval) clearInterval(countdownInterval);
-});
+// Expose functions globally
+window.setDirection = setDirection;
+window.changeStation = changeStation;
+window.refreshData = refreshData;
+window.requestLocationPermission = requestLocationPermission;
+window.useNearestStation = useNearestStation;
+window.dismissLocationBanner = dismissLocationBanner;
+window.dismissAlert = dismissAlert;
 </script>
 </body>
-</html>
+</html> 
