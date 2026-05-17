@@ -13,7 +13,7 @@ dow_avg_exit = {}
 direction_counts = {}
 station_time_series = {}
 
-def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_NEW_v2w/openclose'):
+def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_NEW_v3'):
     global directional_models, directional_scalers
     
     directional_models = {}
