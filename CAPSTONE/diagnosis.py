@@ -1,6 +1,13 @@
 # TESTING SCRIPT
 """
 
+PIPELINE:
+1. Load raw MRT passenger data
+2. Engineer temporal features
+3. Create 24-hour sequence
+4. LSTM prediction
+5. Evaluate vs actual
+
 How to use?
 
 --open 2025.csv(raw data from mrt)
@@ -13,21 +20,27 @@ import tensorflow as tf
 import pickle
 import numpy as np
 import os
+import csv  
 from datetime import datetime, timedelta
+
+# ========== CREATE RESULTS FOLDER ==========
+RESULTS_FOLDER = 'test_results'
+os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
 def rmse(y_true, y_pred):
     return tf.sqrt(tf.reduce_mean(tf.square(y_true - y_pred)))
 
 # ========== CONFIG ==========
-MODEL_PATH = 'models_2023-2024'         
+MODEL_PATH = 'models_2022-2024_NEW_v2w/openclose'         
 DATA_FOLDER = 'data (2022-2024)'
 DATA_FILE = os.path.join(DATA_FOLDER, '2025.csv')
 
-"""       MODIFY HERE   """
-STATION_NAME = "North Ave"
-DIRECTION = "Northbound"
-target_time = pd.to_datetime('2025-09-29 15:00:00')
+# ========== TEST CONFIGURATION (MODIFY HERE) ==========
+STATION_NAME = "Magallanes"
+DIRECTION = "Southbound"
+target_time = pd.to_datetime('2025-01-06 14:00:00')  # ← FIXED: Added hour!
 MODEL_KEY = f"{STATION_NAME}_{DIRECTION}"
+
 SEQ_LENGTH = 24
 
 STATION_NUMBERS = {
@@ -37,7 +50,14 @@ STATION_NUMBERS = {
     "Taft": 13
 }
 
-# ========== FEATURE ENGINEERING FUNCTIONS (same as training) ==========
+# ========== VALIDATION ==========
+if STATION_NAME not in STATION_NUMBERS:
+    raise ValueError(f"Invalid station: {STATION_NAME}")
+
+if DIRECTION not in ["Northbound", "Southbound"]:
+    raise ValueError(f"Invalid direction: {DIRECTION}")
+
+# ========== FEATURE ENGINEERING FUNCTIONS ==========
 def add_cyclical_time_features(df):
     df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
     df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
@@ -94,7 +114,7 @@ def infer_direction(row):
 
 # ========== LOAD RAW DATA ==========
 print("="*60)
-print(" DIAGNOSIS SCRIPT - 2023-2024 MODELS (consistent scaling)")
+print(" DIAGNOSIS SCRIPT - LSTM Congestion Forecasting")
 print("="*60)
 print(f" Loading: {DATA_FILE}")
 
@@ -128,6 +148,35 @@ df = smart_data_cleaner(df)
 
 print(f" Features created: {len(df.columns)} columns")
 
+# ========== CHECK IF MAX PASSENGERS FILE EXISTS ==========
+max_file_path = f'{MODEL_PATH}/per_direction_max_passengers.pkl'
+
+if not os.path.exists(max_file_path):
+    print(f"⚠️ File not found: {max_file_path}")
+    print("📊 Creating it from available data...")
+    
+    per_direction_max = {}
+    station_numbers_reverse = {v: k for k, v in STATION_NUMBERS.items()}
+    
+    for station_num, station_name in station_numbers_reverse.items():
+        for direction in ['Northbound', 'Southbound']:
+            temp_df = df[(df['StationEntry'] == station_num) | (df['StationExit'] == station_num)]
+            temp_df = temp_df[temp_df['Direction'] == direction]
+            
+            if len(temp_df) > 0:
+                max_val = temp_df['TotalPassenger'].max()
+                key = f"{station_name}_{direction}"
+                per_direction_max[key] = max_val
+                print(f"  {key}: {max_val}")
+            else:
+                key = f"{station_name}_{direction}"
+                per_direction_max[key] = 500
+                print(f"  {key}: 500 (fallback)")
+    
+    with open(max_file_path, 'wb') as f:
+        pickle.dump(per_direction_max, f)
+    print(f"✅ Created: {max_file_path}")
+
 # ========== LOAD MODEL ==========
 print(f"\n Loading model: {MODEL_KEY}...")
 print(f"   From: {MODEL_PATH}")
@@ -143,7 +192,7 @@ with open(f'{MODEL_PATH}/{MODEL_KEY}_target_scaler.pkl', 'rb') as f:
 print(" Model loaded")
 
 # ========== LOAD PER-DIRECTION MAX PASSENGERS ==========
-with open(f'{MODEL_PATH}/per_direction_max_passengers.pkl', 'rb') as f:
+with open(max_file_path, 'rb') as f:
     per_direction_max = pickle.load(f)
 print(f" Loaded per-direction max passengers for {len(per_direction_max)} models.")
 
@@ -177,6 +226,10 @@ station_df = station_df.groupby('hour_timestamp').agg({
 # Use the saved per-direction max for consistent scaling
 key = f"{STATION_NAME}_{DIRECTION}"
 global_max = per_direction_max[key]
+print(f"\n🔍 DEBUG: {key} max passengers = {global_max}")
+
+actual_max = station_df['TotalPassenger'].max()
+print(f"🔍 DEBUG: Actual max in this data = {actual_max}")
 station_df['congestion'] = (station_df['TotalPassenger'] / global_max * 100).clip(0, 100)
 
 print(f" {len(station_df)} hourly records (using training max: {global_max:.0f})")
@@ -229,25 +282,66 @@ pred_congestion = np.clip(pred_congestion, 0, 100)
 
 # ========== RESULTS ==========
 diff = abs(actual_congestion - pred_congestion)
-error_pct = diff / max(actual_congestion, 0.1) * 100
+absolute_error = diff
+
+if actual_congestion > 5:
+    percentage_error = (diff / actual_congestion) * 100
+else:
+    percentage_error = 0
 
 print(f"\n{'='*60}")
-print(f" RESULT: {MODEL_KEY} (2023-2024 Model)")
+print(f" RESULT: {MODEL_KEY}")
 print(f"{'='*60}")
 print(f"  Predicted: {pred_congestion:.1f}%")
 print(f"  Actual:    {actual_congestion:.1f}%")
-print(f"  Error:     {diff:.1f}% ({error_pct:.1f}%)")
+print(f"  Absolute Error: {absolute_error:.1f} percentage points")
+print(f"  Percentage Error: {percentage_error:.1f}%")
 
-if error_pct < 10:
-    print(f"\n EXCELLENT")
-elif error_pct < 20:
-    print(f"\n GOOD!")
-elif error_pct < 30:
-    print(f"\n OKAY")
+if absolute_error <= 5:
+    print(f"\n EXCELLENT (within 5 percentage points)")
+    verdict = 'EXCELLENT'
+elif absolute_error <= 10:
+    print(f"\n GOOD! (within 10 percentage points)")
+    verdict = 'GOOD'
+elif absolute_error <= 15:
+    print(f"\n OKAY (within 15 percentage points)")
+    verdict = 'OKAY'
 else:
-    print(f"\n Check model - error is high")
+    print(f"\n Needs improvement - error > 15 percentage points")
+    verdict = 'NEEDS_IMPROVEMENT'
 
-print(f" Model error: {error_pct:.1f}%")
-print("\n" + "="*60)
+# ========== SAVE TO RESULTS FOLDER ==========
+# Create a single filename for this station+direction
+results_filename = os.path.join(RESULTS_FOLDER, f'{STATION_NAME}_{DIRECTION}_results.csv')
+
+# Check if file exists to determine if we need headers
+file_exists = os.path.isfile(results_filename)
+
+# Open in append mode ('a') instead of write mode ('w')
+with open(results_filename, 'a', newline='') as csvfile:
+    fieldnames = ['timestamp', 'station', 'direction', 'target_time', 
+                  'predicted', 'actual', 'absolute_error', 'percentage_error', 'verdict']
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    
+    # Write header only if file is new
+    if not file_exists:
+        writer.writeheader()
+    
+    # Write the result
+    writer.writerow({
+        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        'station': STATION_NAME,
+        'direction': DIRECTION,
+        'target_time': str(target_time),
+        'predicted': round(pred_congestion, 1),
+        'actual': round(actual_congestion, 1),
+        'absolute_error': round(absolute_error, 1),
+        'percentage_error': round(percentage_error, 1),
+        'verdict': verdict
+    })
+
+print(f"\n Result appended to: {results_filename}")
+print(f"\n Model absolute error: {absolute_error:.1f} points | Percentage error: {percentage_error:.1f}%")
+print("="*60)
 print(" DIAGNOSIS COMPLETE")
 print("="*60)

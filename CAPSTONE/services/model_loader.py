@@ -1,6 +1,7 @@
 import os
 import pickle
 import tensorflow as tf
+from tensorflow.keras.saving import register_keras_serializable
 
 directional_models = {}
 directional_scalers = {}
@@ -13,88 +14,132 @@ dow_avg_exit = {}
 direction_counts = {}
 station_time_series = {}
 
-def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_NEW_v3'):
+# Register the rmse function so it can be loaded
+@register_keras_serializable()
+def rmse(y_true, y_pred):
+    return tf.sqrt(tf.reduce_mean(tf.square(y_true - y_pred)))
+
+def debug_prediction(station, direction, features):
+    """Debug why predictions are stuck at 38%"""
+    model_key = f"{station}_{direction}"
+    
+    print(f"\n{'='*50}")
+    print(f"DEBUG: {model_key}")
+    print(f"{'='*50}")
+    
+    # 1. Check if model exists
+    print(f"1. Model in directional_models: {model_key in directional_models}")
+    if model_key not in directional_models:
+        print(f"   Available models: {list(directional_models.keys())[:5]}...")
+        return None
+    
+    # 2. Check scalers
+    feature_key = f'{model_key}_feature'
+    target_key = f'{model_key}_target'
+    
+    print(f"2. Feature scaler exists: {feature_key in directional_scalers}")
+    print(f"3. Target scaler exists: {target_key in directional_scalers}")
+    
+    if feature_key not in directional_scalers:
+        print(f"   Available scalers: {list(directional_scalers.keys())[:5]}...")
+        return None
+    
+    # 4. Get the actual model and scaler
+    model = directional_models[model_key]
+    feature_scaler = directional_scalers[feature_key]
+    target_scaler = directional_scalers.get(target_key)  # Might be None
+    
+    # 5. Check input features BEFORE scaling
+    print(f"\n4. Input features shape: {features.shape}")
+    print(f"   First row, first 5 values: {features[0, :5]}")
+    print(f"   Min/Max values in features: {features.min():.3f} / {features.max():.3f}")
+    
+    # 6. Scale features
+    features_scaled = feature_scaler.transform(features)
+    print(f"\n5. After scaling:")
+    print(f"   First row, first 5 values: {features_scaled[0, :5]}")
+    print(f"   Min/Max scaled: {features_scaled.min():.3f} / {features_scaled.max():.3f}")
+    
+    # 7. Check if scaling worked (should be roughly 0-1 range)
+    if features_scaled.max() > 5 or features_scaled.min() < -5:
+        print(f"   ⚠️ WARNING: Scaling seems off! Range too large")
+    
+    # 8. Make prediction
+    print(f"\n6. Making prediction...")
+    pred_scaled = model.predict(features_scaled, verbose=0)
+    print(f"   Raw model output: {pred_scaled[0]}")
+    print(f"   Shape: {pred_scaled.shape}")
+    
+    # 9. Inverse transform
+    if target_scaler is not None:
+        print(f"\n7. Using target scaler to inverse transform...")
+        pred_congestion = target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))
+        pred_congestion = pred_congestion[0][0]
+        print(f"   After inverse transform: {pred_congestion}")
+    else:
+        print(f"\n7. No target scaler! Converting directly...")
+        # This is likely your problem - the model outputs scaled values (0-1)
+        # But you're treating it as percentage
+        pred_congestion = pred_scaled[0][0]
+        print(f"   Raw output as percentage: {pred_congestion}")
+        print(f"   Raw output * 100: {pred_congestion * 100}")
+        
+        # If raw output is 0.38, then *100 = 38% (matches your issue!)
+        if 0.35 < pred_scaled[0][0] < 0.41:
+            print(f"\n   🔴 PROBLEM IDENTIFIED!")
+            print(f"   Model output is {pred_scaled[0][0]:.3f} (0-1 scale)")
+            print(f"   But you're missing target_scaler to convert to 0-100%")
+            print(f"   Expected: multiply by 100 = {pred_scaled[0][0]*100:.1f}%")
+            print(f"   But you're not doing this conversion!")
+    
+    # 10. Clip to valid range
+    pred_congestion = max(0, min(100, pred_congestion))
+    
+    print(f"\n8. FINAL PREDICTION: {pred_congestion:.1f}%")
+    
+    return pred_congestion
+
+def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_NEW_v2w/openclose'):
     global directional_models, directional_scalers
     
     directional_models = {}
     directional_scalers = {}
     
-    print(f"\nLOADING DIRECTIONAL MODELS...")
-    print(f"Looking in: {DIRECTIONAL_MODELS_PATH}")
-    
-    if not os.path.exists(DIRECTIONAL_MODELS_PATH):
-        print(f"Directory {DIRECTIONAL_MODELS_PATH} not found!")
-        print(f"Current working directory: {os.getcwd()}")
-        return directional_models, directional_scalers
-    
-    print(f"Found directory. Looking for model files...")
-    
-    models_loaded = 0
-    
     for station in STATIONS:
         for direction in ['Northbound', 'Southbound']:
             model_key = f"{station}_{direction}"
-            station_underscore = station.replace(' ', '_')
-            model_key_underscore = f"{station_underscore}_{direction}"
             
-            possible_model_paths = [
-                f'{DIRECTIONAL_MODELS_PATH}/{model_key}_lstm_enhanced.keras',
-                f'{DIRECTIONAL_MODELS_PATH}/{model_key}_best.keras',
-                f'{DIRECTIONAL_MODELS_PATH}/{model_key}.keras',
-                f'{DIRECTIONAL_MODELS_PATH}/{model_key_underscore}_lstm_enhanced.keras',
-                f'{DIRECTIONAL_MODELS_PATH}/{model_key_underscore}_best.keras',
-            ]
+            # Check for BOTH model and both scalers
+            model_path = f'{DIRECTIONAL_MODELS_PATH}/{model_key}_lstm_enhanced.keras'
+            feature_scaler_path = f'{DIRECTIONAL_MODELS_PATH}/{model_key}_feature_scaler.pkl'
+            target_scaler_path = f'{DIRECTIONAL_MODELS_PATH}/{model_key}_target_scaler.pkl'
             
-            model_path = None
-            for path in possible_model_paths:
-                if os.path.exists(path):
-                    model_path = path
-                    print(f"  Found model: {os.path.basename(path)}")
-                    break
-            
-            if model_path is None:
+            # Verify all three files exist
+            if not all([os.path.exists(model_path), 
+                       os.path.exists(feature_scaler_path),
+                       os.path.exists(target_scaler_path)]):
+                print(f"  ⚠️ Missing files for {model_key}, skipping")
                 continue
             
-            possible_scaler_paths = [
-                f'{DIRECTIONAL_MODELS_PATH}/{model_key}_feature_scaler.pkl',
-                f'{DIRECTIONAL_MODELS_PATH}/{model_key_underscore}_feature_scaler.pkl',
-            ]
-            
-            feature_scaler_path = None
-            for path in possible_scaler_paths:
-                if os.path.exists(path):
-                    feature_scaler_path = path
-                    print(f"  Found feature scaler: {os.path.basename(path)}")
-                    break
-            
-            target_scaler_path = f'{DIRECTIONAL_MODELS_PATH}/{model_key}_target_scaler.pkl'
-            if not os.path.exists(target_scaler_path):
-                target_scaler_path = None
-            
-            if feature_scaler_path:
-                try:
-                    print(f"  Loading {model_key}...")
-                    directional_models[model_key] = tf.keras.models.load_model(
-                        model_path, 
-                        compile=False
-                    )
-                    with open(feature_scaler_path, 'rb') as f:
-                        directional_scalers[f'{model_key}_feature'] = pickle.load(f)
-                    
-                    if target_scaler_path:
-                        with open(target_scaler_path, 'rb') as f:
-                            directional_scalers[f'{model_key}_target'] = pickle.load(f)
-                    
-                    models_loaded += 1
-                    print(f"  Loaded: {model_key}")
-                except Exception as e:
-                    print(f"  Error loading {model_key}: {e}")
-            else:
-                print(f"  Missing scaler for {model_key}, skipping")
+            try:
+                print(f"  Loading {model_key}...")
+                directional_models[model_key] = tf.keras.models.load_model(
+                    model_path,
+                    custom_objects={'rmse': rmse}  
+                )
+                
+                with open(feature_scaler_path, 'rb') as f:
+                    directional_scalers[f'{model_key}_feature'] = pickle.load(f)
+                
+                with open(target_scaler_path, 'rb') as f:
+                    directional_scalers[f'{model_key}_target'] = pickle.load(f)
+                
+                print(f"  ✅ Loaded {model_key}")
+                
+            except Exception as e:
+                print(f"  ❌ Error loading {model_key}: {e}")
     
-    print(f"\nLoaded {models_loaded} directional models")
-    print(f"Global directional_models now has {len(directional_models)} models")
-    
+    print(f"\n✅ Loaded {len(directional_models)} directional models")
     return directional_models, directional_scalers
 
 def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY, 
