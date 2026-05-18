@@ -1,4 +1,4 @@
-#train_local_full_optimized.py - Optimized for 3M rows (Per-Direction Models)
+#train_local_full_optimized.py 
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -18,7 +18,7 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
-# ========== OPTIMIZED CONFIGURATION FOR 3M ROWS ==========
+# ==========CONFIGURATION FOR 3M ROWS ==========
 BATCH_SIZE = 128
 EPOCHS = 120
 PATIENCE_EARLY = 15 
@@ -95,9 +95,9 @@ def infer_direction(row):
     entry = row['StationEntry']
     exit_station = row['StationExit']
     
-    if entry < exit_station:
+    if entry < exit_station:  
         return 'Southbound'
-    elif entry > exit_station:
+    elif entry > exit_station:   
         return 'Northbound'
     else:
         return 'Unknown'
@@ -322,6 +322,7 @@ def build_lstm_model(input_shape):
         return tf.sqrt(tf.reduce_mean(tf.square(y_true - y_pred)))
     
     if USE_BIDIRECTIONAL:
+        #di yan magwowork. set as FALSE si bi sa taas
         model = Sequential([
             Bidirectional(LSTM(64, return_sequences=True), input_shape=input_shape),
             Dropout(0.2),
@@ -332,11 +333,11 @@ def build_lstm_model(input_shape):
         ])
     else:
         model = Sequential([
-            LSTM(128, return_sequences=True, input_shape=input_shape),  # 64 → 128
+            LSTM(64, return_sequences=True, input_shape=input_shape), 
             Dropout(0.2),
-            LSTM(64, return_sequences=False),                           # 32 → 64
+            LSTM(32, return_sequences=False),                          
             Dropout(0.2),
-            Dense(32, activation='relu'),                               # 16 → 32
+            Dense(16, activation='relu'),                               
             Dense(1)
             ])
     
@@ -379,7 +380,6 @@ for file in files:
         chunk['is_friday'] = chunk['datetime'].apply(is_friday).astype(np.int8)
         chunk['is_rush_hour'] = ((chunk['hour'].between(7, 9)) | (chunk['hour'].between(17, 19))).astype(np.int8)
         
-        # ADD INFERRED DIRECTION
         chunk['Direction'] = chunk.apply(infer_direction, axis=1)
         
         chunks.append(chunk)

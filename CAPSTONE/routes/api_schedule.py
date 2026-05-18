@@ -154,8 +154,17 @@ def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
     current_time = target_time.time()
     
     # Check if station is open for each direction
+    
     sb_open, sb_last = get_station_opening_hours(station, "southbound")
     nb_open, nb_last = get_station_opening_hours(station, "northbound")
+    
+      # THEN: Print debug info (variables now exist!)
+    print(f"Station: {station}, Time: {current_time}")
+    print(f"SB Open: {sb_open}, SB Last: {sb_last}")
+    print(f"NB Open: {nb_open}, NB Last: {nb_last}")
+    print(f"Current > NB Last? {current_time > nb_last if nb_last else False}")
+    print(f"Current < NB Open? {current_time < nb_open if nb_open else False}")
+    
     
     headway_info = get_current_headway()
     
