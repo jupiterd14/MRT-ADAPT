@@ -148,15 +148,21 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
         print(f"❌ Unknown station: {station_name}")
         return None
     
-    # Filter EXACTLY like diagnosis script
-    station_df = df[(df['StationEntry'] == station_num) | (df['StationExit'] == station_num)]
+    # Filter for the correct station and direction
+    # For Northbound: use exits, for Southbound: use entries
+    if direction == 'Northbound':
+        station_df = df[df['StationExit'] == station_num].copy()
+    else:
+        station_df = df[df['StationEntry'] == station_num].copy()
+    
+    # Filter by direction
     station_df = station_df[station_df['Direction'] == direction].sort_values('datetime')
     
     if len(station_df) < 100:
         print(f"⚠️ Not enough data for {station_name} {direction}: {len(station_df)} rows")
         return None
     
-    # Aggregate by hour (matching diagnosis)
+    # Aggregate by hour
     station_df['hour_timestamp'] = station_df['datetime'].dt.floor('h')
     hourly = station_df.groupby('hour_timestamp').agg({
         'TotalPassenger': 'sum',
@@ -178,26 +184,16 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
         'is_maintenance_record': 'first', 'is_extended_hours': 'first'
     }).reset_index()
     
-    # Use per-direction max for congestion
+    # Calculate congestion using training max
     key = f"{station_name}_{direction}"
     if _PER_DIRECTION_MAX and key in _PER_DIRECTION_MAX:
         station_max = _PER_DIRECTION_MAX[key]
-        print(f"  DEBUG: Using _PER_DIRECTION_MAX[{key}] = {station_max}")
     else:
         station_max = hourly['TotalPassenger'].quantile(0.99)
         if station_max == 0:
             station_max = 1
-        print(f"  DEBUG: Using computed max = {station_max}")
     
-    # CRITICAL FIX: Calculate congestion WITHOUT clipping first
-    # We'll clip after dividing by 100 for normalization
-    raw_congestion = (hourly['TotalPassenger'] / station_max * 100)
-    print(f"  DEBUG: Raw congestion range: {raw_congestion.min():.1f} - {raw_congestion.max():.1f}")
-    
-    # Clip to 0-100 range (model was trained with clipped values)
-    hourly['congestion'] = raw_congestion.clip(0, 100)
-    print(f"  DEBUG: Clipped congestion range: {hourly['congestion'].min():.1f} - {hourly['congestion'].max():.1f}")
-    
+    hourly['congestion'] = (hourly['TotalPassenger'] / station_max * 100).clip(0, 100)
     hourly = hourly.sort_values('hour_timestamp')
     
     # Find target time
@@ -212,7 +208,7 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
     if idx < seq_length:
         return None
     
-    # Get sequence (matching diagnosis)
+    # Get sequence
     history_df = hourly.iloc[idx-seq_length:idx]
     
     FEATURE_COLS = [
@@ -227,32 +223,21 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
     
     features = history_df[FEATURE_COLS].values.astype(np.float32)
     
-    # Normalize (matching diagnosis)
-    features[:, 0] = features[:, 0] / 24.0   # hour
-    features[:, 1] = features[:, 1] / 7.0    # weekday
-    features[:, 2] = (features[:, 2] - 1) / 12.0  # month
-    features[:, -1] = features[:, -1] / 100.0  # congestion (now 0-1 range)
+    scaler_path = f'models_2022-2024_v5/{station_name}_{direction}_feature_scaler.pkl'
     
-    # DEBUG: Print final feature range
-    print(f"  DEBUG: Final features - min: {features.min():.3f}, max: {features.max():.3f}")
-    print(f"  DEBUG: Congestion feature range: {features[:, -1].min():.3f} - {features[:, -1].max():.3f}")
-    # Find which column has the max value
-    max_col_idx = np.argmax(features.max(axis=0))
-    max_col_name = FEATURE_COLS[max_col_idx]
-    print(f"  DEBUG: Column with max value {features.max():.1f} is '{max_col_name}' at index {max_col_idx}")
-    print(f"  DEBUG: That column's values: min={features[:, max_col_idx].min():.2f}, max={features[:, max_col_idx].max():.2f}")
+    if os.path.exists(scaler_path):
+        with open(scaler_path, 'rb') as f:
+            feature_scaler = pickle.load(f)
+        features = feature_scaler.transform(features)
+        print(f"  DEBUG: Used saved scaler - features range: {features.min():.3f} - {features.max():.3f}")
+    else:
+        print(f"  WARNING: No scaler found at {scaler_path}")
+        # Fallback to manual normalization
+        features[:, 0] = features[:, 0] / 24.0
+        features[:, 1] = features[:, 1] / 7.0
+        features[:, 2] = (features[:, 2] - 1) / 12.0
+        features[:, -1] = features[:, -1] / 100.0
     
-    # EMERGENCY FIX: Normalize any column with values > 1
-    for col_idx in range(features.shape[1]):
-        col_min = features[:, col_idx].min()
-        col_max = features[:, col_idx].max()
-        if col_max > 1.0 and col_max - col_min > 0:
-            # Normalize to 0-1 range
-            features[:, col_idx] = (features[:, col_idx] - col_min) / (col_max - col_min)
-            print(f"  DEBUG: Normalized feature '{FEATURE_COLS[col_idx]}' (was {col_min:.1f}-{col_max:.1f}, now 0-1)")
-    
-    print(f"  DEBUG: After normalization - min: {features.min():.3f}, max: {features.max():.3f}")
-        
     return features
 
 

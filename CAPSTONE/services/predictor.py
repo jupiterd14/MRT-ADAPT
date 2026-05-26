@@ -143,7 +143,6 @@ def get_fallback_directional_prediction(station_name, direction, target_datetime
     
     return congestion
 
-
 def get_directional_prediction(station_name, direction, target_datetime=None,
                                directional_models=None, directional_scalers=None,
                                get_sequence_func=None):
@@ -175,33 +174,24 @@ def get_directional_prediction(station_name, direction, target_datetime=None,
             print(f"[DEBUG] Sequence is None, using fallback")
             return get_fallback_directional_prediction(station_name, direction, target_datetime)
         
-        feature_scaler = directional_scalers.get(f'{model_key}_feature')
-        
-        if feature_scaler is None:
-            print(f"[DEBUG] No feature scaler for {model_key}, using fallback")
-            return get_fallback_directional_prediction(station_name, direction, target_datetime)
-        
         # Ensure sequence has correct shape
         if len(sequence.shape) == 2:
             input_sequence = sequence.reshape(1, sequence.shape[0], sequence.shape[1])
         else:
             input_sequence = sequence.reshape(1, 24, -1)
         
-        # Scale features
-        n_samples, n_timesteps, n_features = input_sequence.shape
-        input_flat = input_sequence.reshape(-1, n_features)
-        input_scaled = feature_scaler.transform(input_flat)
-        input_sequence = input_scaled.reshape(n_samples, n_timesteps, n_features)
+        # IMPORTANT FIX: Skip the feature scaler because feature_engineering.py
+        # already normalizes features to the 0-1 range (or -1 to 1 for sin/cos)
+        # The model was trained on normalized features, so we can use the sequence directly
         
-        # Make prediction
+        # Make prediction directly on the normalized sequence
         pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
         
-        # FIX: Properly convert to percentage
+        # Convert to percentage
         target_scaler = directional_scalers.get(f'{model_key}_target')
         
         if target_scaler is not None:
             # Use the target scaler to inverse transform
-            # The scaler expects 2D input
             pred_reshaped = pred_scaled.reshape(-1, 1)
             prediction_raw = target_scaler.inverse_transform(pred_reshaped)
             prediction = float(prediction_raw[0][0])
