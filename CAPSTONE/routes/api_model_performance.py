@@ -1150,7 +1150,7 @@ def run_auto_tests():
                 if not available_indices:
                     continue
                 
-                num_tests = min(10, len(available_indices))
+                num_tests = min(5, len(available_indices))
                 test_indices = random.sample(available_indices, num_tests)
                 print(f"  📅 Testing {num_tests} dates")
                 
