@@ -31,8 +31,14 @@
         --flaging sa report
         --forgot password sa operator and admin
         --improve advisories
+        --
         
-        
+        # Common errors:
+        # - ImportError: No module named 'xxx'
+        # - KeyError: 'column_name'  
+        # - FileNotFoundError: models not loading
+        # - ValueError: shape mismatch
+                
         
 
 

@@ -1,4 +1,11 @@
-from flask import Blueprint, request, jsonify, session
+"""
+PREDICTION API - ML Model Endpoints Only
+Purpose: Raw congestion predictions from ML models
+Use for: Forecasts, batch predictions, route planning
+NOT for: Live map display, alerts, broadcasts
+"""
+
+from flask import Blueprint, request, jsonify, session, current_app
 from datetime import datetime, timedelta
 import numpy as np
 
@@ -12,37 +19,64 @@ STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
 # ========== HELPER FUNCTIONS ==========
 def get_directional_prediction(station_name, direction, target_datetime=None):
     """Get directional congestion prediction directly from model"""
-    from services.model_loader import directional_models, directional_scalers
-    from services import get_directional_prediction as real_prediction
-    from services import get_feature_sequence_for_station
+    # Import from main app's cached models
+    from flask import current_app
     
     print(f"[API] Called for {station_name} {direction}")
     
-    try:
-        # Call the real prediction function directly
-        result = real_prediction(
-            station_name, direction, target_datetime,
-            directional_models, directional_scalers,
-            get_feature_sequence_for_station
-        )
-        print(f"[API] Real prediction: {result:.1f}%")
-        return result
-    except Exception as e:
-        print(f"[API] Error: {e}")
-        import traceback
-        traceback.print_exc()
+    # Try to get the prediction function from app config (set in main app.py)
+    prediction_func = current_app.config.get('GET_DIRECTIONAL_PREDICTION')
     
-    # Fallback
-    print(f"[API] Using FALLBACK")
+    if prediction_func:
+        try:
+            result = prediction_func(station_name, direction, target_datetime)
+            print(f"[API] Real prediction: {result:.1f}%")
+            return result
+        except Exception as e:
+            print(f"[API] Error with prediction func: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print(f"[API] No prediction function found in config")
+        
+        # Fallback: Try to import directly from services (should have cached models)
+        try:
+            from services import get_directional_prediction as real_prediction
+            from services.model_loader import directional_models, directional_scalers
+            from services import get_feature_sequence_for_station
+            
+            result = real_prediction(
+                station_name, direction, target_datetime,
+                directional_models, directional_scalers,
+                get_feature_sequence_for_station
+            )
+            print(f"[API] Direct import prediction: {result:.1f}%")
+            return result
+        except Exception as e2:
+            print(f"[API] Direct import failed: {e2}")
+    
+    # Fallback based on time of day
+    print(f"[API] Using TIME-BASED FALLBACK")
     if target_datetime is None:
         target_datetime = datetime.now()
     hour = target_datetime.hour
-    if 7 <= hour <= 9 or 17 <= hour <= 19:
-        return 65
-    elif 10 <= hour <= 16:
+    
+    # More realistic fallback based on time
+    if 7 <= hour <= 9:  # Morning rush
+        return 75 + (hour - 7) * 5
+    elif 17 <= hour <= 19:  # Evening rush
+        return 70 + (hour - 17) * 5
+    elif 10 <= hour <= 16:  # Midday
         return 45
-    else:
+    else:  # Late night
         return 25
+
+def get_station_prediction(station_name):
+    """Get average congestion for a station"""
+    north = get_directional_prediction(station_name, 'Northbound')
+    south = get_directional_prediction(station_name, 'Southbound')
+    return (north + south) / 2
+
 # ========== MAIN PREDICTION ENDPOINTS ==========
 
 @api_predict_bp.route('/predict/<station_name>')
@@ -104,7 +138,7 @@ def directional_forecast(station_name):
     
     forecasts = []
     
-    # Current hour
+    # Current hour (hour 0)
     current_north = get_directional_prediction(name, 'Northbound', target_datetime)
     current_south = get_directional_prediction(name, 'Southbound', target_datetime)
     
@@ -115,8 +149,9 @@ def directional_forecast(station_name):
         'southbound': round(current_south, 1)
     })
     
-    # Next 5 hours
+    # Next 5 hours - IMPORTANT: Create new datetime for each hour
     for i in range(1, 6):
+        # Create a NEW datetime object for each forecast hour
         forecast_time = target_datetime + timedelta(hours=i)
         
         north = get_directional_prediction(name, 'Northbound', forecast_time)
@@ -145,8 +180,9 @@ def batch_predict():
     """Get congestion for all stations at once"""
     results = []
     for station in STATIONS:
-        congestion = get_station_prediction(station)
-        congestion = max(0, min(100, congestion))
+        north = get_directional_prediction(station, 'Northbound')
+        south = get_directional_prediction(station, 'Southbound')
+        congestion = (north + south) / 2
         
         if congestion >= 75: status = "🔴 CRITICAL"
         elif congestion >= 55: status = "🟠 BUSY"
@@ -156,6 +192,8 @@ def batch_predict():
         results.append({
             "station": station,
             "congestion": round(congestion, 1),
+            "northbound": round(north, 1),
+            "southbound": round(south, 1),
             "status": status
         })
     
@@ -229,8 +267,12 @@ def predict_route():
             year, month, day = map(int, date.split('-'))
             hour, minute = map(int, time.split(':'))
             target_datetime = datetime(year, month, day, hour, minute)
-            congestion_from = get_station_prediction_for_datetime(from_station, target_datetime)
-            congestion_to = get_station_prediction_for_datetime(to_station, target_datetime)
+            north_from = get_directional_prediction(from_station, 'Northbound', target_datetime)
+            south_from = get_directional_prediction(from_station, 'Southbound', target_datetime)
+            north_to = get_directional_prediction(to_station, 'Northbound', target_datetime)
+            south_to = get_directional_prediction(to_station, 'Southbound', target_datetime)
+            congestion_from = (north_from + south_from) / 2
+            congestion_to = (north_to + south_to) / 2
         except:
             congestion_from = get_station_prediction(from_station)
             congestion_to = get_station_prediction(to_station)
@@ -269,9 +311,3 @@ def predict_route():
         "stations_between": station_diff,
         "recommendation": recommendation
     })
-
-def get_station_prediction_for_datetime(station_name, target_datetime):
-    """Get prediction for specific datetime"""
-    north = get_directional_prediction(station_name, 'Northbound', target_datetime)
-    south = get_directional_prediction(station_name, 'Southbound', target_datetime)
-    return (north + south) / 2

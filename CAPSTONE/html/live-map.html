@@ -50,7 +50,7 @@ body {
 
 /* ========== SIDEBAR - RESPONSIVE (MOVED OUTSIDE MOBILE MEDIA QUERY) ========== */
 .sidebar {
-    width: 300px;
+    width: 300px !important;
     background-color: var(--sidebar-bg);
     color: white;
     display: flex;
@@ -173,16 +173,36 @@ nav {
     align-items: center;
 }
 
+  .header-subtitle {
+            font-size: 13px;
+            color: var(--text-light);
+            margin-bottom: 30px;
+        }
 
 
+
+/* Find this existing CSS rule (around line 200) and replace it: */
 .header-top h1 {
-    font-size: 18px;
+    font-size: 1.25rem;
     color: var(--text-dark);
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
+/* Replace with this enhanced version: */
+.header-top h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #1E293B 0%, #3B82F6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
 
 .header-icons {
     display: flex;
@@ -855,6 +875,10 @@ nav {
 @media screen and (max-width: 768px) {
     /* Hide desktop sidebar completely */
 
+     .header-subtitle {
+        font-size: 11px;
+    }
+    
     
     .sidebar {
         display: none !important;
@@ -1126,6 +1150,7 @@ nav {
 
         <div class="header-top">
             <h1>Live Map</h1>
+
             <div class="header-icons">
                 <span class="icon-btn" onclick="refreshMap()"><i class="fas fa-sync-alt"></i></span>
                 <span class="icon-btn" onclick="window.location.href='/alerts'">
@@ -1135,6 +1160,9 @@ nav {
             </div>
         </div>
 
+         <div class="header-subtitle">
+       Overall stations from Northbound and Southbound
+    </div>
 
         <!-- Direction Toggle -->
         <div class="direction-toggle">
@@ -1312,6 +1340,8 @@ function goToReport() {
     const stationName = document.getElementById('modalStationName').textContent;
     window.location.href = '/report?station=' + encodeURIComponent(stationName);
 }
+
+
 
 // ========== OPTIMIZED: Single API Call with Caching ==========
 async function fetchStationData() {

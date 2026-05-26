@@ -31,14 +31,14 @@ def rmse(y_true, y_pred):
     return tf.sqrt(tf.reduce_mean(tf.square(y_true - y_pred)))
 
 # ========== CONFIG ==========
-MODEL_PATH = 'models_2022-2024_NEW_v2w/openclose'         
+MODEL_PATH = 'models_2022-2024_v5'         
 DATA_FOLDER = 'data (2022-2024)'
 DATA_FILE = os.path.join(DATA_FOLDER, '2025.csv')
 
 # ========== TEST CONFIGURATION (MODIFY HERE) ==========
 STATION_NAME = "Magallanes"
 DIRECTION = "Southbound"
-target_time = pd.to_datetime('2025-01-06 14:00:00')  # ← FIXED: Added hour!
+target_time = pd.to_datetime('2025-01-06 14:00:00')  
 MODEL_KEY = f"{STATION_NAME}_{DIRECTION}"
 
 SEQ_LENGTH = 24

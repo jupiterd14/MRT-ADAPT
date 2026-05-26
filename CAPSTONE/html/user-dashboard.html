@@ -800,7 +800,6 @@ canvas {
 }
 
 @media screen and (max-width: 640px) {
-
    
     .best-time-text > div {
         flex-wrap: wrap !important;
@@ -830,6 +829,10 @@ canvas {
 
 /* Update the media query for mobile - keep cards side by side */
 @media screen and (max-width: 768px) {
+
+    .header-top h1 {
+    font-size: 17px !important;
+    }
 
     .custom-btn {
     background: white;
@@ -1464,6 +1467,203 @@ canvas {
     cursor: not-allowed;
 }
 
+.header-subtitle {
+            font-size: 13px;
+            color: var(--text-light);
+            margin-bottom: 30px;
+        }
+
+/* Find this existing CSS rule (around line 200) and replace it: */
+.header-top h1 {
+    font-size: 1.25rem;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Replace with this enhanced version: */
+.header-top h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #1E293B 0%, #3B82F6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* REPLACE the hero card, best time card, and related styles with these cleaner versions */
+
+/* Hero Card - Clean professional look */
+.hero-card {
+    background: var(--light-bluew);
+    border: 2px solid var(--dark-bluew);
+    border-radius: 20px;
+    padding: 25px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.hero-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Best Time Card - Clean professional look */
+.best-time-card {
+    background: white;
+    border: 2px solid var(--dark-bluew);
+    border-radius: 16px;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.best-time-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Train Direction Cards - Clean look */
+.train-direction-card {
+    background: white;
+    border-radius: 16px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid var(--border);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.train-direction-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    border-color: var(--accent-blue);
+}
+
+.north {
+    background: #f7f7f7;
+}
+
+.south {
+    background: #eefcff;
+}
+
+/* Arrival Timer - Keep the gradient text but cleaner */
+.arrival-timer {
+    font-size: 48px;
+    font-weight: bold;
+    color: var(--accent-blue);
+}
+
+/* Station Title - Clean */
+.station-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: black;
+    display: inline-block;
+}
+
+/* Forecast Card - Clean */
+.forecast-card {
+    background: white;
+    border: 2px solid var(--border);
+    border-radius: 20px;
+    padding: 20px;
+    transition: all 0.3s ease;
+}
+
+.forecast-card:hover {
+    border-color: var(--accent-blue);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.1);
+}
+
+/* Toggle Buttons - Keep as is, they're fine */
+.toggle-btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    background: transparent;
+    color: #64748B;
+}
+
+.toggle-btn.active {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #2563EB 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+}
+
+/* Custom Button - Keep the ripple effect, it's nice */
+.custom-btn {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.custom-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.custom-btn:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* Congestion Section Header - Clean */
+.congestion h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+/* Chart Container - Clean */
+.chart-container {
+    background: white;
+    border-radius: 16px;
+    padding: 10px;
+}
+
+/* Remove the shimmer animation and keep it clean */
+/* Remove the ::before pseudo-element from hero-card */
+.hero-card::before {
+    display: none;
+}
+
+/* Keep the header gradient text - it looks good */
+.header-top h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #1E293B 0%, #3B82F6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}   
 </style>
 </head>
 <body>
@@ -1551,6 +1751,8 @@ canvas {
 
       <div class="header-top">
     <h1>Dashboard</h1>
+    
+
     <div class="header-icons">
     
         <span class="icon-btn" onclick="requestLocationPermission()" title="Find nearest station">
@@ -1561,8 +1763,14 @@ canvas {
             <i class="fas fa-bell"></i>
             <span class="badge" id="alertBadge">0</span>
         </span>
+
+        
     </div>
+
+    
 </div>
+
+
 
         <!-- Rush Hour Alert -->
         <div class="rush-alert-banner" id="rushAlert">
@@ -1786,17 +1994,13 @@ async function updateAllUI() {
     updateTrainScheduleUI(data.scheduleData);
  
 }
-
 function updateForecastUI(data) {
-    const currentCong = currentDirection === 'north' 
-        ? (data.current?.northbound || 0)
-        : (data.current?.southbound || 0);
-    
-    const futureForecasts = currentDirection === 'north' 
+    // The forecasts array already includes current hour as first item
+    const forecastData = currentDirection === 'north' 
         ? data.forecasts.map(f => f.northbound)
         : data.forecasts.map(f => f.southbound);
     
-    const forecastData = [currentCong, ...futureForecasts];
+    // No need to add currentCong separately - it's already the first item
     updateForecastChart(forecastData, currentDirection);
 }
 
@@ -2129,12 +2333,20 @@ function updateForecastChart(forecastData, direction) {
     if (chart) chart.destroy();
     
     const now = new Date();
-    const labels = ['NOW'];
-    for (let i = 1; i <= 6; i++) {
-        const hour = (now.getHours() + i) % 24;
+    const currentHour = now.getHours();
+    
+    // Create labels for current hour + next 5 hours (total 6 hours)
+    const labels = [];
+    for (let i = 0; i < forecastData.length; i++) {
+        const hour = (currentHour + i) % 24;
         const ampm = hour >= 12 ? 'PM' : 'AM';
         const hour12 = hour % 12 || 12;
-        labels.push(`${hour12}:00 ${ampm}`);
+        
+        if (i === 0) {
+            labels.push(`NOW (${hour12}:00 ${ampm})`);
+        } else {
+            labels.push(`${hour12}:00 ${ampm}`);
+        }
     }
     
     const lineColor = direction === 'north' ? '#3B82F6' : '#10B981';
@@ -2186,12 +2398,14 @@ function updateForecastChart(forecastData, direction) {
                     beginAtZero: true, 
                     max: 100, 
                     title: { display: true, text: 'Congestion (%)', font: { size: 11 } } 
-                } 
+                },
+                x: {
+                    title: { display: true, text: 'Time', font: { size: 11 } }
+                }
             }
         }
     });
 }
-
 // ========== EVENT HANDLERS ==========
 function setDirection(direction) {
     currentDirection = direction;

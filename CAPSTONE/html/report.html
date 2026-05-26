@@ -46,7 +46,7 @@ body {
 
 
 .sidebar {
-    width: 300px;
+    width: 300px !important;
     background-color: var(--sidebar-bg);
     color: white;
     display: flex;
@@ -181,15 +181,18 @@ nav {
             gap: 4px;
         }
 
-        .header-top h1 {
-            font-size: 1.25rem;
-            color: var(--text-dark);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin: 0;
-        }
-
+       .header-top h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #1E293B 0%, #3B82F6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
         .header-subtitle {
             font-size: 13px;
             color: var(--text-light);
@@ -298,32 +301,79 @@ nav {
             cursor: pointer;
         }
 
-        .report-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .report-card {
-            background: white;
-            border-radius: 16px;
-            padding: 30px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 2px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-            min-height: 160px;
-        }
+        @media (min-width: 1024px) {
+    .report-card {
+        min-height: 260px;
+        padding: 40px 20px;
+        gap: 20px;
+    }
+    
+    .report-card i {
+        font-size: 56px;
+    }
+    
+    .report-card h3 {
+        font-size: 24px;
+    }
+    
+    .report-card p {
+        font-size: 14px;
+    }
+}
 
-        .report-card i { 
-            font-size: 36px; 
-            margin-bottom: 4px;
-        }
+/* For very large desktops (1440px+) */
+@media (min-width: 1440px) {
+    .report-card {
+        min-height: 300px;
+        padding: 50px 30px;
+        gap: 24px;
+    }
+    
+    .report-card i {
+        font-size: 64px;
+    }
+    
+    .report-card h3 {
+        font-size: 28px;
+    }
+    
+    .report-card p {
+        font-size: 15px;
+    }
+}
+
+      .report-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    margin-bottom: 30px;
+}
+
+  .report-card {
+    background: white;
+    border-radius: 20px;
+    padding: 30px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;  /* Added to center content vertically */
+    gap: 15px;
+    min-height: 220px;  /* Increased from 160px to 220px */
+    height: auto;  /* Allow natural height */
+}
+
+
+
+
+
+       .report-card i { 
+    font-size: 44px;  /* Increased from 36px */
+    margin-bottom: 6px;
+}
         
         .report-card h3 { 
             font-size: 18px; 
@@ -336,6 +386,47 @@ nav {
             color: var(--text-light);
             line-height: 1.4;
         }
+
+        @media (min-width: 1024px) {
+    .report-card {
+        min-height: 260px;
+        padding: 40px 20px;
+        gap: 20px;
+    }
+    
+    .report-card i {
+        font-size: 56px;
+    }
+    
+    .report-card h3 {
+        font-size: 24px;
+    }
+    
+    .report-card p {
+        font-size: 14px;
+    }
+}
+
+/* For very large desktops (1440px+) */
+@media (min-width: 1440px) {
+    .report-card {
+        min-height: 300px;
+        padding: 50px 30px;
+        gap: 24px;
+    }
+    
+    .report-card i {
+        font-size: 64px;
+    }
+    
+    .report-card h3 {
+        font-size: 28px;
+    }
+    
+    .report-card p {
+        font-size: 15px;
+    }
+}
 
         .card-low { border-color: var(--green); }
         .card-low i, .card-low h3 { color: var(--green); }
@@ -1310,15 +1401,15 @@ nav {
     }
     
     .report-card i {
-        font-size: 24px;
+        font-size: 35px;
     }
     
     .report-card h3 {
-        font-size: 13px;
+        font-size: 16px;
     }
     
     .report-card p {
-        font-size: 9px;
+        font-size: 12px;
     }
     
     .direction-option {
@@ -2527,6 +2618,7 @@ function syncMobileAlertBadge() {
                 if (Array.isArray(data)) {
                     reports = data;
                     console.log("Total reports fetched:", reports.length);
+                    
                 } else {
                     console.error("Unexpected response format:", data);
                     reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Invalid response format from server</h3></div>`;
@@ -2773,15 +2865,18 @@ async function checkAlertCount() {
             if (report.anonymous) {
                 displayName = 'Anonymous';
                 avatarLetter = 'A';
-            } else if (report.username) {
-                const username = report.username;
-                if (username.includes('@')) {
-                    displayName = username.split('@')[0];
-                } else {
-                    displayName = username;
-                }
-                avatarLetter = displayName.charAt(0).toUpperCase();
-            } else {
+           } else if (report.username) {
+    const username = report.username;
+    if (username && username.includes('@')) {
+        displayName = username.split('@')[0];
+    } else if (username) {
+        displayName = username;
+    } else {
+        displayName = 'Commuter';
+        avatarLetter = 'C';
+    }
+    avatarLetter = displayName.charAt(0).toUpperCase();
+} else {
                 displayName = 'Commuter';
                 avatarLetter = 'C';
             }
@@ -2918,50 +3013,84 @@ async function checkAlertCount() {
     });
 
     function flagReport(reportId, stationName) {
-        currentFlagReportId = reportId;
-        currentFlagStationName = stationName;
-        
-        // Update modal message
-        document.getElementById('flagModalMessage').innerHTML = `Flag report from <strong>${escapeHtml(stationName)}</strong> as inappropriate?`;
-        
-        // Show modal
-        document.getElementById('flagModal').classList.add('active');
+    console.log('========== FLAG REPORT CALLED ==========');
+    console.log('reportId parameter:', reportId);
+    console.log('reportId type:', typeof reportId);
+    console.log('stationName:', stationName);
+    
+    if (!reportId) {
+        console.error('❌ reportId is null or undefined!');
+        showToast('Error: Cannot flag this report', 'error');
+        return;
     }
+    
+    currentFlagReportId = reportId;
+    currentFlagStationName = stationName;
+    
+    console.log('✅ currentFlagReportId set to:', currentFlagReportId);
+    
+    // Update modal message
+    document.getElementById('flagModalMessage').innerHTML = `Flag report from <strong>${escapeHtml(stationName)}</strong> as inappropriate?`;
+    
+    // Show modal
+    document.getElementById('flagModal').classList.add('active');
+}
 
-    function closeFlagModal() {
-        document.getElementById('flagModal').classList.remove('active');
+   function closeFlagModal() {
+    document.getElementById('flagModal').classList.remove('active');
+    // Don't clear currentFlagReportId here! Let confirmFlagReport handle it.
+}
+function confirmFlagReport() {
+    // Store the ID in a local variable first
+    const reportIdToFlag = currentFlagReportId;
+    const stationNameToFlag = currentFlagStationName;
+    
+    console.log('Confirm flag - report ID to flag:', reportIdToFlag);
+    
+    if (!reportIdToFlag) {
+        console.error('No report ID to flag!');
+        showToast('Error: No report selected', 'error');
+        return;
+    }
+    
+    // Close modal first (don't clear the global var yet)
+    document.getElementById('flagModal').classList.remove('active');
+    
+    // Show loading toast
+    showToast('Flagging report...', 'info');
+    
+    console.log('Sending flag request for ID:', reportIdToFlag);
+    
+    fetch(`/api/user-reports/${reportIdToFlag}/flag`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => {
+        console.log('Response status:', res.status);
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+        return res.json();
+    })
+    .then(data => {
+        console.log('Flag response:', data);
+        if (data.success) {
+            showToast(`Report from ${stationNameToFlag} has been flagged`, 'success');
+            fetchReports(); // Refresh to show flagged badge
+        } else {
+            showToast(data.error || 'Failed to flag report', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error flagging report:', error);
+        showToast('Error flagging report', 'error');
+    })
+    .finally(() => {
+        // Clear global vars after request completes
         currentFlagReportId = null;
         currentFlagStationName = null;
-    }
-
-    function confirmFlagReport() {
-        if (!currentFlagReportId) return;
-        
-        // Close modal first
-        closeFlagModal();
-        
-        // Show loading toast
-        showToast('Flagging report...', 'info');
-        
-        fetch(`/api/reports/${currentFlagReportId}/flag`, { 
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                showToast(`Report from ${currentFlagStationName} has been flagged for review`, 'success');
-                fetchReports(); // Refresh to show flagged badge
-            } else {
-                showToast(data.error || 'Failed to flag report', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error flagging report:', error);
-            showToast('Error flagging report', 'error');
-        });
-    }
-
+    });
+}
     function toggleReportContent(contentId, button) {
         const content = document.getElementById(contentId);
         const icon = button.querySelector('i');

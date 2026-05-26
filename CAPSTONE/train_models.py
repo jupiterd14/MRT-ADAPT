@@ -16,6 +16,9 @@ import gc
 import time
 from datetime import datetime
 import warnings
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore')
 
 # ==========CONFIGURATION FOR 3M ROWS ==========
@@ -206,28 +209,31 @@ def create_sequences(features, target, seq_length=SEQ_LENGTH):
     
     for i in range(n_sequences):
         X[i] = features[i:i+seq_length]
-        y[i] = target[i+seq_length]
+        y[i] = target[i+seq_length]  
     
     return X, y
 
 def evaluate_model(model, X_val, y_val, target_scaler, model_name):
-    """Evaluate model performance"""
+    """Evaluate model performance with correct MAPE"""
     y_pred_scaled = model.predict(X_val, verbose=0, batch_size=BATCH_SIZE)
     y_pred = target_scaler.inverse_transform(y_pred_scaled.reshape(-1, 1))
     y_true = target_scaler.inverse_transform(y_val.reshape(-1, 1))
     
     mae = mean_absolute_error(y_true, y_pred)
     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-    mask = (y_true.flatten() > 5)
-    if np.sum(mask) > 0:
-        mape = np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
-    else:
-        mape = 0
     r2 = r2_score(y_true, y_pred)
     
+  
+    epsilon = 1e-8
+    mape = np.mean(np.abs((y_true - y_pred) / (y_true + epsilon))) * 100
+    
+    # Also calculate sMAPE (Symmetric MAPE) which handles zeros better
+    smape = np.mean(2.0 * np.abs(y_pred - y_true) / (np.abs(y_pred) + np.abs(y_true) + epsilon)) * 100
+    
     print(f"\n{model_name} Performance:")
-    print(f"   MAE: {mae:.2f}% | RMSE: {rmse:.2f}% | MAPE: {mape:.2f}% | R2: {r2:.4f}")
-    return {'mae': mae, 'rmse': rmse, 'mape': mape, 'r2': r2}
+    print(f"   MAE: {mae:.2f}% | RMSE: {rmse:.2f}% | MAPE: {mape:.2f}% | sMAPE: {smape:.2f}% | R2: {r2:.4f}")
+    
+    return {'mae': mae, 'rmse': rmse, 'mape': mape, 'smape': smape, 'r2': r2}
 
 def plot_predictions(model, X_val, y_val, target_scaler, model_key, models_path):
     """Plot predictions vs actual"""
@@ -324,9 +330,9 @@ def build_lstm_model(input_shape):
     if USE_BIDIRECTIONAL:
         #di yan magwowork. set as FALSE si bi sa taas
         model = Sequential([
-            Bidirectional(LSTM(64, return_sequences=True), input_shape=input_shape),
+            Bidirectional(LSTM(128, return_sequences=True), input_shape=input_shape),
             Dropout(0.2),
-            Bidirectional(LSTM(32, return_sequences=False)),
+            Bidirectional(LSTM(64, return_sequences=False)),
             Dropout(0.2),
             Dense(16, activation='relu'),
             Dense(1)
@@ -342,7 +348,11 @@ def build_lstm_model(input_shape):
             ])
     
     
-    model.compile(optimizer='adam', loss='mse', metrics=['mae', rmse])
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(clipnorm=1.0),  # Add gradient clipping
+        loss='mse', 
+        metrics=['mae', rmse]
+    )
     return model
 
 # ========== LOAD & ENHANCE DATA IN CHUNKS ==========

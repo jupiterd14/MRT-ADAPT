@@ -73,32 +73,87 @@ def log_activity(user_id, user_type, user_email, action, details=None):
 
 @api_reports_bp.route('/reports')
 def get_reports():
+    """Get reports - filtered for regular users (hide flagged reports)"""
     try:
-        reports = Report.query.order_by(Report.timestamp.desc()).limit(50).all()
+        user_id = session.get('user_id')
+        user_role = session.get('role', session.get('user_type', 'commuter'))
+        
+        print(f"🔍 DEBUG: User role = {user_role}")
+        
+        # TEMPORARY: Get ALL reports first to see what's in database
+        all_reports = Report.query.order_by(Report.timestamp.desc()).limit(50).all()
+        print(f"🔍 DEBUG: Total reports in database: {len(all_reports)}")
+        
+        for r in all_reports[:5]:
+            print(f"🔍 DEBUG: Report {r.id} - is_flagged={getattr(r, 'is_flagged', 'MISSING')}, flag_count={r.flag_count}")
+        
+        # For now, return ALL reports without filtering to test
+        reports = all_reports
         
         result = []
         for report in reports:
-            username = "Commuter"
-            photo_paths = None
+            # Parse photo paths
+            photo_paths = []
             if report.photo_path:
                 try:
                     photo_paths = json.loads(report.photo_path)
                 except:
-                    photo_paths = [report.photo_path]
+                    photo_paths = [report.photo_path] if report.photo_path else []
             
             result.append({
-                'id': report.id, 'station': report.station, 'direction': report.direction,
+                'id': report.id,
+                'station': report.station,
+                'direction': report.direction,
                 'reported_congestion': report.reported_congestion,
                 'predicted_congestion': report.predicted_congestion,
-                'remarks': report.remarks, 'anonymous': report.anonymous,
-                'username': username, 'timestamp': report.timestamp.isoformat() if report.timestamp else None,
-                'photo_path': report.photo_path, 'photo_paths': photo_paths
+                'remarks': report.remarks,
+                'anonymous': report.anonymous,
+                'username': report.user.username if report.user and not report.anonymous else None,
+                'timestamp': report.timestamp.isoformat() if report.timestamp else None,
+                'photo_path': report.photo_path,
+                'photo_paths': photo_paths,
+                'flag_count': getattr(report, 'flag_count', 0),
+                'flagged': getattr(report, 'is_flagged', False),
+                'is_hidden': getattr(report, 'is_flagged', False)
             })
         
+        print(f"🔍 DEBUG: Returning {len(result)} reports to frontend")
         return jsonify(result)
     except Exception as e:
+        print(f"Error in get_reports: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify([])
-
+    
+@api_reports_bp.route('/debug/all-reports')
+def debug_all_reports():
+    """Debug endpoint to see all reports regardless of flags"""
+    try:
+        reports = Report.query.order_by(Report.timestamp.desc()).all()
+        
+        result = []
+        for report in reports:
+            result.append({
+                'id': report.id,
+                'station': report.station,
+                'is_flagged': getattr(report, 'is_flagged', 'NO_COLUMN'),
+                'flag_count': getattr(report, 'flag_count', 0),
+                'status': getattr(report, 'status', 'NO_COLUMN'),
+                'timestamp': report.timestamp.isoformat() if report.timestamp else None
+            })
+        
+        return jsonify({
+            'total_reports': len(result),
+            'reports': result,
+            'columns_check': {
+                'has_is_flagged': hasattr(Report, 'is_flagged'),
+                'has_flag_count': hasattr(Report, 'flag_count'),
+                'has_status': hasattr(Report, 'status')
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
 def is_operating_hours(check_time=None):
     """
     Check if current time is within MRT operating hours
@@ -257,4 +312,35 @@ def flag_report(report_id):
         return jsonify({'success': True, 'message': 'Report flagged for review'})
     except Exception as e:
         db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+# routes/api_reports_bp.py
+
+@api_reports_bp.route('/user-reports/<int:report_id>/flag', methods=['POST'])
+def flag_report_user(report_id):
+    """User flags a report as inappropriate"""
+    try:
+        report = Report.query.get(report_id)
+        if not report:
+            return jsonify({'success': False, 'error': 'Report not found'}), 404
+        
+        # Increment flag count
+        report.flag_count = (report.flag_count or 0) + 1
+        
+        # Auto-hide after 3 flags
+        if report.flag_count >= 3:
+            report.is_flagged = True
+            report.flagged_at = datetime.now()
+            report.status = 'pending'  # Needs admin review
+            print(f"🔴 Report {report_id} automatically hidden after {report.flag_count} flags")
+        
+        db.session.commit()
+        
+        message = f"Report flagged ({report.flag_count}/3). " + \
+                  ("Report will be reviewed by admin." if report.flag_count >= 3 else "Report will be hidden after 3 flags.")
+        
+        return jsonify({'success': True, 'message': message, 'flag_count': report.flag_count})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error flagging report: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

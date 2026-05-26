@@ -52,22 +52,7 @@ def get_best_time_to_travel(station_name=None):
         else:
             return "Consider traveling in 1-2 hours for lighter traffic"
 
-# services/predictor.py
 
-def clamp_prediction_by_time(congestion, target_datetime):
-    """
-    MINIMAL clamping - only enforce absolute bounds.
-    The model already learned operating hours from training data.
-    """
-    # Only enforce 0-100% range (absolute bounds)
-    # DO NOT force values to 0 during operating hours
-    # DO NOT cap to 15/30% during certain times
-    
-    # Just ensure it's within 0-100
-    return min(100, max(0, congestion))
-
-
-# Or even better - remove the clamp entirely:
 def clamp_prediction_by_time(congestion, target_datetime):
     """No clamping - trust the model's predictions"""
     return congestion
@@ -160,53 +145,83 @@ def get_fallback_directional_prediction(station_name, direction, target_datetime
 
 
 def get_directional_prediction(station_name, direction, target_datetime=None,
-                                directional_models=None, directional_scalers=None,
-                                get_feature_sequence_func=None,
-                                fallback_func=None):
-    """
-    Get directional prediction using LSTM model trained on 2023-2024 real data
-    """
-    if target_datetime is None:
-        target_datetime = datetime.now()
+                               directional_models=None, directional_scalers=None,
+                               get_sequence_func=None):
+    """Get directional prediction (0-100%) for a station"""
+    
+    # If no models provided, return fallback
+    if directional_models is None or directional_scalers is None:
+        print(f"[DEBUG] No models provided, using fallback")
+        return get_fallback_directional_prediction(station_name, direction, target_datetime)
     
     model_key = f"{station_name}_{direction}"
     
-    models = directional_models or globals().get('directional_models', {})
-    scalers = directional_scalers or globals().get('directional_scalers', {})
+    if model_key not in directional_models:
+        print(f"[DEBUG] Model {model_key} not found, using fallback")
+        return get_fallback_directional_prediction(station_name, direction, target_datetime)
     
-    prediction = None
-    
-    if model_key in models:
-        try:
-            if get_feature_sequence_func:
-                sequence = get_feature_sequence_func(station_name, direction, target_datetime)
-            else:
-                from .feature_engineering import get_feature_sequence_for_station
-                sequence = get_feature_sequence_for_station(station_name, direction, target_datetime)
-            
-            if sequence is not None and len(sequence) == 24:
-                feature_scaler = scalers.get(f'{model_key}_feature')
-                target_scaler = scalers.get(f'{model_key}_target')
-                
-                if feature_scaler is not None and target_scaler is not None:
-                    scaled_sequence = feature_scaler.transform(sequence)
-                    input_sequence = scaled_sequence.reshape(1, 24, -1)
-                    
-                    pred_scaled = models[model_key].predict(input_sequence, verbose=0)
-                    prediction = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
-        except Exception as e:
-            print(f"⚠️ Directional model error for {model_key}: {e}")
-    
-    if prediction is None:
-        if fallback_func:
-            prediction = fallback_func(station_name, direction, target_datetime)
+    try:
+        if target_datetime is None:
+            target_datetime = datetime.now()
+        
+        # If no sequence function, return fallback
+        if get_sequence_func is None:
+            print(f"[DEBUG] No sequence function provided, using fallback")
+            return get_fallback_directional_prediction(station_name, direction, target_datetime)
+        
+        sequence = get_sequence_func(station_name, direction, target_datetime)
+        
+        if sequence is None:
+            print(f"[DEBUG] Sequence is None, using fallback")
+            return get_fallback_directional_prediction(station_name, direction, target_datetime)
+        
+        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        
+        if feature_scaler is None:
+            print(f"[DEBUG] No feature scaler for {model_key}, using fallback")
+            return get_fallback_directional_prediction(station_name, direction, target_datetime)
+        
+        # Ensure sequence has correct shape
+        if len(sequence.shape) == 2:
+            input_sequence = sequence.reshape(1, sequence.shape[0], sequence.shape[1])
         else:
-            from .predictor import get_fallback_directional_prediction
-            prediction = get_fallback_directional_prediction(station_name, direction, target_datetime)
+            input_sequence = sequence.reshape(1, 24, -1)
+        
+        # Scale features
+        n_samples, n_timesteps, n_features = input_sequence.shape
+        input_flat = input_sequence.reshape(-1, n_features)
+        input_scaled = feature_scaler.transform(input_flat)
+        input_sequence = input_scaled.reshape(n_samples, n_timesteps, n_features)
+        
+        # Make prediction
+        pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
+        
+        # FIX: Properly convert to percentage
+        target_scaler = directional_scalers.get(f'{model_key}_target')
+        
+        if target_scaler is not None:
+            # Use the target scaler to inverse transform
+            # The scaler expects 2D input
+            pred_reshaped = pred_scaled.reshape(-1, 1)
+            prediction_raw = target_scaler.inverse_transform(pred_reshaped)
+            prediction = float(prediction_raw[0][0])
+            print(f"[DEBUG] Using target scaler: {pred_scaled[0][0]:.3f} -> {prediction:.1f}%")
+        else:
+            # If no target scaler, assume model outputs 0-1 (normalized congestion)
+            # Convert to percentage by multiplying by 100
+            prediction = float(pred_scaled[0][0]) * 100
+            print(f"[DEBUG] No target scaler: {pred_scaled[0][0]:.3f} -> {prediction:.1f}%")
+        
+        # Clamp and return
+        prediction = max(0, min(100, prediction))
+        return prediction
+        
+    except Exception as e:
+        print(f"Error predicting {station_name} {direction}: {e}")
+        import traceback
+        traceback.print_exc()
+        return get_fallback_directional_prediction(station_name, direction, target_datetime)
     
-    
-    return min(100, max(0, prediction))
-
 
 def get_station_prediction(station_name, target_datetime=None,
                            directional_models=None, directional_scalers=None,
@@ -239,8 +254,19 @@ def get_station_prediction(station_name, target_datetime=None,
         return congestion
 
 
-def calculate_directional_congestion(station_name, direction, target_datetime=None):
+def calculate_directional_congestion(station_name, direction, target_datetime=None,
+                                      directional_models=None, directional_scalers=None,
+                                      get_sequence_func=None):
     """
     Public function to calculate directional congestion
     """
-    return get_directional_prediction(station_name, direction, target_datetime)
+    return get_directional_prediction(station_name, direction, target_datetime,
+                                       directional_models, directional_scalers,
+                                       get_sequence_func)
+
+
+# Add debug print at the end
+print("=" * 50)
+print("✅ predictor.py loaded successfully!")
+print("✅ get_directional_prediction is defined")
+print("=" * 50)

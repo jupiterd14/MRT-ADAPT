@@ -1,3 +1,12 @@
+"""
+LIVE API - Real-time Station Data
+Purpose: Enriched station data for UI display
+Use for: Live map, alerts, station info pages
+NOT for: Pure ML predictions or forecasting
+"""
+
+
+
 # routes/api_other.py
 from flask import Blueprint, request, jsonify, session, current_app
 from models import Broadcast, User, ActivityLog, Report
@@ -48,8 +57,6 @@ def get_stations_from_config():
         return current_app.config['STATIONS']
     return STATIONS
 
-# routes/api_other.py - COMPLETE REWRITE OF THE V2 ENDPOINT
-
 @api_other_bp.route('/live-map/directions/v2')
 def live_map_directions_v2():
     """New version using directional models - Called by frontend"""
@@ -59,10 +66,23 @@ def live_map_directions_v2():
     
     try:
         from flask import current_app
-        from services.model_loader import directional_models, directional_scalers
         from services import get_feature_sequence_for_station
         from datetime import datetime
-        import numpy as np
+        
+        # GET MODELS FROM APP CONFIG (where they were stored)
+        directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
+        directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+        
+        print(f"🔍 Models loaded from config: {len(directional_models)}")
+        
+        if len(directional_models) == 0:
+            print("⚠️ WARNING: No models found in app config!")
+            # Fallback: try to load directly
+            from services.model_loader import directional_models as svc_models
+            from services.model_loader import directional_scalers as svc_scalers
+            directional_models = svc_models
+            directional_scalers = svc_scalers
+            print(f"🔍 Fallback models: {len(directional_models)}")
         
         stations_list = current_app.config.get('STATIONS', STATIONS)
         northbound = {}
@@ -73,9 +93,8 @@ def live_map_directions_v2():
         print(f"📍 Processing {len(stations_list)} stations...")
         
         for i, station in enumerate(stations_list):
-            # Get predictions using DIRECT model access (same as debug)
-            north_pred = None
-            south_pred = None
+            north_pred = 50  # Default
+            south_pred = 50
             
             # Northbound prediction
             model_key_north = f"{station}_Northbound"
@@ -110,12 +129,6 @@ def live_map_directions_v2():
                             south_pred = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
                 except Exception as e:
                     print(f"  ⚠️ Error predicting {station} Southbound: {e}")
-            
-            # Use fallback if predictions failed
-            if north_pred is None:
-                north_pred = 50
-            if south_pred is None:
-                south_pred = 50
             
             # Print first few for debugging
             if i < 3:
@@ -164,8 +177,8 @@ def live_map_directions_v2():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-# In routes/api_other.py
-
+    
+    
 @api_other_bp.route('/live-map/directions')
 def live_map_directions():
     """Get congestion data for both directions - uses DIRECT model access"""
@@ -201,6 +214,7 @@ def live_map_directions():
         def get_direct_prediction(station_name, direction):
             """Get prediction using DIRECT model access (same as forecast endpoint)"""
             model_key = f"{station_name}_{direction}"
+            
             
             if model_key not in directional_models:
                 # Fallback based on time of day
@@ -267,6 +281,7 @@ def live_map_directions():
                 north_override_key = f"{station}_northbound"
                 south_override_key = f"{station}_southbound"
                 
+                
                 # Check for overrides first
                 if north_override_key in active_overrides:
                     north_congestion = active_overrides[north_override_key].get('congestion', 40)
@@ -321,6 +336,41 @@ def live_map_directions():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@api_other_bp.route('/live-map/debug')
+def debug_live_map():
+    """Debug endpoint to check model loading"""
+    try:
+        from services.model_loader import directional_models
+        from flask import current_app
+        from services import get_feature_sequence_for_station
+        from datetime import datetime
+        
+        stations_list = current_app.config.get('STATIONS', STATIONS)
+        now = datetime.now()
+        
+        result = {}
+        for station in stations_list[:3]:
+            model_key = f"{station}_Northbound"
+            result[station] = {
+                'model_exists': model_key in directional_models,
+                'total_models': len(directional_models),
+                'sample_models': list(directional_models.keys())[:3]
+            }
+            
+            if model_key in directional_models:
+                try:
+                    sequence = get_feature_sequence_for_station(station, 'Northbound', now)
+                    result[station]['sequence_shape'] = sequence.shape if sequence is not None else None
+                except Exception as e:
+                    result[station]['sequence_error'] = str(e)
+        
+        return jsonify({
+            'models_loaded': len(directional_models),
+            'station_check': result,
+            'time': now.isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @api_other_bp.route('/stations')
 def get_stations():

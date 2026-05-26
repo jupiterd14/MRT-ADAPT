@@ -11,9 +11,16 @@ STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
             "Ayala Ave", "Magallanes", "Taft"]
 
 def get_station_prediction(station_name):
-    """Will be imported from main app - placeholder"""
+    """Get station prediction from app config"""
     from flask import current_app
-    return current_app.config.get('PREDICTION_FUNC', lambda x: 50)(station_name)
+    
+    # Use the correct config key (same as your app.py)
+    if 'GET_STATION_PREDICTION' in current_app.config:
+        return current_app.config['GET_STATION_PREDICTION'](station_name)
+    
+    # Fallback
+    return 50
+
 
 @admin_bp.route('/admin/dashboard')
 def admin_dashboard():
@@ -147,33 +154,186 @@ def admin_profile():
         return jsonify({'error': str(e)}), 500
 
 
+# ========== FLAGGED ACTIONS ENDPOINTS (ONLY ONE OF EACH) ==========
+@admin_bp.route('/api/admin/flagged-actions')
+def flagged_actions():
+    """Get flagged reports for admin review"""
+    try:
+        # Get reports that have been flagged (using the 'flagged' column)
+        flagged_reports = Report.query.filter(
+            Report.flagged == True
+        ).order_by(Report.timestamp.desc()).all()
+        
+        print(f"Found {len(flagged_reports)} flagged reports")  # Debug
+        
+        flagged_data = []
+        for report in flagged_reports:
+            reporter_name = 'Anonymous'
+            if not report.anonymous and report.user:
+                reporter_name = report.user.username.split('@')[0] if '@' in report.user.username else report.user.username
+            
+            flagged_data.append({
+                'id': report.id,
+                'userType': 'report',
+                'userName': reporter_name,
+                'action': 'Flagged Report',
+                'target': f'{report.station} - {report.direction or "both"}',
+                'details': report.remarks or 'No remarks',
+                'flag_reason': f'Flagged {report.flag_count} times by users',
+                'ip_address': '-',
+                'timestamp': report.timestamp.isoformat(),
+                'station': report.station,
+                'congestion': report.reported_congestion,
+                'remarks': report.remarks,
+                'photo_path': report.photo_path,
+                'flag_count': report.flag_count
+            })
+        
+        return jsonify(flagged_data)
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify([])
+
+
+@admin_bp.route('/api/admin/flag-audit-entry/<int:entry_id>', methods=['POST'])
+def flag_audit_entry(entry_id):
+    """Flag an audit entry for review"""
+    try:
+        data = request.get_json()
+        reason = data.get('reason', 'No reason provided')
+        
+        log_entry = ActivityLog.query.get(entry_id)
+        if not log_entry:
+            return jsonify({'success': False, 'error': 'Entry not found'}), 404
+        
+        log_entry.is_flagged = True
+        log_entry.flag_reason = reason
+        log_entry.flagged_at = datetime.now()
+        db.session.commit()
+        
+        log_activity(session.get('user_id'), 'admin', session.get('username'), 
+                    'flag_audit_entry', f'Flagged entry {entry_id} for review. Reason: {reason}')
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/admin/approve-flagged/<int:entry_id>', methods=['POST'])
+def approve_flagged(entry_id):
+    """Approve a flagged entry - clear the flag"""
+    try:
+        data = request.get_json() or {}
+        admin_notes = data.get('admin_notes', '')
+        
+        log_entry = ActivityLog.query.get(entry_id)
+        if not log_entry:
+            return jsonify({'success': False, 'error': 'Entry not found'}), 404
+        
+        log_entry.is_flagged = False
+        if hasattr(log_entry, 'flag_reason'):
+            log_entry.flag_reason = None
+        if hasattr(log_entry, 'flagged_at'):
+            log_entry.flagged_at = None
+        if hasattr(log_entry, 'admin_review_notes'):
+            log_entry.admin_review_notes = admin_notes
+        if hasattr(log_entry, 'reviewed_by'):
+            log_entry.reviewed_by = session.get('username', 'admin')
+        if hasattr(log_entry, 'reviewed_at'):
+            log_entry.reviewed_at = datetime.now()
+        
+        db.session.commit()
+        
+        log_activity(session.get('user_id'), 'admin', session.get('username'), 
+                    'approve_flagged', f'Approved flagged entry {entry_id}. Notes: {admin_notes}')
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/admin/dismiss-flagged/<int:entry_id>', methods=['POST'])
+def dismiss_flagged(entry_id):
+    """Dismiss a flag but keep the entry"""
+    try:
+        data = request.get_json() or {}
+        admin_notes = data.get('admin_notes', '')
+        
+        log_entry = ActivityLog.query.get(entry_id)
+        if not log_entry:
+            return jsonify({'success': False, 'error': 'Entry not found'}), 404
+        
+        log_entry.is_flagged = False
+        if hasattr(log_entry, 'flag_reason'):
+            log_entry.flag_reason = None
+        if hasattr(log_entry, 'flagged_at'):
+            log_entry.flagged_at = None
+        if hasattr(log_entry, 'admin_review_notes'):
+            log_entry.admin_review_notes = admin_notes
+        if hasattr(log_entry, 'reviewed_by'):
+            log_entry.reviewed_by = session.get('username', 'admin')
+        if hasattr(log_entry, 'reviewed_at'):
+            log_entry.reviewed_at = datetime.now()
+        
+        db.session.commit()
+        
+        log_activity(session.get('user_id'), 'admin', session.get('username'), 
+                    'dismiss_flagged', f'Dismissed flag on entry {entry_id}. Notes: {admin_notes}')
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/api/admin/delete-flagged/<int:entry_id>', methods=['DELETE'])
+def delete_flagged(entry_id):
+    """Delete a flagged entry permanently"""
+    try:
+        data = request.get_json() or {}
+        admin_notes = data.get('admin_notes', '')
+        
+        log_entry = ActivityLog.query.get(entry_id)
+        if not log_entry:
+            return jsonify({'success': False, 'error': 'Entry not found'}), 404
+        
+        log_activity(session.get('user_id'), 'admin', session.get('username'), 
+                    'delete_flagged', f'Deleted flagged entry {entry_id}. Notes: {admin_notes}')
+        
+        db.session.delete(log_entry)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ========== AUDIT & STATS ENDPOINTS ==========
 @admin_bp.route('/api/admin/audit-stats')
 def admin_audit_stats():
-    """Get real audit statistics from database"""
     try:
         total_actions = ActivityLog.query.count()
-        
-        # Count unique active admins (users who logged in recently)
         active_admins = User.query.filter_by(role='admin', is_active=True).count()
-        
-        # Count active operators
         active_operators = User.query.filter_by(role='operator', is_active=True).count()
         
-        # Count flagged actions (failed logins, deactivations, etc.)
-        flagged = ActivityLog.query.filter(
-            ActivityLog.action.in_(['login_failed', 'deactivate_operator'])
-        ).count()
+        # Count reports that are flagged (using the 'flagged' column)
+        flagged_reports = Report.query.filter(Report.flagged == True).count()
         
         return jsonify({
             'total_actions': total_actions,
             'active_admins': active_admins,
             'active_operators': active_operators,
-            'flagged': flagged
+            'flagged': flagged_reports  # Now shows flagged reports count
         })
     except Exception as e:
-        print(f"Error getting audit stats: {e}")
+        print(f"Error: {e}")
         return jsonify({'total_actions': 0, 'active_admins': 0, 'active_operators': 0, 'flagged': 0})
-
+    
 
 @admin_bp.route('/api/admin/dashboard-stats')
 def dashboard_stats():
@@ -195,6 +355,7 @@ def dashboard_stats():
         })
     except Exception as e:
         return jsonify({'total_reports': 0, 'severe_count': 0, 'active_operators': 0, 'broadcasts_this_week': 0})
+
 
 @admin_bp.route('/api/admin/operator-list')
 def operator_list():
@@ -232,6 +393,7 @@ def operator_list():
         return jsonify(operator_data)
     except Exception as e:
         return jsonify([])
+
 
 @admin_bp.route('/api/admin/generate-invite', methods=['POST'])
 def generate_invite():
@@ -296,6 +458,7 @@ def generate_invite():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
 @admin_bp.route('/api/admin/deactivate-operator/<int:operator_id>', methods=['POST'])
 def deactivate_operator(operator_id):
     try:
@@ -310,6 +473,7 @@ def deactivate_operator(operator_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
 @admin_bp.route('/api/admin/reactivate-operator/<int:operator_id>', methods=['POST'])
 def reactivate_operator(operator_id):
     try:
@@ -321,6 +485,7 @@ def reactivate_operator(operator_id):
         return jsonify({'success': False, 'error': 'Operator not found'}), 404
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @admin_bp.route('/api/admin/audit-log')
 def audit_log():
@@ -346,43 +511,78 @@ def audit_log():
     except Exception as e:
         return jsonify([]), 500
 
+
+@admin_bp.route('/api/admin/debug-check-flags')
+def debug_check_flags():
+    """Debug endpoint to check flag columns and data"""
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('activity_log')]
+        
+        # Check what columns exist
+        has_flag_columns = {
+            'is_flagged': 'is_flagged' in columns,
+            'flag_reason': 'flag_reason' in columns,
+            'flagged_at': 'flagged_at' in columns
+        }
+        
+        # Check if any entries have is_flagged = True
+        flagged_count = ActivityLog.query.filter(ActivityLog.is_flagged == True).count() if 'is_flagged' in columns else 0
+        
+        # Check total entries
+        total_count = ActivityLog.query.count()
+        
+        # Show some sample entries
+        sample_entries = []
+        for log in ActivityLog.query.limit(5).all():
+            sample_entries.append({
+                'id': log.id,
+                'action': log.action,
+                'is_flagged': getattr(log, 'is_flagged', 'column_missing'),
+                'flag_reason': getattr(log, 'flag_reason', 'column_missing')
+            })
+        
+        return jsonify({
+            'columns_exist': has_flag_columns,
+            'flagged_count': flagged_count,
+            'total_entries': total_count,
+            'sample_entries': sample_entries,
+            'all_columns': columns
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
 @admin_bp.route('/api/admin/station-status')
 def station_status():
     """Get station status for admin dashboard - fetches both directions at once"""
     try:
         from flask import current_app
-        from services.model_loader import directional_models, directional_scalers
-        from services import get_feature_sequence_for_station
         from datetime import datetime
         
         stations = current_app.config.get('STATIONS', STATIONS)
         now = datetime.now()
         
+        # Get the prediction function from app config (THIS IS THE KEY!)
+        get_directional = current_app.config.get('GET_DIRECTIONAL_PREDICTION')
+        
+        if not get_directional:
+            print("⚠️ GET_DIRECTIONAL_PREDICTION not found in config!")
+            # Fallback
+            return jsonify({'stations': []})
+        
         def get_congestion(station_name, direction):
-            """Get congestion for a specific station and direction"""
-            model_key = f"{station_name}_{direction}"
-            
-            if model_key in directional_models:
-                try:
-                    sequence = get_feature_sequence_for_station(station_name, direction, now)
-                    if sequence is not None and len(sequence) == 24:
-                        feature_scaler = directional_scalers.get(f'{model_key}_feature')
-                        target_scaler = directional_scalers.get(f'{model_key}_target')
-                        
-                        if feature_scaler and target_scaler:
-                            scaled_sequence = feature_scaler.transform(sequence)
-                            input_sequence = scaled_sequence.reshape(1, 24, -1)
-                            pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
-                            prediction = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
-                            return max(0, min(100, prediction))
-                except Exception as e:
-                    print(f"⚠️ Error predicting {station_name} {direction}: {e}")
-            
-            # Fallback based on time of day
-            hour = now.hour
-            if 7 <= hour <= 9 or 17 <= hour <= 19:
-                return 65
-            return 35
+            """Get congestion using the app's prediction function (same as Live Map)"""
+            try:
+                prediction = get_directional(station_name, direction, now)
+                return max(0, min(100, prediction))
+            except Exception as e:
+                print(f"⚠️ Error predicting {station_name} {direction}: {e}")
+                # Fallback based on time
+                hour = now.hour
+                if 7 <= hour <= 9 or 17 <= hour <= 19:
+                    return 65
+                return 35
         
         def get_status_info(congestion):
             if congestion > 80:
@@ -394,7 +594,6 @@ def station_status():
             else:
                 return "LIGHT", "status-light"
         
-        # Calculate both directions once
         result = []
         for station in stations:
             north_congestion = get_congestion(station, 'Northbound')
@@ -416,6 +615,10 @@ def station_status():
                     'status_class': south_class
                 }
             })
+        
+        # Debug print first few
+        if result:
+            print(f"📊 Admin Dashboard - First station: {result[0]['name']} North: {result[0]['northbound']['congestion']}%")
         
         return jsonify({
             'stations': result,
