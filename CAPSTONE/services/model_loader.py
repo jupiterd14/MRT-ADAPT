@@ -78,19 +78,8 @@ def debug_prediction(station, direction, features):
         print(f"   After inverse transform: {pred_congestion}")
     else:
         print(f"\n7. No target scaler! Converting directly...")
-        # This is likely your problem - the model outputs scaled values (0-1)
-        # But you're treating it as percentage
-        pred_congestion = pred_scaled[0][0]
-        print(f"   Raw output as percentage: {pred_congestion}")
-        print(f"   Raw output * 100: {pred_congestion * 100}")
-        
-        # If raw output is 0.38, then *100 = 38% (matches your issue!)
-        if 0.35 < pred_scaled[0][0] < 0.41:
-            print(f"\n   🔴 PROBLEM IDENTIFIED!")
-            print(f"   Model output is {pred_scaled[0][0]:.3f} (0-1 scale)")
-            print(f"   But you're missing target_scaler to convert to 0-100%")
-            print(f"   Expected: multiply by 100 = {pred_scaled[0][0]*100:.1f}%")
-            print(f"   But you're not doing this conversion!")
+        pred_congestion = pred_scaled[0][0] * 100  # Fixed: multiply by 100
+        print(f"   Raw output * 100: {pred_congestion}")
     
     # 10. Clip to valid range
     pred_congestion = max(0, min(100, pred_congestion))
@@ -99,47 +88,82 @@ def debug_prediction(station, direction, features):
     
     return pred_congestion
 
-def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_NEW_v2w/openclose'):
+def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_v5'):
     global directional_models, directional_scalers
     
     directional_models = {}
     directional_scalers = {}
     
+    print(f"📂 Loading models from: {DIRECTIONAL_MODELS_PATH}")
+    
+    # Check if directory exists
+    if not os.path.exists(DIRECTIONAL_MODELS_PATH):
+        print(f"❌ Directory not found: {DIRECTIONAL_MODELS_PATH}")
+        print(f"   Current working directory: {os.getcwd()}")
+        return directional_models, directional_scalers
+    
     for station in STATIONS:
         for direction in ['Northbound', 'Southbound']:
             model_key = f"{station}_{direction}"
             
-            # Check for BOTH model and both scalers
-            model_path = f'{DIRECTIONAL_MODELS_PATH}/{model_key}_lstm_enhanced.keras'
-            feature_scaler_path = f'{DIRECTIONAL_MODELS_PATH}/{model_key}_feature_scaler.pkl'
-            target_scaler_path = f'{DIRECTIONAL_MODELS_PATH}/{model_key}_target_scaler.pkl'
+            # Try both naming conventions
+            model_path_v1 = os.path.join(DIRECTIONAL_MODELS_PATH, f'{model_key}_lstm_enhanced.keras')
+            model_path_v2 = os.path.join(DIRECTIONAL_MODELS_PATH, f'{model_key}_best.keras')
             
-            # Verify all three files exist
-            if not all([os.path.exists(model_path), 
-                       os.path.exists(feature_scaler_path),
-                       os.path.exists(target_scaler_path)]):
-                print(f"  ⚠️ Missing files for {model_key}, skipping")
+            # Use whichever exists
+            model_path = None
+            if os.path.exists(model_path_v1):
+                model_path = model_path_v1
+            elif os.path.exists(model_path_v2):
+                model_path = model_path_v2
+            
+            if model_path is None:
+                print(f"  ⚠️ No model file for {model_key}")
                 continue
+            
+            feature_scaler_path = os.path.join(DIRECTIONAL_MODELS_PATH, f'{model_key}_feature_scaler.pkl')
+            target_scaler_path = os.path.join(DIRECTIONAL_MODELS_PATH, f'{model_key}_target_scaler.pkl')
             
             try:
                 print(f"  Loading {model_key}...")
                 directional_models[model_key] = tf.keras.models.load_model(
                     model_path,
-                    custom_objects={'rmse': rmse}  
+                    custom_objects={'rmse': rmse}
                 )
                 
-                with open(feature_scaler_path, 'rb') as f:
-                    directional_scalers[f'{model_key}_feature'] = pickle.load(f)
+                # Load feature scaler
+                if os.path.exists(feature_scaler_path):
+                    with open(feature_scaler_path, 'rb') as f:
+                        directional_scalers[f'{model_key}_feature'] = pickle.load(f)
+                    print(f"    ✅ Loaded feature scaler")
+                else:
+                    print(f"    ⚠️ Feature scaler not found: {feature_scaler_path}")
                 
-                with open(target_scaler_path, 'rb') as f:
-                    directional_scalers[f'{model_key}_target'] = pickle.load(f)
+                # Load target scaler - FIXED: Make sure this is loaded properly
+                if os.path.exists(target_scaler_path):
+                    with open(target_scaler_path, 'rb') as f:
+                        directional_scalers[f'{model_key}_target'] = pickle.load(f)
+                    print(f"    ✅ Loaded target scaler")
+                else:
+                    print(f"    ⚠️ Target scaler not found: {target_scaler_path}")
+                    print(f"    Will use fallback: multiply by 100")
                 
                 print(f"  ✅ Loaded {model_key}")
                 
             except Exception as e:
                 print(f"  ❌ Error loading {model_key}: {e}")
+                import traceback
+                traceback.print_exc()
     
     print(f"\n✅ Loaded {len(directional_models)} directional models")
+    print(f"✅ Loaded {len(directional_scalers)} scalers")
+    
+    # Show which target scalers were loaded
+    target_scalers = [k for k in directional_scalers.keys() if k.endswith('_target')]
+    print(f"✅ Target scalers loaded: {len(target_scalers)}")
+    if target_scalers:
+        print(f"   Examples: {target_scalers[:3]}")
+    
     return directional_models, directional_scalers
 
 def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY, 
@@ -234,3 +258,28 @@ def _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY):
     
     direction_counts = {'northbound': 4500000, 'southbound': 3800000}
     print("Generated synthetic historical data")
+
+STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
+            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+            "Ayala Ave", "Magallanes", "Taft"]
+
+print("=" * 50)
+print("🔄 Auto-loading directional models on import...")
+print("=" * 50)
+load_directional_models(STATIONS)
+print(f"✅ Loaded {len(directional_models)} models")
+print(f"✅ Loaded {len(directional_scalers)} scalers")
+
+# Print debug info about target scalers
+target_scalers = [k for k in directional_scalers.keys() if 'target' in k.lower()]
+print(f"✅ Found {len(target_scalers)} target scalers")
+if target_scalers:
+    print(f"   Example target scaler: {target_scalers[0]}")
+    
+# At the end of model_loader.py, after load_directional_models()
+print("=" * 50)
+print("✅ model_loader.py loaded successfully!")
+print(f"✅ directional_models count: {len(directional_models)}")
+print(f"✅ directional_scalers count: {len(directional_scalers)}")
+print(f"✅ Sample model keys: {list(directional_models.keys())[:3]}")
+print("=" * 50)

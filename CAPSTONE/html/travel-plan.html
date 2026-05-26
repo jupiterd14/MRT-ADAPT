@@ -63,7 +63,7 @@ body {
 
 /* ========== SIDEBAR - VISIBLE ON DESKTOP ========== */
 .sidebar {
-    width: 300px;
+    width: 300px !important;
     background-color: var(--sidebar-bg);
     color: white;
     display: flex;
@@ -349,7 +349,6 @@ nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
 }
 
 .header-top h1 {
@@ -359,6 +358,12 @@ nav {
     align-items: center;
     gap: 12px;
 }
+
+.header-subtitle {
+            font-size: 13px;
+            color: var(--text-light);
+            margin-bottom: 30px;
+        }
 
 .header-icons {
     display: flex;
@@ -448,6 +453,7 @@ nav {
 .planner-card {
     background: linear-gradient(135deg, #ffffff 0%, #fafcff 100%);
     border: 2px solid var(--accent-blue);
+    padding:25px;
 }
 
 .planner-header {
@@ -1660,6 +1666,184 @@ nav {
     opacity: 1;
 }
 
+/* Make dropdowns and inputs smaller for desktop */
+@media (min-width: 769px) {
+    .station-dropdown {
+        height: 42px !important;
+        font-size: 14px !important;
+        padding: 0 16px !important;
+    }
+    
+    .datetime-input {
+        height: 42px !important;
+        font-size: 14px !important;
+        padding: 0 16px !important;
+    }
+    
+    .select-label {
+        font-size: 10px !important;
+        margin-bottom: 6px !important;
+    }
+    
+    .btn-plan, .btn-cancel {
+        height: 42px !important;
+    }
+    
+    .input-row {
+        gap: 12px !important;
+    }
+    
+    .details-row {
+        gap: 16px !important;
+    }
+}
+
+/* Even smaller for larger desktops (optional) */
+@media (min-width: 1440px) {
+    .station-dropdown {
+        height: 40px !important;
+        font-size: 13px !important;
+    }
+    
+    .datetime-input {
+        height: 40px !important;
+        font-size: 13px !important;
+    }
+    
+    .btn-plan, .btn-cancel {
+        height: 40px !important;
+    }
+}
+
+/* Add these styles at the end of your <style> section to ensure buttons are visible and enhance typography */
+
+/* Ensure buttons are visible and properly styled */
+.button-group {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 15px !important;
+    margin-top: 10px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.btn-plan, .btn-cancel {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.btn-plan {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #2563EB 100%);
+    min-width: 200px;
+}
+
+.btn-cancel {
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    min-width: 80px;
+}
+
+/* Enhanced typography for Travel Planner */
+.planner-title {
+    font-size: 20px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--text-dark) 0%, var(--accent-blue) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: -0.3px;
+}
+
+.planner-title i {
+    background: linear-gradient(135deg, var(--accent-blue), #60A5FA);
+    color: white !important;
+    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);
+}
+
+/* Better font hierarchy */
+.header-top h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #1E293B 0%, #3B82F6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.header-subtitle {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-light);
+    letter-spacing: -0.2px;
+}
+
+/* Station dropdown font improvements */
+.station-dropdown {
+    font-weight: 600;
+    letter-spacing: -0.2px;
+}
+
+.select-label {
+    font-weight: 800;
+    letter-spacing: 0.5px;
+}
+
+/* Advisory cards better typography */
+.advisory-header h4 {
+    font-weight: 800;
+    letter-spacing: -0.3px;
+}
+
+.advisory-content {
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+/* Responsive font sizes */
+@media (max-width: 768px) {
+    .header-top h1 {
+        font-size: 22px;
+    }
+    
+    .planner-title {
+        font-size: 16px;
+    }
+    
+    .header-subtitle {
+        font-size: 12px;
+    }
+}
+
+/* Animated button press effect */
+.btn-plan, .btn-cancel {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-plan:active, .btn-cancel:active {
+    transform: scale(0.95);
+}
+
+/* Glow effect on buttons */
+.btn-plan {
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.btn-plan:hover {
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+}
+
+.btn-cancel {
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.btn-cancel:hover {
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+}
+
 
 </style>
 </head>
@@ -1782,6 +1966,11 @@ nav {
             </div>
         </div>
 
+        <div class="header-subtitle">
+    Plan what station to go
+    </div>
+
+
         <div class="card planner-card">
             <div class="planner-header">
                 <div class="planner-title">
@@ -1829,10 +2018,14 @@ nav {
                
 
             <div class="details-row">
-                <div class="detail-item">
-                    <label class="detail-item-i"><i class="far fa-calendar"></i> Travel Date</label>
-                    <input type="date" class="datetime-input" id="travelDate" value="">
-                </div>
+               <div class="detail-item">
+    <label class="detail-item-i"><i class="far fa-calendar"></i> Travel Date</label>
+    <input type="date" class="datetime-input" id="travelDate" value="">
+    <small style="display: block; margin-top: 5px; font-size: 10px; color: var(--text-light);">
+        <i class="fas fa-info-circle"></i> You can only plan trips up to 7 days in advance
+    </small>
+</div>
+                
                 <div class="detail-item">
                     <label class="detail-item-i"><i class="far fa-clock"></i> Departure Time</label>
                     <input type="time" class="datetime-input" id="departureTime" value="">
@@ -1945,6 +2138,13 @@ const messageArrays = {
 };
 
 
+function getPreviousStation(station) {
+    const stationsList = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
+    const idx = stationsList.indexOf(station);
+    if (idx > 0) return stationsList[idx - 1];
+    return stationsList[1]; // fallback
+}
+
 function cleanOldReadAlerts() {
     const saved = localStorage.getItem('readAlerts');
     if (saved) {
@@ -1983,14 +2183,21 @@ try {
   document.addEventListener('DOMContentLoaded', function() {
     cleanOldReadAlerts();
     updateDateTime();
-    checkAlertCount();  // This now uses the client-side logic
+    checkAlertCount();
     setInterval(updateDateTime, 1000);
-    setInterval(checkAlertCount, 60000); // Refresh alert count every minute
+    setInterval(checkAlertCount, 60000);
     
     // Set default date to today
     const today = new Date().toISOString().split('T')[0];
+    
+    // Calculate date 7 days from today
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 7);
+    const maxDateStr = maxDate.toISOString().split('T')[0];
+    
     document.getElementById('travelDate').value = today;
     document.getElementById('travelDate').min = today;
+    document.getElementById('travelDate').max = maxDateStr; // ← ADD THIS LINE
     
     // Set default time to current time + 1 hour
     const now = new Date();
@@ -2004,6 +2211,7 @@ try {
     document.getElementById('fromCongestion').classList.remove('visible');
     document.getElementById('toCongestion').classList.remove('visible');
 });
+
     function getPredictionWithDateTime(station, date, time) {
     if (!date || !time) {
         return fetch(`/api/predict/${encodeURIComponent(station)}`).then(res => res.json());
@@ -2015,44 +2223,51 @@ try {
         });
 }
 
-    function cancelRoute() {
-        // Reset to default values
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('travelDate').value = today;
-        
-        const now = new Date();
-        now.setHours(now.getHours() + 1);
-        now.setMinutes(0);
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('departureTime').value = `${hours}:${minutes}`;
-        
-        // Reset station selections
-        document.getElementById('fromStation').value = 'North Ave';
-        document.getElementById('toStation').value = 'Ayala';
-        
-        // Clear advisories and show empty state
-        const container = document.getElementById('advisoriesContainer');
-        container.innerHTML = `
-            <div class="recommendation-alert" id="recommendation">
-                <i class="fas fa-check-circle"></i>
-                <span><b>Recommended:</b> Select stations to get travel recommendations.</span>
-            </div>
-            <div class="empty-state" id="emptyState">
-                <i class="fas fa-route" style="font-size: 48px; color: var(--text-light); opacity: 0.5; margin-bottom: 15px;"></i>
-                <h3 style="color: var(--text-dark); margin-bottom: 5px;">Plan a route to see advisories</h3>
-                <p style="color: var(--text-light); font-size: 13px;">Click "PLAN ROUTE" to get travel recommendations and alerts.</p>
-            </div>
-        `;
-        container.classList.remove('has-content');
-        
-        // Hide congestion indicators
-        document.getElementById('fromCongestion').classList.remove('visible');
-        document.getElementById('toCongestion').classList.remove('visible');
-        
-        showToast('Form reset to defaults');
-    }
-
+   function cancelRoute() {
+    // Reset to default values
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Calculate date 7 days from today
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 7);
+    const maxDateStr = maxDate.toISOString().split('T')[0];
+    
+    document.getElementById('travelDate').value = today;
+    document.getElementById('travelDate').min = today;
+    document.getElementById('travelDate').max = maxDateStr; // ← ADD THIS LINE
+    
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    now.setMinutes(0);
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('departureTime').value = `${hours}:${minutes}`;
+    
+    // Reset station selections
+    document.getElementById('fromStation').value = 'North Ave';
+    document.getElementById('toStation').value = 'Ayala Ave';
+    
+    // Clear advisories and show empty state
+    const container = document.getElementById('advisoriesContainer');
+    container.innerHTML = `
+        <div class="recommendation-alert" id="recommendation">
+            <i class="fas fa-check-circle"></i>
+            <span><b>Recommended:</b> Select stations to get travel recommendations.</span>
+        </div>
+        <div class="empty-state" id="emptyState">
+            <i class="fas fa-route" style="font-size: 48px; color: var(--text-light); opacity: 0.5; margin-bottom: 15px;"></i>
+            <h3 style="color: var(--text-dark); margin-bottom: 5px;">Plan a route to see advisories</h3>
+            <p style="color: var(--text-light); font-size: 13px;">Click "PLAN ROUTE" to get travel recommendations and alerts.</p>
+        </div>
+    `;
+    container.classList.remove('has-content');
+    
+    // Hide congestion indicators
+    document.getElementById('fromCongestion').classList.remove('visible');
+    document.getElementById('toCongestion').classList.remove('visible');
+    
+    showToast('Form reset to defaults');
+}
     function showTravelGuide() {
     const modal = document.getElementById('travelGuideModal');
     modal.classList.add('active');
@@ -2094,40 +2309,50 @@ document.addEventListener('keydown', function(event) {
     }
 
     function validateDateTime() {
-        const dateInput = document.getElementById('travelDate').value;
-        const timeInput = document.getElementById('departureTime').value;
-        const now = new Date();
-        const today = new Date().toISOString().split('T')[0];
-        
-        if (dateInput < today) {
-            showToast('Cannot select past dates', 'error');
-            return false;
-        }
-        
-        if (dateInput === today) {
-            const [hours, minutes] = timeInput.split(':').map(Number);
-            const selectedTime = new Date();
-            selectedTime.setHours(hours, minutes, 0);
-            
-            if (selectedTime < now) {
-                showToast('Cannot select past time', 'error');
-                return false;
-            }
-        }
-        
-        const [hours, minutes] = timeInput.split(':').map(Number);
-        const totalMinutes = hours * 60 + minutes;
-        const openTime = 4 * 60 + 30;
-        const closeTime = 22 * 60 + 30;
-        
-        if (totalMinutes < openTime || totalMinutes > closeTime) {
-            showToast('Trains operate from 4:30 AM to 10:30 PM only', 'error');
-            return false;
-        }
-        
-        return true;
+    const dateInput = document.getElementById('travelDate').value;
+    const timeInput = document.getElementById('departureTime').value;
+    const now = new Date();
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Check for past dates
+    if (dateInput < today) {
+        showToast('Cannot select past dates', 'error');
+        return false;
     }
-
+    
+    // Check if date is more than 7 days in the future
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 7);
+    const maxDateStr = maxDate.toISOString().split('T')[0];
+    
+    if (dateInput > maxDateStr) {
+        showToast('You can only plan trips up to 7 days in advance', 'error');
+        return false;
+    }
+    
+    if (dateInput === today) {
+        const [hours, minutes] = timeInput.split(':').map(Number);
+        const selectedTime = new Date();
+        selectedTime.setHours(hours, minutes, 0);
+        
+        if (selectedTime < now) {
+            showToast('Cannot select past time', 'error');
+            return false;
+        }
+    }
+    
+    const [hours, minutes] = timeInput.split(':').map(Number);
+    const totalMinutes = hours * 60 + minutes;
+    const openTime = 4 * 60 + 30;
+    const closeTime = 22 * 60 + 30;
+    
+    if (totalMinutes < openTime || totalMinutes > closeTime) {
+        showToast('Trains operate from 4:30 AM to 10:30 PM only', 'error');
+        return false;
+    }
+    
+    return true;
+}
     function swapStations() {
     const fromSelect = document.getElementById('fromStation');
     const toSelect = document.getElementById('toStation');

@@ -38,8 +38,9 @@ body {
     overflow: hidden;
 }
 
+
 .sidebar {
-    width: 300px;
+    width: 300px !important;
     background-color: var(--sidebar-bg);
     color: white;
     display: flex;
@@ -75,10 +76,10 @@ body {
     margin: 0;
     color: white;
 }
-.logo-text p {
-    font-size: 10px;
-    opacity: 0.6;
-    color: white;
+.logo-text p { 
+    font-size: 10px; 
+    opacity: 0.6; 
+    letter-spacing: 1px; 
 }
 
 nav {
@@ -136,12 +137,17 @@ nav {
     flex-wrap: wrap;
     gap: 15px;
 }
-.header-top h1 { 
-    font-size: 24px; 
-    color: var(--text-dark); 
-    display: flex; 
-    align-items: center; 
-    gap: 12px; 
+.header-top h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #1E293B 0%, #3B82F6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 .new-badge { 
     background: var(--red); 
@@ -736,6 +742,10 @@ nav {
                 <button class="mark-read-btn" id="markAllBtn" onclick="markAllAsRead()"><i class="far fa-envelope-open"></i> Mark all as read</button>
             </div>
         </div>
+
+        
+
+        
 
         <!-- Filter Bar -->
         <div class="filter-bar">

@@ -19,11 +19,21 @@ def rmse(y_true, y_pred):
     return tf.sqrt(tf.reduce_mean(tf.square(y_true - y_pred)))
 
 # ========== CONFIG ==========
-MODEL_PATH = 'models_2022-2024_NEW_v2w/openclose'         
+MODEL_PATH = 'models_2022-2024_v5'         
 DATA_FOLDER = 'data (2022-2024)'
 DATA_FILE = os.path.join(DATA_FOLDER, '2025.csv')
 
 SEQ_LENGTH = 24
+
+batch_tests = [
+    # (station, direction, datetime)
+    ("North Ave", "Northbound", "2025-12-03 12:00:00"),
+    ("North Ave", "Northbound", "2025-09-19 10:00:00"),
+    ("North AVe", "Northbound", "2025-07-01 22:00:00")
+    
+]
+
+
 
 STATION_NUMBERS = {
     "North Ave": 1, "Quezon Ave": 2, "Kamuning": 3, "Cubao": 4,
@@ -301,17 +311,6 @@ print(f" Loaded per-direction max passengers for {len(per_direction_max)} models
 
 # ========== DEFINE BATCH TESTS ==========
 # Option 1: List of specific tests
-batch_tests = [
-    # (station, direction, datetime)
-    ("Magallanes", "Southbound", "2025-01-06 14:00:00"),
-    ("Magallanes", "Southbound", "2025-01-07 08:30:00"),
-    ("Magallanes", "Southbound", "2025-01-07 18:00:00"),
-    ("Ayala Ave", "Northbound", "2025-01-06 09:00:00"),
-    ("Ayala Ave", "Southbound", "2025-01-06 17:30:00"),
-    ("North Ave", "Northbound", "2025-01-07 07:45:00"),
-    ("Cubao", "Southbound", "2025-01-08 12:00:00"),
-    ("Taft", "Northbound", "2025-01-09 08:00:00"),
-]
 
 # Option 2: Generate systematic tests (uncomment to use)
 # batch_tests = []

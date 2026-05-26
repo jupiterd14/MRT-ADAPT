@@ -10,6 +10,75 @@ STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
             "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
             "Ayala Ave", "Magallanes", "Taft"]
 
+@operator_bp.route('/api/operator/station-status')
+def operator_station_status():
+    """Get station status for operator dashboard"""
+    try:
+        from flask import current_app
+        from datetime import datetime
+        
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        # Get stations this operator can manage
+        managed_stations = get_operator_stations(user_id)
+        
+        # Get the prediction function from app config
+        get_directional = current_app.config.get('GET_DIRECTIONAL_PREDICTION')
+        
+        if not get_directional:
+            return jsonify({'stations': []})
+        
+        now = datetime.now()
+        
+        def get_congestion(station_name, direction):
+            try:
+                prediction = get_directional(station_name, direction, now)
+                return max(0, min(100, prediction))
+            except:
+                hour = now.hour
+                if 7 <= hour <= 9 or 17 <= hour <= 19:
+                    return 65
+                return 35
+        
+        def get_status_info(congestion):
+            if congestion > 80:
+                return "SEVERE", "status-severe"
+            elif congestion > 60:
+                return "CONGESTED", "status-congested"
+            elif congestion > 30:
+                return "MODERATE", "status-moderate"
+            else:
+                return "LIGHT", "status-light"
+        
+        result = []
+        for station in managed_stations:
+            north_congestion = get_congestion(station, 'Northbound')
+            south_congestion = get_congestion(station, 'Southbound')
+            
+            north_text, north_class = get_status_info(north_congestion)
+            south_text, south_class = get_status_info(south_congestion)
+            
+            result.append({
+                'name': station,
+                'northbound': {
+                    'congestion': round(north_congestion, 1),
+                    'status_text': north_text,
+                    'status_class': north_class
+                },
+                'southbound': {
+                    'congestion': round(south_congestion, 1),
+                    'status_text': south_text,
+                    'status_class': south_class
+                }
+            })
+        
+        return jsonify({'stations': result})
+    except Exception as e:
+        print(f"Error in operator_station_status: {e}")
+        return jsonify({'stations': []})
+        
 def get_operator_stations(user_id):
     """Get list of stations assigned to an operator"""
     user = User.query.get(user_id)
