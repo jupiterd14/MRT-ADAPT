@@ -163,6 +163,25 @@ def get_directional_prediction(station_name, direction, target_datetime=None,
         if target_datetime is None:
             target_datetime = datetime.now()
         
+        # ========== ADD OPERATING HOURS CHECK ==========
+        hour = target_datetime.hour
+        minute = target_datetime.minute
+        time_decimal = hour + minute / 60
+        
+        OPERATING_START = 4.5   # 4:30 AM
+        OPERATING_END = 22.5    # 10:30 PM
+        
+        # MRT-3 is effectively closed outside these hours
+        if time_decimal < OPERATING_START or time_decimal >= OPERATING_END:
+            print(f"[DEBUG] {station_name} {direction} at {target_datetime} - OUTSIDE OPERATING HOURS ({time_decimal:.1f}), returning 0%")
+            return 0
+        
+        # Also handle late evening (10:30 PM - 11:30 PM) - trains are rare
+        if time_decimal >= 22.0 and time_decimal < 23.0:
+            print(f"[DEBUG] {station_name} {direction} at {target_datetime} - LATE EVENING, low congestion expected")
+            # Return a low value but let the model decide
+            pass
+        
         # If no sequence function, return fallback
         if get_sequence_func is None:
             print(f"[DEBUG] No sequence function provided, using fallback")
@@ -179,10 +198,6 @@ def get_directional_prediction(station_name, direction, target_datetime=None,
             input_sequence = sequence.reshape(1, sequence.shape[0], sequence.shape[1])
         else:
             input_sequence = sequence.reshape(1, 24, -1)
-        
-        # IMPORTANT FIX: Skip the feature scaler because feature_engineering.py
-        # already normalizes features to the 0-1 range (or -1 to 1 for sin/cos)
-        # The model was trained on normalized features, so we can use the sequence directly
         
         # Make prediction directly on the normalized sequence
         pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
@@ -202,6 +217,12 @@ def get_directional_prediction(station_name, direction, target_datetime=None,
             prediction = float(pred_scaled[0][0]) * 100
             print(f"[DEBUG] No target scaler: {pred_scaled[0][0]:.3f} -> {prediction:.1f}%")
         
+        # Apply operating hours post-processing for late evening
+        if time_decimal >= 22.0 and time_decimal < 23.0:
+            # Reduce prediction by 50% for last hour of operation
+            prediction = prediction * 0.5
+            print(f"[DEBUG] Late evening adjustment: {prediction:.1f}%")
+        
         # Clamp and return
         prediction = max(0, min(100, prediction))
         return prediction
@@ -212,7 +233,6 @@ def get_directional_prediction(station_name, direction, target_datetime=None,
         traceback.print_exc()
         return get_fallback_directional_prediction(station_name, direction, target_datetime)
     
-
 def get_station_prediction(station_name, target_datetime=None,
                            directional_models=None, directional_scalers=None,
                            get_feature_sequence_func=None):

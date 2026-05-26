@@ -1083,9 +1083,79 @@
     scrollbar-width: thin;
 }
 
+/* Loading overlay for dropdown */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
+    z-index: 99999;
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-spinner {
+    background: white;
+    padding: 20px 30px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    animation: fadeInScale 0.2s ease-out;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.loading-spinner i {
+    font-size: 32px;
+    color: var(--accent-blue);
+    animation: spin 1s linear infinite;
+}
+
+.loading-spinner span {
+    font-size: 14px;
+    color: var(--text-dark);
+    font-weight: 500;
+}
+
+/* Disable dropdown while loading */
+.station-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
     </style>
     </head>
        <body>
+
+         <!-- Loading Overlay -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner">
+        <i class="fas fa-circle-notch"></i>
+        <span>Loading station data...</span>
+    </div>
+</div>
+
+
 <div id="flaggedActionModal" class="modal-overlay">
     <div class="modal-content" style="max-width: 650px;">
         <div class="modal-header">
@@ -1561,11 +1631,20 @@ async function loadTestResults() {
 
 async function showStationDetails(station, direction) {
     const directionFormatted = direction === 'northbound' ? 'Northbound' : 'Southbound';
-    showToast('📊', `Loading details for ${station} ${directionFormatted}...`);
+    
+    // Show loading overlay
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = loadingOverlay.querySelector('span');
+    const originalText = loadingText.innerText;
+    loadingText.innerText = `Loading ${station} ${directionFormatted} details...`;
+    loadingOverlay.classList.add('active');
+    
     try {
         const response = await fetch(`/api/model/station-details?station=${station}&direction=${directionFormatted}`);
         const result = await response.json();
+        
         if (result.success && result.data && result.data.length > 0) {
+            // ... rest of your existing code to display details ...
             const details = result.data;
             let tableRows = '';
             for (let row of details) {
@@ -1576,10 +1655,10 @@ async function showStationDetails(station, direction) {
                 else verdictClass = 'status-severe';
                 tableRows += `<tr>
                     <td>${row.target_time}</td>
-                    <td>${row.predicted}%</td>
-                    <td>${row.actual}%</td>
-                    <td>${row.absolute_error}%</td>
-                    <td><span class="${verdictClass}" style="padding:4px 8px;">${row.verdict}</span></td>
+                    <td>${row.predicted}%</strong></td>
+                    <td>${row.actual}%</strong></span></div>?</div></td>
+                    <td>${row.absolute_error}%</strong></div>?</div></td>
+                    <td><span class="${verdictClass}" style="padding:4px 8px;">${row.verdict}</span></span></div>?</div></td>
                 </tr>`;
             }
             const totalTests = details.length;
@@ -1588,6 +1667,7 @@ async function showStationDetails(station, direction) {
             const goodCount = details.filter(r => r.verdict === 'GOOD').length;
             const okayCount = details.filter(r => r.verdict === 'OKAY').length;
             const needsImprovementCount = details.filter(r => r.verdict === 'NEEDS_IMPROVEMENT').length;
+            
             const modalContent = `
                 <div style="margin-bottom:20px;">
                     <h3 style="margin:0 0 8px 0;">${station} - ${directionFormatted}</h3>
@@ -1616,51 +1696,9 @@ async function showStationDetails(station, direction) {
     } catch (error) {
         console.error('Error loading station details:', error);
         showToast('❌', 'Failed to load station details');
-    }
-}
-
-// ========== MODEL PERFORMANCE – METRICS CARDS ==========
-async function loadModelPerformanceMetrics() {
-    const stationSelector = document.getElementById('stationSelector');
-    const selectedStation = stationSelector ? stationSelector.value : 'all';
-    try {
-        const response = await fetch('/api/model/performance/metrics');
-        const result = await response.json();
-                    console.log("here: ", {result});
-
-        if (result.success && result.data) {
-            const data = result.data;
-            if (selectedStation !== 'all') {
-                const stationMetrics = data.per_station ? data.per_station[selectedStation] : null;
-                if (stationMetrics) {
-                    const direction = currentDirectionViewMP;
-                    const stationMae = stationMetrics[direction]?.mae;
-                    document.getElementById('overallMAE').innerText = (stationMae !== undefined && stationMae !== null) ? `${stationMae}%` : 'No data';
-                    document.getElementById('overallMAPE').innerText = (data.overall_mape !== undefined && data.overall_mape !== null) ? `${data.overall_mape}%` : 'N/A';
-                    document.getElementById('testSamples').innerText = data.total_predictions || data.total_tests || 0;
-                    document.getElementById('lastEvaluated').innerText = data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data';
-                } else {
-                    document.getElementById('overallMAE').innerText = 'No data';
-                    document.getElementById('overallMAPE').innerText = 'N/A';
-                    document.getElementById('testSamples').innerText = data.total_predictions || data.total_tests || 0;
-                    document.getElementById('lastEvaluated').innerText = data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data';
-                }
-            } else {
-                document.getElementById('overallMAE').innerText = (data.overall_mae !== undefined && data.overall_mae !== null) ? `${data.overall_mae}%` : '--';
-                document.getElementById('overallMAPE').innerText = (data.overall_mape !== undefined && data.overall_mape !== null) ? `${data.overall_mape}%` : '--';
-                document.getElementById('testSamples').innerText = data.total_predictions || data.total_tests || 0;
-                document.getElementById('lastEvaluated').innerText = data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data';
-            }
-        } else {
-            document.getElementById('overallMAE').innerText = 'Run tests';
-            document.getElementById('overallMAPE').innerText = 'Run tests';
-            document.getElementById('testSamples').innerText = '0';
-            document.getElementById('lastEvaluated').innerText = 'Never';
-        }
-    } catch (error) {
-        console.error('Error loading model metrics:', error);
-        document.getElementById('overallMAE').innerText = 'Error';
-        document.getElementById('overallMAPE').innerText = 'Error';
+    } finally {
+        loadingOverlay.classList.remove('active');
+        loadingText.innerText = originalText;
     }
 }
 
@@ -1816,54 +1854,47 @@ async function runManualTest() {
     const station = document.getElementById('testStation').value;
     const direction = document.getElementById('testDirection').value;
     const testDateTime = document.getElementById('testDateTime').value;
-    
-    // 👇 Get checkbox value (default to true for 0-100% actuals)
     const useTestMaxCheckbox = document.getElementById('useTestMaxCheckbox');
-    const useTestMax = useTestMaxCheckbox ? useTestMaxCheckbox.checked : true;
+    const useTestMax = useTestMaxCheckbox ? useTestMaxCheckbox.checked : false;
     
     if (!testDateTime) { 
         showToast('⚠️', 'Please select a date and time'); 
         return; 
     }
     
-    // Convert from "YYYY-MM-DDTHH:MM" to "YYYY-MM-DD HH:MM:00"
     const datetime = testDateTime.replace('T', ' ') + ':00';
-    
     const resultDiv = document.getElementById('manualTestResult');
     resultDiv.style.display = 'block';
     resultDiv.innerHTML = '<div style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Running prediction...</div>';
     
+    // Show loading overlay
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = loadingOverlay.querySelector('span');
+    const originalText = loadingText.innerText;
+    loadingText.innerText = 'Running prediction model...';
+    loadingOverlay.classList.add('active');
+    
     try {
-        // 👇 ADD the query parameter here
         const response = await fetch(`/api/model/predict/single?use_test_max=${useTestMax}`, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ 
-                station: station, 
-                direction: direction, 
-                datetime: datetime 
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ station, direction, datetime })
         });
         
-        // Check if response is OK before parsing JSON
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Server error:', errorText);
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const result = await response.json();
         
         if (result.success && result.prediction) {
+            // ... rest of your existing code to display results ...
             const pred = result.prediction.predicted;
             let html = `
                 <div style="text-align:center; padding:20px;">
                     <div style="font-size:48px; font-weight:800; color:#3B82F6;">${pred}%</div>
                     <div style="font-size:14px; color:#64748B; margin-top:8px;">Predicted Congestion</div>`;
             
-            // Show actual if available
             if (result.prediction.actual !== undefined) {
                 const actual = result.prediction.actual;
                 const error = result.prediction.error;
@@ -1871,7 +1902,6 @@ async function runManualTest() {
                 if (error <= 5) errorColor = '#22C55E';
                 else if (error <= 10) errorColor = '#F59E0B';
                 
-                // 👇 Add indicator for which mode is being used
                 const modeText = useTestMax ? '(relative to 2025 peak)' : '(relative to training max)';
                 html += `
                     <div style="margin-top:16px; padding:12px; background:#F8FAFC; border-radius:12px;">
@@ -1884,7 +1914,6 @@ async function runManualTest() {
                          </div>`;
             }
             
-            // Format the datetime for display
             const displayDateTime = datetime.replace(' ', ' at ');
             html += `
                     <div style="margin-top:16px; padding:12px; background:#F8FAFC; border-radius:12px;">
@@ -1900,8 +1929,13 @@ async function runManualTest() {
     } catch (error) {
         console.error('Prediction error:', error);
         resultDiv.innerHTML = `<div style="text-align:center; padding:20px; color:#EF4444;"><i class="fas fa-exclamation-triangle"></i> Error: ${error.message}</div>`;
+    } finally {
+        loadingOverlay.classList.remove('active');
+        loadingText.innerText = originalText;
     }
 }
+
+
 async function uploadTestData() {
     const fileInput = document.getElementById('testDataFile');
     const file = fileInput.files[0];
@@ -1952,6 +1986,57 @@ function downloadSampleCSV() {
     a.click();
     URL.revokeObjectURL(url);
     showToast('📥', 'Sample CSV downloaded');
+}
+
+
+// ========== MODEL PERFORMANCE – METRICS CARDS ==========
+async function loadModelPerformanceMetrics() {
+    const stationSelector = document.getElementById('stationSelector');
+    const selectedStation = stationSelector ? stationSelector.value : 'all';
+    try {
+        const response = await fetch('/api/model/performance/metrics');
+        const result = await response.json();
+        console.log("Metrics result:", result);
+
+        if (result.success && result.data) {
+            const data = result.data;
+            if (selectedStation !== 'all') {
+                const stationMetrics = data.per_station ? data.per_station[selectedStation] : null;
+                if (stationMetrics) {
+                    const direction = currentDirectionViewMP;
+                    const stationMae = stationMetrics[direction]?.mae;
+                    document.getElementById('overallMAE').innerText = (stationMae !== undefined && stationMae !== null) ? `${stationMae}%` : 'No data';
+                    document.getElementById('overallMAPE').innerText = (data.overall_mape !== undefined && data.overall_mape !== null) ? `${data.overall_mape}%` : 'N/A';
+                    document.getElementById('testSamples').innerText = data.total_predictions || data.total_tests || 0;
+                    document.getElementById('lastEvaluated').innerText = data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data';
+                } else {
+                    document.getElementById('overallMAE').innerText = 'No data';
+                    document.getElementById('overallMAPE').innerText = 'N/A';
+                    document.getElementById('testSamples').innerText = data.total_predictions || data.total_tests || 0;
+                    document.getElementById('lastEvaluated').innerText = data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data';
+                }
+            } else {
+                document.getElementById('overallMAE').innerText = (data.overall_mae !== undefined && data.overall_mae !== null) ? `${data.overall_mae}%` : '--';
+                document.getElementById('overallMAPE').innerText = (data.overall_mape !== undefined && data.overall_mape !== null) ? `${data.overall_mape}%` : '--';
+                document.getElementById('testSamples').innerText = data.total_predictions || data.total_tests || 0;
+                document.getElementById('lastEvaluated').innerText = data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data';
+            }
+            
+            // Update station metrics table if station selector is 'all'
+            if (selectedStation === 'all' && data.per_station) {
+                updateStationMetricsTableMP(data.per_station);
+            }
+        } else {
+            document.getElementById('overallMAE').innerText = 'Run tests';
+            document.getElementById('overallMAPE').innerText = 'Run tests';
+            document.getElementById('testSamples').innerText = '0';
+            document.getElementById('lastEvaluated').innerText = 'Never';
+        }
+    } catch (error) {
+        console.error('Error loading model metrics:', error);
+        document.getElementById('overallMAE').innerText = 'Error';
+        document.getElementById('overallMAPE').innerText = 'Error';
+    }
 }
 
 // ========== OTHER DASHBOARD FUNCTIONS ==========
@@ -2336,28 +2421,60 @@ document.addEventListener('DOMContentLoaded', function() {
     if (downloadSampleLink) downloadSampleLink.onclick = (e) => { e.preventDefault(); downloadSampleCSV(); };
 
     // Auto‑tests button
-    const autoTestsBtn = document.getElementById('testUploadedCsvBtnMP');
-    if (autoTestsBtn) {
-        autoTestsBtn.onclick = async () => {
-            showToast('🔄', 'Running auto-tests...');
-            try {
-                const response = await fetch('/api/model/run-auto-tests', { method: 'POST' });
-                const result = await response.json();
-                if (result.success) {
-                    showToast('✅', result.message);
-                    setTimeout(() => {
-                        loadModelPerformanceMetrics();
-                        loadPredictionChart();
-                        if (stationSel && stationSel.value !== 'all') loadTestResults();
-                    }, 1000);
-                } else {
-                    showToast('❌', result.error || 'Auto-test failed');
+    // Find this section in your DOMContentLoaded (around line 900-920)
+const autoTestsBtn = document.getElementById('testUploadedCsvBtnMP');
+if (autoTestsBtn) {
+    autoTestsBtn.onclick = async () => {
+        // Show loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = loadingOverlay.querySelector('span');
+        const originalText = loadingText.innerText;
+        
+        loadingText.innerText = 'Running auto-tests on 2025 data...';
+        loadingOverlay.classList.add('active');
+        
+        // Disable button to prevent multiple clicks
+        autoTestsBtn.disabled = true;
+        autoTestsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running Tests...';
+        
+        try {
+            // Add a query parameter to use training max (matching diagnosis)
+            const response = await fetch('/api/model/run-auto-tests?use_test_max=false', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('✅', `Auto-tests completed! ${result.summary.total_tests_run} predictions generated. Avg error: ${result.summary.avg_absolute_error}%`);
+                
+                // Refresh all data
+                await loadModelPerformanceMetrics();
+                await loadPredictionChart();
+                await loadTestResults();
+                
+                // If station selector is set to a specific station, refresh its details
+                const stationSel = document.getElementById('stationSelector');
+                if (stationSel && stationSel.value !== 'all') {
+                    await loadTestResults();
                 }
-            } catch (error) {
-                showToast('❌', 'Auto-test failed: ' + error.message);
+            } else {
+                showToast('❌', result.error || 'Auto-test failed');
             }
-        };
-    }
+        } catch (error) {
+            console.error('Auto-test error:', error);
+            showToast('❌', 'Auto-test failed: ' + error.message);
+        } finally {
+            // Hide loading overlay
+            loadingOverlay.classList.remove('active');
+            loadingText.innerText = originalText;
+            
+            // Re-enable button
+            autoTestsBtn.disabled = false;
+            autoTestsBtn.innerHTML = '<i class="fas fa-robot"></i> Run Tests';
+        }
+    };
+}
 
     // Default manual test date
 const testDateTimeInput = document.getElementById('testDateTime');
