@@ -1693,14 +1693,15 @@
         <div class="chart-container" style="position: relative; height: 250px; width: 100%;">
             <canvas id="forecastChart"></canvas>
         </div>
-
     </div>
         
-    
     </div>
 
             <div id="broadcast" class="page">
+                
         <div class="broadcast-layout">
+         
+
             <div>
                 <div class="form-card">
                     <h3 style="margin-bottom:16px;">Disruption Type</h3>
@@ -2815,37 +2816,7 @@ async function confirmFlagReport() {
 }
 
         // ========== PAGE NAVIGATION ==========
-        window.showPage = function(pageId, element) {
-            console.log("Switching to page:", pageId);
-            
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            
-            const page = document.getElementById(pageId);
-            if (page) page.classList.add('active');
-            if (element) element.classList.add('active');
-            
-            const titles = { dashboard: 'Dashboard', broadcast: 'Broadcast Alerts', log: 'Incident Log', userReports: 'User Reports' };
-            const titleEl = document.getElementById('pageTitle');
-            if (titleEl) titleEl.textContent = titles[pageId];
-            
-            // Load content based on page
-            if (pageId === 'log') {
-                loadIncidentLogs();
-            } else if (pageId === 'userReports') {
-                fetchOperatorReports();
-            } else if (pageId === 'broadcast') {
-                initBroadcast();
-                renderStationPills();
-            } else if (pageId === 'dashboard') {
-                loadCongestionData();
-                if (forecastChart) {
-                    forecastChart.update();
-                } else {
-                    updateForecastChart();
-                }
-            }
-        };
+      
         
         // ========== BROADCAST FUNCTIONS ==========
         const disruptionTypes = ["Train Breakdown", "Overcrowding", "Maintenance", "Signal Issue", "Gate Closure", "General Notice"];
@@ -3055,27 +3026,48 @@ async function confirmFlagReport() {
         }
         
     window.showPage = function(pageId, element) {
-        console.log("Switching to page:", pageId);
-        
-        // Hide all pages
-        document.querySelectorAll('.page').forEach(p => {
-            p.classList.remove('active');
-            p.style.display = 'none';  // Force hide
-        });
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        
-        // Show selected page
-        const page = document.getElementById(pageId);
-        if (page) {
-            page.classList.add('active');
-            page.style.display = 'block';  // Force show
-            page.style.visibility = 'visible';
-            console.log(`Activated ${pageId}, display set to block`);
+    console.log("Switching to page:", pageId);
+    
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(p => {
+        p.classList.remove('active');
+        p.style.display = 'none';
+    });
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    
+    // Show selected page
+    const page = document.getElementById(pageId);
+    if (page) {
+        page.classList.add('active');
+        page.style.display = 'block';
+        page.style.visibility = 'visible';
+        console.log(`Activated ${pageId}, display set to block`);
+    }
+    if (element) element.classList.add('active');
+    
+    // UPDATE THE TITLE - THIS WAS MISSING!
+    const titles = { dashboard: 'Dashboard', broadcast: 'Broadcast Alerts', log: 'Incident Log', userReports: 'User Reports' };
+    const titleEl = document.getElementById('pageTitle');
+    if (titleEl) titleEl.textContent = titles[pageId];
+    
+    // Load content based on page
+    if (pageId === 'log') {
+        loadIncidentLogs();
+    } else if (pageId === 'userReports') {
+        fetchOperatorReports();
+    } else if (pageId === 'broadcast') {
+        initBroadcast();
+        renderStationPills();
+    } else if (pageId === 'dashboard') {
+        loadCongestionData();
+        if (forecastChart) {
+            forecastChart.update();
+        } else {
+            updateForecastChart();
         }
-        if (element) element.classList.add('active');
-        
-        // Rest of your code...
-    };
+    }
+};
+
     async function sendBroadcast() {
         // Get disruption type properly
         let disruptionType = selectedDisruptionType;
