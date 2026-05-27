@@ -608,6 +608,22 @@ def debug_raw_model_output(station_name, direction):
     
     return jsonify(result)
 
+# Add this to your app.py (near the end, before app.run())
+
+@app.route('/debug/routes')
+def list_all_routes():
+    """List all registered routes for debugging"""
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'endpoint': rule.endpoint,
+            'methods': list(rule.methods),
+            'path': str(rule)
+        })
+    # Sort by path
+    routes.sort(key=lambda x: x['path'])
+    return jsonify(routes)
+
 @app.route('/debug/test-no-clamp/<station_name>')
 def debug_test_no_clamp(station_name):
     from services import get_directional_prediction, get_feature_sequence_for_station

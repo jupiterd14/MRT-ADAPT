@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>MRT-3 System - Complete Debugging Guide</title>
+    <style>
+       * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 16px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #00224D, #003366);
+            color: white;
+            padding: 20px 16px;
+            border-radius: 16px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            margin-bottom: 6px;
+        }
+
+        .header p {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+
+        /* Search Bar */
+        .search-bar {
+            background: white;
+            border-radius: 40px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .search-bar input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 14px;
+            background: transparent;
+        }
+
+        .search-bar button {
+            background: #00224D;
+            border: none;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* Category Sections */
+        .category {
+            background: white;
+            border-radius: 16px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .category-header {
+            background: #f8f9fa;
+            padding: 14px 16px;
+            font-weight: 600;
+            font-size: 15px;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .category-header .icon {
+            font-size: 20px;
+        }
+
+        .category-header .arrow {
+            margin-left: auto;
+            transition: transform 0.2s;
+        }
+
+        .category-header.collapsed .arrow {
+            transform: rotate(-90deg);
+        }
+
+        .category-content {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .category-content.expanded {
+            max-height: 5000px;
+        }
+
+        /* Error Item */
+        .error-item {
+            border-bottom: 1px solid #e9ecef;
+            padding: 16px;
+        }
+
+        .error-item:last-child {
+            border-bottom: none;
+        }
+
+        .error-title {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .error-code {
+            background: #dc2626;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: monospace;
+        }
+
+        .error-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1a1a2e;
+            flex: 1;
+        }
+
+        .error-cause {
+            background: #fef2f2;
+            padding: 10px 12px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            border-left: 3px solid #dc2626;
+        }
+
+        .error-solution {
+            background: #ecfdf5;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            border-left: 3px solid #10b981;
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            margin-top: 8px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Syntax Cards */
+        .syntax-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 14px;
+            margin: 12px;
+        }
+
+        .syntax-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #00224D;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* Quick Tips */
+        .tips-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            padding: 16px;
+        }
+
+        .tip-card {
+            background: #f0fdf4;
+            padding: 12px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .tip-card .emoji {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+
+        .tip-card .title {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .tip-card .desc {
+            font-size: 11px;
+            color: #166534;
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-right: 6px;
+        }
+
+        .badge-flask { background: #e0e7ff; color: #1e40af; }
+        .badge-js { background: #fef3c7; color: #b45309; }
+        .badge-db { background: #dcfce7; color: #166534; }
+        .badge-model { background: #f3e8ff; color: #6b21a5; }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            body { padding: 12px; }
+            .tips-grid { grid-template-columns: 1fr; }
+            .error-title { flex-direction: column; }
+            .error-code { align-self: flex-start; }
+            .syntax-card { margin: 8px; }
+            .code-block { font-size: 10px; }
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        /* Table styling for code blocks */
+        .code-block table, .code-block pre {
+            margin: 0;
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🛠️ MRT-3 Debugging Guide</h1>
+        <p>Complete error handling & syntax reference</p>
+    </div>
+
+    <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="🔍 Search errors, solutions, or keywords..." onkeyup="searchItems()">
+        <button onclick="clearSearch()">Clear</button>
+    </div>
+
+    <!-- ==================== ERROR CATEGORIES ==================== -->
+
+    <!-- 1. Model/Prediction Errors -->
+    <div class="category" data-category="model">
+        <div class="category-header" onclick="toggleCategory(this)">
+            <span class="icon">🤖</span>
+            <span>Model & Prediction Errors</span>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="category-content">
+            <!-- Error 1 -->
+            <div class="error-item" data-keywords="prediction low 7% 7.8% accuracy wrong">
+                <div class="error-title">
+                    <span class="error-code">ERR-MOD-001</span>
+                    <span class="error-name">Predictions are too low (7% instead of 27%)</span>
+                </div>
+                <div class="error-cause">❌ Cause: Feature scaler not being used correctly. Manual normalization instead of saved scaler.</div>
+                <div class="error-solution">✅ Solution: Use saved feature scaler from training:<br>
+                    <div class="code-block"># In feature_engineering.py<br>
+scaler_path = f'models_2022-2024_v5/{station}_{direction}_feature_scaler.pkl'<br>
+with open(scaler_path, 'rb') as f:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;feature_scaler = pickle.load(f)<br>
+features = feature_scaler.transform(features)</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="target scaler missing none">
+                <div class="error-title">
+                    <span class="error-code">ERR-MOD-002</span>
+                    <span class="error-name">Target scaler not found / None</span>
+                </div>
+                <div class="error-cause">❌ Cause: Target scaler file missing or wrong path. Model output in 0-1 range but not converted.</div>
+                <div class="error-solution">✅ Solution: Load target scaler and inverse transform:<br>
+                    <div class="code-block">target_scaler = directional_scalers.get(f'{model_key}_target')<br>
+if target_scaler:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prediction = target_scaler.inverse_transform(pred_scaled.reshape(-1,1))[0][0]<br>
+else:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prediction = pred_scaled[0][0] * 100  # fallback</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="feature sequence none null">
+                <div class="error-title">
+                    <span class="error-code">ERR-MOD-003</span>
+                    <span class="error-name">get_feature_sequence_for_station returns None</span>
+                </div>
+                <div class="error-cause">❌ Cause: Not enough historical data (need 24+ hours before target time).</div>
+                <div class="error-solution">✅ Solution: Ensure target date has at least 24 hours of history. For early 2025 data, use dates after Jan 5, 2025.</div>
+            </div>
+
+            <div class="error-item" data-keywords="sequence min max 1140 large">
+                <div class="error-title">
+                    <span class="error-code">ERR-MOD-004</span>
+                    <span class="error-name">Feature sequence has huge values (1140+)</span>
+                </div>
+                <div class="error-cause">❌ Cause: Congestion column not normalized correctly. 'minutes_until_closing' column has raw minutes (0-1110).</div>
+                <div class="error-solution">✅ Solution: Normalize columns with values > 1:<br>
+                    <div class="code-block">for col_idx in range(features.shape[1]):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;col_min, col_max = features[:,col_idx].min(), features[:,col_idx].max()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if col_max > 1.0:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;features[:,col_idx] = (features[:,col_idx] - col_min) / (col_max - col_min)</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="model not found key missing">
+                <div class="error-title">
+                    <span class="error-code">ERR-MOD-005</span>
+                    <span class="error-name">Model key not in directional_models</span>
+                </div>
+                <div class="error-cause">❌ Cause: Station name or direction spelling mismatch (e.g., 'North AVe' vs 'North Ave').</div>
+                <div class="error-solution">✅ Solution: Use exact station names: North Ave, Quezon Ave, Kamuning, Cubao, Santolan, Ortigas, Shaw Blvd, Boni Ave, Guadalupe, Buendia, Ayala Ave, Magallanes, Taft. Directions: 'Northbound' or 'Southbound' (capitalized).</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Flask/Python Errors -->
+    <div class="category" data-category="flask">
+        <div class="category-header" onclick="toggleCategory(this)">
+            <span class="icon">🐍</span>
+            <span>Flask / Python Errors</span>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="category-content">
+            <div class="error-item" data-keywords="500 internal server error">
+                <div class="error-title">
+                    <span class="error-code">ERR-FLK-001</span>
+                    <span class="error-name">500 Internal Server Error</span>
+                </div>
+                <div class="error-cause">❌ Cause: Exception in route handler. Common: CSV reading error, missing file, type conversion issue.</div>
+                <div class="error-solution">✅ Solution: Add try/except with traceback:<br>
+                    <div class="code-block">try:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;# your code<br>
+except Exception as e:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;import traceback<br>
+&nbsp;&nbsp;&nbsp;&nbsp;traceback.print_exc()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return jsonify({'error': str(e)}), 500</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="import circular dependency">
+                <div class="error-title">
+                    <span class="error-code">ERR-FLK-002</span>
+                    <span class="error-name">Circular Import Error</span>
+                </div>
+                <div class="error-cause">❌ Cause: Module A imports B, B imports A. Common between predictor.py and model_loader.py.</div>
+                <div class="error-solution">✅ Solution: Move shared imports to __init__.py or import inside functions:<br>
+                    <div class="code-block">def get_directional_prediction(...):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;from services.model_loader import directional_models<br>
+&nbsp;&nbsp;&nbsp;&nbsp;# use it here</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="duplicate route endpoint overwriting">
+                <div class="error-title">
+                    <span class="error-code">ERR-FLK-003</span>
+                    <span class="error-name">Duplicate route / View function mapping overwriting</span>
+                </div>
+                <div class="error-cause">❌ Cause: Same route decorated twice in different places.</div>
+                <div class="error-solution">✅ Solution: Search for duplicate function names. Keep only one definition per route.</div>
+            </div>
+
+            <div class="error-item" data-keywords="json serializable bool numpy">
+                <div class="error-title">
+                    <span class="error-code">ERR-FLK-004</span>
+                    <span class="error-name">Object of type bool_ is not JSON serializable</span>
+                </div>
+                <div class="error-cause">❌ Cause: NumPy boolean types (np.bool_) in response data.</div>
+                <div class="error-solution">✅ Solution: Convert numpy types to Python natives:<br>
+                    <div class="code-block">def convert_numpy(obj):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if hasattr(obj, 'item'): return obj.item()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return obj<br>
+result = convert_numpy(result)</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="blueprint not registered 404">
+                <div class="error-title">
+                    <span class="error-code">ERR-FLK-005</span>
+                    <span class="error-name">404 - Blueprint route not found</span>
+                </div>
+                <div class="error-cause">❌ Cause: Blueprint not registered or wrong URL prefix.</div>
+                <div class="error-solution">✅ Solution: Register blueprint in app.py:<br>
+                    <div class="code-block">from routes.api_model_performance import model_perf_bp<br>
+app.register_blueprint(model_perf_bp, url_prefix='/api')</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. JavaScript Errors -->
+    <div class="category" data-category="js">
+        <div class="category-header" onclick="toggleCategory(this)">
+            <span class="icon">📜</span>
+            <span>JavaScript Errors</span>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="category-content">
+            <div class="error-item" data-keywords="fetch failed cors network">
+                <div class="error-title">
+                    <span class="error-code">ERR-JS-001</span>
+                    <span class="error-name">fetch() failed / Network error</span>
+                </div>
+                <div class="error-cause">❌ Cause: Flask server not running, wrong URL, or CORS issue.</div>
+                <div class="error-solution">✅ Solution: Check Flask is running (python app.py). Use relative URLs like '/api/...' not 'localhost:5000/...'. Add error handling:<br>
+                    <div class="code-block">fetch(url).catch(error => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;console.error('Fetch failed:', error);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;showToast('❌', 'Server not responding');<br>
+});</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="undefined is not a function">
+                <div class="error-title">
+                    <span class="error-code">ERR-JS-002</span>
+                    <span class="error-name">xxx is not a function / undefined</span>
+                </div>
+                <div class="error-cause">❌ Cause: Function not defined in script, or called before DOM loaded.</div>
+                <div class="error-solution">✅ Solution: Wrap in DOMContentLoaded, or declare functions globally:<br>
+                    <div class="code-block">document.addEventListener('DOMContentLoaded', function() {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;// your initialization code<br>
+});</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="chart.js failed chart not defined">
+                <div class="error-title">
+                    <span class="error-code">ERR-JS-003</span>
+                    <span class="error-name">Chart.js error - Chart is not defined</span>
+                </div>
+                <div class="error-cause">❌ Cause: Chart.js CDN not loaded, or Chart variable not available.</div>
+                <div class="error-solution">✅ Solution: Ensure Chart.js script tag is in head:<br>
+                    <div class="code-block">&lt;script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">&lt;/script&gt;</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="null reference getElementById">
+                <div class="error-title">
+                    <span class="error-code">ERR-JS-004</span>
+                    <span class="error-name">Cannot read property '...' of null</span>
+                </div>
+                <div class="error-cause">❌ Cause: Element ID doesn't exist in DOM when script runs.</div>
+                <div class="error-solution">✅ Solution: Check element exists, or use optional chaining:<br>
+                    <div class="code-block">const el = document.getElementById('myId');<br>
+if (el) { el.innerHTML = 'value'; }</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="async await promise">
+                <div class="error-title">
+                    <span class="error-code">ERR-JS-005</span>
+                    <span class="error-name">Await is only valid in async function</span>
+                </div>
+                <div class="error-cause">❌ Cause: Using 'await' outside an async function.</div>
+                <div class="error-solution">✅ Solution: Add 'async' to function declaration:<br>
+                    <div class="code-block">async function loadData() {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;const response = await fetch('/api/data');<br>
+}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Database/CSV Errors -->
+    <div class="category" data-category="db">
+        <div class="category-header" onclick="toggleCategory(this)">
+            <span class="icon">🗄️</span>
+            <span>Database & CSV Errors</span>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="category-content">
+            <div class="error-item" data-keywords="csv string predicted type error">
+                <div class="error-title">
+                    <span class="error-code">ERR-DB-001</span>
+                    <span class="error-name">CSV column has strings instead of numbers</span>
+                </div>
+                <div class="error-cause">❌ Cause: When writing CSV, numbers were saved as strings ('8.3' instead of 8.3).</div>
+                <div class="error-solution">✅ Solution: Convert on read or fix at write time:<br>
+                    <div class="code-block"># On read:<br>
+df['predicted'] = pd.to_numeric(df['predicted'], errors='coerce')<br><br>
+# On write (ensure numbers, not strings):<br>
+results.append({'predicted': float(round(value, 1))})</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="mysql connection refused">
+                <div class="error-title">
+                    <span class="error-code">ERR-DB-002</span>
+                    <span class="error-name">MySQL connection refused</span>
+                </div>
+                <div class="error-cause">❌ Cause: MySQL server not running, wrong credentials, or wrong host/port.</div>
+                <div class="error-solution">✅ Solution: Check MySQL service is running. Verify DATABASE_URL in .env:<br>
+                    <div class="code-block">DATABASE_URL=mysql+pymysql://user:password@localhost:3306/dbname</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="sqlalchemy table not found">
+                <div class="error-title">
+                    <span class="error-code">ERR-DB-003</span>
+                    <span class="error-name">Table doesn't exist (1146)</span>
+                </div>
+                <div class="error-cause">❌ Cause: Database tables not created yet.</div>
+                <div class="error-solution">✅ Solution: Run migrations or create tables:<br>
+                    <div class="code-block">from app import app, db<br>
+with app.app_context():<br>
+&nbsp;&nbsp;&nbsp;&nbsp;db.create_all()</div>
+                </div>
+            </div>
+
+            <div class="error-item" data-keywords="foreign key constraint fails">
+                <div class="error-title">
+                    <span class="error-code">ERR-DB-004</span>
+                    <span class="error-name">IntegrityError / Foreign key constraint fails</span>
+                </div>
+                <div class="error-cause">❌ Cause: Referencing a record that doesn't exist (e.g., user_id in report doesn't match any user).</div>
+                <div class="error-solution">✅ Solution: Ensure referenced record exists before creating relationship, or use db.session.rollback().</div>
+            </div>
+
+            <div class="error-item" data-keywords="pandas read_csv file not found">
+                <div class="error-title">
+                    <span class="error-code">ERR-DB-005</span>
+                    <span class="error-name">FileNotFoundError: 2025.csv</span>
+                </div>
+                <div class="error-cause">❌ Cause: CSV file not in expected location.</div>
+                <div class="error-solution">✅ Solution: Check multiple paths:<br>
+                    <div class="code-block">possible_paths = [<br>
+&nbsp;&nbsp;&nbsp;&nbsp;'data (2022-2024)/2025.csv',<br>
+&nbsp;&nbsp;&nbsp;&nbsp;'../data (2022-2024)/2025.csv',<br>
+&nbsp;&nbsp;&nbsp;&nbsp;'2025.csv'<br>
+]</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Syntax Reference -->
+    <div class="category" data-category="syntax">
+        <div class="category-header" onclick="toggleCategory(this)">
+            <span class="icon">📖</span>
+            <span>Syntax Reference (Quick Lookup)</span>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="category-content">
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-flask">Flask</span> Route with JSON</div>
+                <div class="code-block">@blueprint.route('/path', methods=['GET', 'POST'])<br>
+def handler():<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data = request.get_json()  # POST body<br>
+&nbsp;&nbsp;&nbsp;&nbsp;param = request.args.get('key')  # Query param<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return jsonify({'success': True, 'data': result})</div>
+            </div>
+
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-flask">Flask</span> Blueprint Registration</div>
+                <div class="code-block"># In routes file:<br>
+bp = Blueprint('name', __name__)<br><br>
+# In app.py:<br>
+from routes.file import bp<br>
+app.register_blueprint(bp, url_prefix='/api')</div>
+            </div>
+
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-js">JavaScript</span> Fetch API</div>
+                <div class="code-block">// GET request<br>
+const response = await fetch('/api/endpoint?param=value');<br>
+const data = await response.json();<br><br>
+// POST request<br>
+const res = await fetch('/api/endpoint', {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;method: 'POST',<br>
+&nbsp;&nbsp;&nbsp;&nbsp;headers: {'Content-Type': 'application/json'},<br>
+&nbsp;&nbsp;&nbsp;&nbsp;body: JSON.stringify({key: 'value'})<br>
+});</div>
+            </div>
+
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-js">JavaScript</span> Chart.js Line Chart</div>
+                <div class="code-block">new Chart(ctx, {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;type: 'line',<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data: {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;labels: ['Jan', 'Feb', 'Mar'],<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;datasets: [{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;label: 'Predicted',<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data: [30, 45, 60],<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;borderColor: '#3B82F6'<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;&nbsp;&nbsp;options: { responsive: true }<br>
+});</div>
+            </div>
+
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-db">SQLAlchemy</span> Query Examples</div>
+                <div class="code-block"># Get all<br>
+users = User.query.all()<br><br>
+# Filter<br>
+reports = Report.query.filter_by(station='North Ave').all()<br><br>
+# Filter with condition<br>
+logs = ActivityLog.query.filter(ActivityLog.timestamp > date).all()<br><br>
+# Order by<br>
+items = Item.query.order_by(Item.created_at.desc()).limit(10).all()<br><br>
+# Count<br>
+count = User.query.filter_by(role='operator').count()</div>
+            </div>
+
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">Pandas</span> DataFrame Operations</div>
+                <div class="code-block"># Read CSV<br>
+df = pd.read_csv('file.csv')<br><br>
+# Convert to datetime<br>
+df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'])<br><br>
+# Group by hour<br>
+hourly = df.groupby(df['datetime'].dt.floor('h')).agg({'TotalPassenger': 'sum'})<br><br>
+# Filter rows<br>
+filtered = df[(df['StationEntry'] == 1) & (df['Direction'] == 'Northbound')]<br><br>
+# Save to CSV<br>
+df.to_csv('output.csv', index=False)</div>
+            </div>
+
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">TensorFlow/Keras</span> Load Model</div>
+                <div class="code-block">def rmse(y_true, y_pred):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;return tf.sqrt(tf.reduce_mean(tf.square(y_true - y_pred)))<br><br>
+model = tf.keras.models.load_model(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;'path/to/model.keras',<br>
+&nbsp;&nbsp;&nbsp;&nbsp;custom_objects={'rmse': rmse}<br>
+)<br><br>
+prediction = model.predict(input_sequence)</div>
+            </div>
+
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-db">SQL</span> Common Queries</div>
+                <div class="code-block">-- Count by station<br>
+SELECT station, COUNT(*) FROM reports GROUP BY station;<br><br>
+-- Last 10 actions<br>
+SELECT * FROM activity_log ORDER BY timestamp DESC LIMIT 10;<br><br>
+-- Find flagged reports<br>
+SELECT * FROM reports WHERE flagged = 1;<br><br>
+-- Update operator status<br>
+UPDATE users SET is_active = 0 WHERE id = 1;</div>
+            </div>
+        </div>
+    </div>
+
+        <!-- 6. API Routes Reference -->
+    <div class="category" data-category="api-routes">
+        <div class="category-header" onclick="toggleCategory(this)">
+            <span class="icon">🔗</span>
+            <span>API Routes Reference (100+ Endpoints)</span>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="category-content">
+            
+            <!-- Authentication Routes -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-flask">🔐 AUTH</span> Authentication Routes (5)</div>
+                <div class="code-block">GET     /login
+GET     /login/google
+GET     /login/google/authorize
+GET     /logout
+POST    /operator-signup
+POST    /signup</div>
+            </div>
+
+            <!-- Admin Routes -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-flask">👑 ADMIN</span> Admin Dashboard Routes (18)</div>
+                <div class="code-block">GET     /admin/dashboard
+GET     /api/admin/approve-flagged/&lt;int:entry_id&gt;
+GET     /api/admin/audit-log
+GET     /api/admin/audit-stats
+GET     /api/admin/dashboard-stats
+POST    /api/admin/deactivate-operator/&lt;int:operator_id&gt;
+GET     /api/admin/debug-check-flags
+DELETE  /api/admin/delete-flagged/&lt;int:entry_id&gt;
+POST    /api/admin/dismiss-flagged/&lt;int:entry_id&gt;
+POST    /api/admin/flag-audit-entry/&lt;int:entry_id&gt;
+GET     /api/admin/flagged-actions
+POST    /api/admin/generate-invite
+GET     /api/admin/operator-list
+GET     /api/admin/profile
+POST    /api/admin/reactivate-operator/&lt;int:operator_id&gt;
+GET     /api/admin/recent-activities-list
+GET     /api/admin/station-status</div>
+            </div>
+
+            <!-- Model Performance Routes -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">🤖 MODEL</span> Model Performance Routes (15)</div>
+                <div class="code-block">GET     /api/model/chart/data
+POST    /api/model/force-generate-tests
+POST    /api/model/generate-all-test-data
+POST    /api/model/generate-predictions
+GET     /api/model/performance/metrics
+POST    /api/model/predict/single
+POST    /api/model/run-auto-tests
+GET     /api/model/station-details
+GET     /api/model/stations
+POST    /api/model/upload/batch
+GET     /api/model/validate-2025-data</div>
+            </div>
+
+            <!-- Debug Routes -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-js">🐛 DEBUG</span> Debug Routes (20+)</div>
+                <div class="code-block">GET     /api/debug/check-models
+GET     /api/debug/force-load-models
+GET     /api/debug/inspect-csv
+GET     /api/debug/loaded-models
+GET     /api/debug/model-path-check
+GET     /api/debug/prediction-failures
+GET     /api/debug/station-details-debug
+GET     /api/debug/taft-check
+GET     /api/debug/test-feature-sequence
+GET     /api/debug/test-prediction
+GET     /api/debug/test-single-prediction/&lt;station&gt;/&lt;direction&gt;
+GET     /api/debug/why-no-predictions
+GET     /debug/clear-cache
+GET     /debug/db-schema
+GET     /debug/routes
+GET     /debug/model-status</div>
+            </div>
+
+            <!-- Live Map & Predictions -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-db">🗺️ LIVE</span> Live Map & Prediction Routes (15+)</div>
+                <div class="code-block">GET     /api/live-map/directions
+GET     /api/live-map/directions/v2
+GET     /api/predict-direction/&lt;station_name&gt;
+GET     /api/predict-route
+GET     /api/predict/&lt;station_name&gt;
+GET     /api/directional-forecast/&lt;station_name&gt;
+GET     /api/station-info/&lt;station_name&gt;
+GET     /api/stations
+GET     /api/batch-predict
+GET     /live-map</div>
+            </div>
+
+            <!-- Broadcast & Alerts -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-js">📢 BROADCAST</span> Broadcast & Alert Routes (8)</div>
+                <div class="code-block">GET     /alerts
+GET     /api/alerts/count
+GET     /api/alerts/list
+GET     /api/broadcasts/public
+GET     /api/operator/broadcasts
+POST    /api/operator/send-broadcast
+PUT     /api/operator/broadcast/&lt;int:broadcast_id&gt;
+DELETE  /api/operator/broadcast/&lt;int:broadcast_id&gt;</div>
+            </div>
+
+            <!-- Reports Routes -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-db">📋 REPORTS</span> Reports Routes (8)</div>
+                <div class="code-block">GET     /api/reports
+POST    /api/report-congestion
+POST    /api/reports/&lt;int:report_id&gt;/flag
+POST    /api/user-reports/&lt;int:report_id&gt;/flag
+GET     /api/operator/flagged-reports
+POST    /api/operator/review-flagged/&lt;int:report_id&gt;
+GET     /api/operator/reports/stats</div>
+            </div>
+
+            <!-- User Features -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-flask">👤 USER</span> User Feature Routes (6)</div>
+                <div class="code-block">POST    /api/user/favorite-station
+GET     /api/saved-routes
+POST    /api/saved-routes
+DELETE  /api/saved-routes/&lt;int:route_id&gt;
+GET     /api/recommendation/&lt;station_name&gt;
+GET     /user-dashboard</div>
+            </div>
+
+            <!-- Schedule Routes -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">🚆 SCHEDULE</span> Schedule Routes (5)</div>
+                <div class="code-block">GET     /api/schedule/headway
+GET     /api/schedule/next-trains/&lt;station_name&gt;
+GET     /api/schedule/station-info/&lt;station_name&gt;
+GET     /api/historical-patterns</div>
+            </div>
+
+            <!-- Operator Routes -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-js">🎯 OPERATOR</span> Operator Routes (8)</div>
+                <div class="code-block">GET     /api/operator/station-status
+GET     /api/operator/get-overrides
+POST    /api/operator/override-congestion
+POST    /api/operator/clear-override
+GET     /api/operator/my-activity
+POST    /api/operator/deactivate-broadcast/&lt;int:broadcast_id&gt;
+GET     /operator-dashboard
+GET     /operator_dashboard</div>
+            </div>
+
+            <!-- Route Statistics -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-db">📊 STATS</span> Route Statistics</div>
+                <div class="code-block">┌─────────────────────┬────────┐
+│ Category            │ Count  │
+├─────────────────────┼────────┤
+│ Admin Dashboard     │   18   │
+│ Model Performance   │   15   │
+│ Debug              │   20+  │
+│ Live Map/Predict    │   15+  │
+│ Broadcast/Alerts    │   8    │
+│ Reports            │   8    │
+│ Authentication     │   5    │
+│ User Features      │   6    │
+│ Schedule/Station   │   5    │
+│ Operator           │   8    │
+├─────────────────────┼────────┤
+│ TOTAL              │ 100+   │
+└─────────────────────┴────────┘</div>
+            </div>
+
+            <!-- Quick Test Commands -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-js">🧪 TEST</span> Quick Test Commands</div>
+                <div class="code-block"># List all routes in terminal
+python -c "from app import app; [print(f'{list(rule.methods)} {rule}') for rule in app.url_map.iter_rules()]"
+
+# Test health endpoint
+curl http://localhost:5000/api/health
+
+# Run auto-tests
+curl -X POST http://localhost:5000/api/model/run-auto-tests
+
+# Test single prediction
+curl -X POST http://localhost:5000/api/model/predict/single \
+  -H "Content-Type: application/json" \
+  -d '{"station":"North Ave","direction":"Northbound","datetime":"2025-12-03 12:00:00"}'</div>
+            </div>
+        </div>
+    </div>
+
+        <!-- 8. Training Guide -->
+    <div class="category" data-category="training">
+        <div class="category-header" onclick="toggleCategory(this)">
+            <span class="icon">🏋️</span>
+            <span>Training Guide - LSTM Model Training</span>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="category-content">
+            
+            <!-- Training Flow Overview -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">📊</span> Training Flow Overview</div>
+                <div class="code-block">┌─────────────────────────────────────────────────────────────────────────────┐
+│                        1. DATA LOADING (3 years: 2022-2024)                  │
+│  Read CSV files in chunks → Add datetime features → Filter by station       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        2. FEATURE ENGINEERING                                │
+│  • Cyclical time features (hour_sin, hour_cos, etc.)                        │
+│  • Operating hour flags (rush hour, pre/post opening)                       │
+│  • Holiday & special event flags                                            │
+│  • Calculate congestion % from passenger counts                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        3. PER-DIRECTION SPLIT                                │
+│  For each station × direction (26 models total):                            │
+│  • Northbound → Count EXITS (people leaving station)                        │
+│  • Southbound → Count ENTRIES (people entering station)                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        4. TRAIN/VALIDATION SPLIT (80/20)                    │
+│  • Temporal split (preserve time order, no random shuffle)                  │
+│  • First 80% of data for training, last 20% for validation                  │
+│  • Prevents data leakage from future to past                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        5. SCALING (Fit ONLY on training data)               │
+│  • Feature scaler: MinMaxScaler (0-1 range)                                 │
+│  • Target scaler: MinMaxScaler for congestion values                        │
+│  • ⚠️ CRITICAL: Never fit scaler on validation data!                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        6. SEQUENCE CREATION (SEQ_LENGTH=24)                 │
+│  • Create sliding windows of 24 hours                                       │
+│  • X: 24 hours of features, y: next hour's congestion                       │
+│  • Shape: (samples, 24, 30 features)                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        7. LSTM MODEL ARCHITECTURE                           │
+│  • LSTM(64, return_sequences=True) → Dropout(0.2)                           │
+│  • LSTM(32, return_sequences=False) → Dropout(0.2)                          │
+│  • Dense(16, activation='relu') → Dense(1)                                  │
+│  • Optimizer: Adam(clipnorm=1.0), Loss: MSE                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        8. TRAINING WITH CALLBACKS                           │
+│  • EarlyStopping (patience=15) - stops if val_loss doesn't improve          │
+│  • ReduceLROnPlateau (patience=10) - reduces LR when plateau                │
+│  • ModelCheckpoint - saves best model                                       │
+│  • Max epochs: 120, Batch size: 128                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        9. EVALUATION METRICS                                │
+│  • MAE, RMSE, MAPE, sMAPE, R²                                               │
+│  • Save predictions plot, training history plot                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        10. SAVE MODEL & SCALERS                             │
+│  • {station}_{direction}_lstm_enhanced.keras                                │
+│  • {station}_{direction}_feature_scaler.pkl                                 │
+│  • {station}_{direction}_target_scaler.pkl                                  │
+│  • per_direction_max_passengers.pkl (for congestion calculation)           │
+└─────────────────────────────────────────────────────────────────────────────┘</div>
+            </div>
+
+            <!-- Metrics Explanation -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">📈</span> Evaluation Metrics Explained</div>
+                <div class="code-block">┌────────────┬─────────────────────────────────────────────────────────────────┐
+│ METRIC     │ WHAT IT TELLS YOU                                              │
+├────────────┼─────────────────────────────────────────────────────────────────┤
+│ MAE        │ Mean Absolute Error: Average prediction error in percentage    │
+│ (Mean      │ Example: MAE = 5% means predictions are off by 5% on average   │
+│ Absolute   │ Lower is better. Range: 0 to ∞                                 │
+│ Error)     │                                                                 │
+├────────────┼─────────────────────────────────────────────────────────────────┤
+│ RMSE       │ Root Mean Square Error: Penalizes large errors more than MAE   │
+│ (Root Mean │ Example: If RMSE >> MAE, there are some very bad predictions   │
+│ Square     │ Lower is better. Always ≥ MAE                                   │
+│ Error)     │                                                                 │
+├────────────┼─────────────────────────────────────────────────────────────────┤
+│ MAPE       │ Mean Absolute Percentage Error: Error as percentage of actual  │
+│ (Mean      │ Example: MAPE = 10% means average 10% deviation from actual    │
+│ Absolute   │ Lower is better. Range: 0% to ∞%                               │
+│ Percentage │ ⚠️ Can be infinite if actual = 0                                │
+│ Error)     │                                                                 │
+├────────────┼─────────────────────────────────────────────────────────────────┤
+│ sMAPE      │ Symmetric MAPE: Treats over/under prediction equally           │
+│ (Symmetric │ Better than MAPE when actual values are near zero              │
+│ MAPE)      │ Range: 0% to 200% (100% means prediction is 2x actual)        │
+├────────────┼─────────────────────────────────────────────────────────────────┤
+│ R² Score   │ Coefficient of determination: How well model explains variance│
+│ (R-Squared)│ R² = 1.0 → Perfect predictions                                 │
+│            │ R² = 0.0 → Model is as good as mean prediction                 │
+│            │ R² < 0.0 → Model is worse than guessing the average           │
+│            │ Closer to 1 is better. Range: -∞ to 1                          │
+└────────────┴─────────────────────────────────────────────────────────────────┘
+
+INTERPRETATION GUIDE:
+┌──────────────────┬─────────────────────────────────────────────────────────┐
+│ MAE Value        │ Meaning                                                  │
+├──────────────────┼─────────────────────────────────────────────────────────┤
+│ < 5%             │ EXCELLENT - Model is very accurate                       │
+│ 5-10%            │ GOOD - Acceptable for most use cases                     │
+│ 10-15%           │ OKAY - May need improvement                              │
+│ > 15%            │ NEEDS IMPROVEMENT - Model is unreliable                  │
+└──────────────────┴─────────────────────────────────────────────────────────┘</div>
+            </div>
+
+            <!-- Training Configuration -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">⚙️</span> Training Configuration</div>
+                <div class="code-block">┌─────────────────────┬─────────────┬─────────────────────────────────────────┐
+│ Parameter          │ Value       │ Why this value?                          │
+├────────────────────┼─────────────┼─────────────────────────────────────────┤
+│ BATCH_SIZE         │ 128         │ Balance speed vs. memory (3M rows)       │
+│ EPOCHS             │ 120         │ Maximum epochs (early stopping stops)    │
+│ PATIENCE_EARLY     │ 15          │ Stop if no improvement for 15 epochs     │
+│ PATIENCE_LR        │ 10          │ Reduce LR if plateau for 10 epochs       │
+│ SEQ_LENGTH         │ 24          │ Use last 24 hours to predict next hour   │
+│ CHUNK_SIZE         │ 100,000     │ Process data in chunks (memory efficient)│
+│ USE_BIDIRECTIONAL  │ False       │ Simpler model, faster training           │
+│ USE_ROBUST_SCALER  │ False       │ MinMaxScaler works well for this data    │
+└────────────────────┴─────────────┴─────────────────────────────────────────┘
+
+FEATURE COLUMNS (30 total):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. hour           │ 11. is_morning_rush    │ 21. is_holiday                 │
+│ 2. weekday        │ 12. is_evening_rush    │ 22. is_special_event           │
+│ 3. month          │ 13. is_noon            │ 23. is_christmas_season        │
+│ 4. hour_sin       │ 14. is_pre_opening     │ 24. is_payday                  │
+│ 5. hour_cos       │ 15. is_post_closing    │ 25. is_friday                  │
+│ 6. dow_sin        │ 16. minutes_until_closing │ 26. is_rush_hour           │
+│ 7. dow_cos        │ 17. minutes_since_opening │ 27. is_maintenance_record   │
+│ 8. month_sin      │ 18. time_normalized    │ 28. is_extended_hours          │
+│ 9. month_cos      │ 19. minute_normalized  │ 29. congestion (target)        │
+│ 10. is_operating_hour │ 20. is_weekend   │                                   │
+└─────────────────────────────────────────────────────────────────────────────┘</div>
+            </div>
+
+            <!-- Critical Loopholes & Gotchas -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-db">⚠️</span> Critical Loopholes & Gotchas</div>
+                <div class="code-block">┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. DATA LEAKAGE - Most Common Mistake!                                       │
+│    ❌ WRONG: Scaling the entire dataset before splitting                     │
+│    ✅ CORRECT: Fit scaler ONLY on training data, then transform validation   │
+│                                                                              │
+│ 2. TEMPORAL ORDER                                                           │
+│    ❌ WRONG: Random shuffle for train/val split                              │
+│    ✅ CORRECT: First 80% of time = train, last 20% = val (no shuffle)        │
+│                                                                              │
+│ 3. DIRECTION MISMATCH                                                        │
+│    ❌ WRONG: Using same filtering for all stations                           │
+│    ✅ CORRECT: Northbound = EXITS, Southbound = ENTRIES                      │
+│    ⚠️ Terminals (North Ave, Taft) need special handling!                     │
+│                                                                              │
+│ 4. CONGESTION CALCULATION                                                    │
+│    ❌ WRONG: Using global max across all stations                            │
+│    ✅ CORRECT: Per-direction max (99th percentile of that station/direction) │
+│                                                                              │
+│ 5. MISSING FEATURES IN INFERENCE                                             │
+│    ❌ WRONG: Adding features that weren't in training                        │
+│    ✅ CORRECT: Use EXACT same FEATURE_COLS list during prediction           │
+│                                                                              │
+│ 6. SCALER PERSISTENCE                                                        │
+│    ❌ WRONG: Recreating scaler during prediction                             │
+│    ✅ CORRECT: Save and load the SAME scaler used in training                │
+│                                                                              │
+│ 7. SEQUENCE BOUNDARIES                                                       │
+│    ❌ WRONG: Allowing prediction with less than 24h history                  │
+│    ✅ CORRECT: Only predict if idx >= SEQ_LENGTH                             │
+│                                                                              │
+│ 8. OPERATING HOURS                                                           │
+│    ❌ WRONG: Predicting when MRT is closed (before 4:30 AM, after 10:30 PM)  │
+│    ✅ CORRECT: Return 0% or handle separately                                │
+│                                                                              │
+│ 9. VERSION MISMATCH WARNINGS                                                 │
+│    ⚠️ "InconsistentVersionWarning: Trying to unpickle estimator from v1.6.1"│
+│    → Normal warning, doesn't affect predictions. Can safely ignore.         │
+│                                                                              │
+│ 10. GPU vs CPU                                                              │
+│     ⚠️ "TensorFlow GPU support is not available on native Windows"          │
+│     → Use WSL2 or TensorFlow-DirectML, or accept CPU training (slower)      │
+└─────────────────────────────────────────────────────────────────────────────┘</div>
+            </div>
+
+            <!-- Saved Files Explanation -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">💾</span> Saved Files & Their Purposes</div>
+                <div class="code-block">┌──────────────────────────────────┬─────────────────────────────────────────┐
+│ File Pattern                     │ Purpose                                  │
+├──────────────────────────────────┼─────────────────────────────────────────┤
+│ {station}_{dir}_lstm_enhanced.keras │ Trained LSTM model for one direction │
+├──────────────────────────────────┼─────────────────────────────────────────┤
+│ {station}_{dir}_feature_scaler.pkl │ MinMaxScaler for input features       │
+├──────────────────────────────────┼─────────────────────────────────────────┤
+│ {station}_{dir}_target_scaler.pkl  │ MinMaxScaler for target (congestion)  │
+├──────────────────────────────────┼─────────────────────────────────────────┤
+│ per_direction_max_passengers.pkl   │ 99th percentile max for each direction│
+├──────────────────────────────────┼─────────────────────────────────────────┤
+│ training_summary_directional.csv │ All models' MAE, RMSE, MAPE, R²         │
+├──────────────────────────────────┼─────────────────────────────────────────┤
+│ {model_key}_predictions.png      │ Visual comparison of predictions        │
+├──────────────────────────────────┼─────────────────────────────────────────┤
+│ {model_key}_training_history.png │ Loss and MAE over epochs                │
+├──────────────────────────────────┼─────────────────────────────────────────┤
+│ all_4_metrics_summary.png        │ Bar charts comparing all 26 models      │
+├──────────────────────────────────┼─────────────────────────────────────────┤
+│ directional_models_comparison.png│ Comprehensive model comparison          │
+└──────────────────────────────────┴─────────────────────────────────────────┘</div>
+            </div>
+
+            <!-- Why 26 Models? -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">🤔</span> Why 26 Models? (13 stations × 2 directions)</div>
+                <div class="code-block">┌─────────────────────────────────────────────────────────────────────────────┐
+│ Station    │ Northbound Model               │ Southbound Model               │
+├────────────┼────────────────────────────────┼────────────────────────────────┤
+│ North Ave  │ North Ave_Northbound (EXITS)   │ North Ave_Southbound (ENTRIES) │
+│ Quezon Ave │ Quezon Ave_Northbound (EXITS)  │ Quezon Ave_Southbound (ENTRIES)│
+│ Kamuning   │ Kamuning_Northbound (EXITS)    │ Kamuning_Southbound (ENTRIES)  │
+│ ...        │ ...                            │ ...                            │
+│ Taft       │ Taft_Northbound (ENTRIES!)     │ Taft_Southbound (EXITS!)       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+⚠️ TERMINAL STATIONS SPECIAL HANDLING:
+• North Ave Northbound → EXITS (people leaving the terminal)
+• North Ave Southbound → ENTRIES (people entering the terminal)
+• Taft Northbound → ENTRIES (people entering the terminal)
+• Taft Southbound → EXITS (people leaving the terminal)
+
+WHY SEPARATE MODELS?
+• Passenger flow patterns differ by direction
+• Morning rush: Southbound to CBD is heavier
+• Evening rush: Northbound leaving CBD is heavier
+• Terminals have opposite flow patterns</div>
+            </div>
+
+            <!-- Training Commands -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-js">🚀</span> How to Run Training</div>
+                <div class="code-block"># On Kaggle (Recommended - has GPU)
+1. Go to Kaggle → New Notebook
+2. Settings → Accelerator → GPU T4 x2
+3. Upload your training script
+4. Run the notebook (3-5 hours)
+
+# On Local Machine (CPU only, slower)
+python train_local_full_optimized.py
+
+# Expected Output After Training:
+✅ Loaded 26 directional models
+✅ Loaded 52 scalers
+✅ Average MAE: ~8-12%
+✅ Average R²: ~0.85-0.95
+
+# Training Results Example:
+North Ave_Northbound: MAE: 4.2% | RMSE: 6.1% | R²: 0.94
+North Ave_Southbound: MAE: 5.1% | RMSE: 7.3% | R²: 0.91
+Cubao_Northbound:    MAE: 6.8% | RMSE: 9.2% | R²: 0.88</div>
+            </div>
+        </div>
+    </div>
+
+        <!-- 8. Testing & Validation Guide -->
+    <div class="category" data-category="testing">
+        <div class="category-header" onclick="toggleCategory(this)">
+            <span class="icon">🧪</span>
+            <span>Testing & Validation Guide - How Accuracy is Measured</span>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="category-content">
+            
+            <!-- Testing Flow Overview -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">📊</span> Testing Flow Overview</div>
+                <div class="code-block">┌─────────────────────────────────────────────────────────────────────────────┐
+│                    HOW MODEL ACCURACY IS TESTED                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 1: Load 2025 Data (NEW unseen data, not used in training)            │
+│  • 2025.csv contains actual passenger counts from Jan-Dec 2025             │
+│  • This is data the model has NEVER seen before                             │
+│  • Tests how well the model generalizes to new data                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 2: For Each Station × Direction (26 combinations)                    │
+│  • Filter data correctly (Northbound = EXITS, Southbound = ENTRIES)        │
+│  • Aggregate by hour                                                        │
+│  • Calculate ACTUAL congestion using training max (not 2025 max)           │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 3: Select Random Test Dates                                           │
+│  • Only dates with 24+ hours of history (after Jan 5, 2025)                │
+│  • Randomly sample up to 10 dates per station/direction                    │
+│  • Ensures unbiased test coverage                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 4: Generate PREDICTED Congestion                                      │
+│  • Call get_directional_prediction() with same logic as live system        │
+│  • Builds 24-hour feature sequence                                          │
+│  • Uses saved feature scaler and target scaler                              │
+│  • Model outputs predicted congestion %                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 5: Compare & Calculate Error                                          │
+│  • Absolute Error = |Predicted - Actual|                                   │
+│  • Percentage Error = (Abs Error / Actual) × 100                           │
+│  • Verdict = EXCELLENT (<5%), GOOD (<10%), OKAY (<15%), NEEDS IMPROVEMENT  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STEP 6: Save Results & Update Dashboard                                    │
+│  • Save to test_results/{station}_{direction}_results.csv                   │
+│  • Update metrics cards (MAE, MAPE, test samples)                          │
+│  • Update prediction vs actual chart                                        │
+└─────────────────────────────────────────────────────────────────────────────┘</div>
+            </div>
+
+            <!-- Test Results Interpretation -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">📈</span> Interpreting Test Results</div>
+                <div class="code-block">┌─────────────────────────────────────────────────────────────────────────────┐
+│                    WHAT THE RESULTS MEAN                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+EXAMPLE OUTPUT:
+┌──────────────────────┬────────────┬────────────┬────────┬───────────────┐
+│ Date/Time            │ Predicted  │ Actual     │ Error  │ Verdict       │
+├──────────────────────┼────────────┼────────────┼────────┼───────────────┤
+│ 2025-12-03 12:00:00  │ 27.6%      │ 26.5%      │ 1.1%   │ EXCELLENT ✅  │
+│ 2025-09-19 10:00:00  │ 26.7%      │ 22.5%      │ 4.2%   │ EXCELLENT ✅  │
+│ 2025-06-18 16:00:00  │ 29.4%      │ 29.6%      │ 0.2%   │ EXCELLENT ✅  │
+└──────────────────────┴────────────┴────────────┴────────┴───────────────┘
+
+VERDICT MEANINGS:
+┌────────────────────┬─────────────────────────────────────────────────────────┐
+│ EXCELLENT (≤5%)    │ Model prediction is VERY ACCURATE.                      │
+│                    │ Error is less than 5 percentage points.                 │
+│                    │ Trust this prediction for operational decisions.       │
+├────────────────────┼─────────────────────────────────────────────────────────┤
+│ GOOD (5-10%)       │ Model prediction is ACCEPTABLE.                         │
+│                    │ Error is within reasonable range.                       │
+│                    │ Can be used with minor caution.                         │
+├────────────────────┼─────────────────────────────────────────────────────────┤
+│ OKAY (10-15%)      │ Model prediction is FAIR.                               │
+│                    │ Error is noticeable but still useful.                   │
+│                    │ May need calibration or more training data.             │
+├────────────────────┼─────────────────────────────────────────────────────────┤
+│ NEEDS IMPROVEMENT  │ Model prediction is INACCURATE.                         │
+│ (>15%)             │ Error is too high for reliable use.                     │
+│                    │ Needs retraining or feature engineering.                │
+└────────────────────┴─────────────────────────────────────────────────────────┘</div>
+            </div>
+
+            <!-- API Testing Endpoints -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-flask">🔌</span> Testing API Endpoints</div>
+                <div class="code-block">┌─────────────────────────────────────────────────────────────────────────────┐
+│  ENDPOINT                    │ PURPOSE                                      │
+├─────────────────────────────┼───────────────────────────────────────────────┤
+│ POST /api/model/run-auto-tests│ Run batch tests on random 2025 dates        │
+│                             │ Returns summary of all tests                  │
+├─────────────────────────────┼───────────────────────────────────────────────┤
+│ POST /api/model/predict/single│ Test a single date/time manually            │
+│                             │ Returns predicted vs actual with error        │
+├─────────────────────────────┼───────────────────────────────────────────────┤
+│ GET /api/model/performance/metrics│ Get aggregated metrics (MAE, MAPE)      │
+│                             │ Shows overall model performance               │
+├─────────────────────────────┼───────────────────────────────────────────────┤
+│ GET /api/model/station-details│ Get detailed test results for a station     │
+│                             │ Shows all test runs for that station          │
+├─────────────────────────────┼───────────────────────────────────────────────┤
+│ GET /api/model/chart/data   │ Get time series data for prediction chart    │
+│                             │ Visualizes predicted vs actual over time      │
+└─────────────────────────────┴───────────────────────────────────────────────┘
+
+SINGLE PREDICTION TEST (Manual):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Request:                                                                    │
+│ POST /api/model/predict/single?use_test_max=false                          │
+│ {                                                                           │
+│   "station": "North Ave",                                                   │
+│   "direction": "Northbound",                                                │
+│   "datetime": "2025-12-03 12:00:00"                                        │
+│ }                                                                           │
+│                                                                             │
+│ Response:                                                                   │
+│ {                                                                           │
+│   "success": true,                                                          │
+│   "prediction": {                                                           │
+│     "predicted": 27.6,                                                      │
+│     "actual": 26.5,                                                         │
+│     "error": 1.1,                                                           │
+│     "station": "North Ave",                                                 │
+│     "direction": "Northbound",                                              │
+│     "target_time": "2025-12-03 12:00:00"                                   │
+│   }                                                                         │
+│ }                                                                           │
+└─────────────────────────────────────────────────────────────────────────────┘</div>
+            </div>
+
+            <!-- Why 2025 Data? -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-db">📅</span> Why Test on 2025 Data?</div>
+                <div class="code-block">┌─────────────────────────────────────────────────────────────────────────────┐
+│ TRAINING DATA (2022-2024)     │ TESTING DATA (2025)                        │
+├───────────────────────────────┼─────────────────────────────────────────────┤
+│ Used to train LSTM models     │ NEVER seen by model during training        │
+│ ~3 million rows               │ ~1 million rows                             │
+│ Contains patterns from past    │ Tests if model GENERALIZES to new data     │
+│                                │                                            │
+│ Purpose: Learn relationships   │ Purpose: Validate accuracy on future data  │
+│ between time, station, flow    │ If model works on 2025 data, it's READY    │
+│ and congestion                  │ for real-time predictions                  │
+└───────────────────────────────┴─────────────────────────────────────────────┘
+
+⚠️ IMPORTANT: Training max values (per_direction_max_passengers.pkl) are
+   calculated from 2022-2024 data, NOT from 2025 data. This ensures
+   congestion percentages are consistent between training and testing.
+
+WHY USE TRAINING MAX FOR TESTING?
+• If we used 2025's own max, congestion would be ~10% instead of ~27%
+• The model was trained to predict congestion RELATIVE to training max
+• Using training max gives apples-to-apples comparison</div>
+            </div>
+
+            <!-- Common Testing Pitfalls -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-db">⚠️</span> Common Testing Pitfalls & Solutions</div>
+                <div class="code-block">┌─────────────────────────────────────────────────────────────────────────────┐
+│ PROBLEM                    │ SOLUTION                                        │
+├────────────────────────────┼─────────────────────────────────────────────────┤
+│ "--%" in results table     │ get_feature_sequence_for_station returned None  │
+│                            │ → Not enough history (need 24+ hours)           │
+│                            │ → Test dates after Jan 5, 2025                  │
+├────────────────────────────┼─────────────────────────────────────────────────┤
+│ Predictions too low (~7%)  │ Feature scaler not used correctly               │
+│                            │ → Use saved feature_scaler.pkl from training    │
+│                            │ → DON'T manually normalize features             │
+├────────────────────────────┼─────────────────────────────────────────────────┤
+│ Actual congestion too high │ Using 2025's own max instead of training max    │
+│                            │ → Always use PER_DIRECTION_MAX from training    │
+│                            │ → Pass use_test_max=false in API call           │
+├────────────────────────────┼─────────────────────────────────────────────────┤
+│ Chart shows no data        │ test_results/*.csv files missing/empty          │
+│                            │ → Run auto-tests first                          │
+│                            │ → Click "Run Tests" button                      │
+├────────────────────────────┼─────────────────────────────────────────────────┤
+│ 500 error on station-details│ CSV column has strings instead of numbers      │
+│                            │ → pd.to_numeric(df['predicted'], errors='coerce')│
+└────────────────────────────┴─────────────────────────────────────────────────┘</div>
+            </div>
+
+            <!-- Manual Testing Commands -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-js">🧪</span> Quick Testing Commands</div>
+                <div class="code-block"># Run Auto-Tests (Batch testing on random 2025 dates)
+curl -X POST http://localhost:5000/api/model/run-auto-tests
+
+# Run Auto-Tests with training max (matching diagnosis script)
+curl -X POST "http://localhost:5000/api/model/run-auto-tests?use_test_max=false"
+
+# Test Single Prediction
+curl -X POST http://localhost:5000/api/model/predict/single \
+  -H "Content-Type: application/json" \
+  -d '{"station":"North Ave","direction":"Northbound","datetime":"2025-12-03 12:00:00"}'
+
+# Get Performance Metrics
+curl http://localhost:5000/api/model/performance/metrics
+
+# Get Station Details
+curl "http://localhost:5000/api/model/station-details?station=North%20Ave&direction=Northbound"
+
+# Get Chart Data
+curl "http://localhost:5000/api/model/chart/data?station=North%20Ave&direction=northbound&limit=20"
+
+# Upload Test Results CSV
+curl -X POST http://localhost:5000/api/model/upload/batch \
+  -F "file=@test_results.csv"</div>
+            </div>
+
+            <!-- Expected Test Results -->
+            <div class="syntax-card">
+                <div class="syntax-title"><span class="badge badge-model">✅</span> Expected Test Results (After Fix)</div>
+                <div class="code-block">┌─────────────────────────────────────────────────────────────────────────────┐
+│ METRIC                     │ BEFORE FIX      │ AFTER FIX       │ STATUS    │
+├────────────────────────────┼─────────────────┼─────────────────┼───────────┤
+│ Predicted (North Ave)      │ 7.4%            │ 27.6%           │ ✅ FIXED   │
+│ Actual (North Ave)         │ 28.1%           │ 26.5%           │ ✅ FIXED   │
+│ Error                      │ 20.7%           │ 1.1%            │ ✅ FIXED   │
+│ Verdict                    │ NEEDS IMPROVEMENT│ EXCELLENT       │ ✅ FIXED   │
+│ Overall MAE                │ 24.5%           │ 4.2%            │ ✅ FIXED   │
+└────────────────────────────┴─────────────────┴─────────────────┴───────────┘
+
+SAMPLE EXCELLENT RESULTS (North Ave Northbound):
+┌──────────────────────┬────────────┬────────────┬────────┬───────────────┐
+│ 2025-12-03 12:00:00  │ 27.6%      │ 26.5%      │ 1.1%   │ EXCELLENT ✅  │
+│ 2025-11-09 08:00:00  │ 27.1%      │ 28.3%      │ 1.2%   │ EXCELLENT ✅  │
+│ 2025-10-15 17:00:00  │ 35.2%      │ 33.8%      │ 1.4%   │ EXCELLENT ✅  │
+│ 2025-09-19 10:00:00  │ 26.7%      │ 22.5%      │ 4.2%   │ EXCELLENT ✅  │
+└──────────────────────┴────────────┴────────────┴────────┴───────────────┘</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Quick Debug Tips -->
+    <div class="category" data-category="tips">
+        <div class="category-header" onclick="toggleCategory(this)">
+            <span class="icon">💡</span>
+            <span>Quick Debug Tips</span>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="category-content">
+            <div class="tips-grid">
+                <div class="tip-card">
+                    <div class="emoji">🔍</div>
+                    <div class="title">Check Flask Logs</div>
+                    <div class="desc">Terminal shows full traceback</div>
+                </div>
+                <div class="tip-card">
+                    <div class="emoji">🌐</div>
+                    <div class="title">Browser DevTools</div>
+                    <div class="desc">F12 → Console & Network tabs</div>
+                </div>
+                <div class="tip-card">
+                    <div class="emoji">🐍</div>
+                    <div class="title">Python Print Debug</div>
+                    <div class="desc">print(f'DEBUG: {variable}')</div>
+                </div>
+                <div class="tip-card">
+                    <div class="emoji">📝</div>
+                    <div class="title">Check CSV Data Types</div>
+                    <div class="desc">df.dtypes, df.head()</div>
+                </div>
+                <div class="tip-card">
+                    <div class="emoji">🔧</div>
+                    <div class="title">Flask Debug Mode</div>
+                    <div class="desc">app.run(debug=True)</div>
+                </div>
+                <div class="tip-card">
+                    <div class="emoji">📦</div>
+                    <div class="title">Check Model Keys</div>
+                    <div class="desc">list(directional_models.keys())</div>
+                </div>
+                <div class="tip-card">
+                    <div class="emoji">🔄</div>
+                    <div class="title">Restart Flask</div>
+                    <div class="desc">Changes need restart</div>
+                </div>
+                <div class="tip-card">
+                    <div class="emoji">🧪</div>
+                    <div class="title">Test Single Endpoint</div>
+                    <div class="desc">Use /debug/test-prediction</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>MRT-3 Congestion Prediction System | Debugging Guide v1.0</p>
+        <p style="font-size: 11px; margin-top: 8px;">Click on any section header to expand/collapse | Use search to find specific errors</p>
+    </div>
+</div>
+
+<script>
+    function toggleCategory(header) {
+        const content = header.nextElementSibling;
+        const isCollapsed = content.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            content.classList.remove('collapsed');
+            header.classList.remove('collapsed');
+        } else {
+            content.classList.add('collapsed');
+            header.classList.add('collapsed');
+        }
+    }
+
+    function searchItems() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const allErrors = document.querySelectorAll('.error-item, .syntax-card');
+        
+        allErrors.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            const parentCategory = item.closest('.category-content');
+            const category = item.closest('.category');
+            
+            if (searchTerm === '') {
+                item.style.display = '';
+                if (parentCategory) parentCategory.style.maxHeight = '';
+                if (category) category.style.display = '';
+            } else {
+                if (text.includes(searchTerm)) {
+                    item.style.display = '';
+                    if (parentCategory) {
+                        parentCategory.classList.remove('collapsed');
+                        const header = parentCategory.previousElementSibling;
+                        if (header) header.classList.remove('collapsed');
+                    }
+                    if (category) category.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            }
+        });
+        
+        // Hide empty categories
+        document.querySelectorAll('.category').forEach(cat => {
+            const visibleItems = cat.querySelectorAll('.error-item, .syntax-card');
+            let hasVisible = false;
+            visibleItems.forEach(item => {
+                if (item.style.display !== 'none') hasVisible = true;
+            });
+            if (!hasVisible && searchTerm !== '') {
+                cat.style.display = 'none';
+            } else {
+                cat.style.display = '';
+            }
+        });
+    }
+
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        searchItems();
+    }
+
+    // Expand first category by default
+    const firstCategory = document.querySelector('.category');
+    if (firstCategory) {
+        const firstContent = firstCategory.querySelector('.category-content');
+        if (firstContent) firstContent.classList.remove('collapsed');
+    }
+
+      function toggleCategory(header) {
+        const content = header.nextElementSibling;
+        const isExpanded = content.classList.contains('expanded');
+        
+        if (isExpanded) {
+            content.classList.remove('expanded');
+            header.classList.add('collapsed');
+        } else {
+            content.classList.add('expanded');
+            header.classList.remove('collapsed');
+        }
+    }
+
+    function searchItems() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const allItems = document.querySelectorAll('.error-item, .syntax-card');
+        const allCategories = document.querySelectorAll('.category');
+        
+        // First, expand all categories to search properly
+        document.querySelectorAll('.category-content').forEach(content => {
+            content.classList.add('expanded');
+        });
+        document.querySelectorAll('.category-header').forEach(header => {
+            header.classList.remove('collapsed');
+        });
+        
+        allItems.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            if (searchTerm === '') {
+                item.style.display = '';
+            } else {
+                if (text.includes(searchTerm)) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            }
+        });
+        
+        // Hide empty categories
+        allCategories.forEach(cat => {
+            const visibleItems = cat.querySelectorAll('.error-item, .syntax-card');
+            let hasVisible = false;
+            visibleItems.forEach(item => {
+                if (item.style.display !== 'none') hasVisible = true;
+            });
+            cat.style.display = hasVisible || searchTerm === '' ? '' : 'none';
+        });
+    }
+
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        // Reset all items to visible
+        document.querySelectorAll('.error-item, .syntax-card').forEach(item => {
+            item.style.display = '';
+        });
+        document.querySelectorAll('.category').forEach(cat => {
+            cat.style.display = '';
+        });
+        // Collapse all categories
+        document.querySelectorAll('.category-content').forEach(content => {
+            content.classList.remove('expanded');
+        });
+        document.querySelectorAll('.category-header').forEach(header => {
+            header.classList.add('collapsed');
+        });
+    }
+
+    // All categories start collapsed
+    document.querySelectorAll('.category-content').forEach(content => {
+        content.classList.remove('expanded');
+    });
+    document.querySelectorAll('.category-header').forEach(header => {
+        header.classList.add('collapsed');
+    });
+</script>
+</body>
+</html>
