@@ -5,10 +5,10 @@
 MRT-ADAPT is a data-driven web application designed to analyze, track, and forecast passenger volume across MRT-3 stations. By leveraging advanced machine learning sequence models, this system provides accurate predictive logic to anticipate passenger traffic, helping to optimize transit management and passenger flow analysis.
 
 ##  Key Features
-* **Predictive Forecasting:** Utilizes Long Short-Term Memory (LSTM), alongside Prophet and XGBoost, to predict station-specific passenger volumes.
+* **Predictive Forecasting:** Utilizes Long Short-Term Memory (LSTMM) and trained 26 models for Northbound and Southbound for 13 MRT stations.
 * **Interactive Dashboard:** A responsive frontend interface for visualizing historical data and future passenger traffic trends.
 * **Robust Data Management:** Secure and efficient data persistence handling large datasets of transit logs.
-* **Cloud Ready:** Configured for live deployment on cloud hosting environments (Railway / PythonAnywhere).
+
 
 ##  Tech Stack
 This project was built utilizing a comprehensive full-stack and machine learning architecture:
