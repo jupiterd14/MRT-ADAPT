@@ -1,35 +1,35 @@
-HOW TO RUN?
+#  MRT-ADAPT
+**Passenger Volume Forecasting System for MRT-3 Stations**
 
- 1. CLONE REPOSITORY
-git clone https://github.com/jupiterd14/MRT-ADAPT.git
+##  Overview
+MRT-ADAPT is a data-driven web application designed to analyze, track, and forecast passenger volume across MRT-3 stations. By leveraging advanced machine learning sequence models, this system provides accurate predictive logic to anticipate passenger traffic, helping to optimize transit management and passenger flow analysis.
 
-cd MRT-ADAPT
+##  Key Features
+* **Predictive Forecasting:** Utilizes Long Short-Term Memory (LSTM), alongside Prophet and XGBoost, to predict station-specific passenger volumes.
+* **Interactive Dashboard:** A responsive frontend interface for visualizing historical data and future passenger traffic trends.
+* **Robust Data Management:** Secure and efficient data persistence handling large datasets of transit logs.
+* **Cloud Ready:** Configured for live deployment on cloud hosting environments (Railway / PythonAnywhere).
 
-----
+##  Tech Stack
+This project was built utilizing a comprehensive full-stack and machine learning architecture:
 
-2. Go to Capstone folder and create virtual environment
-cd Capstone
-python -m venv venv
+**Backend & Architecture**
+* **Language:** Python
+* **Framework:** Flask
+* **Database:** SQLite
 
------
+**Frontend**
+* HTML5, CSS3, Vanilla JavaScript
 
-4. Activate venv (Windows)
-.\venv\Scripts\activate
+**Machine Learning & Data Processing**
+* **Models:** LSTM (Long Short-Term Memory), Prophet, XGBoost
+* **Libraries:** Pandas, NumPy, Scikit-Learn
 
- (skip) For MAC users
-source venv/bin/activate
+## 🚀 Getting Started (Local Development)
 
------
+To run this application locally, follow these steps:
 
-4. Install requirements
-pip install -r requirements.txt
-
-----
-
-6. (skip) If requirements.txt not found, install manually:
-pip install flask flask-sqlalchemy flask-login flask-oauthlib pandas numpy tensorflow python-dotenv werkzeug
-
------
-
-6 Run the app
-python app.py
+### 1. Clone the repository
+```bash
+git clone [https://github.com/yourusername/mrt-adapt.git](https://github.com/yourusername/mrt-adapt.git)
+cd mrt-adapt
