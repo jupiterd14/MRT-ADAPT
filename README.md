@@ -22,7 +22,7 @@ This project was built utilizing a comprehensive full-stack and machine learning
 * HTML5, CSS3, Vanilla JavaScript
 
 **Machine Learning & Data Processing**
-* **Models:** LSTM (Long Short-Term Memory), Prophet, XGBoost
+* **Models:** LSTM (Long Short-Term Memory)
 * **Libraries:** Pandas, NumPy, Scikit-Learn
 
 ## 🚀 Getting Started (Local Development)
