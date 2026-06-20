@@ -1,5 +1,5 @@
 # ============================================
-# KAGGLE NOTEBOOK - RUN YOUR EXACT TRAINING SCRIPT
+# KAGGLE NOTEBOOK -  TRAINING SCRIPT
 # ============================================
 
 import tensorflow as tf

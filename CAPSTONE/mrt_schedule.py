@@ -219,7 +219,6 @@ def get_current_headway(current_time, day_type='weekday'):
     # Default if outside operating hours
     return "Service not available"
 
-# Add this function to your mrt_schedule.py file
 
 def calculate_next_trains(current_time, station, direction='southbound', day_type='weekday'):
     """

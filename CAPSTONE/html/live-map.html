@@ -1089,6 +1089,55 @@ nav {
     }
 }
  
+ /* ========== USER LIVE LOCATION GLOW EFFECT ========== */
+.nearest-station {
+    position: relative;
+    background-color: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* An invisible, expanding circle behind the nearest station dot */
+.nearest-station .station-marker::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 3px solid var(--accent-blue);
+    top: 0;
+    left: 0;
+    animation: stationGlowPulse 2s infinite ease-out;
+    pointer-events: none;
+    box-shadow: 0 0 15px var(--accent-blue);
+}
+
+/* Accent badge to label the closest station text */
+.nearest-badge {
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--accent-blue);
+    background: var(--blue-bg);
+    padding: 1px 6px;
+    border-radius: 10px;
+    width: fit-content;
+    margin-top: 2px;
+    display: inline-block;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.station-row:nth-child(odd) .nearest-badge {
+    margin-left: auto; /* Keeps text right-aligned on odd rows */
+}
+
+@keyframes stationGlowPulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1.6);
+        opacity: 0;
+    }
+}
 </style>
 
 
@@ -1144,7 +1193,7 @@ nav {
 
     <div class="main-content">
         <div class="greeting">
-            GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, {{ username.upper() }}
+            GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, Commuter
         </div>
 
 
@@ -1226,8 +1275,27 @@ nav {
         </div>
     </div>
 <script>
-// ========== OPTIMIZED LIVE MAP - FASTER LOADING ==========
-console.log('🚀 LIVE MAP OPTIMIZED');
+// ========== OPTIMIZED LIVE MAP - FASTER LOADING WITH GEOLOCATION ==========
+console.log('🚀 LIVE MAP OPTIMIZED WITH GEOLOCATION');
+
+// Physical Latitude and Longitude variables for MRT-3 stations
+const STATION_COORDINATES = {
+    "North Ave":    { lat: 14.6521, lon: 121.0323 },
+    "Quezon Ave":   { lat: 14.6424, lon: 121.0374 },
+    "Kamuning":     { lat: 14.6352, lon: 121.0433 },
+    "Cubao":        { lat: 14.6195, lon: 121.0511 },
+    "Santolan":     { lat: 14.6078, lon: 121.0565 },
+    "Ortigas":      { lat: 14.5878, lon: 121.0567 },
+    "Shaw Blvd":    { lat: 14.5811, lon: 121.0536 },
+    "Boni Ave":     { lat: 14.5739, lon: 121.0481 },
+    "Guadalupe":    { lat: 14.5672, lon: 121.0456 },
+    "Buendia":      { lat: 14.5542, lon: 121.0343 },
+    "Ayala Ave":    { lat: 14.5491, lon: 121.0278 },
+    "Magallanes":   { lat: 14.5420, lon: 121.0194 },
+    "Taft":         { lat: 14.5376, lon: 120.9940 } // Corrected terminal alignment coordinate variant
+};
+
+let nearestStationName = null; // Holds the live calculation state
 
 const stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
 
@@ -1257,10 +1325,63 @@ function getStatusText(congestion) {
     return 'Light';
 }
 
+// Mathematical Haversine function to determine true distance over ground curves
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius variable in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Absolute distance return value
+}
+
+function findNearestStation(userLat, userLon) {
+    let shortestDistance = Infinity;
+    let closestStation = null;
+
+    for (const [stationName, coords] of Object.entries(STATION_COORDINATES)) {
+        const dist = calculateDistance(userLat, userLon, coords.lat, coords.lon);
+        if (dist < shortestDistance) {
+            shortestDistance = dist;
+            closestStation = stationName;
+        }
+    }
+    
+    // Only flag if user is reasonably close to the rail line (e.g., within 5km)
+    if (shortestDistance < 5.0) {
+        if (nearestStationName !== closestStation) {
+            nearestStationName = closestStation;
+            console.log(`🎯 Nearest station identified: ${closestStation} (${shortestDistance.toFixed(2)} km away)`);
+        }
+    } else {
+        nearestStationName = null; // User is traveling outside Metro Manila limits (e.g., Beach/Baguio)
+    }
+}
+
+function trackUserLocation() {
+    if (!navigator.geolocation) {
+        console.log("❌ Geolocation services unexposed by window frame client.");
+        return;
+    }
+
+    navigator.geolocation.watchPosition(
+        (position) => {
+            const { latitude, longitude } = position.coords;
+            findNearestStation(latitude, longitude);
+            renderStations(); // Instantly push calculations to view frames without refresh
+        },
+        (error) => {
+            console.log("⚠️ Standalone GPS connection lost or permission blocked:", error.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+}
+
 function getStatusMessage(stationName, congestion) {
     const status = getStatusText(congestion);
     
-    // Random advice messages for each congestion level (no emojis)
     const severeAdvice = [
         `${stationName} Station is severely congested. Avoid if possible or expect 30-60 min delays.`,
         `CRITICAL: ${stationName} Station is packed. Consider taking a bus or waiting 1 hour for crowds to clear.`,
@@ -1293,7 +1414,6 @@ function getStatusMessage(stationName, congestion) {
         `${stationName} Station is clear. Best time to travel is now.`
     ];
     
-    // Get random message based on congestion level
     let messages;
     if (congestion > 80) {
         messages = severeAdvice;
@@ -1309,7 +1429,6 @@ function getStatusMessage(stationName, congestion) {
     return messages[randomIndex];
 }
 
-// Helper function to get alternative station suggestion
 function getAlternativeStation(stationName) {
     const stationAlternatives = {
         "North Ave": "Quezon Ave or Roosevelt",
@@ -1341,9 +1460,6 @@ function goToReport() {
     window.location.href = '/report?station=' + encodeURIComponent(stationName);
 }
 
-
-
-// ========== OPTIMIZED: Single API Call with Caching ==========
 async function fetchStationData() {
     const now = Date.now();
     
@@ -1360,18 +1476,17 @@ async function fetchStationData() {
     isUpdating = true;
     
     try {
-        console.log(' Fetching fresh map data...');
-        const response = await fetch('/api/live-map/directions/v2');
-      
+        console.log('🚀 Fetching fresh map data from LIVE MAP API (with overrides)...');
         
-
+        const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
+        
         if (response.ok) {
             const data = await response.json();
-              console.log('here', data.northbound)
             
-            const now = new Date();
-            const hour = now.getHours();
-            const minute = now.getMinutes();
+            // Check operating hours
+            const nowTime = new Date();
+            const hour = nowTime.getHours();
+            const minute = nowTime.getMinutes();
             const currentTime = hour + minute/60;
             const OPERATING_START = 4.5;
             const OPERATING_END = 22.5;
@@ -1379,23 +1494,69 @@ async function fetchStationData() {
             
             const processedData = { northbound: {}, southbound: {} };
             
-            if (isClosed) {
-                for (const station of stations) {
-                    processedData.northbound[station] = { congestion: 0, wait_time: 'CLOSED' };
-                    processedData.southbound[station] = { congestion: 0, wait_time: 'CLOSED' };
-                }
-            } else {
-                for (const station of stations) {
-                    const northData = data.northbound[station] || { congestion: 0 };
-                    const southData = data.southbound[station] || { congestion: 0 };
-                    
+            // ========== FIX: Check for overrides even when closed ==========
+            for (const station of stations) {
+                const northData = data.northbound?.[station];
+                const southData = data.southbound?.[station];
+                
+                // Check if station has overrides
+                const isNorthOverridden = northData?.overridden || false;
+                const isSouthOverridden = southData?.overridden || false;
+                
+                // Northbound - use override if present, otherwise use closed status
+                if (isNorthOverridden) {
+                    // Use override value from API
+                    const northCong = northData?.congestion ?? 25;
                     processedData.northbound[station] = {
-                        congestion: northData.congestion || 0,
-                        wait_time: northData.wait_time || getWaitTime(northData.congestion || 0)
+                        congestion: northCong,
+                        wait_time: northData?.wait_time || getWaitTime(northCong),
+                        status: northData?.status || getStatusText(northCong),
+                        overridden: true
                     };
+                } else if (isClosed) {
+                    // MRT is closed and no override
+                    processedData.northbound[station] = { 
+                        congestion: 0, 
+                        wait_time: 'CLOSED', 
+                        status: 'CLOSED',
+                        overridden: false
+                    };
+                } else {
+                    // Normal operation
+                    const northCong = northData?.congestion ?? 25;
+                    processedData.northbound[station] = {
+                        congestion: northCong,
+                        wait_time: northData?.wait_time || getWaitTime(northCong),
+                        status: northData?.status || getStatusText(northCong),
+                        overridden: false
+                    };
+                }
+                
+                // Southbound - use override if present, otherwise use closed status
+                if (isSouthOverridden) {
+                    const southCong = southData?.congestion ?? 25;
                     processedData.southbound[station] = {
-                        congestion: southData.congestion || 0,
-                        wait_time: southData.wait_time || getWaitTime(southData.congestion || 0)
+                        congestion: southCong,
+                        wait_time: southData?.wait_time || getWaitTime(southCong),
+                        status: southData?.status || getStatusText(southCong),
+                        overridden: true
+                    };
+                } else if (isClosed) {
+                    // MRT is closed and no override
+                    processedData.southbound[station] = { 
+                        congestion: 0, 
+                        wait_time: 'CLOSED', 
+                        status: 'CLOSED',
+                        overridden: false
+                    };
+                } else {
+                    // Normal operation
+                    const southCong = southData?.congestion ?? 25;
+                    processedData.southbound[station] = {
+                        congestion: southCong,
+                        wait_time: southData?.wait_time || getWaitTime(southCong),
+                        status: southData?.status || getStatusText(southCong),
+                        overridden: false
                     };
                 }
             }
@@ -1404,8 +1565,57 @@ async function fetchStationData() {
             lastFetchTime = now;
             isUpdating = false;
             
+            console.log('✅ Map data loaded, overrides preserved');
             return processedData;
+            
+        } else {
+            console.error('V2 API returned:', response.status);
+            console.log('⚠️ Falling back to directional-forecast API...');
+            
+            const forecastPromises = stations.map(async (station) => {
+                try {
+                    const forecastResponse = await fetch(`/api/directional-forecast/${encodeURIComponent(station)}?_=${Date.now()}`);
+                    if (forecastResponse.ok) {
+                        const forecastData = await forecastResponse.json();
+                        return { station, data: forecastData };
+                    }
+                } catch (e) {
+                    console.error(`Error fetching forecast for ${station}:`, e);
+                }
+                return null;
+            });
+            
+            const forecastResults = await Promise.all(forecastPromises);
+            const fallbackData = { northbound: {}, southbound: {} };
+            
+            for (const result of forecastResults) {
+                if (result && result.data && result.data.forecasts && result.data.forecasts.length > 0) {
+                    const station = result.station;
+                    const currentForecast = result.data.forecasts[0];
+                    const northCong = currentForecast.northbound || 25;
+                    const southCong = currentForecast.southbound || 25;
+                    
+                    fallbackData.northbound[station] = { 
+                        congestion: northCong, 
+                        wait_time: getWaitTime(northCong), 
+                        status: getStatusText(northCong),
+                        overridden: false
+                    };
+                    fallbackData.southbound[station] = { 
+                        congestion: southCong, 
+                        wait_time: getWaitTime(southCong), 
+                        status: getStatusText(southCong),
+                        overridden: false
+                    };
+                }
+            }
+            
+            cachedData = fallbackData;
+            lastFetchTime = now;
+            isUpdating = false;
+            return fallbackData;
         }
+        
     } catch (e) {
         console.error("Fetch failed:", e);
     }
@@ -1414,7 +1624,7 @@ async function fetchStationData() {
     return cachedData || directionData;
 }
 
-// ========== OPTIMIZED: Batch DOM Updates ==========
+// ========== OPTIMIZED: Batch DOM Updates With Nearest Location Glow ==========
 function renderStations() {
     const container = document.getElementById('stations-container');
     if (!container) return;
@@ -1422,13 +1632,14 @@ function renderStations() {
     const displayStations = currentDirection === 'north' ? stations : [...stations].reverse();
     const data = currentDirection === 'north' ? directionData.northbound : directionData.southbound;
     
-    // Use DocumentFragment for batch DOM updates
     const fragment = document.createDocumentFragment();
     
     for (const station of displayStations) {
         const stationInfo = data[station];
         const row = document.createElement('div');
-        row.className = 'station-row';
+        
+        const isNearest = (station === nearestStationName);
+        row.className = `station-row ${isNearest ? 'nearest-station' : ''}`;
         row.onclick = (function(s) { return function() { openModal(s); }; })(station);
         
         if (!stationInfo) {
@@ -1445,16 +1656,37 @@ function renderStations() {
             continue;
         }
         
-        const congestion = stationInfo.congestion || 0;
-        const waitTime = stationInfo.wait_time || (congestion === 0 ? 'CLOSED' : getWaitTime(congestion));
+        const congestion = Math.max(0, stationInfo.congestion || 0);
+        const isOverridden = stationInfo.overridden || false;
+        const status = stationInfo.status || getStatusText(congestion);
+        
+        // ========== FIX: Determine wait time based on status ==========
+        let waitTime;
+        if (status === 'CLOSED') {
+            waitTime = 'CLOSED';
+        } else {
+            waitTime = stationInfo.wait_time || getWaitTime(congestion);
+        }
+        
+        // If overridden, use the override status (never CLOSED)
+        if (isOverridden && status === 'CLOSED') {
+            waitTime = getWaitTime(congestion);
+        }
+        
         const colorClass = getStatusClass(congestion);
+        const overrideBadge = isOverridden ? `<span style="font-size: 9px; color: #8B5CF6; background: #EDE9FE; padding: 1px 6px; border-radius: 10px; margin-left: 4px; border: 1px solid #8B5CF6;"><i class="fas fa-pen"></i></span>` : '';
+        const nearestBadgeHTML = isNearest ? `<span class="nearest-badge"><i class="fas fa-street-view"></i> Nearest</span>` : '';
+        
+        // If status is CLOSED and not overridden, use gray color
+        const displayColorClass = (status === 'CLOSED' && !isOverridden) ? 'bg-light' : colorClass;
         
         row.innerHTML = `
             <div class="station-text-group">
-                <span class="st-name">${station}</span>
-                <span class="st-time">${waitTime}</span>
+                <span class="st-name">${station} ${overrideBadge}</span>
+                <span class="st-time" style="${status === 'CLOSED' && !isOverridden ? 'color: #94A3B8;' : ''}">${waitTime}</span>
+                ${nearestBadgeHTML}
             </div>
-            <div class="station-marker ${colorClass}">
+            <div class="station-marker ${displayColorClass}" style="${status === 'CLOSED' && !isOverridden ? 'background: #94A3B8;' : ''}">
                 <i class="fas fa-train"></i>
             </div>
         `;
@@ -1465,7 +1697,6 @@ function renderStations() {
     container.appendChild(fragment);
 }
 
-// ==========  Update All Stations ==========
 async function updateAllStations() {
     const data = await fetchStationData();
     if (data) {
@@ -1474,24 +1705,21 @@ async function updateAllStations() {
         updateAlertBadges(data);
     }
 }
-// Cache alert count and reuse
+
 let cachedAlertCount = null;
 let cachedAlertCountTime = 0;
-const ALERT_CACHE_DURATION = 30000; // 30 seconds cache for alerts too
+const ALERT_CACHE_DURATION = 30000;
 let cachedBroadcasts = null;
 let cachedBroadcastsTime = 0;
 
 async function fetchAlertCount() {
     const now = Date.now();
     
-    // Use cached alert count if still valid
     if (cachedAlertCount !== null && (now - cachedAlertCountTime) < ALERT_CACHE_DURATION) {
-        console.log('📦 Using cached alert count:', cachedAlertCount);
         return cachedAlertCount;
     }
     
     try {
-        // Get read status from localStorage
         let readAlerts = new Set();
         const saved = localStorage.getItem('readAlerts');
         if (saved) {
@@ -1500,34 +1728,28 @@ async function fetchAlertCount() {
         
         let congestionData = directionData;
         
-        // Only fetch if we don't have cached data
         if (!congestionData.northbound || Object.keys(congestionData.northbound).length === 0) {
             try {
                 const response = await fetch('/api/live-map/directions/v2');
                 congestionData = await response.json();
             } catch (e) {
-                console.log('Could not fetch congestion data:', e);
                 congestionData = { northbound: {}, southbound: {} };
             }
         }
         
-        const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-            "Ayala Ave", "Magallanes", "Taft"];
+        const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
         
         let allAlerts = [];
         const currentHour = new Date().getHours();
         const nowDate = new Date();
         const hour = currentHour;
         
-        // 1. Rush Hour Alert
         if ((hour >= 7 && hour <= 9)) {
             allAlerts.push({ id: 'rush-morning-permanent' });
         } else if ((hour >= 17 && hour <= 19)) {
             allAlerts.push({ id: 'rush-evening-permanent' });
         }
         
-        // 2. Advisory Alert
         if (hour >= 0 && hour < 5) {
             allAlerts.push({ id: 'advisory-early-morning-permanent' });
         } else if (hour >= 5 && hour < 7) {
@@ -1540,14 +1762,12 @@ async function fetchAlertCount() {
             allAlerts.push({ id: 'advisory-service-ended-permanent' });
         }
         
-        // 3. Congestion Advisory
         if (hour >= 21 || hour < 5) {
             allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
         } else if (hour >= 14 && hour < 17) {
             allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
         }
         
-        // 4. Service Notices
         const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
         if (isWeekend) {
             allAlerts.push({ id: 'service-weekend-permanent' });
@@ -1556,7 +1776,6 @@ async function fetchAlertCount() {
             allAlerts.push({ id: 'service-maintenance-night-permanent' });
         }
         
-        // 5. Congestion alerts - use existing data
         if (congestionData && congestionData.northbound && congestionData.southbound) {
             for (const station of STATIONS) {
                 const northData = congestionData.northbound[station];
@@ -1571,11 +1790,9 @@ async function fetchAlertCount() {
             }
         }
         
-        // 6. Broadcasts - fetch only if cache expired
         let broadcastAlerts = [];
         if (cachedBroadcasts && (now - cachedBroadcastsTime) < ALERT_CACHE_DURATION) {
             broadcastAlerts = cachedBroadcasts;
-            console.log('📦 Using cached broadcasts');
         } else {
             try {
                 const broadcastResponse = await fetch('/api/broadcasts/public');
@@ -1592,7 +1809,6 @@ async function fetchAlertCount() {
         
         allAlerts.push(...broadcastAlerts);
         
-        // 7. Count unread alerts
         let unreadCount = 0;
         for (const alert of allAlerts) {
             if (!readAlerts.has(alert.id)) {
@@ -1600,12 +1816,9 @@ async function fetchAlertCount() {
             }
         }
         
-        // Cache the result
         cachedAlertCount = unreadCount;
         cachedAlertCountTime = now;
         
-        console.log('Dashboard total alerts:', allAlerts.length);
-        console.log('Dashboard unread alert count:', unreadCount);
         return unreadCount;
         
     } catch (error) {
@@ -1614,29 +1827,23 @@ async function fetchAlertCount() {
     }
 }
 
-
 function cleanOldReadAlerts() {
     const saved = localStorage.getItem('readAlerts');
     if (saved) {
         const readAlerts = JSON.parse(saved);
-        // Check if any alert ID doesn't match the new permanent format
         const hasOldFormat = readAlerts.some(id => 
             id.includes('-') && !id.includes('permanent') && !id.includes('congestion-')
         );
         
         if (hasOldFormat) {
-            console.log('Cleaning old readAlerts format...');
             localStorage.removeItem('readAlerts');
         }
     }
 }
 
-
 async function updateAlertBadges(data) {
-    // Only update if we haven't already set the badge
     const badge = document.getElementById('alertBadge');
     if (badge && badge.textContent !== '0' && badge.textContent !== '') {
-        // Badge already has a value, don't overwrite
         return;
     }
     
@@ -1708,14 +1915,13 @@ function closeModal() {
 }
 
 function refreshMap() {
-    cachedData = null; // Force cache refresh
+    cachedData = null; 
     document.body.classList.add('loading');
     updateAllStations().finally(() => {
         setTimeout(() => document.body.classList.remove('loading'), 300);
     });
 }
 
-// Sync mobile alert badge with desktop badge
 function syncMobileAlertBadge() {
     const desktopBadge = document.getElementById('alertBadge');
     const mobileBadge = document.getElementById('mobileAlertBadge');
@@ -1729,13 +1935,16 @@ function syncMobileAlertBadge() {
         }
     }
 }
+
 function initializeMap() {
+    // Render initial structures
     renderStations();
     
-    // Clean old read alerts once at start
+    // Activate location tracking engine via hardware GPS
+    trackUserLocation();
+    
     cleanOldReadAlerts();
     
-    // Fetch alert count and update badges
     fetchAlertCount().then(count => {
         const badge = document.getElementById('alertBadge');
         const sidebarBadge = document.getElementById('sidebarAlertCount');
@@ -1763,14 +1972,11 @@ function initializeMap() {
         syncMobileAlertBadge();
     });
     
-    // Now fetch station data
     updateAllStations();
     
-    // Set up intervals
     setInterval(() => {
-        cachedData = null; // Clear cache periodically
+        cachedData = null; 
         updateAllStations();
-        // Refresh alert count periodically
         fetchAlertCount().then(count => {
             const badge = document.getElementById('alertBadge');
             const sidebarBadge = document.getElementById('sidebarAlertCount');

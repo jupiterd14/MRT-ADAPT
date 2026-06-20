@@ -2,74 +2,123 @@
 PREDICTION API - ML Model Endpoints Only
 Purpose: Raw congestion predictions from ML models
 Use for: Forecasts, batch predictions, route planning
-NOT for: Live map display, alerts, broadcasts
 """
 
-from flask import Blueprint, request, jsonify, session, current_app
+from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timedelta
+from services.feature_engineering import get_feature_sequence_for_station
+from config import Config
 import numpy as np
+import math
+from routes.api_other import MRT3_PLATFORM_CAPACITY
 
 api_predict_bp = Blueprint('api_predict', __name__)
 
-# These will be imported from main app or services
 STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
             "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
             "Ayala Ave", "Magallanes", "Taft"]
 
 # ========== HELPER FUNCTIONS ==========
 def get_directional_prediction(station_name, direction, target_datetime=None):
-    """Get directional congestion prediction directly from model"""
-    # Import from main app's cached models
-    from flask import current_app
+    """Get prediction using station capacity as the reference - MAX 100%"""
     
-    print(f"[API] Called for {station_name} {direction}")
-    
-    # Try to get the prediction function from app config (set in main app.py)
-    prediction_func = current_app.config.get('GET_DIRECTIONAL_PREDICTION')
-    
-    if prediction_func:
-        try:
-            result = prediction_func(station_name, direction, target_datetime)
-            print(f"[API] Real prediction: {result:.1f}%")
-            return result
-        except Exception as e:
-            print(f"[API] Error with prediction func: {e}")
-            import traceback
-            traceback.print_exc()
-    else:
-        print(f"[API] No prediction function found in config")
-        
-        # Fallback: Try to import directly from services (should have cached models)
-        try:
-            from services import get_directional_prediction as real_prediction
-            from services.model_loader import directional_models, directional_scalers
-            from services import get_feature_sequence_for_station
-            
-            result = real_prediction(
-                station_name, direction, target_datetime,
-                directional_models, directional_scalers,
-                get_feature_sequence_for_station
-            )
-            print(f"[API] Direct import prediction: {result:.1f}%")
-            return result
-        except Exception as e2:
-            print(f"[API] Direct import failed: {e2}")
-    
-    # Fallback based on time of day
-    print(f"[API] Using TIME-BASED FALLBACK")
     if target_datetime is None:
-        target_datetime = datetime.now()
-    hour = target_datetime.hour
+        target_datetime = Config.get_current_time()
     
-    # More realistic fallback based on time
-    if 7 <= hour <= 9:  # Morning rush
-        return 75 + (hour - 7) * 5
-    elif 17 <= hour <= 19:  # Evening rush
-        return 70 + (hour - 17) * 5
-    elif 10 <= hour <= 16:  # Midday
+    # CHECK IF MRT IS CLOSED (10:30 PM to 4:30 AM)
+    hour = target_datetime.hour
+    minute = target_datetime.minute
+    current_time_decimal = hour + minute / 60
+    
+    OPERATING_START = 4.5  # 4:30 AM
+    OPERATING_END = 22.5   # 10:30 PM
+    
+    if current_time_decimal < OPERATING_START or current_time_decimal >= OPERATING_END:
+        print(f"🚇 MRT CLOSED at {target_datetime.strftime('%H:%M')} - returning 0% congestion")
+        return 0
+    
+    directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
+    directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
+    model_key = f"{station_name}_{direction}"
+    
+    print(f"🔍 PREDICTION: {station_name} {direction} at {target_datetime.strftime('%H:%M')}")
+    print(f"   Model exists: {model_key in directional_models}")
+    
+    if model_key not in directional_models:
+        if 7 <= hour <= 9 or 17 <= hour <= 19:
+            return 65
+        elif 10 <= hour <= 16:
+            return 45
+        elif 5 <= hour <= 6 or 20 <= hour <= 21:
+            return 25
+        else:
+            return 10
+    
+    try:
+        features = get_feature_sequence_for_station(station_name, direction, target_datetime)
+        
+        if features is None:
+            print(f"   ❌ Features returned None")
+            return _get_operating_hours_fallback(target_datetime)
+        
+        print(f"   ✅ Features shape: {features.shape}")
+        
+        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        target_scaler = directional_scalers.get(f'{model_key}_target')
+        
+        if feature_scaler is None or target_scaler is None:
+            print(f"   ❌ Scalers missing")
+            return _get_operating_hours_fallback(target_datetime)
+        
+        scaled_features = feature_scaler.transform(features)
+        if scaled_features.ndim == 2:
+            scaled_features = scaled_features.reshape(1, 24, -1)
+        
+        prediction_scaled = directional_models[model_key].predict(scaled_features, verbose=0)
+        raw_output = float(prediction_scaled[0][0])
+        
+        print(f"   🎯 Raw model output: {raw_output:.4f}")
+        
+        # ========== CAPACITY-BASED CONGESTION (MAX 100%) ==========
+        capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        
+        # Apply sigmoid to normalize raw output to 0-1
+        center = 0.5
+        temperature = 0.8
+        normalized = 1 / (1 + math.exp(-(raw_output - center) / temperature))
+        
+        print(f"   📊 Normalized output: {normalized:.4f}")
+        print(f"   📊 Station capacity: {capacity} passengers")
+        
+        # Scale normalized output to passenger count
+        # Use capacity as the max - never exceed capacity
+        pred_passengers = normalized * capacity
+        
+        # Calculate congestion percentage (0-100%)
+        congestion = (pred_passengers / capacity * 100)
+        
+        # Cap at 100% - NEVER exceed
+        congestion = min(congestion, 100)
+        
+        print(f"   ✅ {pred_passengers:.0f} passengers → {congestion:.1f}% (capacity: {capacity})")
+        return congestion
+        
+    except Exception as e:
+        print(f"   ❌ Prediction error: {e}")
+        return _get_operating_hours_fallback(target_datetime)
+
+def _get_operating_hours_fallback(target_datetime):
+    """Get realistic fallback based on time of day"""
+    hour = target_datetime.hour
+    if 7 <= hour <= 9 or 17 <= hour <= 19:
+        return 65
+    elif 10 <= hour <= 16:
         return 45
-    else:  # Late night
+    elif 5 <= hour <= 6 or 20 <= hour <= 21:
         return 25
+    else:
+        return 10
 
 def get_station_prediction(station_name):
     """Get average congestion for a station"""
@@ -79,9 +128,160 @@ def get_station_prediction(station_name):
 
 # ========== MAIN PREDICTION ENDPOINTS ==========
 
-@api_predict_bp.route('/predict/<station_name>')
-def predict_congestion(station_name):
-    """Get current congestion for a station (direct from model)"""
+@api_predict_bp.route('/debug/check-data-availability')
+def debug_check_data_availability():
+    """Check what data is available for lookback"""
+    from services.feature_engineering import get_station_dataframe, load_data_fast
+    
+    station = request.args.get('station', 'North Ave')
+    direction = request.args.get('direction', 'Northbound')
+    
+    df = load_data_fast()
+    if df is None:
+        return jsonify({"error": "No data loaded"})
+    
+    hourly = get_station_dataframe(station, direction)
+    
+    result = {
+        "station": station,
+        "direction": direction,
+        "raw_data_stats": {
+            "total_rows": len(df),
+            "date_range": {
+                "min": df['datetime'].min().isoformat() if 'datetime' in df.columns else None,
+                "max": df['datetime'].max().isoformat() if 'datetime' in df.columns else None
+            },
+            "available_years": df['datetime'].dt.year.unique().tolist() if 'datetime' in df.columns else []
+        },
+        "hourly_data_stats": {
+            "total_rows": len(hourly) if hourly is not None else 0,
+            "date_range": {
+                "min": hourly.index.min().isoformat() if hourly is not None and len(hourly) > 0 else None,
+                "max": hourly.index.max().isoformat() if hourly is not None and len(hourly) > 0 else None
+            } if hourly is not None else None
+        }
+    }
+    
+    from datetime import datetime
+    test_date = datetime(2024, 6, 20, 10, 55)
+    
+    if hourly is not None and len(hourly) > 0:
+        date_exists = test_date in hourly.index
+        before = hourly[hourly.index < test_date].tail(5) if len(hourly[hourly.index < test_date]) > 0 else None
+        after = hourly[hourly.index >= test_date].head(5) if len(hourly[hourly.index >= test_date]) > 0 else None
+        
+        result["test_date_check"] = {
+            "test_date": test_date.isoformat(),
+            "exists_in_data": date_exists,
+            "before_date": [
+                {"timestamp": idx.isoformat(), "passengers": row['TotalPassenger']}
+                for idx, row in before.iterrows()
+            ] if before is not None else "No data before",
+            "after_date": [
+                {"timestamp": idx.isoformat(), "passengers": row['TotalPassenger']}
+                for idx, row in after.iterrows()
+            ] if after is not None else "No data after"
+        }
+    
+    return jsonify(result)
+
+@api_predict_bp.route('/debug/target-scaler-test/<station_name>')
+def debug_target_scaler_test(station_name):
+    """Test what the target scaler does"""
+    station = station_name.replace('%20', ' ')
+    directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
+    results = {}
+    
+    for direction in ['Northbound', 'Southbound']:
+        model_key = f"{station}_{direction}"
+        target_scaler = directional_scalers.get(f'{model_key}_target')
+        
+        if target_scaler:
+            test_values = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+            
+            results[direction] = {
+                "scaler_type": str(type(target_scaler)),
+                "data_min": float(target_scaler.data_min_[0]) if hasattr(target_scaler, 'data_min_') else None,
+                "data_max": float(target_scaler.data_max_[0]) if hasattr(target_scaler, 'data_max_') else None,
+                "scale": float(target_scaler.scale_[0]) if hasattr(target_scaler, 'scale_') else None,
+                "conversions": {
+                    f"input_{v:.1f}": float(target_scaler.inverse_transform(np.array([[v]]))[0][0])
+                    for v in test_values
+                }
+            }
+        else:
+            results[direction] = {"error": "Target scaler not found"}
+    
+    return jsonify(results)
+
+@api_predict_bp.route('/debug/passenger-prediction/<station_name>')
+def debug_passenger_prediction(station_name):
+    """Debug raw passenger predictions vs capacity-based congestion - FIXED"""
+    from services.feature_engineering import get_feature_sequence_for_station, MRT3_PLATFORM_CAPACITY
+    
+    station = station_name.replace('%20', ' ')
+    directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
+    directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
+    results = {}
+    
+    # Test different times
+    test_times = [8, 12, 18, 21]
+    
+    for hour in test_times:
+        test_time = Config.get_current_time().replace(hour=hour, minute=0, second=0)
+        
+        for direction in ['Northbound', 'Southbound']:
+            model_key = f"{station}_{direction}"
+            
+            if model_key not in directional_models:
+                continue
+            
+            try:
+                features = get_feature_sequence_for_station(station, direction, test_time)
+                feature_scaler = directional_scalers.get(f'{model_key}_feature')
+                target_scaler = directional_scalers.get(f'{model_key}_target')
+                
+                scaled_features = feature_scaler.transform(features)
+                input_sequence = scaled_features.reshape(1, 24, -1)
+                
+                raw_output = directional_models[model_key].predict(input_sequence, verbose=0)
+                raw_value = float(raw_output[0][0])
+                
+                # ========== FIX: Use station capacity, NOT scaler_max ==========
+                capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+                
+                # Apply sigmoid
+                center = 0.5
+                temperature = 0.8
+                normalized = 1 / (1 + math.exp(-(raw_value - center) / temperature))
+                
+                # Scale to passenger count based on capacity (never exceed capacity)
+                pred_passengers = normalized * capacity
+                
+                # Calculate congestion based on capacity (0-100%)
+                congestion = (pred_passengers / capacity * 100)
+                congestion = min(congestion, 100)  # Cap at 100%
+                
+                results[f"{hour}:00_{direction}"] = {
+                    "raw_scaled_output": round(raw_value, 4),
+                    "normalized_output": round(normalized, 4),
+                    "station_capacity": capacity,
+                    "predicted_passengers": round(pred_passengers, 0),
+                    "congestion_percentage": round(congestion, 1),
+                    "lookback_data_points": len(features),
+                    "time_of_day": "Rush" if (7 <= hour <= 9 or 17 <= hour <= 19) else "Normal"
+                }
+                
+            except Exception as e:
+                results[f"{hour}:00_{direction}"] = {"error": str(e)}
+    
+    return jsonify(results)
+
+@api_predict_bp.route('/directional-forecast/<station_name>')
+def directional_forecast(station_name):
+    """Generates a 6-hour forecast array for the Line Chart"""
     name = station_name.replace('%20', ' ')
     
     date_param = request.args.get('date')
@@ -91,20 +291,563 @@ def predict_congestion(station_name):
         try:
             year, month, day = map(int, date_param.split('-'))
             hour, minute = map(int, time_param.split(':'))
-            target_datetime = datetime(year, month, day, hour, minute)
-            north_congestion = get_directional_prediction(name, 'Northbound', target_datetime)
-            south_congestion = get_directional_prediction(name, 'Southbound', target_datetime)
-            congestion = (north_congestion + south_congestion) / 2
-        except:
-            north_congestion = get_directional_prediction(name, 'Northbound')
-            south_congestion = get_directional_prediction(name, 'Southbound')
-            congestion = (north_congestion + south_congestion) / 2
+            base_time = datetime(year, month, day, hour, minute)
+            print(f"📅 Using requested date/time: {base_time.strftime('%Y-%m-%d %H:%M')}")
+        except Exception as e:
+            print(f"⚠️ Invalid date/time: {e}, using current time")
+            base_time = Config.get_current_time()
     else:
-        north_congestion = get_directional_prediction(name, 'Northbound')
-        south_congestion = get_directional_prediction(name, 'Southbound')
-        congestion = (north_congestion + south_congestion) / 2
+        base_time = Config.get_current_time()
+        print(f"🕐 Using current time: {base_time.strftime('%Y-%m-%d %H:%M')}")
     
-    # Determine status from congestion directly
+    forecasts = []
+    
+    print(f"\n📊 Generating 6-hour forecast for {name} at {base_time.strftime('%H:%M')}")
+    
+    for i in range(6):
+        target_time = base_time + timedelta(hours=i)
+        
+        north_cong = get_directional_prediction(name, 'Northbound', target_time)
+        south_cong = get_directional_prediction(name, 'Southbound', target_time)
+        
+        ampm = target_time.strftime('%I:%M %p')
+        if i == 0:
+            ampm = f"NOW ({ampm})"
+
+        forecasts.append({
+            "hour": target_time.hour,
+            "time": ampm,
+            "northbound": round(north_cong, 1),
+            "southbound": round(south_cong, 1)
+        })
+        
+        print(f"   Hour {i} ({target_time.strftime('%H:%M')}): North={north_cong:.1f}%, South={south_cong:.1f}%")
+
+    return jsonify({
+        "station": name,
+        "timestamp": base_time.isoformat(),
+        "current": {
+            "northbound": forecasts[0]["northbound"],
+            "southbound": forecasts[0]["southbound"]
+        },
+        "forecasts": forecasts
+    })
+
+@api_predict_bp.route('/debug-only')
+def test():
+   directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
+   return jsonify({
+       'models_in_config': len(directional_models),
+       'model_keys': list(directional_models.keys()),
+       'config_keys': list(current_app.config.keys())[:20]
+   })
+
+@api_predict_bp.route('/directional-forecast/all')
+def directional_forecast_all():
+    """Get current congestion for ALL stations at once"""
+    result = {"northbound": {}, "southbound": {}}
+    now = Config.get_current_time()
+    
+    print(f"\n[PREDICTION API] Getting all stations at {now.strftime('%H:%M:%S')}")
+    
+    for station in STATIONS:
+        north_cong = get_directional_prediction(station, 'Northbound', now)
+        south_cong = get_directional_prediction(station, 'Southbound', now)
+        
+        def get_status(cong):
+            if cong > 80: return "SEVERE"
+            if cong > 60: return "CONGESTED"
+            if cong > 30: return "MODERATE"
+            return "LIGHT"
+        
+        result['northbound'][station] = {
+            "congestion": round(float(north_cong), 1),
+            "status": get_status(north_cong)
+        }
+        result['southbound'][station] = {
+            "congestion": round(float(south_cong), 1),
+            "status": get_status(south_cong)
+        }
+    
+    return jsonify(result)
+
+@api_predict_bp.route('/debug-model-output/<station_name>')
+def debug_model_output(station_name):
+    """Check raw model output for different times - FIXED with capacity"""
+    from services.feature_engineering import get_feature_sequence_for_station
+    
+    station = station_name.replace('%20', ' ')
+    directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
+    directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
+    results = {}
+    
+    test_times = [8, 12, 18, 21]
+    
+    for hour in test_times:
+        test_time = Config.get_current_time().replace(hour=hour, minute=0, second=0)
+        
+        for direction in ['Northbound', 'Southbound']:
+            model_key = f"{station}_{direction}"
+            
+            if model_key not in directional_models:
+                continue
+            
+            try:
+                features = get_feature_sequence_for_station(station, direction, test_time)
+                feature_scaler = directional_scalers.get(f'{model_key}_feature')
+                target_scaler = directional_scalers.get(f'{model_key}_target')
+                
+                scaled_features = feature_scaler.transform(features)
+                input_sequence = scaled_features.reshape(1, 24, -1)
+                
+                raw_output = directional_models[model_key].predict(input_sequence, verbose=0)
+                raw_value = float(raw_output[0][0])
+                
+                # ========== FIX: Use station capacity ==========
+                capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+                
+                center = 0.5
+                temperature = 0.8
+                normalized = 1 / (1 + math.exp(-(raw_value - center) / temperature))
+                
+                pred_passengers = normalized * capacity
+                congestion = (pred_passengers / capacity * 100)
+                congestion = min(congestion, 100)
+                
+                results[f"{hour}:00_{direction}"] = {
+                    "raw_model_output": round(raw_value, 4),
+                    "normalized_output": round(normalized, 4),
+                    "station_capacity": capacity,
+                    "predicted_passengers": round(pred_passengers, 0),
+                    "predicted_congestion": round(congestion, 1)
+                }
+                
+            except Exception as e:
+                results[f"{hour}:00_{direction}"] = {"error": str(e)}
+    
+    return jsonify(results)
+
+@api_predict_bp.route('/model-evaluation')
+def model_evaluation():
+    """Evaluate model performance using historical data - FIXED with capacity"""
+    from services.feature_engineering import get_station_dataframe, get_feature_sequence_for_station
+    from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, f1_score, precision_score, recall_score
+    import pandas as pd
+    
+    station = request.args.get('station', 'North Ave')
+    direction = request.args.get('direction', 'Northbound')
+    test_days = int(request.args.get('days', 30))
+    
+    df = get_station_dataframe(station, direction)
+    if df is None or len(df) == 0:
+        return jsonify({"error": "No data available"})
+    
+    directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
+    directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
+    model_key = f"{station}_{direction}"
+    if model_key not in directional_models:
+        return jsonify({"error": f"Model {model_key} not found"})
+    
+    def get_congestion_category(congestion):
+        if congestion > 80:
+            return "Severe"
+        elif congestion > 60:
+            return "Heavy"
+        elif congestion > 30:
+            return "Moderate"
+        else:
+            return "Light"
+    
+    predictions = []
+    actuals = []
+    
+    end_date = df.index.max()
+    start_date = end_date - timedelta(days=test_days)
+    test_data = df[(df.index >= start_date) & (df.index < end_date)]
+    
+    print(f"Testing on {len(test_data)} hours of data from {start_date} to {end_date}")
+    
+    capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+    
+    for timestamp in test_data.index:
+        actual_passengers = test_data.loc[timestamp, 'TotalPassenger']
+        actual_congestion = (actual_passengers / capacity * 100)
+        actual_congestion = max(0, min(100, actual_congestion))
+        
+        try:
+            features = get_feature_sequence_for_station(station, direction, timestamp)
+            if features is None:
+                continue
+                
+            feature_scaler = directional_scalers.get(f'{model_key}_feature')
+            target_scaler = directional_scalers.get(f'{model_key}_target')
+            
+            scaled_features = feature_scaler.transform(features)
+            input_sequence = scaled_features.reshape(1, 24, -1)
+            
+            pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
+            raw_value = float(pred_scaled[0][0])
+            
+            center = 0.5
+            temperature = 0.8
+            normalized = 1 / (1 + math.exp(-(raw_value - center) / temperature))
+            
+            pred_passengers = normalized * capacity
+            predicted_congestion = (pred_passengers / capacity * 100)
+            predicted_congestion = min(predicted_congestion, 100)
+            
+            predictions.append(predicted_congestion)
+            actuals.append(actual_congestion)
+            
+        except Exception as e:
+            print(f"Error at {timestamp}: {e}")
+            continue
+    
+    if len(predictions) == 0:
+        return jsonify({"error": "No valid predictions made"})
+    
+    pred_categories = [get_congestion_category(p) for p in predictions]
+    actual_categories = [get_congestion_category(a) for a in actuals]
+    
+    categories = ["Light", "Moderate", "Heavy", "Severe"]
+    
+    cm = confusion_matrix(actual_categories, pred_categories, labels=categories)
+    class_report = classification_report(actual_categories, pred_categories, labels=categories, output_dict=True)
+    
+    accuracy = accuracy_score(actual_categories, pred_categories)
+    macro_f1 = f1_score(actual_categories, pred_categories, labels=categories, average='macro')
+    weighted_f1 = f1_score(actual_categories, pred_categories, labels=categories, average='weighted')
+    
+    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+    mae = mean_absolute_error(actuals, predictions)
+    rmse = np.sqrt(mean_squared_error(actuals, predictions))
+    r2 = r2_score(actuals, predictions)
+    
+    mae_by_category = {}
+    for category in categories:
+        indices = [i for i, a in enumerate(actual_categories) if a == category]
+        if indices:
+            cat_mae = np.mean([abs(actuals[i] - predictions[i]) for i in indices])
+            mae_by_category[category] = round(cat_mae, 2)
+    
+    return jsonify({
+        "station": station,
+        "direction": direction,
+        "test_period": {
+            "start": start_date.isoformat(),
+            "end": end_date.isoformat(),
+            "total_hours_tested": len(predictions)
+        },
+        "confusion_matrix": {
+            "labels": categories,
+            "matrix": cm.tolist()
+        },
+        "classification_report": class_report,
+        "accuracy": round(accuracy * 100, 2),
+        "f1_scores": {
+            "macro": round(macro_f1 * 100, 2),
+            "weighted": round(weighted_f1 * 100, 2)
+        },
+        "regression_metrics": {
+            "mae": round(mae, 2),
+            "rmse": round(rmse, 2),
+            "r2": round(r2, 4),
+            "mae_by_category": mae_by_category
+        },
+        "sample_predictions": [
+            {
+                "timestamp": test_data.index[i].isoformat(),
+                "actual": round(actuals[i], 1),
+                "predicted": round(predictions[i], 1),
+                "error": round(abs(actuals[i] - predictions[i]), 1)
+            }
+            for i in range(min(10, len(predictions)))
+        ]
+    })
+
+# Keep all other endpoints unchanged...
+@api_predict_bp.route('/confusion-matrix')
+def confusion_matrix_endpoint():
+    """Generate confusion matrix visualization data"""
+    from services.feature_engineering import get_station_dataframe
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import io
+    import base64
+    
+    station = request.args.get('station', 'North Ave')
+    direction = request.args.get('direction', 'Northbound')
+    
+    from sklearn.metrics import confusion_matrix
+    
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=categories, yticklabels=categories)
+    plt.title(f'Confusion Matrix - {station} {direction}')
+    plt.ylabel('Actual')
+    plt.xlabel('Predicted')
+    
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100)
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.getvalue()).decode()
+    plt.close()
+    
+    return jsonify({
+        "image": f"data:image/png;base64,{img_base64}",
+        "matrix": cm.tolist(),
+        "labels": categories
+    })
+
+@api_predict_bp.route('/test-rush-hour')
+def test_rush_hour():
+    """Test predictions for rush hour times"""
+    results = {}
+    now = Config.get_current_time()
+    
+    test_times = [
+        now.replace(hour=8, minute=0),
+        now.replace(hour=12, minute=0),
+        now.replace(hour=18, minute=0),
+        now.replace(hour=21, minute=0),
+    ]
+    
+    for test_time in test_times:
+        north = get_directional_prediction("North Ave", "Northbound", test_time)
+        south = get_directional_prediction("North Ave", "Southbound", test_time)
+        
+        results[test_time.strftime("%H:%M")] = {
+            "northbound": round(north, 1),
+            "southbound": round(south, 1),
+            "avg": round((north + south) / 2, 1)
+        }
+    
+    return jsonify(results)
+
+@api_predict_bp.route('/debug/scalers/<station_name>')
+def debug_scalers(station_name):
+    """Debug target scaler parameters"""
+    station = station_name.replace('%20', ' ')
+    directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
+    results = {}
+    for direction in ['Northbound', 'Southbound']:
+        model_key = f"{station}_{direction}"
+        target_scaler = directional_scalers.get(f'{model_key}_target')
+        
+        if target_scaler:
+            test_values = [0.0, 0.25, 0.5, 0.75, 1.0]
+            inverse_values = target_scaler.inverse_transform(np.array(test_values).reshape(-1, 1))
+            
+            results[direction] = {
+                "scaler_exists": True,
+                "scaler_type": "MinMaxScaler",
+                "min": float(target_scaler.min_[0]) if hasattr(target_scaler, 'min_') else None,
+                "scale": float(target_scaler.scale_[0]) if hasattr(target_scaler, 'scale_') else None,
+                "data_min": float(target_scaler.data_min_[0]) if hasattr(target_scaler, 'data_min_') else None,
+                "data_max": float(target_scaler.data_max_[0]) if hasattr(target_scaler, 'data_max_') else None,
+                "test_conversion": {
+                    f"input_{v}": float(inverse_values[i][0]) 
+                    for i, v in enumerate(test_values)
+                }
+            }
+        else:
+            results[direction] = {"scaler_exists": False}
+    
+    return jsonify(results)
+
+@api_predict_bp.route('/debug/check-lookback')
+def debug_check_lookback():
+    """Check what values are in the lookback column"""
+    from services.feature_engineering import get_station_dataframe
+    
+    station = "North Ave"
+    direction = "Northbound"
+    
+    df = get_station_dataframe(station, direction)
+    
+    if df is not None:
+        last_24 = df.tail(24)
+        
+        return jsonify({
+            "station": station,
+            "direction": direction,
+            "lookback_column_name": "congestion" if 'congestion' in df.columns else "NOT FOUND",
+            "actual_values_last_24_hours": last_24['congestion'].tolist() if 'congestion' in df.columns else [],
+            "values_range": {
+                "min": float(df['congestion'].min()),
+                "max": float(df['congestion'].max()),
+                "mean": float(df['congestion'].mean())
+            } if 'congestion' in df.columns else None,
+            "total_passenger_range": {
+                "min": float(df['TotalPassenger'].min()),
+                "max": float(df['TotalPassenger'].max()),
+                "mean": float(df['TotalPassenger'].mean())
+            }
+        })
+    
+    return jsonify({"error": "No data"})
+
+@api_predict_bp.route('/debug/lookback-values/<station_name>')
+def debug_lookback_values(station_name):
+    """Check what lookback values are being passed to the model"""
+    from services.feature_engineering import get_feature_sequence_for_station
+    
+    station = station_name.replace('%20', ' ')
+    test_time = Config.get_current_time().replace(hour=8, minute=0, second=0)
+    
+    results = {}
+    
+    for direction in ['Northbound', 'Southbound']:
+        features = get_feature_sequence_for_station(station, direction, test_time)
+        
+        if features is not None:
+            lookback_values = features[:, -1]
+            
+            results[direction] = {
+                "lookback_values_scaled": lookback_values.tolist()[:10],
+                "min_scaled": float(lookback_values.min()),
+                "max_scaled": float(lookback_values.max()),
+                "mean_scaled": float(lookback_values.mean()),
+            }
+    
+    return jsonify(results)
+
+@api_predict_bp.route('/debug/scaler-test/<station_name>')
+def debug_scaler_test(station_name):
+    """Test what the scaler does with different inputs"""
+    station = station_name.replace('%20', ' ')
+    directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
+    results = {}
+    for direction in ['Northbound', 'Southbound']:
+        model_key = f"{station}_{direction}"
+        target_scaler = directional_scalers.get(f'{model_key}_target')
+        
+        if target_scaler:
+            test_values = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+            results[direction] = {
+                "scaler_type": str(type(target_scaler)),
+                "data_min": float(target_scaler.data_min_[0]) if hasattr(target_scaler, 'data_min_') else None,
+                "data_max": float(target_scaler.data_max_[0]) if hasattr(target_scaler, 'data_max_') else None,
+                "conversions": {
+                    f"input_{v:.1f}": float(target_scaler.inverse_transform(np.array([[v]]))[0][0])
+                    for v in test_values
+                }
+            }
+    
+    return jsonify(results)
+
+@api_predict_bp.route('/debug/training-data-distribution')
+def debug_training_data_distribution():
+    """Check what data the model was trained on"""
+    from services.feature_engineering import get_station_dataframe
+    
+    station = "North Ave"
+    results = {}
+    
+    for direction in ['Northbound', 'Southbound']:
+        df = get_station_dataframe(station, direction)
+        
+        if df is not None:
+            hourly_avg = df.groupby(df.index.hour)['TotalPassenger'].mean()
+            
+            results[direction] = {
+                "hourly_average_passengers": {
+                    f"{hour:02d}:00": round(float(hourly_avg[hour]), 0) 
+                    for hour in range(24) if hour in hourly_avg.index
+                },
+                "peak_hour": int(hourly_avg.idxmax()),
+                "peak_passengers": float(hourly_avg.max()),
+                "morning_rush_8am": float(hourly_avg[8]) if 8 in hourly_avg.index else 0,
+                "evening_rush_6pm": float(hourly_avg[18]) if 18 in hourly_avg.index else 0,
+            }
+    
+    return jsonify(results)
+
+@api_predict_bp.route('/debug/fix-scaler/<station_name>')
+def debug_fix_scaler(station_name):
+    """Check what the target scaler should be based on data"""
+    from services.feature_engineering import get_station_dataframe
+    
+    station = station_name.replace('%20', ' ')
+    results = {}
+    
+    for direction in ['Northbound', 'Southbound']:
+        hourly = get_station_dataframe(station, direction)
+        
+        if hourly is not None and len(hourly) > 0:
+            passengers = hourly['TotalPassenger'].values
+            data_min = float(passengers.min())
+            data_max = float(passengers.max())
+            
+            directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+            model_key = f"{station}_{direction}"
+            target_scaler = directional_scalers.get(f'{model_key}_target')
+            
+            current_min = float(target_scaler.data_min_[0]) if target_scaler and hasattr(target_scaler, 'data_min_') else None
+            current_max = float(target_scaler.data_max_[0]) if target_scaler and hasattr(target_scaler, 'data_max_') else None
+            
+            results[direction] = {
+                "actual_data": {
+                    "min_passengers": data_min,
+                    "max_passengers": data_max,
+                    "mean_passengers": float(passengers.mean()),
+                    "total_data_points": len(passengers)
+                },
+                "current_scaler": {
+                    "min": current_min,
+                    "max": current_max
+                },
+                "capacity_based_fix": f"Use capacity {MRT3_PLATFORM_CAPACITY.get(station, 1000)} instead of scaler_max"
+            }
+    
+    return jsonify(results)
+
+@api_predict_bp.route('/debug/check-scaler-values')
+def debug_check_scaler_values():
+    """Check what values the target scalers are actually using"""
+    directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
+    results = {}
+    
+    for key, scaler in directional_scalers.items():
+        if '_target' in key:
+            if hasattr(scaler, 'data_min_') and hasattr(scaler, 'data_max_'):
+                results[key] = {
+                    "data_min": float(scaler.data_min_[0]),
+                    "data_max": float(scaler.data_max_[0]),
+                    "scale": float(scaler.scale_[0]) if hasattr(scaler, 'scale_') else None
+                }
+            else:
+                results[key] = {"error": "No data_min_ or data_max_ attribute"}
+    
+    return jsonify(results)
+
+@api_predict_bp.route('/predict/<station_name>')
+def predict_congestion(station_name):
+    """Get current snapshot congestion metrics for a single station"""
+    name = station_name.replace('%20', ' ')
+    
+    date_param = request.args.get('date')
+    time_param = request.args.get('time')
+    
+    target_datetime = None
+    if date_param and time_param:
+        try:
+            year, month, day = map(int, date_param.split('-'))
+            hour, minute = map(int, time_param.split(':'))
+            target_datetime = datetime(year, month, day, hour, minute)
+        except:
+            target_datetime = None
+
+    north_congestion = get_directional_prediction(name, 'Northbound', target_datetime)
+    south_congestion = get_directional_prediction(name, 'Southbound', target_datetime)
+    congestion = (north_congestion + south_congestion) / 2
+    
     if congestion > 80: status = "CRITICAL"
     elif congestion > 50: status = "BUSY"
     elif congestion > 20: status = "MODERATE"
@@ -118,100 +861,16 @@ def predict_congestion(station_name):
         "status": status
     })
 
-@api_predict_bp.route('/directional-forecast/<station_name>')
-def directional_forecast(station_name):
-    """Get 6-hour forecast (current + next 5 hours) for both directions"""
-    name = station_name.replace('%20', ' ')
-    
-    date_str = request.args.get('date')
-    time_str = request.args.get('time')
-    
-    if date_str and time_str:
-        try:
-            year, month, day = map(int, date_str.split('-'))
-            hour, minute = map(int, time_str.split(':'))
-            target_datetime = datetime(year, month, day, hour, minute)
-        except:
-            target_datetime = datetime.now()
-    else:
-        target_datetime = datetime.now()
-    
-    forecasts = []
-    
-    # Current hour (hour 0)
-    current_north = get_directional_prediction(name, 'Northbound', target_datetime)
-    current_south = get_directional_prediction(name, 'Southbound', target_datetime)
-    
-    forecasts.append({
-        'hour': target_datetime.hour,
-        'time': target_datetime.strftime('%I:%M %p'),
-        'northbound': round(current_north, 1),
-        'southbound': round(current_south, 1)
-    })
-    
-    # Next 5 hours - IMPORTANT: Create new datetime for each hour
-    for i in range(1, 6):
-        # Create a NEW datetime object for each forecast hour
-        forecast_time = target_datetime + timedelta(hours=i)
-        
-        north = get_directional_prediction(name, 'Northbound', forecast_time)
-        south = get_directional_prediction(name, 'Southbound', forecast_time)
-        
-        forecasts.append({
-            'hour': forecast_time.hour,
-            'time': forecast_time.strftime('%I:%M %p'),
-            'northbound': round(north, 1),
-            'southbound': round(south, 1)
-        })
-    
-    return jsonify({
-        'station': name,
-        'forecasts': forecasts,
-        'current': {
-            'northbound': round(current_north, 1),
-            'southbound': round(current_south, 1)
-        }
-    })
-
-# ========== BATCH AND ROUTE ENDPOINTS ==========
-
-@api_predict_bp.route('/batch-predict')
-def batch_predict():
-    """Get congestion for all stations at once"""
-    results = []
-    for station in STATIONS:
-        north = get_directional_prediction(station, 'Northbound')
-        south = get_directional_prediction(station, 'Southbound')
-        congestion = (north + south) / 2
-        
-        if congestion >= 75: status = "🔴 CRITICAL"
-        elif congestion >= 55: status = "🟠 BUSY"
-        elif congestion >= 30: status = "🟡 MODERATE"
-        else: status = "🟢 LIGHT"
-        
-        results.append({
-            "station": station,
-            "congestion": round(congestion, 1),
-            "northbound": round(north, 1),
-            "southbound": round(south, 1),
-            "status": status
-        })
-    
-    return jsonify(results)
-
 @api_predict_bp.route('/predict-direction/<station_name>')
 def predict_direction(station_name):
-    """Get congestion with direction-specific advice"""
     name = station_name.replace('%20', ' ')
     
-    # Get directional congestion directly from model
     north_congestion = get_directional_prediction(name, 'Northbound')
     south_congestion = get_directional_prediction(name, 'Southbound')
     congestion = (north_congestion + south_congestion) / 2
     
     station_idx = STATIONS.index(name) if name in STATIONS else 0
     
-    # Determine dominant direction based on station position
     if station_idx < 6:
         direction = "southbound"
         next_station = STATIONS[station_idx + 1] if station_idx + 1 < len(STATIONS) else STATIONS[0]
@@ -253,7 +912,6 @@ def predict_direction(station_name):
 
 @api_predict_bp.route('/predict-route')
 def predict_route():
-    """Get route prediction between two stations"""
     from_station = request.args.get('from')
     to_station = request.args.get('to')
     date = request.args.get('date')

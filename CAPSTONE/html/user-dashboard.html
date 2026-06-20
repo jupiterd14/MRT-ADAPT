@@ -1726,7 +1726,7 @@ canvas {
     <!-- Main Content -->
     <div class="main-content">
         <div class="greeting">
-            GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, {{ username.upper() }}
+            GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, Commuter
         </div>
 
      
@@ -1876,19 +1876,18 @@ canvas {
           
         </div>
     </div>
-
-  <script>
-// ========== OPTIMIZED DASHBOARD - FASTER LOADING ==========
+<script>
+// ========== OPTIMIZED DASHBOARD - 10 MINUTE CACHE ==========
 console.log('🚀 SCRIPT LOADED at:', new Date().toLocaleTimeString());
 
 let chart = null;
 let currentStation = '{{ favorite_station if favorite_station else "North Ave" }}';
 let updateInterval = null;
-let countdownInterval = null;
 let currentDirection = 'north';
 let cachedData = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 30000; // 30 seconds cache
+const CACHE_DURATION = 600000; // 10 minutes cache (600,000 ms)
+let isRefreshing = false; // Prevent concurrent refreshes
 
 // Station coordinates
 const stationCoordinates = {
@@ -1907,7 +1906,33 @@ const stationCoordinates = {
     "Taft": { lat: 14.5378, lng: 121.0112 }
 };
 
-// Sync mobile alert badge with desktop badge
+const validStations = {{ stations | tojson }};
+
+// ========== CACHE MANAGEMENT ==========
+function isCacheValid() {
+    return cachedData && (Date.now() - lastFetchTime) < CACHE_DURATION;
+}
+
+function getCacheTimeRemaining() {
+    if (!cachedData) return 0;
+    const elapsed = Date.now() - lastFetchTime;
+    return Math.max(0, CACHE_DURATION - elapsed);
+}
+
+// ========== DEBOUNCE HELPER ==========
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// ========== Sync mobile alert badge ==========
 function syncMobileAlertBadge() {
     const desktopBadge = document.getElementById('alertBadge');
     const mobileBadge = document.getElementById('mobileAlertBadge');
@@ -1921,8 +1946,6 @@ function syncMobileAlertBadge() {
         }
     }
 }
-
-const validStations = {{ stations | tojson }};
 
 function validateStationName(station) {
     return validStations.includes(station) ? station : 'North Ave';
@@ -1952,402 +1975,135 @@ function findNearestStation(userLat, userLng) {
     return { station: nearestStation, distance: shortestDistance };
 }
 
-// ========== OPTIMIZED: SINGLE API CALL FOR ALL DATA ==========
+// ========== CACHED API CALL ==========
 async function fetchAllData() {
-    const now = Date.now();
+    // If already refreshing, wait
+    if (isRefreshing) {
+        console.log('⏳ Refresh already in progress, waiting...');
+        return cachedData;
+    }
     
     // Check cache
-    if (cachedData && (now - lastFetchTime) < CACHE_DURATION) {
-        console.log('📦 Using cached data');
+    if (isCacheValid()) {
+        console.log('📦 Using cached data (expires in ' + Math.round(getCacheTimeRemaining()/1000) + 's)');
         return cachedData;
     }
     
-    console.log('🌐 Fetching fresh data...');
+    isRefreshing = true;
+    console.log('🌐 Fetching fresh data for station:', currentStation);
     
     try {
-        // Parallel API calls for maximum speed
+        // Show loading indicator
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) loadingOverlay.classList.add('active');
+        
+        // Parallel API calls
         const [forecastData, scheduleData, alertData] = await Promise.all([
-            fetch(`/api/directional-forecast/${encodeURIComponent(currentStation)}`).then(res => res.json()),
-            fetch(`/api/schedule/next-trains/${encodeURIComponent(currentStation)}`).then(res => res.json()),
-            fetch('/api/alerts/count').then(res => res.json())
+            fetch(`/api/directional-forecast/${encodeURIComponent(currentStation)}`).then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            }),
+            fetch(`/api/schedule/next-trains/${encodeURIComponent(currentStation)}`).then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            }),
+            fetch('/api/alerts/count').then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            }).catch(() => ({ count: 0 }))
         ]);
         
-        cachedData = { forecastData, scheduleData, alertData };
-        lastFetchTime = now;
+        console.log("Here:", forecastData);
+        console.log('✅ Data fetched successfully');
+        
+        cachedData = { 
+            forecastData, 
+            scheduleData, 
+            alertData,
+            timestamp: Date.now()
+        };
+        lastFetchTime = Date.now();
+        
+        // Update last updated time display
+        updateLastUpdatedTime();
         
         return cachedData;
+        
     } catch (error) {
-        console.error('Error fetching data:', error);
-        return cachedData || null;
+        console.error('❌ Error fetching data:', error);
+        // If we have stale cache, return it
+        if (cachedData) {
+            console.log('⚠️ Using stale cached data');
+            return cachedData;
+        }
+        return null;
+    } finally {
+        isRefreshing = false;
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) loadingOverlay.classList.remove('active');
     }
 }
 
-// ========== UPDATE ALL UI COMPONENTS AT ONCE ==========
-async function updateAllUI() {
-    const data = await fetchAllData();
-    if (!data) return;
-    
-    // Update everything in one go
-    updateForecastUI(data.forecastData);
-    updateStationStatusUI(data.forecastData);
-    updateBestTimeUI(data.forecastData);
-    updateTrainScheduleUI(data.scheduleData);
- 
-}
-function updateForecastUI(data) {
-    // The forecasts array already includes current hour as first item
-    const forecastData = currentDirection === 'north' 
-        ? data.forecasts.map(f => f.northbound)
-        : data.forecasts.map(f => f.southbound);
-    
-    // No need to add currentCong separately - it's already the first item
-    updateForecastChart(forecastData, currentDirection);
+// ========== UPDATE LAST UPDATED TIME ==========
+function updateLastUpdatedTime() {
+    const timeElement = document.getElementById('lastUpdatedTime');
+    if (timeElement) {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        timeElement.textContent = `Last updated: ${timeStr}`;
+        timeElement.style.display = 'block';
+    }
 }
 
-// ========== CONGESTION HELPER - NO EMOJIS, MOBILE FRIENDLY ==========
+// ========== DIRECTION TOGGLE ==========
+function setDirection(direction) {
+    console.log('🔄 Setting direction to:', direction);
+    currentDirection = direction;
+    
+    const northBtn = document.getElementById('toggleNorthBtn');
+    const southBtn = document.getElementById('toggleSouthBtn');
+    
+    if (northBtn && southBtn) {
+        if (direction === 'north') {
+            northBtn.classList.add('active');
+            southBtn.classList.remove('active');
+        } else {
+            northBtn.classList.remove('active');
+            southBtn.classList.add('active');
+        }
+    }
+    
+    if (cachedData) {
+        updateForecastUI(cachedData.forecastData);
+    } else {
+        updateAllUI();
+    }
+}
+
+// ========== CONGESTION HELPER ==========
 function getCongestionLevel(percentage) {
-    if (percentage > 80) return { level: 'severe', text: 'SEVERE', icon:'' };
-    if (percentage > 60) return { level: 'congested', text: 'CONGESTED', icon: '' };
-    if (percentage > 30) return { level: 'moderate', text: 'MODERATE', icon: '' };
-    return { level: 'light', text: 'LIGHT', icon: '' };
+    if (percentage > 80) return { level: 'severe', text: 'SEVERE', color: '#EF4444' };
+    if (percentage > 60) return { level: 'congested', text: 'CONGESTED', color: '#F97316' };
+    if (percentage > 30) return { level: 'moderate', text: 'MODERATE', color: '#F59E0B' };
+    return { level: 'light', text: 'LIGHT', color: '#22C55E' };
 }
 
 function createCongestionPill(percentage, size = 'xs') {
-    const { level, text, icon } = getCongestionLevel(percentage);
+    const { level, text } = getCongestionLevel(percentage);
     const sizeClass = size === 'xs' ? 'congestion-pill-xs' : 'congestion-pill';
-    return `<span class="congestion-pill congestion-${level} ${sizeClass}"><i class="${icon}"></i> ${text}</span>`;
+    return `<span class="congestion-pill congestion-${level} ${sizeClass}">${text}</span>`;
 }
 
-function updateStationStatusUI(data) {
-    const northEl = document.getElementById('stationStatusNorth');
-    const southEl = document.getElementById('stationStatusSouth');
+// ========== UPDATE FORECAST CHART ==========
+function updateForecastChart(chartLabels, chartData, direction) {
+    const ctx = document.getElementById('forecastChart');
+    if (!ctx) return;
     
-    const now = new Date();
-    const currentTime = now.getHours() + now.getMinutes()/60;
-    const OPERATING_START = 4.5;
-    const OPERATING_END = 22.5;
-    
-    if (currentTime < OPERATING_START || currentTime >= OPERATING_END) {
-        northEl.innerHTML = '<span class="status-pill closed"><i class="fas fa-ban"></i> CLOSED</span>';
-        southEl.innerHTML = '<span class="status-pill closed"><i class="fas fa-ban"></i> CLOSED</span>';
-        return;
-    }
-    
-    const northCong = data.current?.northbound || 0;
-    const southCong = data.current?.southbound || 0;
-    
-    northEl.innerHTML = createCongestionPill(northCong, 'xs');
-    southEl.innerHTML = createCongestionPill(southCong, 'xs');
-}
-
-// Replace your updateTrainScheduleUI function with this:
-function updateTrainScheduleUI(data) {
-    const northEl = document.getElementById('northTime');
-    const southEl = document.getElementById('southTime');
-    const northOriginEl = document.getElementById('northOrigin');
-    const southOriginEl = document.getElementById('southOrigin');
-    
-    // Check if MRT is operating
-    if (data.is_operating === false || data.is_closed === true) {
-        northEl.innerHTML = '<span>CLOSED</span>';
-        southEl.innerHTML = '<span>CLOSED</span>';
-        northOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
-        southOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
-        return;
-    }
-    
-    // Use the actual API response data
-    const northMinutes = data.northbound?.minutes || 5;
-    const southMinutes = data.southbound?.minutes || 3;
-    const northOrigin = data.northbound?.origin || data.northbound?.from_station || 'Taft';
-    const southOrigin = data.southbound?.origin || data.southbound?.from_station || 'North Ave';
-    
-    // Display the accurate times
-    northEl.innerHTML = `${northMinutes} <span>min</span>`;
-    southEl.innerHTML = `${southMinutes} <span>min</span>`;
-    
-    // Show where the train is coming from
-    northOriginEl.textContent = `Arriving from ${northOrigin}`;
-    southOriginEl.textContent = `Arriving from ${southOrigin}`;
-    
-    // Add warning if train is delayed or during off-peak
-    if (data.headway && data.headway > 6) {
-        northOriginEl.style.color = '#F97316';
-        southOriginEl.style.color = '#F97316';
-    } else {
-        northOriginEl.style.color = 'var(--text-light)';
-        southOriginEl.style.color = 'var(--text-light)';
-    }
-}
-// Replace the fetchAlertCount function in your Dashboard with this:
-async function fetchAlertCount() {
-    try {
-        // Get read status from localStorage (same as Alerts page)
-        let readAlerts = new Set();
-        const saved = localStorage.getItem('readAlerts');
-        if (saved) {
-            readAlerts = new Set(JSON.parse(saved));
-        }
-        
-        // Generate alerts using the SAME logic as Alerts page
-        const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-            "Ayala Ave", "Magallanes", "Taft"];
-        
-        let allAlerts = [];
-        const now = new Date();
-        const hour = now.getHours();
-        
-        // 1. Rush Hour Alert
-        if ((hour >= 7 && hour <= 9)) {
-            allAlerts.push({ id: 'rush-morning-permanent' });
-        } else if ((hour >= 17 && hour <= 19)) {
-            allAlerts.push({ id: 'rush-evening-permanent' });
-        }
-        
-        // 2. Advisory Alert
-        if (hour >= 0 && hour < 5) {
-            allAlerts.push({ id: 'advisory-early-morning-permanent' });
-        } else if (hour >= 5 && hour < 7) {
-            allAlerts.push({ id: 'advisory-pre-rush-permanent' });
-        } else if (hour >= 10 && hour < 16) {
-            allAlerts.push({ id: 'advisory-midday-permanent' });
-        } else if (hour >= 20 && hour < 22.5) {
-            allAlerts.push({ id: 'advisory-late-evening-permanent' });
-        } else if (hour >= 22.5 || hour === 23) {
-            allAlerts.push({ id: 'advisory-service-ended-permanent' });
-        }
-        
-        // 3. Congestion Advisory
-        if (hour >= 21 || hour < 5) {
-            allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
-        } else if (hour >= 14 && hour < 17) {
-            allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
-        }
-        
-        // 4. Service Notices
-        const isWeekend = now.getDay() === 0 || now.getDay() === 6;
-        if (isWeekend) {
-            allAlerts.push({ id: 'service-weekend-permanent' });
-        }
-        if (hour >= 23 || hour <= 3) {
-            allAlerts.push({ id: 'service-maintenance-night-permanent' });
-        }
-        
-        // 5. Congestion alerts - COUNT ALL LEVELS (>0%, same as Alerts page)
-        try {
-            const response = await fetch('/api/live-map/directions/v2');
-            const data = await response.json();
-            
-            if (data && data.northbound && data.southbound) {
-                for (const station of STATIONS) {
-                    const northData = data.northbound[station];
-                    const southData = data.southbound[station];
-                    
-                    // COUNT ALL congestion levels (>0%) to match Alerts page
-                    if (northData && northData.congestion > 0) {
-                        allAlerts.push({ id: `congestion-${station}-northbound` });
-                    }
-                    if (southData && southData.congestion > 0) {
-                        allAlerts.push({ id: `congestion-${station}-southbound` });
-                    }
-                }
-            }
-        } catch (e) {
-            console.log('Could not fetch congestion alerts:', e);
-        }
-        
-        // 6. Operator broadcasts
-        try {
-            const broadcastResponse = await fetch('/api/broadcasts/public');
-            const broadcastData = await broadcastResponse.json();
-            if (broadcastData.success && broadcastData.broadcasts) {
-                broadcastData.broadcasts.forEach(b => {
-                    allAlerts.push({ id: `broadcast-${b.id}` });
-                });
-            }
-        } catch (e) {
-            console.log('Could not fetch broadcasts:', e);
-        }
-        
-        // Count ONLY unread alerts
-        let unreadCount = 0;
-        for (const alert of allAlerts) {
-            if (!readAlerts.has(alert.id)) {
-                unreadCount++;
-            }
-        }
-        
-        console.log('Dashboard total alerts generated:', allAlerts.length);
-        console.log('Dashboard unread alert count:', unreadCount);
-        return unreadCount;
-        
-    } catch (error) {
-        console.error('Error calculating alert count:', error);
-        return 0;
-    }
-}
-
-// Add this function
-function cleanOldReadAlerts() {
-    const saved = localStorage.getItem('readAlerts');
-    if (saved) {
-        const readAlerts = JSON.parse(saved);
-        // Check if any alert ID doesn't match the new permanent format
-        const hasOldFormat = readAlerts.some(id => 
-            id.includes('-') && !id.includes('permanent') && !id.includes('congestion-') && !id.includes('broadcast-')
-        );
-        
-        if (hasOldFormat) {
-            console.log('Cleaning old readAlerts format...');
-            localStorage.removeItem('readAlerts');
-        }
-    }
-}
-
-// Add this line inside your DOMContentLoaded, before fetchAlertCount:
-cleanOldReadAlerts();
-
-function updateAlertBadgeUI(data) {
-    const badge = document.getElementById('alertBadge');
-    const sidebarBadge = document.getElementById('sidebarAlertCount');
-    
-    // Get count from data
-    let count = 0;
-    if (typeof data === 'number') {
-        count = data;
-    } else if (data && data.count !== undefined) {
-        count = data.count;
-    } else if (data && data.unread_count !== undefined) {
-        count = data.unread_count;
-    } else if (data && data.total !== undefined) {
-        count = data.total;
-    }
-    
-    console.log('Setting dashboard alert badge to:', count);
-    
-    // Bell badge: Show 9+ for counts > 9
-    const bellDisplayValue = count > 9 ? '9+' : count;
-    
-    // Sidebar badge: Show actual number (no truncation)
-    const sidebarDisplayValue = count;
-    
-    if (badge) {
-        if (count > 0) {
-            badge.textContent = bellDisplayValue;
-            badge.style.backgroundColor = 'var(--red)';
-            badge.style.display = 'flex';
-        } else {
-            badge.textContent = '0';
-            badge.style.backgroundColor = '#94A3B8';
-            badge.style.display = 'flex';
-        }
-    }
-    
-    if (sidebarBadge) {
-        if (count > 0) { 
-            sidebarBadge.textContent = sidebarDisplayValue;
-            sidebarBadge.style.display = 'block'; 
-        } else { 
-            sidebarBadge.style.display = 'none'; 
-        }
-    }
-    
-    syncMobileAlertBadge();
-}
-function updateBestTimeUI(data) {
-    const northCong = data.current?.northbound || 0;
-    const southCong = data.current?.southbound || 0;
-    const bestTimeText = document.getElementById('bestTimeText');
-    
-    const severeMessages = [
-        "Expect 30-60 min delays",
-        "Heavy congestion - major delays expected",
-        "Allow at least 45 minutes extra travel time",
-        "Severe crowding - consider alternative routes",
-        "Expect significant wait times at platforms"
-    ];
-    
-    const congestedMessages = [
-        "Expect 15-30 min delays",
-        "Moderate to heavy traffic ahead",
-        "Allow extra 20-25 minutes for your trip",
-        "Crowded trains - prepare for standing room only",
-        "Expect longer queue times at ticket booths"
-    ];
-    
-    const moderateMessages = [
-        "Allow extra 5-10 min",
-        "Mild congestion - slight delays possible",
-        "Expect normal rush hour conditions",
-        "Allow 8-12 minutes of buffer time",
-        "Moderate crowd - manageable wait times"
-    ];
-    
-    const lightMessages = [
-        "Smooth travel expected",
-        "Light traffic - on-time arrival likely",
-        "Clear sailing - minimal delays",
-        "Great time to travel - low congestion",
-        "Express travel conditions ahead"
-    ];
-    
-    const getAdvice = (cong) => {
-        if (cong > 80) {
-            return severeMessages[Math.floor(Math.random() * severeMessages.length)];
-        }
-        if (cong > 60) {
-            return congestedMessages[Math.floor(Math.random() * congestedMessages.length)];
-        }
-        if (cong > 30) {
-            return moderateMessages[Math.floor(Math.random() * moderateMessages.length)];
-        }
-        return lightMessages[Math.floor(Math.random() * lightMessages.length)];
-    };
-    
-    const northAdvice = getAdvice(northCong);
-    const southAdvice = getAdvice(southCong);
-    
-    bestTimeText.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; margin-bottom: 12px;">
-            <div style="display: flex; align-items: center; gap: 10px; min-width: 140px;">
-                <i class="fas fa-arrow-up" style="color: #3B82F6; font-size: 13px; width: 16px;"></i>
-                <strong style="font-size: 13px; min-width: 85px;">NORTHBOUND</strong>
-                ${createCongestionPill(northCong, 'xs')}
-            </div>
-            <span style="font-size: 11px; color: var(--text-light); flex: 1; text-align: left;">${northAdvice}</span>
-        </div>
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-            <div style="display: flex; align-items: center; gap: 10px; min-width: 140px;">
-                <i class="fas fa-arrow-down" style="color: #10B981; font-size: 13px; width: 16px;"></i>
-                <strong style="font-size: 13px; min-width: 85px;">SOUTHBOUND</strong>
-                ${createCongestionPill(southCong, 'xs')}
-            </div>
-            <span style="font-size: 11px; color: var(--text-light); flex: 1; text-align: left;">${southAdvice}</span>
-        </div>
-    `;
-}
-
-function updateForecastChart(forecastData, direction) {
-    const ctx = document.getElementById('forecastChart').getContext('2d');
     if (chart) chart.destroy();
-    
-    const now = new Date();
-    const currentHour = now.getHours();
-    
-    // Create labels for current hour + next 5 hours (total 6 hours)
-    const labels = [];
-    for (let i = 0; i < forecastData.length; i++) {
-        const hour = (currentHour + i) % 24;
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const hour12 = hour % 12 || 12;
-        
-        if (i === 0) {
-            labels.push(`NOW (${hour12}:00 ${ampm})`);
-        } else {
-            labels.push(`${hour12}:00 ${ampm}`);
-        }
-    }
     
     const lineColor = direction === 'north' ? '#3B82F6' : '#10B981';
     const bgColor = direction === 'north' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
@@ -2355,20 +2111,19 @@ function updateForecastChart(forecastData, direction) {
     chart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: labels,
+            labels: chartLabels,
             datasets: [{
                 label: direction === 'north' ? 'Northbound Congestion' : 'Southbound Congestion',
-                data: forecastData,
+                data: chartData,
                 borderColor: lineColor,
                 backgroundColor: bgColor,
                 borderWidth: 3,
-                pointBackgroundColor: (context) => {
-                    const value = forecastData[context.dataIndex];
-                    if (value > 80) return '#EF4444';
-                    if (value > 60) return '#F97316';
-                    if (value > 30) return '#F59E0B';
+                pointBackgroundColor: chartData.map(v => {
+                    if (v > 80) return '#EF4444';
+                    if (v > 60) return '#F97316';
+                    if (v > 30) return '#F59E0B';
                     return '#22C55E';
-                },
+                }),
                 pointBorderColor: 'white',
                 pointBorderWidth: 2,
                 pointRadius: 6,
@@ -2384,11 +2139,8 @@ function updateForecastChart(forecastData, direction) {
                     callbacks: {
                         label: function(context) {
                             const value = context.raw;
-                            let level = 'LIGHT';
-                            if (value > 80) level = 'SEVERE';
-                            else if (value > 60) level = 'CONGESTED';
-                            else if (value > 30) level = 'MODERATE';
-                            return `${level}: ${value}%`;
+                            const { text } = getCongestionLevel(value);
+                            return ` Congestion: ${text}`;
                         }
                     }
                 }
@@ -2397,116 +2149,323 @@ function updateForecastChart(forecastData, direction) {
                 y: { 
                     beginAtZero: true, 
                     max: 100, 
-                    title: { display: true, text: 'Congestion (%)', font: { size: 11 } } 
+                    title: { display: true, text: 'Congestion (%)', font: { size: 11, weight: 'bold' } },
+                    ticks: { callback: (v) => v + '%' }
                 },
                 x: {
-                    title: { display: true, text: 'Time', font: { size: 11 } }
+                    title: { display: true, text: 'Time', font: { size: 11, weight: 'bold' } }
                 }
             }
         }
     });
 }
-// ========== EVENT HANDLERS ==========
-function setDirection(direction) {
-    currentDirection = direction;
-    document.getElementById('toggleNorthBtn').classList.toggle('active', direction === 'north');
-    document.getElementById('toggleSouthBtn').classList.toggle('active', direction === 'south');
+
+function updateForecastUI(data) {
+    if (!data || !data.forecasts || !Array.isArray(data.forecasts)) {
+        console.error('No forecasts array found:', data);
+        return;
+    }
     
-    // Use cached data if available, otherwise fetch
-    if (cachedData) {
-        updateForecastUI(cachedData.forecastData);
-    } else {
-        updateAllUI();
+    const labels = data.forecasts.map((f, index) => {
+        return index === 0 ? `NOW (${f.time})` : f.time;
+    });
+    
+    const rawMetrics = currentDirection === 'north' 
+        ? data.forecasts.map(f => f.northbound)
+        : data.forecasts.map(f => f.southbound);
+        
+    const cleanData = rawMetrics.map(v => v !== null && v !== undefined ? v : 0);
+    updateForecastChart(labels, cleanData, currentDirection);
+}
+
+// ========== UPDATE STATION STATUS ==========
+function updateStationStatusUI(data) {
+    const northEl = document.getElementById('stationStatusNorth');
+    const southEl = document.getElementById('stationStatusSouth');
+    
+    if (!northEl || !southEl) return;
+    
+    // FIX: Get current hour from system time, not forecast data
+    const now = new Date();
+    let currentHour = now.getHours();
+    let currentMinute = now.getMinutes();
+    const currentTime = currentHour + (currentMinute / 60);
+    
+    // Operating hours: 4:30 AM (4.5) to 10:30 PM (22.5)
+    const OPERATING_START = 4.5;
+    const OPERATING_END = 22.5;
+    
+    // Check if MRT is operating
+    const isOperating = (currentTime >= OPERATING_START && currentTime < OPERATING_END);
+    
+    if (!isOperating) {
+        northEl.innerHTML = '<span class="status-pill" style="background:#6B7280; color:white;"><i class="fas fa-ban"></i> CLOSED</span>';
+        southEl.innerHTML = '<span class="status-pill" style="background:#6B7280; color:white;"><i class="fas fa-ban"></i> CLOSED</span>';
+        return;
+    }
+    
+    // Get congestion from forecast data
+    let northCong = 0;
+    let southCong = 0;
+    
+    if (data.forecastData && data.forecastData.forecasts && data.forecastData.forecasts[0]) {
+        northCong = data.forecastData.forecasts[0].northbound || 0;
+        southCong = data.forecastData.forecasts[0].southbound || 0;
+    }
+    
+    northEl.innerHTML = createCongestionPill(northCong, 'xs');
+    southEl.innerHTML = createCongestionPill(southCong, 'xs');
+}
+
+// ========== UPDATE TRAIN SCHEDULE ==========
+function updateTrainScheduleUI(data) {
+    const northEl = document.getElementById('northTime');
+    const southEl = document.getElementById('southTime');
+    const northOriginEl = document.getElementById('northOrigin');
+    const southOriginEl = document.getElementById('southOrigin');
+    
+    if (!northEl || !southEl) return;
+    
+    // FIX: Use system time to determine if operating
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTime = currentHour + (currentMinute / 60);
+    const OPERATING_START = 4.5;
+    const OPERATING_END = 22.5;
+    const isOperating = (currentTime >= OPERATING_START && currentTime < OPERATING_END);
+    
+    if (!isOperating) {
+        northEl.innerHTML = '<span>CLOSED</span>';
+        southEl.innerHTML = '<span>CLOSED</span>';
+        if (northOriginEl) northOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
+        if (southOriginEl) southOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
+        return;
+    }
+    
+    // Use schedule data if available, otherwise fallback
+    const northMinutes = data?.northbound?.minutes || data?.northbound?.arrival_minutes || 5;
+    const southMinutes = data?.southbound?.minutes || data?.southbound?.arrival_minutes || 3;
+    const northOrigin = data?.northbound?.origin || data?.northbound?.from_station || 'Taft';
+    const southOrigin = data?.southbound?.origin || data?.southbound?.from_station || 'North Ave';
+    
+    northEl.innerHTML = `${northMinutes} <span>min</span>`;
+    southEl.innerHTML = `${southMinutes} <span>min</span>`;
+    
+    if (northOriginEl) northOriginEl.textContent = `Arriving from ${northOrigin}`;
+    if (southOriginEl) southOriginEl.textContent = `Arriving from ${southOrigin}`;
+}
+// ========== UPDATE BEST TIME UI ==========
+function updateBestTimeUI(data) {
+    const bestTimeText = document.getElementById('bestTimeText');
+    if (!bestTimeText) return;
+    
+    let northCong = 0;
+    let southCong = 0;
+    
+    if (data.forecastData && data.forecastData.forecasts && data.forecastData.forecasts[0]) {
+        northCong = data.forecastData.forecasts[0].northbound || 0;
+        southCong = data.forecastData.forecasts[0].southbound || 0;
+    }
+    
+    // FIX: Use system time for rush hour detection
+    const now = new Date();
+    const currentHour = now.getHours();
+    const isRushHour = (currentHour >= 7 && currentHour < 9) || (currentHour >= 17 && currentHour < 19);
+    
+    const getAdvice = (cong) => {
+        if (cong > 80) return "Expect 30-60 min delays - Severe congestion";
+        if (cong > 60) return "Expect 15-30 min delays - Heavy traffic";
+        if (cong > 30) return "Allow extra 5-10 min - Moderate congestion";
+        return "Smooth travel expected - Light traffic";
+    };
+    
+    // Add rush hour warning
+    const rushWarning = isRushHour ? 
+        '<div style="color: #EF4444; font-weight: bold; margin-bottom: 8px;">⚠️ RUSH HOUR - Expect delays</div>' : '';
+    
+    bestTimeText.innerHTML = rushWarning + `
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 140px;">
+                <i class="fas fa-arrow-up" style="color: #3B82F6; font-size: 13px;"></i>
+                <strong style="font-size: 13px;">NORTHBOUND</strong>
+                ${createCongestionPill(northCong, 'xs')}
+            </div>
+            <span style="font-size: 11px; color: var(--text-light); flex: 1;">${getAdvice(northCong)}</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 140px;">
+                <i class="fas fa-arrow-down" style="color: #10B981; font-size: 13px;"></i>
+                <strong style="font-size: 13px;">SOUTHBOUND</strong>
+                ${createCongestionPill(southCong, 'xs')}
+            </div>
+            <span style="font-size: 11px; color: var(--text-light); flex: 1;">${getAdvice(southCong)}</span>
+        </div>
+    `;
+}
+// ========== UPDATE ALERT FUNCTIONS ==========
+async function fetchAlertCount() {
+    try {
+        const response = await fetch('/api/alerts/count');
+        const data = await response.json();
+        return data.count || 0;
+    } catch (error) {
+        console.error('Error fetching alert count:', error);
+        return 0;
     }
 }
-function changeStation(station) {
-    // Show loading overlay
+
+function updateAlertBadgeUI(count) {
+    const badge = document.getElementById('alertBadge');
+    const sidebarBadge = document.getElementById('sidebarAlertCount');
+    
+    const displayValue = count > 9 ? '9+' : count;
+    
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = displayValue;
+            badge.style.display = 'flex';
+        } else {
+            badge.textContent = '0';
+            badge.style.display = 'flex';
+        }
+    }
+    
+    if (sidebarBadge) {
+        if (count > 0) {
+            sidebarBadge.textContent = count;
+            sidebarBadge.style.display = 'block';
+        } else {
+            sidebarBadge.style.display = 'none';
+        }
+    }
+    
+    syncMobileAlertBadge();
+}
+
+// ========== RUSH HOUR ALERT ==========
+function updateRushAlert() {
+    const rushAlert = document.getElementById('rushAlert');
+    if (!rushAlert) return;
+    
+    const hour = new Date().getHours();
+    
+    if ((hour >= 7 && hour < 9) || (hour >= 17 && hour < 19)) {
+        rushAlert.style.display = 'flex';
+        const alertMessage = document.getElementById('alertMessage');
+        if (alertMessage) {
+            alertMessage.innerHTML = `<strong>RUSH HOUR NOW</strong> · Expect delays of 10-20 minutes`;
+        }
+    } else {
+        rushAlert.style.display = 'none';
+    }
+}
+
+function dismissAlert() {
+    const rushAlert = document.getElementById('rushAlert');
+    if (rushAlert) rushAlert.style.display = 'none';
+}
+
+// ========== UPDATE ALL UI ==========
+async function updateAllUI() {
+    const data = await fetchAllData();
+    if (!data) return;
+    
+    updateForecastUI(data.forecastData);
+    updateStationStatusUI(data);
+    updateBestTimeUI(data);
+    updateTrainScheduleUI(data.scheduleData);
+    
+    if (data.alertData) {
+        updateAlertBadgeUI(data.alertData.count || 0);
+    } else {
+        const count = await fetchAlertCount();
+        updateAlertBadgeUI(count);
+    }
+}
+
+// ========== STATION CHANGE ==========
+const debouncedStationChange = debounce((station) => {
     const loadingOverlay = document.getElementById('loadingOverlay');
-    const topDropdown = document.getElementById('topStationDropdown');
     const forecastDropdown = document.getElementById('forecastStationSelect');
     
-    // Disable dropdowns while loading
-    if (topDropdown) topDropdown.disabled = true;
-    if (forecastDropdown) forecastDropdown.disabled = true;
-    
     if (loadingOverlay) loadingOverlay.classList.add('active');
+    if (forecastDropdown) forecastDropdown.disabled = true;
     
     currentStation = validateStationName(station);
     
-    // Update dropdown values
-    if (topDropdown && topDropdown.value !== currentStation) {
-        topDropdown.value = currentStation;
-    }
     if (forecastDropdown && forecastDropdown.value !== currentStation) {
         forecastDropdown.value = currentStation;
     }
     
-    // Update the chart title text
     const chartTitleElements = document.querySelectorAll('.chartTitle');
     chartTitleElements.forEach(el => {
-        el.textContent = currentStation.toUpperCase() + ': NEXT 6 HOURS';
+        if (el) el.textContent = currentStation.toUpperCase() + ': NEXT 6 HOURS';
     });
     
-    // Update other elements
     const mainStationName = document.getElementById('mainStationName');
     const bestStationName = document.getElementById('bestStationName');
     
     if (mainStationName) mainStationName.innerHTML = currentStation;
-    
-    // Preserve the clock icon when updating best station name
     if (bestStationName) {
         bestStationName.innerHTML = `<i class="far fa-clock" style="padding-right:5px;"></i>${currentStation}`;
     }
     
-    // Clear cache to force fresh data fetch
+    // Clear cache and refresh
     cachedData = null;
     lastFetchTime = 0;
     
-    // Fetch new data with loading indicator
     updateAllUI().finally(() => {
-        // Hide loading overlay and re-enable dropdowns
         setTimeout(() => {
             if (loadingOverlay) loadingOverlay.classList.remove('active');
-            if (topDropdown) topDropdown.disabled = false;
             if (forecastDropdown) forecastDropdown.disabled = false;
-        }, 300);
+        }, 500);
     });
+}, 300);
+
+function changeStation(station) {
+    debouncedStationChange(station);
 }
 
+// ========== REFRESH FUNCTION ==========
 function refreshData() {
-    cachedData = null; // Force refresh
+    cachedData = null;
+    lastFetchTime = 0;
     updateAllUI();
-}
-
-function startAutoRefresh() {
-    if (updateInterval) clearInterval(updateInterval);
-    updateInterval = setInterval(() => {
-        cachedData = null;
-        updateAllUI();
-    }, 60000);
 }
 
 // ========== LOCATION FUNCTIONS ==========
 function requestLocationPermission() {
     const banner = document.getElementById('locationBanner');
+    if (!banner) return;
+    
     if (!navigator.geolocation) {
-        alert('Geolocation is not supported');
+        alert('Geolocation is not supported by your browser');
         return;
     }
     
     banner.style.display = 'block';
-    document.getElementById('nearestStationText').innerHTML = '<span class="location-loading"></span> Detecting...';
+    const nearestStationText = document.getElementById('nearestStationText');
+    if (nearestStationText) {
+        nearestStationText.innerHTML = '<span class="location-loading"></span> Detecting...';
+    }
     
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const { station, distance } = findNearestStation(position.coords.latitude, position.coords.longitude);
             sessionStorage.setItem('nearestStation', station);
             let distanceText = distance < 1 ? `${(distance * 1000).toFixed(0)} meters` : `${distance.toFixed(1)} km`;
-            document.getElementById('nearestStationText').innerHTML = `<strong>${station}</strong> (${distanceText} away)`;
+            if (nearestStationText) {
+                nearestStationText.innerHTML = `<strong>${station}</strong> (${distanceText} away)`;
+            }
         },
         (error) => {
-            document.getElementById('nearestStationText').innerHTML = 'Location permission denied';
-            setTimeout(() => banner.style.display = 'none', 3000);
+            if (nearestStationText) {
+                nearestStationText.innerHTML = 'Location permission denied';
+            }
+            setTimeout(() => {
+                if (banner) banner.style.display = 'none';
+            }, 3000);
         }
     );
 }
@@ -2520,59 +2479,58 @@ function useNearestStation() {
 }
 
 function dismissLocationBanner() {
-    document.getElementById('locationBanner').style.display = 'none';
+    const banner = document.getElementById('locationBanner');
+    if (banner) banner.style.display = 'none';
     sessionStorage.setItem('locationBannerDismissed', 'true');
 }
 
-function updateRushAlert() {
-    const hour = new Date().getHours();
-    const rushAlert = document.getElementById('rushAlert');
-    if ((hour >= 7 && hour < 9) || (hour >= 17 && hour < 19)) {
-        rushAlert.style.display = 'flex';
-        document.getElementById('alertMessage').innerHTML = `<strong>RUSH HOUR NOW</strong> · Expect delays`;
-    } else {
-        rushAlert.style.display = 'none';
-    }
-}
-
-function dismissAlert() {
-    document.getElementById('rushAlert').style.display = 'none';
+// ========== AUTO REFRESH ==========
+function startAutoRefresh() {
+    if (updateInterval) clearInterval(updateInterval);
+    // Refresh every 10 minutes (to match cache duration)
+    updateInterval = setInterval(() => {
+        // Only refresh if cache is expired or about to expire
+        if (!isCacheValid() || getCacheTimeRemaining() < 30000) {
+            console.log('🔄 Auto-refresh triggered (cache expired or expiring)');
+            cachedData = null;
+            lastFetchTime = 0;
+            updateAllUI();
+        } else {
+            console.log('⏳ Auto-refresh skipped (cache still valid)');
+            // Update the last updated time display
+            updateLastUpdatedTime();
+        }
+    }, 60000); // Check every minute
 }
 
 // ========== INITIALIZATION ==========
 document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Page loaded, initializing dashboard...');
+    console.log('📦 Cache duration: ' + CACHE_DURATION/60000 + ' minutes');
     
     // Set dropdown values
-    const topSelector = document.getElementById('topStationDropdown');
     const forecastSelector = document.getElementById('forecastStationSelect');
-    
-    if (topSelector) topSelector.value = currentStation;
     if (forecastSelector) forecastSelector.value = currentStation;
     
-    // FIX: Ensure the clock icon is preserved on initial load
+    // Set station names
     const bestStationName = document.getElementById('bestStationName');
     if (bestStationName) {
-        bestStationName.innerHTML = `<i class="far fa-clock"></i>${currentStation}`;
+        bestStationName.innerHTML = `<i class="far fa-clock" style="padding-right:5px;"></i>${currentStation}`;
     }
     
     const mainStationName = document.getElementById('mainStationName');
     if (mainStationName) mainStationName.textContent = currentStation;
-
-    // Fetch alert count properly
-   fetchAlertCount().then(count => {
-    console.log('Fetched alert count:', count);
-    updateAlertBadgeUI({ count: count });
-}).catch(() => {
-    updateAlertBadgeUI({ count: 0 });
-});
     
+    // Initial data load
     updateAllUI();
     startAutoRefresh();
     updateRushAlert();
+    
+    // Update last updated time
+    updateLastUpdatedTime();
 });
 
-// Expose functions globally
+// Make functions global for onclick handlers
 window.setDirection = setDirection;
 window.changeStation = changeStation;
 window.refreshData = refreshData;

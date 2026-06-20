@@ -976,6 +976,55 @@
     gap: 6px;
 }
 
+/* Status classes matching operator dashboard */
+.status-light {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #DCFCE7;
+    color: #166534;
+}
+
+.status-moderate {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #FEF3C7;
+    color: #D97706;
+}
+
+.status-congested {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #FFEDD5;
+    color: #EA580C;
+}
+
+.status-severe {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #FEE2E2;
+    color: #DC2626;
+}
+
 .btn-danger:hover {
     background: #EF4444;
     color: white;
@@ -1156,24 +1205,7 @@
 </div>
 
 
-<div id="flaggedActionModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 650px;">
-        <div class="modal-header">
-            <i class="fas fa-flag-checkered" style="color: var(--danger-red);"></i>
-            <h2>Review Flagged Action</h2>
-            <button onclick="closeFlaggedModal()" style="margin-left: auto; background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
-        </div>
-        <div id="flaggedModalContent"></div>
-        <div class="modal-footer" style="justify-content: space-between; margin-top: 20px;">
-            <div><button class="btn-cancel" onclick="closeFlaggedModal()">Close</button></div>
-            <div style="display: flex; gap: 10px;">
-                <button class="btn-success" id="approveFlagBtn" style="background: #22C55E; color: white;">✓ Approve & Keep</button>
-                <button class="btn-danger" id="dismissFlagBtn" style="background: #F59E0B; color: white;">📝 Dismiss Flag</button>
-                <button class="btn-danger" id="deleteActionBtn" style="background: #EF4444; color: white;">🗑️ Delete Entry</button>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 <div id="auditDetailsModal" class="modal-overlay">
     <div class="modal-content" style="max-width: 550px;">
@@ -1462,6 +1494,37 @@
         </div>
     </div>
 
+    <!-- Add this after the existing cards in the Model Performance page -->
+<div class="grid-2" style="margin-top: 24px;">
+    <!-- Confusion Matrix -->
+    <div class="card">
+        <div class="card-title">
+            <i class="fas fa-table"></i> Confusion Matrix
+            <button class="btn btn-primary btn-sm" onclick="runEvaluation()" style="margin-left: auto;">
+                <i class="fas fa-sync"></i> Run Evaluation
+            </button>
+        </div>
+        <div id="confusionMatrixContainer">
+            <div style="text-align:center; padding:40px; color: var(--text-light);">
+                <i class="fas fa-chart-pie" style="font-size:48px; margin-bottom:12px;"></i>
+                <p>Click "Run Evaluation" to generate confusion matrix and classification metrics.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Classification Metrics -->
+    <div class="card">
+        <div class="card-title">
+            <i class="fas fa-chart-bar"></i> Classification Metrics
+        </div>
+        <div id="classificationMetricsContainer">
+            <div style="text-align:center; padding:40px; color: var(--text-light);">
+                <i class="fas fa-chart-bar" style="font-size:48px; margin-bottom:12px;"></i>
+                <p>Run evaluation to see precision, recall, and F1-score metrics.</p>
+            </div>
+        </div>
+    </div>
+</div>
     <!-- Prediction vs Actual Chart -->
     <!-- Prediction vs Actual Chart -->
 <div class="card" style="margin-bottom: 24px;">
@@ -1573,6 +1636,21 @@ function getStationValue() {
     return document.getElementById('opStation').value;
 }
 
+// ========== GET STATUS CLASS FROM CONGESTION ==========
+function getStatusClass(congestion) {
+    if (congestion > 80) return 'status-severe';
+    if (congestion > 60) return 'status-congested';
+    if (congestion > 30) return 'status-moderate';
+    return 'status-light';
+}
+
+function getStatusText(congestion) {
+    if (congestion > 80) return 'SEVERE';
+    if (congestion > 60) return 'CONGESTED';
+    if (congestion > 30) return 'MODERATE';
+    return 'LIGHT';
+}
+
 // ========== MODEL PERFORMANCE – TABLE HEADERS ==========
 function updateTableHeaders() {
     const station = document.getElementById('stationSelector').value;
@@ -1632,7 +1710,6 @@ async function loadTestResults() {
 async function showStationDetails(station, direction) {
     const directionFormatted = direction === 'northbound' ? 'Northbound' : 'Southbound';
     
-    // Show loading overlay
     const loadingOverlay = document.getElementById('loadingOverlay');
     const loadingText = loadingOverlay.querySelector('span');
     const originalText = loadingText.innerText;
@@ -1644,7 +1721,6 @@ async function showStationDetails(station, direction) {
         const result = await response.json();
         
         if (result.success && result.data && result.data.length > 0) {
-            // ... rest of your existing code to display details ...
             const details = result.data;
             let tableRows = '';
             for (let row of details) {
@@ -1655,10 +1731,10 @@ async function showStationDetails(station, direction) {
                 else verdictClass = 'status-severe';
                 tableRows += `<tr>
                     <td>${row.target_time}</td>
-                    <td>${row.predicted}%</strong></td>
-                    <td>${row.actual}%</strong></span></div>?</div></td>
-                    <td>${row.absolute_error}%</strong></div>?</div></td>
-                    <td><span class="${verdictClass}" style="padding:4px 8px;">${row.verdict}</span></span></div>?</div></td>
+                    <td>${row.predicted}%</td>
+                    <td>${row.actual}%</td>
+                    <td>${row.absolute_error}%</td>
+                    <td><span class="${verdictClass}" style="padding:4px 8px;">${row.verdict}</span></td>
                 </tr>`;
             }
             const totalTests = details.length;
@@ -1747,10 +1823,10 @@ async function loadPredictionChart() {
     
     try {
         const chartContainer = document.getElementById('predictionChart');
-    const noDataDiv = document.getElementById('chartNoData');
-    chartContainer.style.display = 'none';
-    noDataDiv.style.display = 'block';
-    noDataDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading chart data...';
+        const noDataDiv = document.getElementById('chartNoData');
+        chartContainer.style.display = 'none';
+        noDataDiv.style.display = 'block';
+        noDataDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading chart data...';
         const response = await fetch(`/api/model/chart/data?station=${station}&direction=${direction}&limit=${range}`);
         const result = await response.json();
         
@@ -1758,19 +1834,16 @@ async function loadPredictionChart() {
             const chartData = result.data;
             const ctx = document.getElementById('predictionChart').getContext('2d');
             
-            // Format dates for better display
-           const formattedLabels = chartData.labels.map(d => {
-    const date = new Date(d);
-    const month = date.toLocaleString('en-US', { month: 'short' }); // "Nov"
-    const day = date.getDate(); // 2
-    const hour = date.getHours();
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${month} ${day} ${hour12}:00 ${ampm}`;
-    // Output: "Nov 2 2:00 PM"
-});
+            const formattedLabels = chartData.labels.map(d => {
+                const date = new Date(d);
+                const month = date.toLocaleString('en-US', { month: 'short' });
+                const day = date.getDate();
+                const hour = date.getHours();
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const hour12 = hour % 12 || 12;
+                return `${month} ${day} ${hour12}:00 ${ampm}`;
+            });
           
-            
             if (predictionChart) predictionChart.destroy();
             
             predictionChart = new Chart(ctx, {
@@ -1850,6 +1923,7 @@ async function loadPredictionChart() {
         document.getElementById('chartNoData').style.display = 'block';
     }
 }
+
 async function runManualTest() {
     const station = document.getElementById('testStation').value;
     const direction = document.getElementById('testDirection').value;
@@ -1867,7 +1941,6 @@ async function runManualTest() {
     resultDiv.style.display = 'block';
     resultDiv.innerHTML = '<div style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Running prediction...</div>';
     
-    // Show loading overlay
     const loadingOverlay = document.getElementById('loadingOverlay');
     const loadingText = loadingOverlay.querySelector('span');
     const originalText = loadingText.innerText;
@@ -1888,7 +1961,6 @@ async function runManualTest() {
         const result = await response.json();
         
         if (result.success && result.prediction) {
-            // ... rest of your existing code to display results ...
             const pred = result.prediction.predicted;
             let html = `
                 <div style="text-align:center; padding:20px;">
@@ -1934,7 +2006,6 @@ async function runManualTest() {
         loadingText.innerText = originalText;
     }
 }
-
 
 async function uploadTestData() {
     const fileInput = document.getElementById('testDataFile');
@@ -1988,7 +2059,126 @@ function downloadSampleCSV() {
     showToast('📥', 'Sample CSV downloaded');
 }
 
+// ========== EVALUATION FUNCTIONS ==========
+async function runEvaluation() {
+    const station = document.getElementById('stationSelector').value || 'all';
+    const direction = currentDirectionViewMP === 'northbound' ? 'northbound' : 'southbound';
+    
+    showToast('📊', 'Running evaluation...');
+    
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = loadingOverlay.querySelector('span');
+    const originalText = loadingText.innerText;
+    loadingText.innerText = 'Running model evaluation...';
+    loadingOverlay.classList.add('active');
+    
+    try {
+        const response = await fetch('/api/model/evaluate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ station, direction })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            displayEvaluationResults(result.data);
+            showToast('✅', 'Evaluation complete!');
+        } else {
+            showToast('❌', result.error || 'Evaluation failed');
+        }
+    } catch (error) {
+        console.error('Evaluation error:', error);
+        showToast('❌', 'Evaluation failed: ' + error.message);
+    } finally {
+        loadingOverlay.classList.remove('active');
+        loadingText.innerText = originalText;
+    }
+}
 
+function displayEvaluationResults(data) {
+    // Display Confusion Matrix
+    const cmContainer = document.getElementById('confusionMatrixContainer');
+    const cm = data.confusion_matrix;
+    const labels = cm.labels;
+    const matrix = cm.matrix;
+    
+    let cmHtml = `
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead>
+                    <tr>
+                        <th style="padding: 8px; text-align: center; font-weight: 600; color: var(--text-light);">Actual \\ Predicted</th>
+                        ${labels.map(l => `<th style="padding: 8px; text-align: center; font-weight: 600; color: var(--text-light);">${l}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${matrix.map((row, i) => `
+                        <tr>
+                            <td style="padding: 8px; text-align: center; font-weight: 600; color: var(--text-dark);">${labels[i]}</td>
+                            ${row.map(val => `
+                                <td style="padding: 8px; text-align: center; background: ${val > 0 ? 'rgba(59, 130, 246, ' + Math.min(0.3 + (val / 50), 0.8) + ')' : '#F8FAFC'}; border-radius: 4px; font-weight: ${val > 0 ? '700' : '400'};">
+                                    ${val}
+                                </td>
+                            `).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; font-size: 12px; color: var(--text-light);">
+            <span><span style="display: inline-block; width: 12px; height: 12px; background: #3B82F6; border-radius: 2px;"></span> Higher = More predictions</span>
+            <span>Total: ${data.total_samples} samples</span>
+            <span>Accuracy: <strong style="color: var(--accent-blue);">${data.accuracy}%</strong></span>
+        </div>
+    `;
+    cmContainer.innerHTML = cmHtml;
+    
+    // Display Classification Metrics
+    const metricsContainer = document.getElementById('classificationMetricsContainer');
+    const perClass = data.per_class_metrics;
+    const weighted = {
+        precision: data.precision_weighted,
+        recall: data.recall_weighted,
+        f1: data.f1_weighted
+    };
+    
+    let metricsHtml = `
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
+            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-light);">Precision (Weighted)</div>
+                <div style="font-size: 22px; font-weight: 700; color: #3B82F6;">${weighted.precision}%</div>
+            </div>
+            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-light);">Recall (Weighted)</div>
+                <div style="font-size: 22px; font-weight: 700; color: #22C55E;">${weighted.recall}%</div>
+            </div>
+            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-light);">F1-Score (Weighted)</div>
+                <div style="font-size: 22px; font-weight: 700; color: #8B5CF6;">${weighted.f1}%</div>
+            </div>
+            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-light);">Samples</div>
+                <div style="font-size: 22px; font-weight: 700; color: #1E293B;">${data.total_samples}</div>
+            </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            ${Object.entries(perClass).map(([category, metrics]) => `
+                <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; border-left: 4px solid ${category === 'Severe' ? '#EF4444' : category === 'Heavy' ? '#F97316' : category === 'Moderate' ? '#F59E0B' : '#22C55E'};">
+                    <div style="font-weight: 600; font-size: 14px; color: var(--text-dark);">${category}</div>
+                    <div style="font-size: 12px; color: var(--text-light); margin-top: 4px;">
+                        Precision: <strong>${metrics.precision}%</strong> · Recall: <strong>${metrics.recall}%</strong> · F1: <strong>${metrics.f1_score}%</strong>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-light);">Support: ${metrics.support}</div>
+                </div>
+            `).join('')}
+        </div>
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0; font-size: 12px; color: var(--text-light);">
+            <strong>Regression Metrics:</strong> MAE: ${data.regression_metrics.mae}% · RMSE: ${data.regression_metrics.rmse}% · R²: ${data.regression_metrics.r2} · MAPE: ${data.regression_metrics.mape}%
+        </div>
+    `;
+    metricsContainer.innerHTML = metricsHtml;
+}
 // ========== MODEL PERFORMANCE – METRICS CARDS ==========
 async function loadModelPerformanceMetrics() {
     const stationSelector = document.getElementById('stationSelector');
@@ -2022,7 +2212,6 @@ async function loadModelPerformanceMetrics() {
                 document.getElementById('lastEvaluated').innerText = data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data';
             }
             
-            // Update station metrics table if station selector is 'all'
             if (selectedStation === 'all' && data.per_station) {
                 updateStationMetricsTableMP(data.per_station);
             }
@@ -2039,59 +2228,179 @@ async function loadModelPerformanceMetrics() {
     }
 }
 
-// ========== OTHER DASHBOARD FUNCTIONS ==========
+// ========== DASHBOARD FUNCTIONS - USING LIVE MAP API ==========
 async function loadDashboardStats() {
     try {
-        const response = await fetch('/api/admin/dashboard-stats');
+        // Use the live map API for accurate counts
+        const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
         const data = await response.json();
-        document.getElementById('totalReports').innerText = data.total_reports || 0;
-        document.getElementById('severeCount').innerText = data.severe_count || 0;
-        document.getElementById('activeOperators').innerText = data.active_operators || 0;
-        document.getElementById('broadcastsWeek').innerText = data.broadcasts_this_week || 0;
-    } catch (error) { console.error('Error loading dashboard stats:', error); }
+        
+        // Count severe stations from live map data
+        let severeCount = 0;
+        if (data.northbound) {
+            for (const station in data.northbound) {
+                const north = data.northbound[station]?.congestion || 0;
+                const south = data.southbound?.[station]?.congestion || 0;
+                if (north > 80 || south > 80) {
+                    severeCount++;
+                }
+            }
+        }
+        
+        // Get other stats from admin endpoints
+        const statsResponse = await fetch('/api/admin/dashboard-stats');
+        const stats = await statsResponse.json();
+        
+        document.getElementById('totalReports').innerText = stats.total_reports || 0;
+        document.getElementById('severeCount').innerText = severeCount;
+        document.getElementById('activeOperators').innerText = stats.active_operators || 0;
+        document.getElementById('broadcastsWeek').innerText = stats.broadcasts_this_week || 0;
+    } catch (error) { 
+        console.error('Error loading dashboard stats:', error);
+        // Fallback
+        try {
+            const response = await fetch('/api/admin/dashboard-stats');
+            const data = await response.json();
+            document.getElementById('totalReports').innerText = data.total_reports || 0;
+            document.getElementById('severeCount').innerText = data.severe_count || 0;
+            document.getElementById('activeOperators').innerText = data.active_operators || 0;
+            document.getElementById('broadcastsWeek').innerText = data.broadcasts_this_week || 0;
+        } catch(e) {}
+    }
 }
 
 let cachedStationData = null, lastFetchTime = 0, CACHE_DURATION = 30000;
+
+// ========== STATION STATUS - USING SAME API AS LIVE MAP ==========
 async function loadStationStatus() {
     const tbody = document.getElementById('stationStatusBody');
     tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Loading...</td></tr>';
     try {
         const now = Date.now();
         if (!cachedStationData || (now - lastFetchTime) > CACHE_DURATION) {
-            const response = await fetch('/api/admin/station-status');
+            // ========== USE THE SAME API AS LIVE MAP ==========
+            const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
             const data = await response.json();
-            if (!data.stations || data.stations.length === 0) throw new Error('No station data received');
-            cachedStationData = data;
+            
+            if (!data.northbound || !data.southbound) {
+                throw new Error('No station data received');
+            }
+            
+            // Convert live map data format to station list format
+            const stations = Object.keys(data.northbound).map(station => {
+                const northData = data.northbound[station] || { congestion: 0, status: 'LIGHT' };
+                const southData = data.southbound[station] || { congestion: 0, status: 'LIGHT' };
+                
+                return {
+                    name: station,
+                    northbound: {
+                        congestion: northData.congestion || 0,
+                        status_text: northData.status || 'LIGHT',
+                        status_class: getStatusClass(northData.congestion || 0),
+                        ridership: northData.ridership || 0,
+                        overridden: northData.overridden || false
+                    },
+                    southbound: {
+                        congestion: southData.congestion || 0,
+                        status_text: southData.status || 'LIGHT',
+                        status_class: getStatusClass(southData.congestion || 0),
+                        ridership: southData.ridership || 0,
+                        overridden: southData.overridden || false
+                    }
+                };
+            });
+            
+            cachedStationData = { stations };
             lastFetchTime = now;
         }
+        
         const stations = cachedStationData.stations;
         const stationOrder = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
+        
         let stationList = stations.map(s => {
             if (currentDirection === 'north') {
-                return { name: s.name, status_text: s.northbound?.status_text || 'LIGHT', status_class: s.northbound?.status_class || 'status-light', congestion: s.northbound?.congestion || 0 };
+                return { 
+                    name: s.name, 
+                    status_text: s.northbound?.status_text || 'LIGHT', 
+                    status_class: s.northbound?.status_class || 'status-light', 
+                    overridden: s.northbound?.overridden || false
+                };
             } else {
-                return { name: s.name, status_text: s.southbound?.status_text || 'LIGHT', status_class: s.southbound?.status_class || 'status-light', congestion: s.southbound?.congestion || 0 };
+                return { 
+                    name: s.name, 
+                    status_text: s.southbound?.status_text || 'LIGHT', 
+                    status_class: s.southbound?.status_class || 'status-light', 
+                    overridden: s.southbound?.overridden || false
+                };
             }
         });
-        if (currentDirection === 'south') stationList.sort((a, b) => stationOrder.indexOf(b.name) - stationOrder.indexOf(a.name));
-        else stationList.sort((a, b) => stationOrder.indexOf(a.name) - stationOrder.indexOf(b.name));
-        if (stationList.length === 0) { tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No station data available</td></tr>'; return; }
-        tbody.innerHTML = stationList.map(s => `<tr><td style="font-weight:500;">${s.name}<span style="font-size:11px; color:#64748B; margin-left:8px;">${s.congestion}%</span></td><td><span class="${s.status_class}">${s.status_text}</span></td></tr>`).join('');
+        
+        if (currentDirection === 'south') {
+            stationList.sort((a, b) => stationOrder.indexOf(b.name) - stationOrder.indexOf(a.name));
+        } else {
+            stationList.sort((a, b) => stationOrder.indexOf(a.name) - stationOrder.indexOf(b.name));
+        }
+        
+        if (stationList.length === 0) { 
+            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No station data available</td></tr>'; 
+            return; 
+        }
+        
+        // Map status to CSS classes
+        tbody.innerHTML = stationList.map(s => {
+            let statusClass = 'status-light';
+            let displayText = s.status_text || 'LIGHT';
+            
+            if (s.status_text === 'SEVERE' || s.status_text === 'SEVERELY CONGESTED' || s.status_text === 'Severely Congested') {
+                statusClass = 'status-severe';
+                displayText = 'SEVERE';
+            } else if (s.status_text === 'CONGESTED' || s.status_text === 'Congested') {
+                statusClass = 'status-congested';
+                displayText = 'CONGESTED';
+            } else if (s.status_text === 'MODERATE' || s.status_text === 'Moderate') {
+                statusClass = 'status-moderate';
+                displayText = 'MODERATE';
+            } else if (s.status_text === 'CLOSED') {
+                statusClass = 'status-light';
+                displayText = 'CLOSED';
+            } else {
+                statusClass = 'status-light';
+                displayText = 'LIGHT';
+            }
+            
+            // Add override indicator
+            const overrideBadge = s.overridden ? 
+                '<span style="background:#8B5CF6; color:white; padding:2px 8px; border-radius:12px; font-size:9px; margin-left:4px;"><i class="fas fa-pen"></i></span>' : '';
+            
+            return `<tr>
+                <td style="font-weight:500;">${s.name}${overrideBadge}<span style="font-size:11px; color:#64748B; margin-left:8px;"></span></td>
+                <td><span class="${statusClass}">${displayText}</span></td>
+            </tr>`;
+        }).join('');
+        
         const northBtn = document.getElementById('northBtn'), southBtn = document.getElementById('southBtn');
         if (northBtn && southBtn) {
             northBtn.classList.toggle('active', currentDirection === 'north');
             southBtn.classList.toggle('active', currentDirection === 'south');
         }
         document.getElementById('currentDirLabel').innerHTML = currentDirection === 'north' ? 'Northbound' : 'Southbound';
+        
+        console.log('✅ Admin station status updated from Live Map API');
+        
     } catch (error) {
         console.error('Error loading station status:', error);
         tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:red;">Error loading data. Please refresh.</td></tr>';
     }
 }
 
+// ========== REFRESH INTERVAL ==========
 setInterval(() => {
     const dashboardPage = document.getElementById('page-dashboard');
-    if (dashboardPage && dashboardPage.classList.contains('active')) { lastFetchTime = 0; loadStationStatus(); }
+    if (dashboardPage && dashboardPage.classList.contains('active')) { 
+        lastFetchTime = 0; 
+        loadStationStatus(); 
+        loadDashboardStats();
+    }
 }, 30000);
 
 let isUpdating = false;
@@ -2288,9 +2597,9 @@ window.reviewFlaggedReport = function(report) {
     modal.style.display = 'flex';
 };
 
-window.approveFlaggedReport = async function() { /* same as before – kept for brevity */ };
-window.dismissFlaggedReport = async function() { /* same as before */ };
-window.deleteFlaggedReport = async function() { /* same as before */ };
+window.approveFlaggedReport = async function() { /* kept for brevity */ };
+window.dismissFlaggedReport = async function() { /* kept for brevity */ };
+window.deleteFlaggedReport = async function() { /* kept for brevity */ };
 window.closeFlaggedModal = function() { const modal = document.getElementById('flaggedActionModal'); if (modal) modal.style.display = 'none'; currentFlaggedReportId = null; };
 
 function getActionClass(action) {
@@ -2421,74 +2730,64 @@ document.addEventListener('DOMContentLoaded', function() {
     if (downloadSampleLink) downloadSampleLink.onclick = (e) => { e.preventDefault(); downloadSampleCSV(); };
 
     // Auto‑tests button
-    // Find this section in your DOMContentLoaded (around line 900-920)
-const autoTestsBtn = document.getElementById('testUploadedCsvBtnMP');
-if (autoTestsBtn) {
-    autoTestsBtn.onclick = async () => {
-        // Show loading overlay
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const loadingText = loadingOverlay.querySelector('span');
-        const originalText = loadingText.innerText;
-        
-        loadingText.innerText = 'Running auto-tests on 2025 data...';
-        loadingOverlay.classList.add('active');
-        
-        // Disable button to prevent multiple clicks
-        autoTestsBtn.disabled = true;
-        autoTestsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running Tests...';
-        
-        try {
-            // Add a query parameter to use training max (matching diagnosis)
-            const response = await fetch('/api/model/run-auto-tests?use_test_max=false', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            const result = await response.json();
+    const autoTestsBtn = document.getElementById('testUploadedCsvBtnMP');
+    if (autoTestsBtn) {
+        autoTestsBtn.onclick = async () => {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = loadingOverlay.querySelector('span');
+            const originalText = loadingText.innerText;
             
-            if (result.success) {
-                showToast('✅', `Auto-tests completed! ${result.summary.total_tests_run} predictions generated. Avg error: ${result.summary.avg_absolute_error}%`);
+            loadingText.innerText = 'Running auto-tests on 2025 data...';
+            loadingOverlay.classList.add('active');
+            
+            autoTestsBtn.disabled = true;
+            autoTestsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running Tests...';
+            
+            try {
+                const response = await fetch('/api/model/run-auto-tests?use_test_max=false', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
                 
-                // Refresh all data
-                await loadModelPerformanceMetrics();
-                await loadPredictionChart();
-                await loadTestResults();
-                
-                // If station selector is set to a specific station, refresh its details
-                const stationSel = document.getElementById('stationSelector');
-                if (stationSel && stationSel.value !== 'all') {
+                if (result.success) {
+                    showToast('✅', `Auto-tests completed! ${result.summary.total_tests_run} predictions generated. Avg error: ${result.summary.avg_absolute_error}%`);
+                    
+                    await loadModelPerformanceMetrics();
+                    await loadPredictionChart();
                     await loadTestResults();
+                    
+                    const stationSel = document.getElementById('stationSelector');
+                    if (stationSel && stationSel.value !== 'all') {
+                        await loadTestResults();
+                    }
+                } else {
+                    showToast('❌', result.error || 'Auto-test failed');
                 }
-            } else {
-                showToast('❌', result.error || 'Auto-test failed');
+            } catch (error) {
+                console.error('Auto-test error:', error);
+                showToast('❌', 'Auto-test failed: ' + error.message);
+            } finally {
+                loadingOverlay.classList.remove('active');
+                loadingText.innerText = originalText;
+                autoTestsBtn.disabled = false;
+                autoTestsBtn.innerHTML = '<i class="fas fa-robot"></i> Run Tests';
             }
-        } catch (error) {
-            console.error('Auto-test error:', error);
-            showToast('❌', 'Auto-test failed: ' + error.message);
-        } finally {
-            // Hide loading overlay
-            loadingOverlay.classList.remove('active');
-            loadingText.innerText = originalText;
-            
-            // Re-enable button
-            autoTestsBtn.disabled = false;
-            autoTestsBtn.innerHTML = '<i class="fas fa-robot"></i> Run Tests';
-        }
-    };
-}
+        };
+    }
 
     // Default manual test date
-const testDateTimeInput = document.getElementById('testDateTime');
-if (testDateTimeInput) {
-    const now = new Date();
-    now.setHours(12, 0, 0, 0);
-    // Format as YYYY-MM-DDTHH:MM
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    testDateTimeInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
-}
+    const testDateTimeInput = document.getElementById('testDateTime');
+    if (testDateTimeInput) {
+        const now = new Date();
+        now.setHours(12, 0, 0, 0);
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        testDateTimeInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
 
     // Direction buttons for model performance
     const northDir = document.getElementById('toggleNorthboundMP');
@@ -2552,7 +2851,7 @@ if (testDateTimeInput) {
         };
     }
 
-    // Flagged card click – FIXED: setTimeout correctly spelled
+    // Flagged card click
     setTimeout(() => {
         const flaggedCard = document.querySelector('#page-audit .grid-4 .stat-card:last-child');
         if (flaggedCard) {

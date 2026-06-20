@@ -1,9 +1,8 @@
-# services/__init__.py
 """
 Services module - Business logic with no Flask dependencies
 """
 
-# Import from predictor
+# Import from predictor (needed for lstm_performance)
 from .predictor import (
     get_directional_prediction, 
     get_station_prediction, 
@@ -13,7 +12,7 @@ from .predictor import (
     get_best_time_to_travel
 )
 
-# Import from feature_engineering (THIS IS CRITICAL)
+# Import from feature_engineering
 from .feature_engineering import (
     get_feature_sequence_for_station,
     add_cyclical_time_features,
@@ -39,17 +38,13 @@ from .model_loader import (
 # Import from lstm_performance
 from .lstm_performance import LSTMPerformanceService
 
-# Explicitly export everything
 __all__ = [
-    # Predictor
     'get_directional_prediction', 
     'get_station_prediction', 
     'get_fallback_directional_prediction', 
     'clamp_prediction_by_time', 
     'get_wait_time', 
     'get_best_time_to_travel',
-    
-    # Feature Engineering
     'get_feature_sequence_for_station',
     'add_cyclical_time_features',
     'add_smart_operating_flags',
@@ -57,8 +52,6 @@ __all__ = [
     'is_christmas_season',
     'is_payday',
     'is_friday',
-    
-    # Model Loader
     'load_directional_models', 
     'load_real_historical_data',
     'directional_models', 
@@ -67,7 +60,9 @@ __all__ = [
     'historical_exit',
     'hourly_avg_entry', 
     'hourly_avg_exit',
-    
-    # Service
     'LSTMPerformanceService'
 ]
+
+print("=" * 50)
+print("✅ services module loaded")
+print("=" * 50)

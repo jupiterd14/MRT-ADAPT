@@ -10,6 +10,14 @@ STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
             "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
             "Ayala Ave", "Magallanes", "Taft"]
 
+# DOTr Official Platform Capacities (for congestion calculation)
+MRT3_PLATFORM_CAPACITY = {
+    "North Ave": 1142, "Quezon Ave": 1195, "Kamuning": 1364, "Cubao": 1747,
+    "Santolan": 1306, "Ortigas": 1331, "Shaw Blvd": 1619, "Boni Ave": 1417,
+    "Guadalupe": 1301, "Buendia": 1645, "Ayala Ave": 1222, "Magallanes": 1202,
+    "Taft": 720
+}
+
 def get_station_prediction(station_name):
     """Get station prediction from app config"""
     from flask import current_app
@@ -337,25 +345,85 @@ def admin_audit_stats():
 
 @admin_bp.route('/api/admin/dashboard-stats')
 def dashboard_stats():
+    """Get dashboard stats - uses capacity-based congestion for severe count"""
     try:
-        total_reports = Report.query.count()
-        severe_count = 0
-        for station in STATIONS:
-            congestion = get_station_prediction(station)
-            if congestion > 80:
-                severe_count += 1
+        from flask import current_app
+        from datetime import datetime, timedelta
         
+        print("\n" + "="*50)
+        print("📊 FETCHING DASHBOARD STATS")
+        print("="*50)
+        
+        # Count reports
+        total_reports = Report.query.count()
+        print(f"   Total Reports: {total_reports}")
+        
+        # Count operators
         active_operators = User.query.filter_by(role='operator', is_active=True).count()
+        print(f"   Active Operators: {active_operators}")
+        
+        # Count broadcasts this week
         one_week_ago = datetime.now() - timedelta(days=7)
-        broadcasts_this_week = Broadcast.query.filter(Broadcast.created_at >= one_week_ago).count()
+        broadcasts_this_week = Broadcast.query.filter(
+            Broadcast.created_at >= one_week_ago
+        ).count()
+        print(f"   Broadcasts This Week: {broadcasts_this_week}")
+        
+        # Calculate severe count from live map API
+        severe_count = 0
+        try:
+            # Use the live map API to get current congestion
+            import requests
+            live_response = requests.get('http://localhost:5000/api/live-map/directions/v2', timeout=5)
+            if live_response.status_code == 200:
+                live_data = live_response.json()
+                for station in STATIONS:
+                    north = live_data.get('northbound', {}).get(station, {}).get('congestion', 0)
+                    south = live_data.get('southbound', {}).get(station, {}).get('congestion', 0)
+                    if north > 80 or south > 80:
+                        severe_count += 1
+                print(f"   Severe Count (from live map): {severe_count}")
+            else:
+                print(f"   ⚠️ Live map API returned status {live_response.status_code}")
+        except Exception as e:
+            print(f"   ⚠️ Could not fetch live map data: {e}")
+            # Fallback: use the prediction function from config
+            get_directional = current_app.config.get('GET_DIRECTIONAL_PREDICTION')
+            if get_directional:
+                now = datetime.now()
+                for station in STATIONS:
+                    try:
+                        # FIX: get_directional takes (station, direction, datetime)
+                        north = get_directional(station, 'Northbound', now)
+                        south = get_directional(station, 'Southbound', now)
+                        if max(north, south) > 80:
+                            severe_count += 1
+                    except Exception as e2:
+                        print(f"   ⚠️ Error getting prediction for {station}: {e2}")
+        
+        print(f"   Final Severe Count: {severe_count}")
+        print("="*50)
         
         return jsonify({
-            'total_reports': total_reports, 'severe_count': severe_count,
-            'active_operators': active_operators, 'broadcasts_this_week': broadcasts_this_week
+            'total_reports': total_reports,
+            'severe_count': severe_count,
+            'active_operators': active_operators,
+            'broadcasts_this_week': broadcasts_this_week
         })
+        
     except Exception as e:
-        return jsonify({'total_reports': 0, 'severe_count': 0, 'active_operators': 0, 'broadcasts_this_week': 0})
-
+        import traceback
+        print(f"❌ Error in dashboard_stats: {e}")
+        traceback.print_exc()
+        
+        # Return error response with details
+        return jsonify({
+            'total_reports': 0,
+            'severe_count': 0,
+            'active_operators': 0,
+            'broadcasts_this_week': 0,
+            'error': str(e)
+        }), 200
 
 @admin_bp.route('/api/admin/operator-list')
 def operator_list():
@@ -602,17 +670,22 @@ def station_status():
             north_text, north_class = get_status_info(north_congestion)
             south_text, south_class = get_status_info(south_congestion)
             
+            # Add ridership based on DOTr capacity
+            capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+            
             result.append({
                 'name': station,
                 'northbound': {
                     'congestion': round(north_congestion, 1),
                     'status_text': north_text,
-                    'status_class': north_class
+                    'status_class': north_class,
+                    'ridership': int((north_congestion / 100) * capacity)
                 },
                 'southbound': {
                     'congestion': round(south_congestion, 1),
                     'status_text': south_text,
-                    'status_class': south_class
+                    'status_class': south_class,
+                    'ridership': int((south_congestion / 100) * capacity)
                 }
             })
         

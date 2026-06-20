@@ -1,6 +1,5 @@
-# services/feature_engineering.py
 """
-Feature engineering for LSTM predictions - MATCHES DIAGNOSIS SCRIPT
+Feature engineering for LSTM predictions - OPTIMIZED FOR SPEED
 """
 
 import pandas as pd
@@ -8,10 +7,16 @@ import numpy as np
 import os
 import pickle
 from datetime import datetime, timedelta
+from urllib.parse import unquote
+
+from config import Config
 
 # ========== GLOBAL CACHE ==========
 _DATA_CACHE = None
 _PER_DIRECTION_MAX = None
+_STATION_DATA_CACHE = {}  # Cache for station-specific dataframes
+_FEATURE_SCALER_CACHE = {}  # Cache for scalers
+_BASELINE_FEATURES_CACHE = {}  # Cache for baseline features
 
 # Station numbers (matching training)
 STATION_NUMBERS = {
@@ -21,33 +26,80 @@ STATION_NUMBERS = {
     "Taft": 13
 }
 
-def load_data():
-    """Load data once and cache it (like diagnosis script)"""
-    global _DATA_CACHE, _PER_DIRECTION_MAX
+FEATURE_COLS = [
+    'hour', 'weekday', 'month',
+    'hour_sin', 'hour_cos', 'dow_sin', 'dow_cos', 'month_sin', 'month_cos',
+    'is_operating_hour', 'is_morning_rush', 'is_evening_rush', 'is_noon',
+    'is_pre_opening', 'is_post_closing',
+    'minutes_until_closing', 'minutes_since_opening', 'time_normalized', 'minute_normalized',
+    'is_weekend', 'is_holiday', 'is_special_event', 'is_christmas_season', 'is_payday', 'is_friday',
+    'is_rush_hour', 'is_maintenance_record', 'is_extended_hours', 'congestion'
+]
+
+MRT3_PLATFORM_CAPACITY = {
+    "North Ave": 1142, "Quezon Ave": 1195, "Kamuning": 1364, "Cubao": 1747,
+    "Santolan": 1306, "Ortigas": 1331, "Shaw Blvd": 1619, "Boni Ave": 1417,
+    "Guadalupe": 1301, "Buendia": 1645, "Ayala Ave": 1222, "Magallanes": 1202,
+    "Taft": 720
+}
+
+import joblib
+
+def process_raw_data():
+    """Load the training data (2022-2024) that the models were trained on"""
+    # ========== FIX: Explicitly load only 2022-2024 data ==========
+    data_files = []
+    possible_years = ['2022', '2023', '2024']
     
-    if _DATA_CACHE is not None:
-        return _DATA_CACHE
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # Find data file
-    possible_paths = [
-        'data (2022-2024)/2025.csv',
-        '../data (2022-2024)/2025.csv',
-        '2025.csv',
-        'data/2025.csv'
-    ]
+    for year in possible_years:
+        # Try multiple paths with explicit priority
+        paths = [
+            os.path.join(script_dir, f'data (2022-2024)/{year}.csv'),
+            os.path.join(script_dir, f'../data (2022-2024)/{year}.csv'),
+            os.path.join(script_dir, f'{year}.csv'),
+            os.path.join(script_dir, f'data/{year}.csv'),
+            f'data (2022-2024)/{year}.csv',
+            f'../data (2022-2024)/{year}.csv',
+            f'{year}.csv',
+            f'data/{year}.csv'
+        ]
+        
+        found = False
+        for path in paths:
+            if os.path.exists(path):
+                print(f"📊 Loading {year} data from: {path}")
+                try:
+                    df = pd.read_csv(path)
+                    data_files.append(df)
+                    found = True
+                    break
+                except Exception as e:
+                    print(f"   ❌ Error reading {path}: {e}")
+        
+        if not found:
+            print(f"⚠️ {year}.csv not found, skipping...")
     
-    data_file = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            data_file = path
-            break
-    
-    if not data_file:
-        print("❌ No data file found")
+    if not data_files:
+        print("❌ No training data files found (2022, 2023, 2024)")
+        print("   Looking for: 2022.csv, 2023.csv, 2024.csv in:")
+        print(f"   - {os.path.join(script_dir, 'data (2022-2024)/')}")
+        print("   - ./")
+        print("   - data/")
         return None
     
-    print(f"📊 Loading data from: {data_file}")
-    df = pd.read_csv(data_file)
+    # Combine all data
+    df = pd.concat(data_files, ignore_index=True)
+    print(f"✅ Loaded {len(df)} rows from {len(data_files)} years of training data")
+    print(f"   Date range: {df['Date'].min()} to {df['Date'].max()}")
+    
+    # Check passenger counts
+    if 'TotalPassenger' in df.columns:
+        print(f"   Passenger count - min: {df['TotalPassenger'].min()}, max: {df['TotalPassenger'].max()}, mean: {df['TotalPassenger'].mean():.1f}")
+    
+    # Process the data
     df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'])
     df['hour'] = df['datetime'].dt.hour
     df['weekday'] = df['datetime'].dt.weekday
@@ -55,7 +107,7 @@ def load_data():
     df['day'] = df['datetime'].dt.day
     df['minute'] = df['datetime'].dt.minute
     
-    # Add features (matching diagnosis script)
+    # Add features
     df = add_cyclical_time_features(df)
     df = add_smart_operating_flags(df)
     df = smart_data_cleaner(df)
@@ -69,17 +121,306 @@ def load_data():
     df['is_rush_hour'] = ((df['hour'].between(7, 9)) | (df['hour'].between(17, 19))).astype(np.int8)
     df['Direction'] = df.apply(infer_direction, axis=1)
     
-    # Load per-direction max
-    max_path = 'models_2022-2024_v5/per_direction_max_passengers.pkl'
-    if os.path.exists(max_path):
-        with open(max_path, 'rb') as f:
-            _PER_DIRECTION_MAX = pickle.load(f)
-        print(f"✅ Loaded {len(_PER_DIRECTION_MAX)} per-direction max values")
+    return df
+
+def load_data_fast():
+    """Optimized data loading - creates cache on first run"""
+    global _DATA_CACHE
     
-    _DATA_CACHE = df
+    if _DATA_CACHE is not None:
+        return _DATA_CACHE
+    
+    preprocessed_path = 'data/preprocessed.parquet'
+    
+    # Try loading preprocessed data first
+    if os.path.exists(preprocessed_path):
+        try:
+            print("📊 Loading preprocessed data from cache...")
+            _DATA_CACHE = pd.read_parquet(preprocessed_path)
+            
+            # Verify we have 2022-2024 data
+            years_loaded = _DATA_CACHE['datetime'].dt.year.unique().tolist()
+            print(f"   Years in data: {years_loaded}")
+            print(f"   Date range: {_DATA_CACHE['datetime'].min()} to {_DATA_CACHE['datetime'].max()}")
+            
+            # If only 2025 data, force reload from CSV
+            if years_loaded == [2025] or (len(years_loaded) == 1 and years_loaded[0] >= 2025):
+                print("⚠️ WARNING: Only 2025 data found! Forcing reload from CSV files...")
+                os.remove(preprocessed_path)
+                _DATA_CACHE = None
+                return load_data_fast()  # Recursively reload
+            
+            return _DATA_CACHE
+            
+        except Exception as e:
+            print(f"⚠️ Error loading cache: {e}")
+            _DATA_CACHE = None
+    
+    # Process raw data and save cache
+    print("📊 Processing raw data from CSV files...")
+    _DATA_CACHE = process_raw_data()
+    if _DATA_CACHE is not None:
+        # Create directory if it doesn't exist
+        os.makedirs('data', exist_ok=True)
+        _DATA_CACHE.to_parquet(preprocessed_path, compression='snappy')
+        print(f"💾 Saved preprocessed data to {preprocessed_path} for future runs")
+    else:
+        return None
+    
     return _DATA_CACHE
 
-# ========== FEATURE ENGINEERING FUNCTIONS (COPY FROM DIAGNOSIS) ==========
+def get_station_dataframe(station_name, direction):
+    """Cache station-specific dataframes - USE RAW PASSENGER COUNTS FOR LOOKBACK"""
+    cache_key = f"{station_name}_{direction}"
+    
+    # Return from memory cache if available
+    if cache_key in _STATION_DATA_CACHE:
+        return _STATION_DATA_CACHE[cache_key]
+    
+    df = load_data_fast()
+    if df is None:
+        return None
+    
+    station_num = STATION_NUMBERS.get(station_name)
+    if not station_num:
+        print(f"❌ Unknown station: {station_name}")
+        return None
+    
+    # Filter by station metrics and tracking direction
+    if station_name == "North Ave":
+        if direction == 'Northbound':
+            station_df = df[df['StationExit'] == station_num].copy()
+        else:
+            station_df = df[df['StationEntry'] == station_num].copy()
+    elif station_name == "Taft":
+        if direction == 'Northbound':
+            station_df = df[df['StationEntry'] == station_num].copy()
+        else:
+            station_df = df[df['StationExit'] == station_num].copy()
+    else:
+        if direction == 'Northbound':
+            station_df = df[df['StationExit'] == station_num].copy()
+        else:
+            station_df = df[df['StationEntry'] == station_num].copy()
+    
+    # Filter by direction and sort
+    station_df = station_df[station_df['Direction'] == direction].sort_values('datetime')
+    
+    if len(station_df) < 100:
+        print(f"⚠️ Not enough data for {station_name} {direction}: {len(station_df)} rows")
+        _STATION_DATA_CACHE[cache_key] = None
+        return None
+    
+    # Get current time to exclude incomplete hour
+    current_time = Config.get_current_time()
+    current_hour_floor = current_time.replace(minute=0, second=0, microsecond=0)
+    
+    # Exclude current incomplete hour
+    station_df = station_df[station_df['datetime'] < current_hour_floor]
+    
+    # Aggregate to hourly
+    station_df['hour_timestamp'] = station_df['datetime'].dt.floor('h')
+    hourly = station_df.groupby('hour_timestamp').agg({
+        'TotalPassenger': 'sum',
+        'hour': 'first', 'weekday': 'first', 'month': 'first',
+        'minute': 'first',
+        'hour_sin': 'first', 'hour_cos': 'first',
+        'dow_sin': 'first', 'dow_cos': 'first',
+        'month_sin': 'first', 'month_cos': 'first',
+        'time_decimal': 'first',
+        'is_operating_hour': 'first',
+        'minute_normalized': 'first',
+        'is_morning_rush': 'first', 'is_evening_rush': 'first', 'is_noon': 'first',
+        'is_pre_opening': 'first', 'is_post_closing': 'first',
+        'minutes_until_closing': 'first', 'minutes_since_opening': 'first',
+        'time_normalized': 'first',
+        'is_weekend': 'first', 'is_holiday': 'first', 'is_special_event': 'first',
+        'is_christmas_season': 'first', 'is_payday': 'first', 'is_friday': 'first',
+        'is_rush_hour': 'first',
+        'is_maintenance_record': 'first', 'is_extended_hours': 'first'
+    }).reset_index()
+    
+    # Create complete hour range
+    if len(hourly) > 0:
+        min_date = hourly['hour_timestamp'].min().floor('D')
+        max_date = hourly['hour_timestamp'].max().ceil('D')
+        all_hours = pd.date_range(start=min_date, end=max_date, freq='h')
+        
+        hourly.set_index('hour_timestamp', inplace=True)
+        hourly = hourly.reindex(all_hours)
+        
+        # Fill closed hours with zeros
+        closed_hour_mask = (hourly.index.hour >= 22) | (hourly.index.hour <= 4)
+        if 'TotalPassenger' in hourly.columns:
+            hourly.loc[closed_hour_mask, 'TotalPassenger'] = 0
+        
+        # Forward fill remaining NaN values
+        hourly = hourly.ffill().bfill()
+        
+        # ========== CRITICAL FIX ==========
+        # The model expects RAW PASSENGER COUNTS in the 'congestion' column
+        # because it was trained on raw passenger counts
+        # DO NOT convert to percentage - keep as raw passenger counts!
+        hourly['congestion'] = hourly['TotalPassenger'].copy()
+        
+        # Also calculate actual congestion percentage for display (if needed elsewhere)
+        capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        hourly['congestion_percentage'] = (hourly['TotalPassenger'] / capacity * 100).clip(0, 100)
+        
+        hourly = hourly.sort_index()
+    
+    # Store in memory cache
+    _STATION_DATA_CACHE[cache_key] = hourly
+    
+    print(f"✅ Created hourly data for {station_name} {direction}")
+    print(f"   Raw passenger counts (lookback) - min: {hourly['congestion'].min():.0f}, max: {hourly['congestion'].max():.0f}, mean: {hourly['congestion'].mean():.0f}")
+    
+    return hourly
+
+def get_feature_scaler(station_name, direction):
+    """Cache feature scalers to avoid repeated disk I/O"""
+    cache_key = f"{station_name}_{direction}"
+    
+    if cache_key not in _FEATURE_SCALER_CACHE:
+        # ========== FIX: Use the correct model folder ==========
+        model_folder = 'models_2022-2024_v8'
+        scaler_path = f'{model_folder}/{cache_key}_feature_scaler.pkl'
+        
+        # Try alternative naming
+        if not os.path.exists(scaler_path):
+            # Check if file exists with different naming
+            alt_path = f'{model_folder}/{cache_key.replace(" ", "_")}_feature_scaler.pkl'
+            if os.path.exists(alt_path):
+                scaler_path = alt_path
+        
+        if os.path.exists(scaler_path):
+            try:
+                with open(scaler_path, 'rb') as f:
+                    _FEATURE_SCALER_CACHE[cache_key] = pickle.load(f)
+                print(f"   ✅ Loaded feature scaler for {cache_key}")
+            except Exception as e:
+                print(f"   ⚠️ Error loading scaler: {e}")
+                _FEATURE_SCALER_CACHE[cache_key] = None
+        else:
+            _FEATURE_SCALER_CACHE[cache_key] = None
+            print(f"   ⚠️ No feature scaler found at: {scaler_path}")
+    
+    return _FEATURE_SCALER_CACHE[cache_key]
+
+def get_baseline_features(target_datetime, seq_length=24):
+    """Cache baseline features for repeated lookups"""
+    cache_key = f"{target_datetime.strftime('%Y%m%d%H')}_{seq_length}"
+    
+    if cache_key not in _BASELINE_FEATURES_CACHE:
+        default_features = np.zeros((seq_length, len(FEATURE_COLS)), dtype=np.float32)
+        for i in range(seq_length):
+            loop_time = target_datetime - timedelta(hours=(seq_length - i))
+            h_val = loop_time.hour
+            
+            default_features[i, 0] = h_val
+            default_features[i, 1] = loop_time.weekday()
+            default_features[i, 2] = loop_time.month
+            default_features[i, 3] = np.sin(2 * np.pi * h_val / 24)  # hour_sin
+            default_features[i, 4] = np.cos(2 * np.pi * h_val / 24)  # hour_cos
+            default_features[i, 5] = np.sin(2 * np.pi * loop_time.weekday() / 7)  # dow_sin
+            default_features[i, 6] = np.cos(2 * np.pi * loop_time.weekday() / 7)  # dow_cos
+            default_features[i, 7] = np.sin(2 * np.pi * (loop_time.month - 1) / 12)  # month_sin
+            default_features[i, 8] = np.cos(2 * np.pi * (loop_time.month - 1) / 12)  # month_cos
+            
+            # Set congestion based on rush hours
+            if 7 <= h_val <= 9:
+                default_features[i, -1] = 3500.0  # Morning rush passenger count
+            elif 17 <= h_val <= 19:
+                default_features[i, -1] = 4000.0  # Evening rush passenger count
+            elif 10 <= h_val <= 16:
+                default_features[i, -1] = 2000.0  # Midday
+            elif 5 <= h_val <= 6:
+                default_features[i, -1] = 800.0   # Early morning
+            elif 20 <= h_val <= 21:
+                default_features[i, -1] = 1500.0  # Late evening
+            else:
+                default_features[i, -1] = 100.0   # Very early/late
+        
+        _BASELINE_FEATURES_CACHE[cache_key] = default_features
+    
+    return _BASELINE_FEATURES_CACHE[cache_key].copy()
+
+def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
+    """Get feature sequence with RAW PASSENGER COUNTS for lookback - SUPPORTS 2025"""
+    station_name = unquote(station_name)
+    direction = unquote(direction)
+    
+    hourly = get_station_dataframe(station_name, direction)
+    if hourly is None:
+        print(f"⚠️ No hourly data for {station_name} {direction}, using baseline")
+        return get_baseline_features(target_datetime, seq_length)
+    
+    # ========== FIX: Handle 2025 predictions ==========
+    # Use 2024 data as lookback for 2025 predictions
+    if target_datetime.year >= 2025:
+        # Use the same time from 2024
+        try:
+            lookback_end = target_datetime.replace(year=2024)
+        except:
+            # If invalid date (e.g., Feb 29), use Feb 28
+            lookback_end = target_datetime.replace(year=2024, month=2, day=28)
+        start_lookback = lookback_end - timedelta(hours=seq_length)
+        # print(f"📅 Using 2024 lookback for 2025 prediction: {start_lookback.strftime('%Y-%m-%d %H:%M')} to {lookback_end.strftime('%Y-%m-%d %H:%M')}")
+    else:
+        # Normal lookback
+        start_lookback = target_datetime - timedelta(hours=seq_length)
+        lookback_end = target_datetime
+        # print(f"📅 Using normal lookback: {start_lookback.strftime('%Y-%m-%d %H:%M')} to {lookback_end.strftime('%Y-%m-%d %H:%M')}")
+    
+    # Get available data in the window
+    sequence_df = hourly[(hourly.index >= start_lookback) & (hourly.index < lookback_end)]
+    
+    available_rows = len(sequence_df)
+    
+    # If no data found, use baseline
+    if available_rows == 0:
+        # print(f"🌙 No historical data for {station_name} {direction} at {target_datetime}, using baseline")
+        return get_baseline_features(target_datetime, seq_length)
+    
+    if available_rows == seq_length:
+        features = sequence_df[FEATURE_COLS].copy()
+        features = features.values.astype(np.float32)
+        # print(f"✅ Using {available_rows} hours of historical data")
+    elif available_rows >= 10:
+        # print(f"⚠️ Only {available_rows}/{seq_length} hours available")
+        features = sequence_df[FEATURE_COLS].values.astype(np.float32)
+        if available_rows < seq_length:
+            missing_count = seq_length - available_rows
+            baseline_features = get_baseline_features(target_datetime, missing_count)
+            features = np.vstack([baseline_features, features])
+            # print(f"   Padded with {missing_count} baseline hours")
+    else:
+        # print(f"🌙 Not enough data ({available_rows} rows), using full baseline")
+        return get_baseline_features(target_datetime, seq_length)
+    
+    # Ensure we have exactly seq_length rows
+    if len(features) != seq_length:
+        if len(features) > seq_length:
+            features = features[:seq_length]
+        else:
+            while len(features) < seq_length:
+                features = np.vstack([features, features[-1:]])
+    
+    # Scale features
+    feature_scaler = get_feature_scaler(station_name, direction)
+    if feature_scaler is not None:
+        try:
+            features = feature_scaler.transform(features)
+        except Exception as e:
+            print(f"   ⚠️ Scaling failed: {e}")
+    
+    return features
+
+# Keep the original load_data function for backward compatibility
+def load_data():
+    """Legacy function - now uses fast loading"""
+    return load_data_fast()
+
 def add_cyclical_time_features(df):
     df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
     df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
@@ -134,114 +475,6 @@ def infer_direction(row):
     else:
         return 'Unknown'
 
-# ========== MAIN FUNCTION (MATCHES DIAGNOSIS) ==========
-def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
-    """
-    Generate feature sequence - EXACTLY like diagnosis script
-    """
-    df = load_data()
-    if df is None:
-        return None
-    
-    station_num = STATION_NUMBERS.get(station_name)
-    if not station_num:
-        print(f"❌ Unknown station: {station_name}")
-        return None
-    
-    # Filter for the correct station and direction
-    # For Northbound: use exits, for Southbound: use entries
-    if direction == 'Northbound':
-        station_df = df[df['StationExit'] == station_num].copy()
-    else:
-        station_df = df[df['StationEntry'] == station_num].copy()
-    
-    # Filter by direction
-    station_df = station_df[station_df['Direction'] == direction].sort_values('datetime')
-    
-    if len(station_df) < 100:
-        print(f"⚠️ Not enough data for {station_name} {direction}: {len(station_df)} rows")
-        return None
-    
-    # Aggregate by hour
-    station_df['hour_timestamp'] = station_df['datetime'].dt.floor('h')
-    hourly = station_df.groupby('hour_timestamp').agg({
-        'TotalPassenger': 'sum',
-        'hour': 'first', 'weekday': 'first', 'month': 'first',
-        'minute': 'first',
-        'hour_sin': 'first', 'hour_cos': 'first',
-        'dow_sin': 'first', 'dow_cos': 'first',
-        'month_sin': 'first', 'month_cos': 'first',
-        'time_decimal': 'first',
-        'is_operating_hour': 'first',
-        'minute_normalized': 'first',
-        'is_morning_rush': 'first', 'is_evening_rush': 'first', 'is_noon': 'first',
-        'is_pre_opening': 'first', 'is_post_closing': 'first',
-        'minutes_until_closing': 'first', 'minutes_since_opening': 'first',
-        'time_normalized': 'first',
-        'is_weekend': 'first', 'is_holiday': 'first', 'is_special_event': 'first',
-        'is_christmas_season': 'first', 'is_payday': 'first', 'is_friday': 'first',
-        'is_rush_hour': 'first',
-        'is_maintenance_record': 'first', 'is_extended_hours': 'first'
-    }).reset_index()
-    
-    # Calculate congestion using training max
-    key = f"{station_name}_{direction}"
-    if _PER_DIRECTION_MAX and key in _PER_DIRECTION_MAX:
-        station_max = _PER_DIRECTION_MAX[key]
-    else:
-        station_max = hourly['TotalPassenger'].quantile(0.99)
-        if station_max == 0:
-            station_max = 1
-    
-    hourly['congestion'] = (hourly['TotalPassenger'] / station_max * 100).clip(0, 100)
-    hourly = hourly.sort_values('hour_timestamp')
-    
-    # Find target time
-    target_hour = pd.to_datetime(target_datetime).floor('h')
-    if target_hour not in hourly['hour_timestamp'].values:
-        available = hourly[hourly['hour_timestamp'] <= target_hour]['hour_timestamp'].values
-        if len(available) == 0:
-            return None
-        target_hour = available[-1]
-    
-    idx = hourly[hourly['hour_timestamp'] == target_hour].index[0]
-    if idx < seq_length:
-        return None
-    
-    # Get sequence
-    history_df = hourly.iloc[idx-seq_length:idx]
-    
-    FEATURE_COLS = [
-        'hour', 'weekday', 'month',
-        'hour_sin', 'hour_cos', 'dow_sin', 'dow_cos', 'month_sin', 'month_cos',
-        'is_operating_hour', 'is_morning_rush', 'is_evening_rush', 'is_noon',
-        'is_pre_opening', 'is_post_closing',
-        'minutes_until_closing', 'minutes_since_opening', 'time_normalized', 'minute_normalized',
-        'is_weekend', 'is_holiday', 'is_special_event', 'is_christmas_season', 'is_payday', 'is_friday',
-        'is_rush_hour', 'is_maintenance_record', 'is_extended_hours', 'congestion'
-    ]
-    
-    features = history_df[FEATURE_COLS].values.astype(np.float32)
-    
-    scaler_path = f'models_2022-2024_v5/{station_name}_{direction}_feature_scaler.pkl'
-    
-    if os.path.exists(scaler_path):
-        with open(scaler_path, 'rb') as f:
-            feature_scaler = pickle.load(f)
-        features = feature_scaler.transform(features)
-        print(f"  DEBUG: Used saved scaler - features range: {features.min():.3f} - {features.max():.3f}")
-    else:
-        print(f"  WARNING: No scaler found at {scaler_path}")
-        # Fallback to manual normalization
-        features[:, 0] = features[:, 0] / 24.0
-        features[:, 1] = features[:, 1] / 7.0
-        features[:, 2] = (features[:, 2] - 1) / 12.0
-        features[:, -1] = features[:, -1] / 100.0
-    
-    return features
-
-
-# At the end of services/feature_engineering.py
 print("=" * 50)
 print("✅ feature_engineering.py loaded successfully!")
 print(f"✅ get_feature_sequence_for_station is defined: {get_feature_sequence_for_station is not None}")
