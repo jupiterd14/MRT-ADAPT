@@ -1948,7 +1948,7 @@ nav {
 
     <div class="main-content">
         <div class="greeting">
-            GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, {{ username.upper() }}
+            GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, Commuter
         </div>
 
         <div class="header-top">
@@ -1992,8 +1992,7 @@ nav {
             <option value="{{ station }}" {% if station == 'North Ave' %}selected{% endif %}>{{ station }}</option>
             {% endfor %}
         </select>
-        <div class="congestion-indicator" id="fromCongestion">
-        </div>
+        
     </div>
 
     <div class="swap-icon" onclick="swapStations()">
@@ -2009,8 +2008,7 @@ nav {
             <option value="{{ station }}" {% if station == 'Ayala Ave' %}selected{% endif %}>{{ station }}</option>
             {% endfor %}
         </select>
-        <div class="congestion-indicator" id="toCongestion">
-        </div>
+       
     </div>
 </div>
 
@@ -2138,12 +2136,6 @@ const messageArrays = {
 };
 
 
-function getPreviousStation(station) {
-    const stationsList = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
-    const idx = stationsList.indexOf(station);
-    if (idx > 0) return stationsList[idx - 1];
-    return stationsList[1]; // fallback
-}
 
 function cleanOldReadAlerts() {
     const saved = localStorage.getItem('readAlerts');
@@ -2187,17 +2179,12 @@ try {
     setInterval(updateDateTime, 1000);
     setInterval(checkAlertCount, 60000);
     
-    // Set default date to today
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Calculate date 7 days from today
-    const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 7);
-    const maxDateStr = maxDate.toISOString().split('T')[0];
-    
-    document.getElementById('travelDate').value = today;
-    document.getElementById('travelDate').min = today;
-    document.getElementById('travelDate').max = maxDateStr; // ← ADD THIS LINE
+    // ========== FOR TESTING WITH 2025 DATA - ONLY 2025 ==========
+    // Set default date to January 15, 2025
+    const defaultDate = '2025-01-15';
+    document.getElementById('travelDate').value = defaultDate;
+    document.getElementById('travelDate').min = '2025-01-01';
+    document.getElementById('travelDate').max = '2025-12-31';
     
     // Set default time to current time + 1 hour
     const now = new Date();
@@ -2206,10 +2193,6 @@ try {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     document.getElementById('departureTime').value = `${hours}:${minutes}`;
-    
-    // Hide congestion indicators initially
-    document.getElementById('fromCongestion').classList.remove('visible');
-    document.getElementById('toCongestion').classList.remove('visible');
 });
 
     function getPredictionWithDateTime(station, date, time) {
@@ -2223,18 +2206,11 @@ try {
         });
 }
 
-   function cancelRoute() {
-    // Reset to default values
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Calculate date 7 days from today
-    const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 7);
-    const maxDateStr = maxDate.toISOString().split('T')[0];
-    
-    document.getElementById('travelDate').value = today;
-    document.getElementById('travelDate').min = today;
-    document.getElementById('travelDate').max = maxDateStr; // ← ADD THIS LINE
+  function cancelRoute() {
+    // Reset to default values - ALWAYS 2025
+    document.getElementById('travelDate').value = '2025-01-15';
+    document.getElementById('travelDate').min = '2025-01-01';
+    document.getElementById('travelDate').max = '2025-12-31';
     
     const now = new Date();
     now.setHours(now.getHours() + 1);
@@ -2261,10 +2237,6 @@ try {
         </div>
     `;
     container.classList.remove('has-content');
-    
-    // Hide congestion indicators
-    document.getElementById('fromCongestion').classList.remove('visible');
-    document.getElementById('toCongestion').classList.remove('visible');
     
     showToast('Form reset to defaults');
 }
@@ -2308,38 +2280,29 @@ document.addEventListener('keydown', function(event) {
         document.getElementById('currentDateTime').textContent = now.toLocaleDateString('en-US', options);
     }
 
-    function validateDateTime() {
+   function validateDateTime() {
     const dateInput = document.getElementById('travelDate').value;
     const timeInput = document.getElementById('departureTime').value;
     const now = new Date();
-    const today = new Date().toISOString().split('T')[0];
     
-    // Check for past dates
-    if (dateInput < today) {
-        showToast('Cannot select past dates', 'error');
+    // ========== ONLY ALLOW 2025 DATES (ANY DATE IN 2025) ==========
+    const selectedYear = parseInt(dateInput.split('-')[0]);
+    if (selectedYear !== 2025) {
+        showToast('Only 2025 dates are allowed for testing', 'error');
+        document.getElementById('travelDate').value = '2025-01-15';
         return false;
     }
     
-    // Check if date is more than 7 days in the future
-    const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 7);
-    const maxDateStr = maxDate.toISOString().split('T')[0];
-    
-    if (dateInput > maxDateStr) {
-        showToast('You can only plan trips up to 7 days in advance', 'error');
+    // Check if date is within 2025
+    if (dateInput < '2025-01-01' || dateInput > '2025-12-31') {
+        showToast('Please select a date in 2025', 'error');
+        document.getElementById('travelDate').value = '2025-01-15';
         return false;
     }
     
-    if (dateInput === today) {
-        const [hours, minutes] = timeInput.split(':').map(Number);
-        const selectedTime = new Date();
-        selectedTime.setHours(hours, minutes, 0);
-        
-        if (selectedTime < now) {
-            showToast('Cannot select past time', 'error');
-            return false;
-        }
-    }
+    // ========== REMOVE THE PAST DATE CHECK FOR TESTING ==========
+    // Allow any date in 2025, even if it's "past" (for testing purposes)
+    // Just check if the time is valid
     
     const [hours, minutes] = timeInput.split(':').map(Number);
     const totalMinutes = hours * 60 + minutes;
@@ -2375,79 +2338,35 @@ document.addEventListener('keydown', function(event) {
     showToast('Stations swapped');
 }
 
-// Load congestion for selected stations - Show LEVELS only (no emojis, no percentages)
+// Load congestion for selected stations - Simplified (no indicators needed)
 async function updateStationCongestion() {
     const fromStation = document.getElementById('fromStation').value;
     const toStation = document.getElementById('toStation').value;
     const date = document.getElementById('travelDate').value;
     const time = document.getElementById('departureTime').value;
     
-    // Function to get level from percentage
-    function getLevel(congestion) {
-        if (congestion > 80) return 'SEVERE';
-        if (congestion > 60) return 'CONGESTED';
-        if (congestion > 40) return 'MODERATE';
-        if (congestion > 20) return 'LIGHT';
-        return 'LIGHT';
-    }
+    // Just log the values - no UI elements to update
+    console.log(`FROM: ${fromStation}, TO: ${toStation}, Date: ${date}, Time: ${time}`);
     
-    // Function to get color for level
-    function getColor(level) {
-        if (level === 'SEVERE') return '#EF4444';
-        if (level === 'CONGESTED') return '#F97316';
-        if (level === 'MODERATE') return '#F59E0B';
-        return '#22C55E';
-    }
-    
-    // Fetch current congestion for FROM station
+    // Optionally, you could still fetch data for debugging
     try {
         const url = `/api/directional-forecast/${encodeURIComponent(fromStation)}?date=${date}&time=${time}`;
         const response = await fetch(url);
         const data = await response.json();
-        
-        if (data && data.current) {
-            const fromCongestion = data.current.southbound || data.current.northbound || 0;
-            const fromDiv = document.getElementById('fromCongestion');
-            const level = getLevel(fromCongestion);
-            const color = getColor(level);
-            
-            if (fromCongestion > 0) {
-                fromDiv.innerHTML = `<span style="display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; color: ${color};">${level}</span>`;
-                fromDiv.classList.add('visible');
-            } else {
-                fromDiv.innerHTML = '';
-                fromDiv.classList.remove('visible');
-            }
-        }
+        console.log('FROM forecast:', data);
     } catch(e) {
         console.log('Error fetching from congestion:', e);
     }
     
-    // Fetch for TO station
     try {
         const url = `/api/directional-forecast/${encodeURIComponent(toStation)}?date=${date}&time=${time}`;
         const response = await fetch(url);
         const data = await response.json();
-        
-        if (data && data.current) {
-            const toCongestion = data.current.southbound || data.current.northbound || 0;
-            const toDiv = document.getElementById('toCongestion');
-            const level = getLevel(toCongestion);
-            const color = getColor(level);
-            
-            if (toCongestion > 0) {
-                toDiv.innerHTML = `<span style="display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; color: ${color};">${level}</span>`;
-                toDiv.classList.add('visible');
-            } else {
-                toDiv.innerHTML = '';
-                toDiv.classList.remove('visible');
-            }
-        }
+        console.log('TO forecast:', data);
     } catch(e) {
         console.log('Error fetching to congestion:', e);
     }
 }
-
 document.addEventListener('DOMContentLoaded', function() {
     
     const fromSelect = document.getElementById('fromStation');
@@ -2484,7 +2403,7 @@ function planRoute() {
     // FIX: Add date and time as query parameters to BOTH API calls
     Promise.all([
         fetch(`/api/directional-forecast/${encodeURIComponent(from)}?date=${date}&time=${time}`).then(res => res.json()),
-        fetch(`/api/directional-forecast/${encodeURIComponent(to)}?date=${date}&time=${time}`).then(res => res.json()),  // ← ALSO ADD HERE
+        fetch(`/api/directional-forecast/${encodeURIComponent(to)}?date=${date}&time=${time}`).then(res => res.json()),
         fetch(`/api/schedule/headway`).then(res => res.json())
     ]).then(([fromForecast, toForecast, headwayData]) => {
         
@@ -2495,24 +2414,38 @@ function planRoute() {
         const [hours, minutes] = time.split(':');
         const departureHour = parseInt(hours);
         
-        // Find the forecast for the selected hour (or use current if not found)
+        // ========== FIX: Find the forecast for the selected hour ==========
         const fromHourlyForecast = fromForecast.forecasts?.find(f => f.hour === departureHour);
         const toHourlyForecast = toForecast.forecasts?.find(f => f.hour === departureHour);
         
-        // Use hourly forecast if available, otherwise use current
-        const fromData = fromHourlyForecast || {
-            northbound: fromForecast.current?.northbound || 0,
-            southbound: fromForecast.current?.southbound || 0
-        };
+        // ========== FIX: Use current forecast if exact hour not found ==========
+        let fromData;
+        let toData;
         
-        const toData = toHourlyForecast || {
-            northbound: toForecast.current?.northbound || 0,
-            southbound: toForecast.current?.southbound || 0
-        };
+        if (fromHourlyForecast) {
+            fromData = fromHourlyForecast;
+            console.log(`✅ Found FROM forecast for hour ${departureHour}`);
+        } else {
+            // Use the first forecast (closest to requested time) or current data
+            fromData = fromForecast.forecasts?.[0] || fromForecast.current || {
+                northbound: 0,
+                southbound: 0
+            };
+            console.log(`⚠️ Hour ${departureHour} not in FROM forecast, using closest available (hour ${fromData.hour})`);
+        }
         
-        console.log("FROM FORECAST forecasts:", fromForecast.forecasts);
-        console.log("Looking for hour:", departureHour);
-        console.log("Found hourly forecast:", fromHourlyForecast);
+        if (toHourlyForecast) {
+            toData = toHourlyForecast;
+            console.log(`✅ Found TO forecast for hour ${departureHour}`);
+        } else {
+            // Use the first forecast (closest to requested time) or current data
+            toData = toForecast.forecasts?.[0] || toForecast.current || {
+                northbound: 0,
+                southbound: 0
+            };
+            console.log(`⚠️ Hour ${departureHour} not in TO forecast, using closest available (hour ${toData.hour})`);
+        }
+        
         console.log(`   FROM data at ${departureHour}:00:`, fromData);
         console.log(`   TO data at ${departureHour}:00:`, toData);
         
@@ -2550,11 +2483,12 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     const stationDiff = Math.abs(fromIdx - toIdx);
     const baseTravelTime = stationDiff * 3 + 5;
     
-    // Determine which direction you're traveling
+    // Determine direction
     const travelingSouth = fromIdx < toIdx;
     const directionText = travelingSouth ? 'SOUTHBOUND' : 'NORTHBOUND';
+    const directionIcon = travelingSouth ? 'fa-arrow-down' : 'fa-arrow-up';
     
-    // Get congestion for YOUR direction from forecast data
+    // Get congestion for YOUR direction
     const fromCongestion = travelingSouth 
         ? (fromData?.southbound || 0)
         : (fromData?.northbound || 0);
@@ -2563,190 +2497,207 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
         ? (toData?.southbound || 0)
         : (toData?.northbound || 0);
     
-    // ========== ETA ADJUSTMENT BASED ON FROM STATION CONGESTION ==========
+    // ETA adjustment
     let etaAdjustment = 0;
-    
-    if (fromCongestion > 80) {
-        etaAdjustment = 15;
-    } else if (fromCongestion > 70) {
-        etaAdjustment = 10;
-    } else if (fromCongestion > 60) {
-        etaAdjustment = 7;
-    } else if (fromCongestion > 40) {
-        etaAdjustment = 4;
-    } else if (fromCongestion > 20) {
-        etaAdjustment = 2;
-    } else {
-        etaAdjustment = 0;
-    }
-    
+    if (fromCongestion > 80) etaAdjustment = 15;
+    else if (fromCongestion > 70) etaAdjustment = 10;
+    else if (fromCongestion > 60) etaAdjustment = 7;
+    else if (fromCongestion > 40) etaAdjustment = 4;
+    else if (fromCongestion > 20) etaAdjustment = 2;
     const adjustedTravelTime = baseTravelTime + etaAdjustment;
     
-    // Get status text and color (without emojis)
-const getStatus = (cong) => {
-    if (cong > 80) return { text: 'SEVERE', color: '#EF4444', bg: '#FEE2E2' };
-    if (cong > 60) return { text: 'CONGESTED', color: '#F97316', bg: '#FFEDD5' };
-    if (cong > 40) return { text: 'MODERATE', color: '#F59E0B', bg: '#FEF3C7' };
-    if (cong > 20) return { text: 'LIGHT', color: '#3B82F6', bg: '#EFF6FF' };
-    return { text: 'LIGHT', color: '#22C55E', bg: '#DCFCE7' };
-};
+    // Status helper
+    const getStatus = (cong) => {
+        if (cong > 80) return { text: 'SEVERE', color: '#EF4444', bg: '#FEE2E2' };
+        if (cong > 60) return { text: 'CONGESTED', color: '#F97316', bg: '#FFEDD5' };
+        if (cong > 40) return { text: 'MODERATE', color: '#F59E0B', bg: '#FEF3C7' };
+        if (cong > 20) return { text: 'LIGHT', color: '#3B82F6', bg: '#EFF6FF' };
+        return { text: 'LIGHT', color: '#22C55E', bg: '#DCFCE7' };
+    };
     
     const fromStatus = getStatus(fromCongestion);
     const toStatus = getStatus(toCongestion);
     
-    // Wait time based on FROM station congestion
     const getWaitTime = (cong) => {
-        if (cong > 80) return '15-20 min';
-        if (cong > 60) return '10-15 min';
-        if (cong > 30) return '5-10 min';
-        return '2-5 min';
+        if (cong > 80) return '15-20m';
+        if (cong > 60) return '10-15m';
+        if (cong > 30) return '5-10m';
+        return '2-5m';
     };
-    
     const waitTime = getWaitTime(fromCongestion);
     
-    // Get congestion level and dynamic messages from your arrays
-    const congestionLevel = getCongestionLevel(fromCongestion);
-    const levelMessages = messageArrays[congestionLevel];
+    // Short messages
+    const getShortMessage = (congestion, station) => {
+        if (congestion > 80) return `${station} severely congested. Long queues expected.`;
+        if (congestion > 60) return `${station} congested. Allow extra boarding time.`;
+        if (congestion > 40) return `${station} moderate. Normal commute.`;
+        return `${station} light. Smooth journey.`;
+    };
     
-    // Get random messages from your arrays
-    const randomTitle = getRandomMessage(levelMessages.titles);
-    const randomRecommendation = getRandomMessage(levelMessages.recommendations);
-    const randomAction = getRandomMessage(levelMessages.actions);
-
+    const getShortTip = (congestion) => {
+        if (congestion > 80) return 'Consider postponing trip.';
+        if (congestion > 60) return 'Arrive 10-15 min early.';
+        if (congestion > 40) return 'Arrive at normal time.';
+        return 'No delays expected.';
+    };
     
-    
-   // ADVISORY 1 - Destination station info (keep original UI) - BUT SHOW FROM STATION DATA
-const advisory1 = document.createElement('div');
-advisory1.className = `advisory-card info`;
-advisory1.style.background = 'white';
-advisory1.style.border = '1px solid #E2E8F0';
-advisory1.innerHTML = `
-    <div class="adv1" style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 15px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <i class="fas fa-subway" style="font-size: 20px; color: #00224D;"></i>
-            <h4 style="font-size: 16px; font-weight: 600; margin: 0; color: #1E293B;">BOARDING: ${from}</h4>                
-        </div>
-        <div style="font-size: 14px; color: #64748B; background: #F1F5F9; padding: 4px 10px; border-radius: 30px;">
-            <i class="far fa-clock"></i> ${time}
-        </div>
-    </div>
-    <div style="display: flex; gap: 20px; padding: 10px 0;">
-        <div style="flex: 1; text-align: center; padding: 12px; background: #F8FAFC; border-radius: 12px;">
-            <i class="fas fa-arrow-up" style="color: #3B82F6; font-size: 18px; margin-bottom: 5px; display: block;"></i>
-            <div style="font-size: 11px; color: #64748B;">NORTHBOUND</div>
-            <div style="margin-top: 8px;">
-
-                <span style="display: inline-block; padding: 6px 16px; border-radius: 30px; font-size: 13px; font-weight: 600; background: ${getStatus(fromData?.northbound || 0).bg}; color: ${getStatus(fromData?.northbound || 0).color};">${getStatus(fromData?.northbound || 0).text}</span>
+    // ========== ADVISORY 1 - BOARDING STATION (EXPANDED HEIGHT) ==========
+    const advisory1 = document.createElement('div');
+    advisory1.className = 'advisory-card info';
+    advisory1.style.background = 'white';
+    advisory1.style.border = '1px solid #E2E8F0';
+    advisory1.style.padding = '18px 20px';
+    advisory1.style.minHeight = '120px';
+    advisory1.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="background: #EFF6FF; padding: 8px 12px; border-radius: 10px;">
+                    <i class="fas fa-subway" style="color: #3B82F6; font-size: 18px;"></i>
                 </div>
-        </div>
-        <div style="flex: 1; text-align: center; padding: 12px; background: #F8FAFC; border-radius: 12px;">
-            <i class="fas fa-arrow-down" style="color: #3B82F6; font-size: 18px; margin-bottom: 5px; display: block;"></i>
-            <div style="font-size: 11px; color: #64748B;">SOUTHBOUND</div>
-            <div style="margin-top: 8px;">
-                <span style="display: inline-block; padding: 6px 16px; border-radius: 30px; font-size: 13px; font-weight: 600; background: ${getStatus(fromData?.southbound || 0).bg}; color: ${getStatus(fromData?.southbound || 0).color};">${getStatus(fromData?.southbound || 0).text}</span>
+                <div>
+                    <div style="font-weight: 700; font-size: 15px; color: #1E293B;">BOARDING: ${from}</div>
+                    <div style="font-size: 11px; color: #64748B;">${time} · ${directionText} · ${stationDiff} stops</div>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 18px; font-weight: 700; color: ${fromStatus.color};">${fromStatus.text}</div>
+                <div style="font-size: 11px; color: #64748B;">${waitTime}</div>
             </div>
         </div>
-    </div>
-    <div style="margin-top: 8px; font-size: 12px; color: #64748B; text-align: center; padding-top: 8px; border-top: 1px solid #E2E8F0;">
-        <i class="fas fa-route"></i> ${from} → ${to} (${stationDiff} stops)
-    </div>
-`;
-    
-console.log(`🎯 FINAL - fromCongestion: ${fromCongestion}%, congestionLevel: ${congestionLevel}`);
-console.log(`🎯 randomTitle being used: ${randomTitle}`);
-
-    // ADVISORY 2 - Recommendation with dynamic messages from YOUR ARRAYS
-    const advisory2 = document.createElement('div');
-    
-    let cardClass = 'info';
-    let backgroundColor = '';
-    let borderStyle = '';
-    
-    // Set card styling based on congestion level
-    switch(congestionLevel) {
-        case 'severe':
-            cardClass = 'critical';
-            backgroundColor = '#EF4444';
-            break;
-        case 'heavy':
-            cardClass = 'warning';
-            backgroundColor = '#F97316';
-            break;
-        case 'busy':
-            cardClass = 'moderate';
-            backgroundColor = '#F59E0B';
-            break;
-        case 'moderate':
-            cardClass = 'info';
-            backgroundColor = 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)';
-            borderStyle = '2px solid #3B82F6';
-            break;
-        default:
-            cardClass = 'success';
-            backgroundColor = 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)';
-            borderStyle = '2px solid #22C55E';
-    }
-    
-    advisory2.className = `advisory-card ${cardClass}`;
-    
-    if (cardClass === 'info') {
-        advisory2.style.background = backgroundColor;
-        advisory2.style.border = borderStyle;
-    } else if (cardClass === 'success') {
-        advisory2.style.background = backgroundColor;
-        advisory2.style.border = borderStyle;
-    } else {
-        advisory2.style.background = backgroundColor;
-        advisory2.style.border = 'none';
-    }
-    
-    // USE YOUR DYNAMIC MESSAGES HERE
-    advisory2.innerHTML = `
-        <div class="advisory-header" style="${cardClass === 'info' ? 'border-bottom-color: rgba(0,0,0,0.1);' : ''}">
-            <i class="fas ${congestionLevel === 'severe' ? 'fa-exclamation-triangle' : congestionLevel === 'heavy' ? 'fa-exclamation-circle' : 'fa-info-circle'}" 
-               style="${cardClass === 'info' ? 'color: #3B82F6;' : cardClass === 'success' ? 'color: #22C55E;' : 'color: white;'}"></i>
-            <h4 style="${cardClass === 'info' ? 'color: #1E40AF;' : cardClass === 'success' ? 'color: #166534;' : 'color: white;'}">${randomTitle}</h4>
-        </div>
-        <div class="advisory-content" style="${cardClass === 'info' || cardClass === 'success' ? 'color: #1E293B;' : 'color: white;'}">
-<strong>${from}</strong> station: <strong>${getStatus(fromCongestion).text}</strong> congestion level<br><br>
-            ${randomRecommendation}<br><br>
-            📌 ${randomAction}
-        </div>
-        <div class="advisory-footer" style="${cardClass === 'info' ? 'color: #64748B; border-top-color: #E2E8F0;' : cardClass === 'success' ? 'color: #64748B; border-top-color: #E2E8F0;' : 'color: white; border-top-color: rgba(255,255,255,0.2);'}">
-            <span><i class="fas fa-clock"></i> Base travel: ${baseTravelTime} min | ETA: ${adjustedTravelTime} min</span>
-            <span class="advisory-tag" style="${cardClass === 'info' || cardClass === 'success' ? 'background: rgba(0,0,0,0.05);' : 'background: rgba(255,255,255,0.2);'}">Wait: ${waitTime}</span>
+        <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid #F1F5F9; display: flex; gap: 10px;">
+            <div style="flex:1; text-align:center; background:#F8FAFC; border-radius:8px; padding:10px;">
+                <div style="font-size:10px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">BOARDING</div>
+                <div style="font-weight:700; font-size:16px; color:${fromStatus.color};">${fromStatus.text}</div>
+            </div>
+            <div style="flex:1; text-align:center; background:#F8FAFC; border-radius:8px; padding:10px;">
+                <div style="font-size:10px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">TRAVEL TIME</div>
+                <div style="font-weight:700; font-size:16px; color:#1E293B;">${adjustedTravelTime}m</div>
+            </div>
+            
         </div>
     `;
     
-    // ADVISORY 3 - Travel Advisory (keep your existing logic)
+    // ========== ADVISORY 2 - STATUS & TIP (EXPANDED HEIGHT) ==========
+    const advisory2 = document.createElement('div');
+    let cardClass = 'info';
+    let bgColor = '#EFF6FF';
+    let textColor = '#1E293B';
+    let borderColor = '#3B82F6';
+    
+    if (fromCongestion > 80) {
+        cardClass = 'critical';
+        bgColor = '#EF4444';
+        textColor = 'white';
+        borderColor = '#EF4444';
+    } else if (fromCongestion > 60) {
+        cardClass = 'warning';
+        bgColor = '#F97316';
+        textColor = 'white';
+        borderColor = '#F97316';
+    } else if (fromCongestion > 40) {
+        cardClass = 'moderate';
+        bgColor = '#F59E0B';
+        textColor = 'white';
+        borderColor = '#F59E0B';
+    } else {
+        cardClass = 'success';
+        bgColor = '#F0FDF4';
+        textColor = '#166534';
+        borderColor = '#22C55E';
+    }
+    
+    advisory2.className = `advisory-card ${cardClass}`;
+    advisory2.style.background = bgColor;
+    advisory2.style.border = cardClass === 'info' || cardClass === 'success' ? `2px solid ${borderColor}` : 'none';
+    advisory2.style.padding = '16px 20px';
+    advisory2.style.marginTop = '10px';
+    advisory2.style.minHeight = '80px';
+    
+    const shortMsg = getShortMessage(fromCongestion, from);
+    const shortTip = getShortTip(fromCongestion);
+    
+    advisory2.innerHTML = `
+        <div style="display: flex; align-items: flex-start; gap: 12px; color: ${textColor};">
+            <i class="fas ${fromCongestion > 80 ? 'fa-exclamation-triangle' : fromCongestion > 60 ? 'fa-exclamation-circle' : 'fa-info-circle'}" 
+               style="font-size: 18px; margin-top: 2px;"></i>
+            <div style="flex:1;">
+                <div style="font-size: 15px; font-weight: 600; line-height: 1.4;">${shortMsg}</div>
+                <div style="margin-top: 6px; font-size: 13px; opacity: 0.85; display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-lightbulb" style="font-size: 12px;"></i> ${shortTip}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // ========== ADVISORY 3 - RUSH HOUR (EXPANDED HEIGHT) ==========
     const advisory3 = document.createElement('div');
-    let advisoryContent = '';
+    advisory3.className = 'advisory-card info';
+    advisory3.style.background = 'white';
+    advisory3.style.border = '1px solid #E2E8F0';
+    advisory3.style.padding = '16px 20px';
+    advisory3.style.marginTop = '10px';
+    advisory3.style.minHeight = '80px';
     
     const isMorningRush = hour >= 7 && hour <= 9;
     const isEveningRush = hour >= 17 && hour <= 20;
     
-    if (isMorningRush) {
-    advisoryContent = ` MORNING RUSH HOUR: Due to ${fromStatus.text.toLowerCase()} congestion at ${from} station, your estimated arrival at ${to} is approximately ${adjustedTravelTime} minutes. Please arrive at ${from} station early to account for boarding delays.`;
-} else if (isEveningRush) {
-    advisoryContent = ` EVENING RUSH HOUR: ${from} station has ${fromStatus.text.toLowerCase()} congestion. Your estimated travel time to ${to} is ${adjustedTravelTime} minutes. Consider arriving early.`;
-} else if (hour >= 21) {
-    advisoryContent = ` LATE NIGHT: Service ends at 10:30 PM. ${from} station has ${fromStatus.text.toLowerCase()} congestion. Your ETA to ${to} is ${adjustedTravelTime} minutes.`;
-} else {
-    advisoryContent = `${from} station has ${fromStatus.text.toLowerCase()} congestion. Your estimated arrival at ${to} is ${adjustedTravelTime} minutes (${baseTravelTime} min travel + ${etaAdjustment} min boarding delay).`;
-}
+    let rushLabel = '';
+    let rushNote = '';
+    let rushAdvice = '';
+    let rushColor = '#3B82F6';
     
-    advisory3.className = `advisory-card info`;
+    if (isMorningRush) {
+        rushLabel = 'MORNING RUSH HOUR';
+        rushNote = `Peak commuting · ${from} is ${fromStatus.text.toLowerCase()}`;
+        rushAdvice = 'Arrive 15-20 min early · Use first/last car for less crowding';
+        rushColor = '#F97316';
+    } else if (isEveningRush) {
+        rushLabel = 'EVENING RUSH HOUR';
+        rushNote = `Office hours · ${from} is ${fromStatus.text.toLowerCase()}`;
+        rushAdvice = 'Allow extra boarding time · Trains may be delayed 5-10 min';
+        rushColor = '#F97316';
+    } else if (hour >= 21) {
+        rushLabel = 'LATE NIGHT SERVICE';
+        rushNote = `Last trains · ${from} is ${fromStatus.text.toLowerCase()}`;
+        rushAdvice = 'Final train at 10:30 PM · Arrive early to board';
+        rushColor = '#3B82F6';
+    } else if (hour >= 5 && hour < 7) {
+        rushLabel = 'EARLY MORNING SERVICE';
+        rushNote = `Service starting · ${from} is ${fromStatus.text.toLowerCase()}`;
+        rushAdvice = 'Trains every 5-7 min · Light crowds expected';
+        rushColor = '#22C55E';
+    } else {
+        rushLabel = 'REGULAR SERVICE HOURS';
+        rushNote = `${from} is ${fromStatus.text.toLowerCase()}`;
+        rushAdvice = 'Normal schedule · No significant delays expected';
+        rushColor = '#3B82F6';
+    }
+    
+    // Format date for display
+    const dateObj = new Date(date + 'T00:00:00');
+    const formattedDate = dateObj.toLocaleDateString('en-US', { 
+        weekday: 'short',
+        month: 'short', 
+        day: 'numeric',
+        year: 'numeric'
+    });
+    
     advisory3.innerHTML = `
-        <div class="advisory-header">
-            <i class="fas fa-info-circle" style="color: #3B82F6;"></i>
-            <h4 style="color: #1E40AF;">Travel Advisory</h4>
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="background: ${rushColor}15; padding: 8px 10px; border-radius: 8px; border-left: 4px solid ${rushColor};">
+                <i class="fas fa-clock" style="color: ${rushColor}; font-size: 16px;"></i>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 14px; color: ${rushColor};">${rushLabel}</div>
+                <div style="font-size: 13px; color: #1E293B; margin-top: 2px;">${rushNote}</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">
+                    <i class="fas fa-lightbulb" style="color: ${rushColor};"></i> ${rushAdvice}
+                </div>
+            </div>
         </div>
-        <div class="advisory-content" style="color: #1E293B;">
-            ${advisoryContent}
-        </div>
-        <div class="advisory-footer">
-            <span><i class="fas fa-calendar"></i> ${date}</span>
-            <span class="advisory-tag">${directionText}</span>
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #F1F5F9; display: flex; justify-content: space-between; font-size: 11px; color: #64748B;">
+            <span><i class="fas fa-route"></i> ${from} → ${to}</span>
+          
         </div>
     `;
     

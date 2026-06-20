@@ -513,6 +513,9 @@ nav {
     background: linear-gradient(90deg, transparent, var(--border), transparent);
 }
 
+.alert-icon.yellow { color: #D97706; background: #FEF3C7; }
+
+
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -734,7 +737,7 @@ nav {
     </div>
 
     <div class="main-content">
-        <div class="greeting">GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, {{ username.upper() }}</div>
+        <div class="greeting">GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, Commuter</div>
         <div class="header-top">
             <h1>Alerts <span class="new-badge" id="newAlertBadge">0 New</span></h1>
             <div class="header-icons">
@@ -989,8 +992,7 @@ nav {
             return alerts;
         }
 
-        // Congestion Alerts - ALL levels (including LIGHT)
-      // Congestion Alerts - NO ICONS AT ALL
+    // Congestion Alerts - WITH PROPER ICONS
 async function getCongestionAlerts() {
     const alerts = [];
     try {
@@ -1002,24 +1004,28 @@ async function getCongestionAlerts() {
                 const northData = data.northbound[station];
                 const southData = data.southbound[station];
                 
-                // NORTHBOUND - ALL congestion levels, NO ICONS
+                // NORTHBOUND - ALL congestion levels with icons
                 if (northData && northData.congestion > 0) {
-                    let icon = '';  // ← NO ICON for ALL levels
+                    let icon = 'subway';
                     let icon_color = 'green';
                     let titlePrefix = 'LIGHT';
                     
                     if (northData.congestion > 80) {
-                        icon = '';  // ← NO ICON
+                        icon = 'exclamation-triangle';
                         icon_color = 'red';
                         titlePrefix = 'SEVERE';
                     } else if (northData.congestion > 60) {
-                        icon = '';  // ← NO ICON
+                        icon = 'exclamation-circle';
                         icon_color = 'orange';
                         titlePrefix = 'CONGESTED';
                     } else if (northData.congestion > 30) {
-                        icon = '';  // ← NO ICON
+                        icon = 'chart-line';
                         icon_color = 'yellow';
                         titlePrefix = 'MODERATE';
+                    } else {
+                        icon = 'check-circle';
+                        icon_color = 'green';
+                        titlePrefix = 'LIGHT';
                     }
                     
                     alerts.push({
@@ -1028,7 +1034,7 @@ async function getCongestionAlerts() {
                         icon: icon,
                         icon_color: icon_color,
                         title: `${titlePrefix}: ${station} (Northbound)`,
-                        message: `${Math.round(northData.congestion)}% congestion at ${station} northbound. ${northData.wait_time || 'Expected wait time'}.`,
+                        message: `${titlePrefix} congestion at ${station} northbound. ${northData.wait_time || 'Expected wait time'}. Congestion: ${northData.congestion}%`,
                         time: 'Just now',
                         unread: true,
                         station: station,
@@ -1036,24 +1042,28 @@ async function getCongestionAlerts() {
                     });
                 }
                 
-                // SOUTHBOUND 
+                // SOUTHBOUND
                 if (southData && southData.congestion > 0) {
-                    let icon = '';  
+                    let icon = 'subway';
                     let icon_color = 'green';
                     let titlePrefix = 'LIGHT';
                     
                     if (southData.congestion > 80) {
-                        icon = '';  
+                        icon = 'exclamation-triangle';
                         icon_color = 'red';
                         titlePrefix = 'SEVERE';
                     } else if (southData.congestion > 60) {
-                        icon = '';  
+                        icon = 'exclamation-circle';
                         icon_color = 'orange';
                         titlePrefix = 'CONGESTED';
                     } else if (southData.congestion > 30) {
-                        icon = ''; 
+                        icon = 'chart-line';
                         icon_color = 'yellow';
                         titlePrefix = 'MODERATE';
+                    } else {
+                        icon = 'check-circle';
+                        icon_color = 'green';
+                        titlePrefix = 'LIGHT';
                     }
                     
                     alerts.push({
@@ -1062,7 +1072,7 @@ async function getCongestionAlerts() {
                         icon: icon,
                         icon_color: icon_color,
                         title: `${titlePrefix}: ${station} (Southbound)`,
-                        message: `${Math.round(southData.congestion)}% congestion at ${station} southbound. ${southData.wait_time || 'Expected wait time'}.`,
+                        message: `${titlePrefix} congestion at ${station} southbound. ${southData.wait_time || 'Expected wait time'}. Congestion: ${southData.congestion}%`,
                         time: 'Just now',
                         unread: true,
                         station: station,

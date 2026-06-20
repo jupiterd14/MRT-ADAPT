@@ -2,6 +2,8 @@ import os
 import pickle
 import tensorflow as tf
 from tensorflow.keras.saving import register_keras_serializable
+from sklearn.preprocessing import MinMaxScaler
+import numpy as np
 
 directional_models = {}
 directional_scalers = {}
@@ -88,7 +90,25 @@ def debug_prediction(station, direction, features):
     
     return pred_congestion
 
-def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_v5'):
+def fix_target_scalers_to_percentage():
+    """
+    DEPRECATED: This was the wrong fix!
+    Fix target scalers to convert model output (0-1) to percentages (0-100)
+    This ensures predictions are in the 0-100% range
+    """
+    global directional_scalers
+    
+    fixed_count = 0
+    skipped_count = 0
+    
+    print("\n" + "="*50)
+    print("⚠️ DEPRECATED: fix_target_scalers_to_percentage() is the WRONG fix!")
+    print("   Use fix_target_scalers_to_passenger_counts() instead")
+    print("="*50)
+    
+    return 0
+
+def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_v8'):
     global directional_models, directional_scalers
     
     directional_models = {}
@@ -139,7 +159,7 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
                 else:
                     print(f"    ⚠️ Feature scaler not found: {feature_scaler_path}")
                 
-                # Load target scaler - FIXED: Make sure this is loaded properly
+                # Load target scaler
                 if os.path.exists(target_scaler_path):
                     with open(target_scaler_path, 'rb') as f:
                         directional_scalers[f'{model_key}_target'] = pickle.load(f)
@@ -165,6 +185,162 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
         print(f"   Examples: {target_scalers[:3]}")
     
     return directional_models, directional_scalers
+
+def fix_target_scalers_to_passenger_counts(STATIONS):
+    """
+    Fix target scalers to output passenger counts (0-8000) instead of percentages (0-100)
+    This is the CORRECT fix for models trained on passenger counts
+    """
+    global directional_scalers
+    from sklearn.preprocessing import MinMaxScaler
+    import numpy as np
+    
+    print("\n" + "="*60)
+    print("🔧 FIXING TARGET SCALERS TO PASSENGER COUNTS")
+    print("="*60)
+    
+    fixed_count = 0
+    skipped_count = 0
+    
+    for station in STATIONS:
+        for direction in ['Northbound', 'Southbound']:
+            model_key = f"{station}_{direction}"
+            target_key = f"{model_key}_target"
+            
+            if target_key in directional_scalers:
+                # Get the current scaler
+                current_scaler = directional_scalers[target_key]
+                
+                # Check if it's already a passenger scaler (max > 100)
+                if hasattr(current_scaler, 'data_max_'):
+                    current_max = float(current_scaler.data_max_[0])
+                    
+                    # If max > 100, it's already a passenger scaler
+                    if current_max > 100:
+                        skipped_count += 1
+                        print(f"   ⏭️  {target_key} already passenger scaler (max={current_max:.0f})")
+                        continue
+                
+                # Get the station capacity from MRT3_PLATFORM_CAPACITY
+                try:
+                    # Try to import from config or routes
+                    from services.feature_engineering import MRT3_PLATFORM_CAPACITY
+                    capacity = MRT3_PLATFORM_CAPACITY.get(station, 1142)
+                except:
+                    # Fallback capacities
+                    capacities = {
+                        "North Ave": 1142, "Quezon Ave": 1195, "Kamuning": 1364,
+                        "Cubao": 1747, "Santolan": 1306, "Ortigas": 1331,
+                        "Shaw Blvd": 1619, "Boni Ave": 1417, "Guadalupe": 1301,
+                        "Buendia": 1645, "Ayala Ave": 1222, "Magallanes": 1202,
+                        "Taft": 720
+                    }
+                    capacity = capacities.get(station, 1142)
+                
+                # Calculate max passengers based on capacity
+                # Models were trained on 2022-2024 data with max ~5000-6000 passengers
+                # Use 6x capacity as safe upper bound, capped at 8000
+                max_passengers = min(int(capacity * 6), 8000)
+                
+                # Ensure minimum of 1000 passengers
+                max_passengers = max(max_passengers, 1000)
+                
+                # Create new scaler for passenger counts
+                new_scaler = MinMaxScaler()
+                # Fit to 0 to max_passengers
+                dummy_data = np.array([[0], [max_passengers]])
+                new_scaler.fit(dummy_data)
+                
+                # Store the min/max info
+                new_scaler.data_min_ = np.array([0.0])
+                new_scaler.data_max_ = np.array([float(max_passengers)])
+                new_scaler.scale_ = np.array([1.0 / max_passengers])
+                new_scaler.min_ = np.array([0.0])
+                
+                # Replace the scaler
+                directional_scalers[target_key] = new_scaler
+                fixed_count += 1
+                print(f"   ✅ Fixed {target_key}: 0 → {max_passengers} passengers")
+    
+    print(f"\n✅ Fixed {fixed_count} target scalers to passenger counts")
+    if skipped_count > 0:
+        print(f"   ⏭️  Skipped {skipped_count} scalers (already passenger scalers)")
+    
+    return fixed_count
+
+def fix_target_scalers_to_passenger_counts_auto(STATIONS):
+    """
+    Automatically fix scalers based on actual training data
+    Uses the historical data to determine correct passenger ranges
+    """
+    global directional_scalers, historical_entry
+    
+    print("\n" + "="*60)
+    print("🔧 AUTO-FIXING TARGET SCALERS USING HISTORICAL DATA")
+    print("="*60)
+    
+    fixed_count = 0
+    
+    # Get actual passenger ranges from training data
+    from services.feature_engineering import get_station_dataframe
+    
+    for station in STATIONS:
+        for direction in ['Northbound', 'Southbound']:
+            model_key = f"{station}_{direction}"
+            target_key = f"{model_key}_target"
+            
+            if target_key not in directional_scalers:
+                continue
+            
+            try:
+                # Get actual data for this station/direction
+                hourly = get_station_dataframe(station, direction)
+                
+                if hourly is not None and len(hourly) > 0:
+                    # Get actual passenger min/max from training data
+                    actual_min = float(hourly['TotalPassenger'].min())
+                    actual_max = float(hourly['TotalPassenger'].max())
+                    
+                    # Add 10% buffer to max
+                    max_passengers = int(actual_max * 1.1)
+                    
+                    # Create new scaler with actual data range
+                    new_scaler = MinMaxScaler()
+                    dummy_data = np.array([[actual_min], [max_passengers]])
+                    new_scaler.fit(dummy_data)
+                    
+                    new_scaler.data_min_ = np.array([actual_min])
+                    new_scaler.data_max_ = np.array([float(max_passengers)])
+                    new_scaler.scale_ = np.array([1.0 / (max_passengers - actual_min)]) if max_passengers > actual_min else np.array([1.0])
+                    new_scaler.min_ = np.array([actual_min])
+                    
+                    directional_scalers[target_key] = new_scaler
+                    fixed_count += 1
+                    print(f"   ✅ Fixed {target_key}: {actual_min:.0f} → {max_passengers} passengers (from actual data)")
+                else:
+                    print(f"   ⚠️ No data for {target_key}, using default range")
+                    # Use default fix
+                    from services.feature_engineering import MRT3_PLATFORM_CAPACITY
+                    capacity = MRT3_PLATFORM_CAPACITY.get(station, 1142)
+                    max_passengers = min(int(capacity * 6), 8000)
+                    
+                    new_scaler = MinMaxScaler()
+                    dummy_data = np.array([[0], [max_passengers]])
+                    new_scaler.fit(dummy_data)
+                    new_scaler.data_min_ = np.array([0.0])
+                    new_scaler.data_max_ = np.array([float(max_passengers)])
+                    new_scaler.scale_ = np.array([1.0 / max_passengers])
+                    new_scaler.min_ = np.array([0.0])
+                    
+                    directional_scalers[target_key] = new_scaler
+                    fixed_count += 1
+                    print(f"   ✅ Fixed {target_key}: 0 → {max_passengers} passengers (default range)")
+                    
+            except Exception as e:
+                print(f"   ❌ Error fixing {target_key}: {e}")
+    
+    print(f"\n✅ Auto-fixed {fixed_count} target scalers using historical data")
+    return fixed_count
 
 def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY, 
                                historical_cache='historical_data_cache_2023_2024.pkl'):
@@ -275,8 +451,31 @@ target_scalers = [k for k in directional_scalers.keys() if 'target' in k.lower()
 print(f"✅ Found {len(target_scalers)} target scalers")
 if target_scalers:
     print(f"   Example target scaler: {target_scalers[0]}")
-    
-# At the end of model_loader.py, after load_directional_models()
+
+# ========== CRITICAL FIX: Fix target scalers to passenger counts ==========
+# The models were trained on passenger counts, NOT percentages!
+# The scalers were incorrectly set to 0-100 (percentage) but should be 0-8000 (passengers)
+print("\n" + "="*50)
+print("🔧 APPLYING CRITICAL FIX: Converting scalers to passenger counts...")
+print("="*50)
+
+# Option 1: Auto-fix using historical data (recommended)
+print("\nUsing auto-fix with historical data...")
+fix_target_scalers_to_passenger_counts_auto(STATIONS)
+
+# Option 2: Manual fix with station capacities (fallback)
+# fix_target_scalers_to_passenger_counts(STATIONS)
+
+# Print final scaler info
+print("\n" + "="*50)
+print("📊 FINAL SCALER STATUS:")
+print("="*50)
+for key in directional_scalers.keys():
+    if '_target' in key:
+        scaler = directional_scalers[key]
+        if hasattr(scaler, 'data_max_'):
+            print(f"  {key}: min={float(scaler.data_min_[0]):.1f}, max={float(scaler.data_max_[0]):.1f}")
+
 print("=" * 50)
 print("✅ model_loader.py loaded successfully!")
 print(f"✅ directional_models count: {len(directional_models)}")

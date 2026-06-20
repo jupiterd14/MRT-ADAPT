@@ -49,6 +49,8 @@ from routes import (
 _MODELS_CACHE = {}
 _MODELS_CACHE_FILE = None
 
+
+
 def get_models_cache_path():
     """Get a persistent cache file path for models"""
     cache_dir = tempfile.gettempdir()
@@ -102,6 +104,8 @@ def load_models_with_cache(stations, models_path):
     
     return directional_models, directional_scalers
 
+
+
 def load_historical_with_cache(stations, base_capacity):
     """Load historical data with disk caching"""
     cache_file = get_historical_cache_path()
@@ -134,6 +138,10 @@ def load_historical_with_cache(stations, base_capacity):
 # ============ APP INITIALIZATION ============
 app = Flask(__name__, template_folder='html', static_folder='static')
 app.config.from_object(Config)
+
+@app.route('/api/test')
+def api_test():
+    return jsonify({"status": "ok", "message": "API is working", "time": datetime.now().isoformat()})
 
 db.init_app(app)
 
@@ -169,7 +177,7 @@ print("LOADING MRT-3 PREDICTION SYSTEM")
 print("="*50)
 
 # Load models with caching
-DIRECTIONAL_MODELS_PATH = 'models_2022-2024_v4'
+DIRECTIONAL_MODELS_PATH = 'models_2022-2024_v8'
 directional_models_cached, directional_scalers_cached = load_models_with_cache(STATIONS, DIRECTIONAL_MODELS_PATH)
 
 # Load historical data with caching
@@ -191,6 +199,7 @@ app.config['DIRECTIONAL_MODELS'] = directional_models_cached
 app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
 
 print("="*50 + "\n")
+
 
 # ============ WRAPPER FUNCTIONS ============
 def get_directional_prediction_wrapper(station_name, direction, target_datetime=None):
@@ -353,7 +362,36 @@ def raw_prediction(station_name, direction):
         return jsonify({
             'error': str(e),
             'traceback': traceback.format_exc()
-        })@app.route('/debug/test-real-model/<station_name>')
+        })
+@app.route('/debug/feature-sequence-test/<station>/<direction>')
+def test_feature_sequence(station, direction):
+    """Test if feature sequence generation is working"""
+    from services.feature_engineering import get_feature_sequence_for_station
+    from datetime import datetime
+    from urllib.parse import unquote
+    
+    # Decode the URL-encoded station name (convert %20 back to space)
+    station = unquote(station)
+    direction = unquote(direction)
+    
+    now = datetime.now()
+    sequence = get_feature_sequence_for_station(station, direction, now)
+    
+    result = {
+        "station": station,
+        "direction": direction,
+        "target_time": now.isoformat(),
+        "sequence_is_none": sequence is None,
+        "sequence_shape": sequence.shape if sequence is not None else None,
+        "current_working_directory": os.getcwd(),
+        "data_file_exists": os.path.exists('data (2022-2024)/2025.csv'),
+        "alternative_path_exists": os.path.exists('../data (2022-2024)/2025.csv'),
+        "models_loaded": len(directional_models_cached)
+    }
+    
+    return jsonify(result)
+
+
 def test_real_model(station_name):
     """Test if real models are being used"""
     from services import get_feature_sequence_for_station
