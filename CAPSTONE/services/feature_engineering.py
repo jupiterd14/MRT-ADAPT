@@ -346,7 +346,7 @@ def get_baseline_features(target_datetime, seq_length=24):
     return _BASELINE_FEATURES_CACHE[cache_key].copy()
 
 def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
-    """Get feature sequence with RAW PASSENGER COUNTS for lookback - SUPPORTS 2025"""
+    """Get feature sequence - congestion is scaled, then ALL 29 features go through scaler"""
     station_name = unquote(station_name)
     direction = unquote(direction)
     
@@ -355,50 +355,40 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
         print(f"⚠️ No hourly data for {station_name} {direction}, using baseline")
         return get_baseline_features(target_datetime, seq_length)
     
-    # ========== FIX: Handle 2025 predictions ==========
-    # Use 2024 data as lookback for 2025 predictions
+    # Handle 2025 predictions
     if target_datetime.year >= 2025:
-        # Use the same time from 2024
         try:
             lookback_end = target_datetime.replace(year=2024)
         except:
-            # If invalid date (e.g., Feb 29), use Feb 28
             lookback_end = target_datetime.replace(year=2024, month=2, day=28)
         start_lookback = lookback_end - timedelta(hours=seq_length)
-        # print(f"📅 Using 2024 lookback for 2025 prediction: {start_lookback.strftime('%Y-%m-%d %H:%M')} to {lookback_end.strftime('%Y-%m-%d %H:%M')}")
     else:
-        # Normal lookback
         start_lookback = target_datetime - timedelta(hours=seq_length)
         lookback_end = target_datetime
-        # print(f"📅 Using normal lookback: {start_lookback.strftime('%Y-%m-%d %H:%M')} to {lookback_end.strftime('%Y-%m-%d %H:%M')}")
     
     # Get available data in the window
     sequence_df = hourly[(hourly.index >= start_lookback) & (hourly.index < lookback_end)]
     
     available_rows = len(sequence_df)
     
-    # If no data found, use baseline
     if available_rows == 0:
-        # print(f"🌙 No historical data for {station_name} {direction} at {target_datetime}, using baseline")
         return get_baseline_features(target_datetime, seq_length)
     
+    # Get features with raw passenger counts
     if available_rows == seq_length:
-        features = sequence_df[FEATURE_COLS].copy()
-        features = features.values.astype(np.float32)
-        # print(f"✅ Using {available_rows} hours of historical data")
+        features_df = sequence_df[FEATURE_COLS].copy()
+        features = features_df.values.astype(np.float32)
     elif available_rows >= 10:
-        # print(f"⚠️ Only {available_rows}/{seq_length} hours available")
-        features = sequence_df[FEATURE_COLS].values.astype(np.float32)
+        features_df = sequence_df[FEATURE_COLS].copy()
+        features = features_df.values.astype(np.float32)
         if available_rows < seq_length:
             missing_count = seq_length - available_rows
             baseline_features = get_baseline_features(target_datetime, missing_count)
             features = np.vstack([baseline_features, features])
-            # print(f"   Padded with {missing_count} baseline hours")
     else:
-        # print(f"🌙 Not enough data ({available_rows} rows), using full baseline")
         return get_baseline_features(target_datetime, seq_length)
     
-    # Ensure we have exactly seq_length rows
+    # Ensure exactly seq_length rows
     if len(features) != seq_length:
         if len(features) > seq_length:
             features = features[:seq_length]
@@ -406,15 +396,88 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
             while len(features) < seq_length:
                 features = np.vstack([features, features[-1:]])
     
-    # Scale features
+    # ========== SCALE CONGESTION USING TARGET SCALER ==========
+    target_scaler = get_target_scaler(station_name, direction)
+    congestion_idx = -1
+    
+    if target_scaler is not None:
+        try:
+            # Extract raw congestion and scale using target scaler
+            raw_congestion = features[:, congestion_idx].reshape(-1, 1)
+            scaled_congestion = target_scaler.transform(raw_congestion)
+            
+            # Replace the congestion column with the scaled version
+            features[:, congestion_idx] = scaled_congestion.flatten()
+            
+            print(f"   📊 {station_name} {direction}: Using target scaler max={target_scaler.data_max_[0]:.0f}")
+            print(f"   📊 Raw congestion: min={raw_congestion.min():.1f}, max={raw_congestion.max():.1f}")
+            print(f"   📊 Scaled congestion: min={features[:, congestion_idx].min():.4f}, max={features[:, congestion_idx].max():.4f}, mean={features[:, congestion_idx].mean():.4f}")
+            
+        except Exception as e:
+            print(f"   ⚠️ Target scaler failed: {e}")
+            # Fallback: use capacity-based scaling
+            capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+            max_scale = capacity * 2.0
+            features[:, congestion_idx] = features[:, congestion_idx] / max_scale
+            features[:, congestion_idx] = np.clip(features[:, congestion_idx], 0, 1)
+    else:
+        # Fallback: use capacity-based scaling
+        print(f"   ⚠️ No target scaler, using capacity fallback")
+        capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        max_scale = capacity * 2.0
+        features[:, congestion_idx] = features[:, congestion_idx] / max_scale
+        features[:, congestion_idx] = np.clip(features[:, congestion_idx], 0, 1)
+    
+    # ========== APPLY FEATURE SCALER TO ALL 29 FEATURES ==========
     feature_scaler = get_feature_scaler(station_name, direction)
+    
     if feature_scaler is not None:
         try:
+            # Scale ALL 29 features (including the now-scaled congestion column)
             features = feature_scaler.transform(features)
+            print(f"   ✅ Scaled all 29 features with feature scaler")
+            print(f"   ✅ Final shape: {features.shape}")
+            
         except Exception as e:
-            print(f"   ⚠️ Scaling failed: {e}")
+            print(f"   ⚠️ Feature scaling failed: {e}")
     
     return features
+
+# Add this global cache
+_TARGET_SCALER_CACHE = {}
+
+def get_target_scaler(station_name, direction):
+    """Load the target scaler for a station-direction"""
+    cache_key = f"{station_name}_{direction}"
+    
+    # Check cache
+    if cache_key in _TARGET_SCALER_CACHE:
+        return _TARGET_SCALER_CACHE[cache_key]
+    
+    # Load from disk
+    model_folder = 'models_2022-2024_v8'
+    scaler_path = f'{model_folder}/{cache_key}_target_scaler.pkl'
+    
+    # Try alternative naming
+    if not os.path.exists(scaler_path):
+        alt_path = f'{model_folder}/{cache_key.replace(" ", "_")}_target_scaler.pkl'
+        if os.path.exists(alt_path):
+            scaler_path = alt_path
+    
+    if os.path.exists(scaler_path):
+        try:
+            with open(scaler_path, 'rb') as f:
+                _TARGET_SCALER_CACHE[cache_key] = pickle.load(f)
+            print(f"   ✅ Loaded target scaler for {cache_key}")
+            return _TARGET_SCALER_CACHE[cache_key]
+        except Exception as e:
+            print(f"   ⚠️ Error loading target scaler: {e}")
+            _TARGET_SCALER_CACHE[cache_key] = None
+    else:
+        print(f"   ⚠️ No target scaler found at: {scaler_path}")
+        _TARGET_SCALER_CACHE[cache_key] = None
+    
+    return _TARGET_SCALER_CACHE[cache_key]
 
 # Keep the original load_data function for backward compatibility
 def load_data():

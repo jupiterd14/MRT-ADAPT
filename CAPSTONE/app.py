@@ -43,7 +43,7 @@ from services import (
 from routes import (
     auth_bp, user_bp, admin_bp, operator_bp, public_bp,
     api_predict_bp, api_schedule_bp, api_reports_bp, api_other_bp,
-    model_perf_bp 
+    model_perf_bp, email_bp  # ADD email_bp HERE
 )
 # ============ CACHE SETUP FOR FAST RELOADS ============
 _MODELS_CACHE = {}
@@ -166,6 +166,7 @@ app.register_blueprint(api_schedule_bp, url_prefix='/api')
 app.register_blueprint(api_reports_bp, url_prefix='/api')
 app.register_blueprint(api_other_bp, url_prefix='/api')
 app.register_blueprint(model_perf_bp, url_prefix='/api')
+app.register_blueprint(email_bp, url_prefix='/api/profile')
 
 @app.context_processor
 def inject_now():

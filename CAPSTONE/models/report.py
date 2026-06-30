@@ -16,4 +16,12 @@ class Report(db.Model):
     reviewed = db.Column(db.Boolean, default=False)
     flag_count = db.Column(db.Integer, default=0)
     
+    # ========== ADD THESE LINES ==========
+    archived = db.Column(db.Boolean, default=False)  # Soft delete flag
+    archived_at = db.Column(db.DateTime, nullable=True)
+    archived_by = db.Column(db.String(100), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reviewed_by = db.Column(db.String(100), nullable=True)
+    # =====================================
+    
     user = db.relationship('User', backref=db.backref('reports', lazy=True))

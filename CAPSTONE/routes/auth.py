@@ -61,6 +61,12 @@ def login():
         password = request.form.get('password')
         ip_address = request.remote_addr
         
+        print(f"\n{'='*50}")
+        print(f"🔑 LOGIN ATTEMPT")
+        print(f"   Email: {email}")
+        print(f"   Password entered: {password}")
+        print(f"{'='*50}\n")
+        
         admin_email = os.getenv('ADMIN_EMAIL')
         admin_password = os.getenv('ADMIN_PASSWORD')
         
@@ -76,38 +82,51 @@ def login():
         user = User.query.filter_by(username=email).first()
         
         if user is None:
+            print(f"❌ User not found: {email}")
             error = "Account not found."
             error_type = "error"
         elif not user.is_active:
+            print(f"❌ Account deactivated: {email}")
             error = "Account deactivated."
             error_type = "error"
         elif user.google_id and not user.has_password():
+            print(f"ℹ️ Google account - no password: {email}")
             error = "This account uses Google Sign-In. Please click 'Continue with Google'."
             error_type = "info"
-        elif user.verify_password(password):
-            session.clear()
-            session.permanent = True
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['role'] = user.role
-            session['favorite_station'] = user.favorite_station
-            session['google_user'] = False
-            
-            user.last_login = datetime.now()
-            db.session.commit()
-            
-            log_activity(user.id, user.role, user.username, 'login_success', 
-                        f'Logged in from IP: {ip_address}')
-            
-            if user.role == 'admin':
-                return redirect(url_for('admin.admin_dashboard'))
-            elif user.role == 'operator':
-                return redirect(url_for('operator.operator_dashboard'))
-            else:
-                return redirect(url_for('user.user_dashboard'))
         else:
-            error = "Incorrect password."
-            error_type = "error"
+            print(f"👤 User found: {user.username}")
+            print(f"   Password hash in DB: {user.password_hash[:30] if user.password_hash else 'None'}...")
+            
+            # Try verification
+            result = user.verify_password(password)
+            print(f"   Password verification result: {'✅ PASS' if result else '❌ FAIL'}")
+            
+            if result:
+                print(f"✅ Login successful for {email}")
+                session.clear()
+                session.permanent = True
+                session['user_id'] = user.id
+                session['username'] = user.username
+                session['role'] = user.role
+                session['favorite_station'] = user.favorite_station
+                session['google_user'] = False
+                
+                user.last_login = datetime.now()
+                db.session.commit()
+                
+                log_activity(user.id, user.role, user.username, 'login_success', 
+                            f'Logged in from IP: {ip_address}')
+                
+                if user.role == 'admin':
+                    return redirect(url_for('admin.admin_dashboard'))
+                elif user.role == 'operator':
+                    return redirect(url_for('operator.operator_dashboard'))
+                else:
+                    return redirect(url_for('user.user_dashboard'))
+            else:
+                print(f"❌ Incorrect password for {email}")
+                error = "Incorrect password."
+                error_type = "error"
     
     return render_template('login.html', error=error, error_type=error_type)
 

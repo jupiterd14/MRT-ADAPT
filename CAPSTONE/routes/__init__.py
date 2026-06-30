@@ -7,10 +7,11 @@ from .api_predict import api_predict_bp
 from .api_schedule import api_schedule_bp
 from .api_reports import api_reports_bp
 from .api_other import api_other_bp
-from .api_model_performance import model_perf_bp  
+from .api_model_performance import model_perf_bp
+from .api_email import email_bp  # ADD THIS LINE
 
 __all__ = [
     'auth_bp', 'user_bp', 'admin_bp', 'operator_bp', 'public_bp',
     'api_predict_bp', 'api_schedule_bp', 'api_reports_bp', 'api_other_bp',
-    'model_perf_bp'  
+    'model_perf_bp', 'email_bp'  # ADD email_bp HERE
 ]

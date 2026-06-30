@@ -19,6 +19,8 @@
             --text-gray: #94a3b8;
             --error-red: #ef4444;
             --error-bg: rgba(239, 68, 68, 0.1);
+            --success-green: #22c55e;
+            --success-bg: rgba(34, 197, 94, 0.1);
         }
 
         body, html {
@@ -106,6 +108,8 @@
             outline: none;
         }
 
+        input::placeholder { color: #64748b; }
+
         .toggle-eye {
             position: absolute; right: 18px; top: 50%;
             transform: translateY(-50%); cursor: pointer; color: var(--text-gray);
@@ -132,6 +136,8 @@
             font-size: 14px;
         }
 
+        .btn-social:hover { background: rgba(255,255,255,0.05); }
+
         .btn-signin {
             width: 100%;
             background: var(--btn-blue);
@@ -145,10 +151,30 @@
 
         .btn-signin:hover {
             background: rgb(35, 35, 172);
+            transform: translateY(-2px);
+        }
+
+        .btn-signin:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .signup-link { text-align: center; margin-top: 25px; font-size: 14px; color: var(--text-gray); }
         .signup-link a { color: #38bdf8; text-decoration: none; font-weight: 600; }
+
+        .forgot-link {
+            color: var(--btn-blue);
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .forgot-link:hover {
+            color: #60a5fa;
+            text-decoration: underline;
+        }
 
         /* Modal Styles */
         .modal-overlay {
@@ -168,32 +194,50 @@
 
         .modal-content {
             background: #1a2634;
-            border: 1px solid var(--error-red);
+            border: 1px solid var(--card-border);
             border-radius: 30px;
             padding: 30px 40px;
-            max-width: 400px;
+            max-width: 420px;
             width: 90%;
             text-align: center;
             animation: slideUp 0.3s ease;
-            box-shadow: 0 20px 40px rgba(239, 68, 68, 0.2);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .modal-content.error {
+            border-color: var(--error-red);
+        }
+
+        .modal-content.success {
+            border-color: var(--success-green);
         }
 
         .modal-icon {
             width: 70px;
             height: 70px;
-            background: var(--error-bg);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 20px;
+        }
+
+        .modal-icon.error {
+            background: var(--error-bg);
             border: 2px solid var(--error-red);
+        }
+
+        .modal-icon.success {
+            background: var(--success-bg);
+            border: 2px solid var(--success-green);
         }
 
         .modal-icon i {
             font-size: 35px;
-            color: var(--error-red);
         }
+
+        .modal-icon.error i { color: var(--error-red); }
+        .modal-icon.success i { color: var(--success-green); }
 
         .modal-title {
             font-size: 24px;
@@ -210,21 +254,122 @@
         }
 
         .modal-btn {
-            background: var(--error-red);
-            color: white;
-            border: none;
             padding: 12px 40px;
             border-radius: 30px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
+            border: none;
+            color: white;
         }
 
-        .modal-btn:hover {
+        .modal-btn.error {
+            background: var(--error-red);
+        }
+
+        .modal-btn.error:hover {
             background: #dc2626;
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        .modal-btn.success {
+            background: var(--success-green);
+        }
+
+        .modal-btn.success:hover {
+            background: #16a34a;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3);
+        }
+
+        .modal-btn.secondary {
+            background: transparent;
+            border: 1px solid var(--text-gray);
+            color: var(--text-gray);
+        }
+
+        .modal-btn.secondary:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .modal-actions .modal-btn {
+            flex: 1;
+        }
+
+        /* Forgot Password Modal specific */
+        .forgot-step {
+            display: none;
+        }
+
+        .forgot-step.active {
+            display: block;
+        }
+
+        .code-input-wrapper {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .code-input {
+            width: 50px;
+            height: 60px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+            border: 2px solid var(--card-border);
+            border-radius: 12px;
+            background: var(--input-bg);
+            color: white;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .code-input:focus {
+            border-color: var(--btn-blue);
+        }
+
+        .code-input-filled {
+            border-color: var(--success-green);
+        }
+
+        .timer-text {
+            color: var(--text-gray);
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        .timer-text span {
+            color: #fbbf24;
+            font-weight: 600;
+        }
+
+        .resend-btn {
+            background: none;
+            border: none;
+            color: var(--btn-blue);
+            cursor: pointer;
+            font-size: 13px;
+            text-decoration: underline;
+            padding: 0;
+        }
+
+        .resend-btn:hover {
+            color: #60a5fa;
+        }
+
+        .resend-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         @keyframes fadeIn {
@@ -243,7 +388,6 @@
             }
         }
 
-        /* Shake animation for form */
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
             10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
@@ -254,7 +398,7 @@
             animation: shake 0.5s ease;
         }
 
-        /* MOBILE RESPONSIVE FIX */
+        /* MOBILE RESPONSIVE */
         @media (max-width: 600px) {
             .page-container { padding: 5px; }
             .auth-card {
@@ -289,9 +433,16 @@
             .modal-message {
                 font-size: 14px;
             }
+            .code-input {
+                width: 40px;
+                height: 50px;
+                font-size: 20px;
+            }
+            .modal-actions {
+                flex-direction: column;
+            }
         }
 
-        /* Extra small screen height fix */
         @media (max-height: 600px) {
             .brand-header { margin-bottom: 10px; }
             .auth-card { padding: 15px 30px; }
@@ -302,14 +453,78 @@
 <body>
 
     <!-- Error Modal -->
-    <div class="modal-overlay" id="errorModal">
-        <div class="modal-content">
-            <div class="modal-icon">
+    <div id="errorModal" class="modal-overlay">
+        <div class="modal-content error">
+            <div class="modal-icon error">
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
             <h2 class="modal-title">Login Failed</h2>
             <p class="modal-message" id="errorMessage">Invalid email or password. Please try again.</p>
-            <button class="modal-btn" onclick="closeModal()">Try Again</button>
+            <button class="modal-btn error" onclick="closeModal('errorModal')">Try Again</button>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgotModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-icon" id="forgotIcon" style="background: var(--success-bg); border: 2px solid var(--btn-blue);">
+                <i class="fas fa-key" style="color: var(--btn-blue); font-size: 30px;"></i>
+            </div>
+
+            <!-- Step 1: Enter Email -->
+            <div id="forgotStep1" class="forgot-step active">
+                <h2 class="modal-title">Reset Password</h2>
+                <p class="modal-message">Enter your email address and we'll send you a 6-digit verification code.</p>
+                
+                <div class="field-wrap" style="margin-bottom: 25px;">
+                    <i class="fa-regular fa-envelope"></i>
+                    <input type="email" id="resetEmail" placeholder="you@email.com" style="padding-left: 50px;">
+                </div>
+
+                <div class="modal-actions">
+                    <button class="modal-btn secondary" onclick="closeModal('forgotModal')">Cancel</button>
+                    <button class="modal-btn" id="sendCodeBtn" style="background: var(--btn-blue);" onclick="sendResetCode()">
+                        <i class="fas fa-paper-plane"></i> Send Code
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Enter Code & New Password -->
+            <div id="forgotStep2" class="forgot-step">
+                <h2 class="modal-title">Verify Code</h2>
+                <p class="modal-message">Enter the 6-digit code sent to <strong id="resetEmailDisplay"></strong></p>
+                
+                <div class="code-input-wrapper">
+                    <input type="text" class="code-input" id="code1" maxlength="1" oninput="moveNext(this, 'code2')">
+                    <input type="text" class="code-input" id="code2" maxlength="1" oninput="moveNext(this, 'code3')">
+                    <input type="text" class="code-input" id="code3" maxlength="1" oninput="moveNext(this, 'code4')">
+                    <input type="text" class="code-input" id="code4" maxlength="1" oninput="moveNext(this, 'code5')">
+                    <input type="text" class="code-input" id="code5" maxlength="1" oninput="moveNext(this, 'code6')">
+                    <input type="text" class="code-input" id="code6" maxlength="1" oninput="moveNext(this, null)">
+                </div>
+
+                <div class="timer-text" id="timerDisplay">⏱️ <span id="timerSeconds">5:00</span> remaining</div>
+                <div style="margin-top: 6px;">
+                    <button class="resend-btn" id="resendBtn" onclick="resendCode()" disabled>Resend Code</button>
+                </div>
+
+                <div class="field-wrap" style="margin-top: 20px;">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" id="newPassword" placeholder="New password (min 8 chars)" style="padding-left: 50px;">
+                </div>
+                <div class="field-wrap">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" id="confirmPassword" placeholder="Confirm new password" style="padding-left: 50px;">
+                </div>
+                <div id="passwordMatchHint" style="font-size: 12px; color: var(--text-gray); text-align: left; margin-top: -10px; margin-bottom: 15px;"></div>
+
+                <div class="modal-actions">
+                    <button class="modal-btn secondary" onclick="closeModal('forgotModal')">Cancel</button>
+                    <button class="modal-btn" id="resetPasswordBtn" style="background: var(--success-green);" onclick="resetPassword()">
+                        <i class="fas fa-check"></i> Reset Password
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -334,9 +549,10 @@
                     <input type="password" name="password" id="password" placeholder="••••••••••••" required>
                     <i class="fa-solid fa-eye toggle-eye" id="toggleIcon"></i>
                 </div>
-<span style="display: flex; justify-content: flex-end; width: 100%;">
-    <a href="#" style="text-decoration:none; color:var(--btn-blue); font-size:12px; padding-right:20px;">Forgot Password?</a>
-</span>
+
+                <div style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 20px;">
+                    <span class="forgot-link" onclick="openForgotModal()">Forgot Password?</span>
+                </div>
 
                 <div class="divider"><span>OR</span></div>
 
@@ -353,7 +569,11 @@
     </div>
 
     <script>
-        // Toggle password visibility
+        let resetEmail = '';
+        let resetTimer = null;
+        let resetSeconds = 300;
+
+        // ========== TOGGLE PASSWORD VISIBILITY ==========
         const togglePassword = document.querySelector('#toggleIcon');
         const passwordInput = document.querySelector('#password');
         
@@ -364,73 +584,358 @@
             this.classList.toggle('fa-eye-slash');
         });
 
-        // Check for error parameter in URL
-        window.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const error = urlParams.get('error');
+        // ========== MODAL FUNCTIONS ==========
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'flex';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+            if (modalId === 'forgotModal') {
+                resetForgotForm();
+            }
+        }
+
+        function resetForgotForm() {
+            document.getElementById('forgotStep1').classList.add('active');
+            document.getElementById('forgotStep2').classList.remove('active');
+            document.getElementById('resetEmail').value = '';
+            document.querySelectorAll('.code-input').forEach(el => el.value = '');
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            document.getElementById('passwordMatchHint').textContent = '';
+            document.getElementById('timerDisplay').textContent = '⏱️ 5:00 remaining';
+            if (resetTimer) {
+                clearInterval(resetTimer);
+                resetTimer = null;
+            }
+            resetSeconds = 300;
+            document.getElementById('resendBtn').disabled = true;
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal-overlay')) {
+                event.target.style.display = 'none';
+                if (event.target.id === 'forgotModal') {
+                    resetForgotForm();
+                }
+            }
+        }
+
+        // ========== FORGOT PASSWORD ==========
+        function openForgotModal() {
+            resetForgotForm();
+            openModal('forgotModal');
+        }
+
+        async function sendResetCode() {
+            const email = document.getElementById('resetEmail').value.trim();
             
+            if (!email) {
+                showToast('Please enter your email address', 'error');
+                return;
+            }
+            
+            if (!email.includes('@') || !email.includes('.')) {
+                showToast('Please enter a valid email address', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('sendCodeBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+            try {
+                const response = await fetch('/api/profile/request-reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resetEmail = email;
+                    document.getElementById('resetEmailDisplay').textContent = email;
+                    
+                    // Switch to step 2
+                    document.getElementById('forgotStep1').classList.remove('active');
+                    document.getElementById('forgotStep2').classList.add('active');
+                    
+                    // Start timer
+                    startTimer();
+                    
+                    // Enable resend
+                    document.getElementById('resendBtn').disabled = true;
+                    
+                    showToast('✅ Verification code sent!', 'success');
+                } else {
+                    showToast(data.error || 'Failed to send code', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Failed to send request. Please try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Code';
+            }
+        }
+
+        async function resendCode() {
+            if (!resetEmail) {
+                showToast('Please enter your email first', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('resendBtn');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const response = await fetch('/api/profile/request-reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: resetEmail })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resetSeconds = 300;
+                    startTimer();
+                    btn.disabled = true;
+                    showToast('✅ New code sent!', 'success');
+                } else {
+                    showToast(data.error || 'Failed to resend', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Failed to resend. Please try again.', 'error');
+            } finally {
+                btn.disabled = true;
+                btn.textContent = 'Resend Code';
+            }
+        }
+
+        function startTimer() {
+            if (resetTimer) clearInterval(resetTimer);
+            
+            resetSeconds = 300;
+            updateTimerDisplay();
+
+            resetTimer = setInterval(() => {
+                resetSeconds--;
+                updateTimerDisplay();
+                
+                if (resetSeconds <= 0) {
+                    clearInterval(resetTimer);
+                    resetTimer = null;
+                    document.getElementById('timerDisplay').innerHTML = 
+                        '<span style="color: #ef4444;">Code expired. <button class="resend-btn" onclick="resendCode()" style="color: #ef4444;">Resend</button></span>';
+                    document.getElementById('resendBtn').disabled = false;
+                } else if (resetSeconds <= 60) {
+                    document.getElementById('resendBtn').disabled = true;
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(resetSeconds / 60);
+            const seconds = resetSeconds % 60;
+            document.getElementById('timerDisplay').innerHTML = 
+                `⏱️ <span style="color: ${resetSeconds <= 60 ? '#ef4444' : '#fbbf24'}; font-weight: 600;">${minutes}:${seconds.toString().padStart(2, '0')}</span> remaining`;
+        }
+
+        // ========== CODE INPUT HANDLING ==========
+        function moveNext(current, nextId) {
+            if (current.value.length === 1) {
+                if (nextId) {
+                    document.getElementById(nextId).focus();
+                } else {
+                    // All digits entered, auto-verify
+                    document.getElementById('newPassword').focus();
+                }
+            }
+        }
+
+        // Auto-advance and backspace on code inputs
+        document.querySelectorAll('.code-input').forEach((input, index, inputs) => {
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && this.value.length === 0 && index > 0) {
+                    inputs[index - 1].focus();
+                }
+                if (e.key === 'Enter') {
+                    document.getElementById('resetPasswordBtn').click();
+                }
+            });
+            
+            input.addEventListener('paste', function(e) {
+                e.preventDefault();
+                const paste = (e.clipboardData || window.clipboardData).getData('text');
+                const digits = paste.replace(/\D/g, '').slice(0, 6);
+                const inputs = document.querySelectorAll('.code-input');
+                digits.split('').forEach((digit, i) => {
+                    if (inputs[i]) inputs[i].value = digit;
+                });
+                if (digits.length === 6) {
+                    document.getElementById('newPassword').focus();
+                }
+            });
+        });
+
+        // ========== PASSWORD MATCH CHECK ==========
+        document.getElementById('newPassword').addEventListener('input', checkPasswordMatch);
+        document.getElementById('confirmPassword').addEventListener('input', checkPasswordMatch);
+
+        function checkPasswordMatch() {
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmPassword').value;
+            const hint = document.getElementById('passwordMatchHint');
+
+            if (confirmPass.length === 0) {
+                hint.textContent = '';
+                return;
+            }
+
+            if (newPass === confirmPass) {
+                hint.textContent = '✅ Passwords match';
+                hint.style.color = '#22c55e';
+            } else {
+                hint.textContent = '❌ Passwords do not match';
+                hint.style.color = '#ef4444';
+            }
+        }
+
+        // ========== RESET PASSWORD ==========
+        async function resetPassword() {
+            const code = document.querySelectorAll('.code-input');
+            const codeValue = Array.from(code).map(el => el.value).join('');
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (codeValue.length !== 6 || !/^\d{6}$/.test(codeValue)) {
+                showToast('Please enter a valid 6-digit code', 'error');
+                return;
+            }
+
+            if (!newPassword || newPassword.length < 8) {
+                showToast('Password must be at least 8 characters', 'error');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                showToast('Passwords do not match', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('resetPasswordBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting...';
+
+            try {
+                const response = await fetch('/api/profile/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: resetEmail,
+                        code: codeValue,
+                        new_password: newPassword
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('✅ Password reset successfully!', 'success');
+                    closeModal('forgotModal');
+                    
+                    // Pre-fill email on login form
+                    document.getElementById('email').value = resetEmail;
+                    document.getElementById('password').focus();
+                } else {
+                    showToast(data.error || 'Failed to reset password', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Failed to reset password. Please try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check"></i> Reset Password';
+            }
+        }
+
+        // ========== TOAST NOTIFICATION ==========
+        function showToast(message, type = 'info') {
+            // Remove existing toast
+            const existing = document.querySelector('.toast-notification');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = 'toast-notification';
+            
+            const colors = {
+                success: '#22c55e',
+                error: '#ef4444',
+                info: '#3b82f6'
+            };
+            
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                info: 'fa-info-circle'
+            };
+
+            toast.innerHTML = `
+                <i class="fas ${icons[type]}" style="color: ${colors[type]};"></i>
+                <span>${message}</span>
+            `;
+            
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 30px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #1e293b;
+                color: white;
+                padding: 14px 24px;
+                border-radius: 16px;
+                z-index: 9999;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-size: 14px;
+                font-family: 'Inter', sans-serif;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                border: 1px solid ${colors[type]}44;
+                animation: slideUp 0.3s ease;
+                max-width: 90%;
+            `;
+
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(-50%) translateY(20px)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // ========== LOGIN ERROR HANDLING ==========
+        window.addEventListener('DOMContentLoaded', function() {
             {% if error %}
-                showModal("{{ error }}");
+                showToast("{{ error }}", 'error');
             {% endif %}
         });
 
-        // Modal functions
-        function showModal(message) {
-            const modal = document.getElementById('errorModal');
-            const messageElement = document.getElementById('errorMessage');
-            const form = document.getElementById('loginForm');
-            
-            messageElement.textContent = message;
-            modal.style.display = 'flex';
-            
-            // Add shake animation to form
-            form.classList.add('shake');
-            
-            // Remove shake after animation
-            setTimeout(() => {
-                form.classList.remove('shake');
-            }, 500);
-            
-            // Highlight the fields with error
-            document.querySelectorAll('input').forEach(input => {
-                input.style.borderColor = '#ef4444';
-                setTimeout(() => {
-                    input.style.borderColor = '';
-                }, 1000);
-            });
-        }
-
-        function closeModal() {
-            const modal = document.getElementById('errorModal');
-            modal.style.display = 'none';
-            
-            // Focus on email field
-            document.getElementById('email').focus();
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('errorModal');
-            if (event.target === modal) {
-                closeModal();
-            }
-        }
-
-        // Close modal with Escape key
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                closeModal();
-            }
-        });
-
-        // Form submission handling
         document.getElementById('loginForm').addEventListener('submit', function(e) {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             
             if (!email || !password) {
                 e.preventDefault();
-                showModal('Please fill in both email and password fields.');
+                showToast('Please fill in both email and password fields.', 'error');
             }
         });
     </script>

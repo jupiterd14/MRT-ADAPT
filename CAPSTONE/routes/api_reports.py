@@ -3,6 +3,7 @@ from models import Report, User, db
 from datetime import datetime, timedelta
 import json, os, re, time
 from collections import defaultdict
+from config import Config
 
 api_reports_bp = Blueprint('api_reports', __name__)
 
@@ -47,7 +48,8 @@ def is_suspicious_remarks(remarks):
 def check_duplicate_report(station, congestion_value, user_id, minutes=10):
     if not user_id:
         return False
-    time_threshold = datetime.now() - timedelta(minutes=minutes)
+    # Use Config.get_current_time() for consistent year
+    time_threshold = Config.get_current_time() - timedelta(minutes=minutes)
     min_congestion = congestion_value - 15
     max_congestion = congestion_value + 15
     duplicate = Report.query.filter(
@@ -80,14 +82,13 @@ def get_reports():
         
         print(f"🔍 DEBUG: User role = {user_role}")
         
-        # TEMPORARY: Get ALL reports first to see what's in database
+        # Get ALL reports
         all_reports = Report.query.order_by(Report.timestamp.desc()).limit(50).all()
         print(f"🔍 DEBUG: Total reports in database: {len(all_reports)}")
         
         for r in all_reports[:5]:
-            print(f"🔍 DEBUG: Report {r.id} - is_flagged={getattr(r, 'is_flagged', 'MISSING')}, flag_count={r.flag_count}")
+            print(f"🔍 DEBUG: Report {r.id} - timestamp={r.timestamp}, flagged={getattr(r, 'is_flagged', 'MISSING')}")
         
-        # For now, return ALL reports without filtering to test
         reports = all_reports
         
         result = []
@@ -100,6 +101,11 @@ def get_reports():
                 except:
                     photo_paths = [report.photo_path] if report.photo_path else []
             
+            # Ensure timestamp is properly formatted
+            timestamp_str = None
+            if report.timestamp:
+                timestamp_str = report.timestamp.isoformat()
+            
             result.append({
                 'id': report.id,
                 'station': report.station,
@@ -109,7 +115,7 @@ def get_reports():
                 'remarks': report.remarks,
                 'anonymous': report.anonymous,
                 'username': report.user.username if report.user and not report.anonymous else None,
-                'timestamp': report.timestamp.isoformat() if report.timestamp else None,
+                'timestamp': timestamp_str,
                 'photo_path': report.photo_path,
                 'photo_paths': photo_paths,
                 'flag_count': getattr(report, 'flag_count', 0),
@@ -161,7 +167,7 @@ def is_operating_hours(check_time=None):
     Returns: bool (True if open, False if closed)
     """
     if check_time is None:
-        check_time = datetime.now()
+        check_time = Config.get_current_time()  # Use Config for consistent year
     
     hour = check_time.hour
     minute = check_time.minute
@@ -174,7 +180,7 @@ def is_operating_hours(check_time=None):
 
 def get_next_opening_time():
     """Get the next opening time as a string"""
-    now = datetime.now()
+    now = Config.get_current_time()  # Use Config for consistent year
     today_open = now.replace(hour=4, minute=30, second=0, microsecond=0)
     
     if now < today_open:
@@ -199,7 +205,6 @@ def report_congestion():
         
         if is_rate_limited(user_id, ip_address, limit=3, window=3600):
             return jsonify({"success": False, "error": "You've reached the limit of 3 reports per hour."}), 429
-        
         
         station = None
         direction = None
@@ -229,7 +234,9 @@ def report_congestion():
                             return jsonify({"success": False, "error": "Image too large (max 10MB)"}), 400
                         
                         safe_filename = file.filename.replace(' ', '_').replace('%', '')
-                        filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{safe_filename}"
+                        # Use Config.get_current_time() for consistent year in filenames
+                        current_time = Config.get_current_time()
+                        filename = f"{current_time.strftime('%Y%m%d_%H%M%S')}_{safe_filename}"
                         upload_folder = os.path.join('static', 'uploads', 'reports')
                         os.makedirs(upload_folder, exist_ok=True)
                         filepath = os.path.join(upload_folder, filename)
@@ -271,19 +278,33 @@ def report_congestion():
         
         photo_path_json = json.dumps(photo_paths) if photo_paths else None
         
+        # Use Config.get_current_time() for consistent year (2025)
+        current_time = Config.get_current_time()
+        
         report = Report(
-            user_id=user_id, station=station, direction=direction,
-            reported_congestion=reported, predicted_congestion=predicted,
+            user_id=user_id,
+            station=station,
+            direction=direction,
+            reported_congestion=reported,
+            predicted_congestion=predicted,
             remarks=remarks[:500] if remarks else None,
-            photo_path=photo_path_json, anonymous=anonymous
+            photo_path=photo_path_json,
+            anonymous=anonymous,
+            timestamp=current_time  # Use the correct year (2025)
         )
         
         db.session.add(report)
         db.session.commit()
         track_report_submission(user_id, ip_address, station)
         
-        return jsonify({"success": True, "message": "Report submitted successfully!",
-                       "photos": len(photo_paths), "direction": direction, "report_id": report.id})
+        return jsonify({
+            "success": True,
+            "message": "Report submitted successfully!",
+            "photos": len(photo_paths),
+            "direction": direction,
+            "report_id": report.id,
+            "timestamp": current_time.isoformat()
+        })
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
@@ -302,7 +323,9 @@ def flag_report(report_id):
         report.flag_count = (report.flag_count or 0) + 1
         
         if report.flag_count >= 3:
-            report.flagged = True
+            report.is_flagged = True
+            report.flagged_at = Config.get_current_time()
+            report.status = 'pending'
         
         db.session.commit()
         
@@ -330,7 +353,7 @@ def flag_report_user(report_id):
         # Auto-hide after 3 flags
         if report.flag_count >= 3:
             report.is_flagged = True
-            report.flagged_at = datetime.now()
+            report.flagged_at = Config.get_current_time()  # Use Config for consistent year
             report.status = 'pending'  # Needs admin review
             print(f"🔴 Report {report_id} automatically hidden after {report.flag_count} flags")
         

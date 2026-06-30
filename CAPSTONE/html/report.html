@@ -900,6 +900,18 @@ nav {
     transform: scale(0.95);
 }
 
+.nav-badge {
+    position: absolute;
+    right: 25px;
+    background: var(--red);
+    color: white;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: bold;
+    display: none;
+}
+
 .bottom-nav-item .nav-badge-mobile {
     position: absolute;
     top: 2px;
@@ -953,6 +965,13 @@ nav {
 
 /* Mobile responsive */
 @media screen and (max-width: 768px) {
+    
+ 
+      .pill {
+        padding: 2px 8px !important;
+        font-size: 10px !important;
+        border-radius: 14px !important;
+    }
      .remark-text {
         font-size: 11px;
         line-height: 1.4;
@@ -1237,213 +1256,42 @@ nav {
     }
     
     /* Adjust filter dropdown for mobile */
-    .dropdown-card {
+      .dropdown-card {
         position: fixed;
-        top: auto;
-        bottom: 80px;
-        right: 15px;
-        left: 15px;
-        width: auto;
-        max-width: none;
-        max-height: 70vh;
-        overflow-y: auto;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        bottom: auto !important;
+        right: auto !important;
+        width: 92% !important;
+        max-width: 400px !important;
+        max-height: 80vh !important;
+        overflow-y: auto !important;
+        padding: 20px !important;
+        border-radius: 20px !important;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+        margin: 0 !important;
+    }
+
+     
+
+     .dropdown-card.show {
+        display: block !important;
+    }
+
+     .filter-container {
+        position: relative;
+        z-index: 1001;
     }
     
+    .filter-header {
+        padding: 6px 12px !important;
+        font-size: 12px !important;
+    }
     .stations-grid {
         max-height: 200px;
     }
 }
-
-/* Extra small devices */
-@media screen and (max-width: 480px) {
-
-    .remark-none {
-        font-size: 10px;
-    }
-     .remark-text {
-        font-size: 10px;
-        line-height: 1.4;
-        padding: 8px;
-    }
-
-     .report-item {
-        padding: 10px !important;
-    }
-    
-    .report-item .station-name {
-        font-size: 14px !important;
-    }
-    
-    .report-item .level-text {
-        font-size: 10px !important;
-    }
-
-      .report-item > div:nth-child(3) {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-        }
-        
-        .report-item > div:nth-child(3) > button {
-            margin-left: 0 !important;
-            margin-top: 6px !important;
-        }
-    }
-    
-    /* Photos grid fix for mobile */
-    .report-item .photos-grid,
-    .report-item > div:last-child > div:last-child > div {
-        display: grid !important;
-        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)) !important;
-        gap: 6px !important;
-        margin-top: 10px !important;
-    }
-    
-    /* Photo container fix */
-    .report-item .photos-grid > div,
-    .report-item > div:last-child > div:last-child > div > div {
-        aspect-ratio: 1 !important;
-        width: 100% !important;
-    }
-    
-    /* Photos grid images */
-    .report-item .photos-grid img,
-    .report-item > div:last-child > div:last-child img {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: cover !important;
-    }
-    
-    /* Expanded content area */
-    .report-item > div:last-child {
-        margin-top: 12px !important;
-        padding-top: 12px !important;
-        clear: both !important;
-    }
-    
-    /* Remarks section */
-    .report-item .remarks {
-        margin-bottom: 10px !important;
-    }
-}
-
-    
-    .report-item > div:first-child .avatar {
-        width: 24px !important;
-        height: 24px !important;
-        font-size: 10px !important;
-    }
-    
-    .report-item > div:first-child .username {
-        font-size: 11px !important;
-    }
-    
-    .report-item .remarks {
-        font-size: 10px !important;
-        padding: 6px !important;
-    }
-    
-    .report-item .direction-badge {
-        font-size: 8px !important;
-        padding: 2px 6px !important;
-    }
-    
-    .report-item .photos-grid {
-        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
-        gap: 5px !important;
-    }
-
-     .direction-btn {
-        display: flex;
-        flex-direction: row !important;
-        gap: 8px !important;
-        
-    }
-
-     .direction-option {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        justify-content: center !important;
-        text-align: center;
-        padding: 10px 6px !important;
-        gap: 4px !important;
-    }
-
-      .direction-option i {
-        font-size: 18px !important;
-        margin-bottom: 2px;
-    }
-    
-    .direction-option span {
-        font-size: 11px !important;
-        font-weight: 600;
-    }
-    
-    .direction-option small {
-        display: block !important;
-        font-size: 8px !important;
-        margin-top: 2px;
-        white-space: normal;
-        line-height: 1.2;
-    }
-
-    .station-selector {
-        height: 40px;
-        font-size: 12px;
-    }
-    .report-grid {
-        gap: 8px;
-    }
-    
-    .report-card {
-        padding: 15px 8px;
-        min-height: 110px;
-    }
-    
-    .report-card i {
-        font-size: 35px;
-    }
-    
-    .report-card h3 {
-        font-size: 16px;
-    }
-    
-    .report-card p {
-        font-size: 12px;
-    }
-    
-    .direction-option {
-        padding: 8px !important;
-        font-size: 11px;
-        gap: 6px;
-    }
-    
-    .direction-option i {
-        font-size: 12px;
-    }
-    
-    .bottom-nav-items {
-        gap: 4px;
-    }
-    
-    .bottom-nav-item {
-        padding: 4px 6px;
-        font-size: 9px;
-    }
-    
-    .bottom-nav-item i {
-        font-size: 16px;
-    }
-    
-    .report-item > div:first-child {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-    }
-     .section-header h3 {
-    font-size: 14px;
-    }
-
 
 /* Mobile responsive - make everything smaller */
 @media screen and (max-width: 768px) {
@@ -1794,7 +1642,6 @@ nav {
         <a href="/alerts" class="bottom-nav-item">
             <i class="fas fa-exclamation-triangle"></i>
             <span>Alerts</span>
-            <span class="nav-badge-mobile" id="mobileAlertBadge" style="display: none;">0</span>
         </a>
         <a href="/report" class="bottom-nav-item active">
             <i class="fas fa-chart-line"></i>
@@ -1814,7 +1661,7 @@ nav {
             <a href="/user-dashboard" class="nav-item"><i class="fas fa-th-large"></i> Dashboard</a>
             <a href="/live-map" class="nav-item"><i class="fas fa-map-marked-alt"></i> Live Map</a>
             <a href="/travel-plan" class="nav-item"><i class="fas fa-route"></i> Travel Status</a>
-            <a href="/alerts" class="nav-item"><i class="fas fa-exclamation-triangle"></i> Alerts</a>
+            <a href="/alerts" class="nav-item"><i class="fas fa-exclamation-triangle"></i> Alerts  <span class="nav-badge" id="sidebarAlertCount">0</span></a>
             <a href="/report" class="nav-item active"><i class="fas fa-chart-line"></i> Report</a>
         </nav>
     </div>
@@ -1959,7 +1806,7 @@ nav {
                                     <div class="chip" data-date="today">Today</div>
                                     <div class="chip" data-date="yesterday">Yesterday</div>
                                     <div class="chip" data-date="week">7 days</div>
-                                    <div class="chip" data-date="month">30 days</div>
+                                    <div class="chip" data-date="month">30 days+</div>
                                 </div>
 
                                 <hr>
@@ -2085,7 +1932,15 @@ nav {
     let currentFlagReportId = null;
     let currentFlagStationName = null;
 
-    // Operating hours check functions - KEEP ONLY ONE COPY
+    // ========== ALERT CACHE VARIABLES ==========
+    let cachedAlertCount = null;
+    let cachedAlertCountTime = 0;
+    let cachedCongestionData = null;
+    let cachedCongestionTime = 0;
+    const ALERT_CACHE_DURATION = 60000; // 60 seconds cache
+    const CONGESTION_CACHE_DURATION = 120000; // 2 minutes for congestion data
+
+    // ========== OPERATING HOURS ==========
     function isOperatingHours() {
         const now = new Date();
         const hour = now.getHours();
@@ -2097,22 +1952,6 @@ nav {
         
         return currentTime >= OPERATING_START && currentTime < OPERATING_END;
     }
-
-
-    // Add this function near other helper functions
-function syncMobileAlertBadge() {
-    const desktopBadge = document.getElementById('alertBadge');
-    const mobileBadge = document.getElementById('mobileAlertBadge');
-    if (desktopBadge && mobileBadge) {
-        const count = parseInt(desktopBadge.textContent) || 0;
-        if (count > 0) {
-            mobileBadge.textContent = count > 9 ? '9+' : count;
-            mobileBadge.style.display = 'flex';
-        } else {
-            mobileBadge.style.display = 'none';
-        }
-    }
-}
 
     function getNextOpeningTime() {
         const now = new Date();
@@ -2129,6 +1968,194 @@ function syncMobileAlertBadge() {
         }
     }
 
+    // ========== SYNC MOBILE ALERT BADGE ==========
+    function syncMobileAlertBadge() {
+        const desktopBadge = document.getElementById('alertBadge');
+        const mobileBadge = document.getElementById('mobileAlertBadge');
+        if (desktopBadge && mobileBadge) {
+            const count = parseInt(desktopBadge.textContent) || 0;
+            if (count > 0) {
+                mobileBadge.textContent = count > 9 ? '9+' : count;
+                mobileBadge.style.display = 'flex';
+            } else {
+                mobileBadge.style.display = 'none';
+            }
+        }
+    }
+
+    // ========== FETCH ALERT COUNT WITH CACHING ==========
+    async function fetchAlertCount() {
+        const now = Date.now();
+        
+        // Use cached alert count if still valid
+        if (cachedAlertCount !== null && (now - cachedAlertCountTime) < ALERT_CACHE_DURATION) {
+            console.log('📦 Using cached alert count:', cachedAlertCount);
+            return cachedAlertCount;
+        }
+        
+        try {
+            // Get read status from localStorage
+            let readAlerts = new Set();
+            const saved = localStorage.getItem('readAlerts');
+            if (saved) {
+                readAlerts = new Set(JSON.parse(saved));
+            }
+            
+            // Calculate base alerts (time-based, no API calls)
+            let allAlerts = [];
+            
+            const nowDate = new Date();
+            const hour = nowDate.getHours();
+            
+            // 1. Rush Hour Alert
+            if ((hour >= 7 && hour <= 9)) {
+                allAlerts.push({ id: 'rush-morning-permanent' });
+            } else if ((hour >= 17 && hour <= 19)) {
+                allAlerts.push({ id: 'rush-evening-permanent' });
+            }
+            
+            // 2. Advisory Alert
+            if (hour >= 0 && hour < 5) {
+                allAlerts.push({ id: 'advisory-early-morning-permanent' });
+            } else if (hour >= 5 && hour < 7) {
+                allAlerts.push({ id: 'advisory-pre-rush-permanent' });
+            } else if (hour >= 10 && hour < 16) {
+                allAlerts.push({ id: 'advisory-midday-permanent' });
+            } else if (hour >= 20 && hour < 22.5) {
+                allAlerts.push({ id: 'advisory-late-evening-permanent' });
+            } else if (hour >= 22.5 || hour === 23) {
+                allAlerts.push({ id: 'advisory-service-ended-permanent' });
+            }
+            
+            // 3. Congestion Advisory
+            if (hour >= 21 || hour < 5) {
+                allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
+            } else if (hour >= 14 && hour < 17) {
+                allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
+            }
+            
+            // 4. Service Notices
+            const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
+            if (isWeekend) {
+                allAlerts.push({ id: 'service-weekend-permanent' });
+            }
+            if (hour >= 23 || hour <= 3) {
+                allAlerts.push({ id: 'service-maintenance-night-permanent' });
+            }
+            
+            // 5. Congestion alerts - fetch from API (with caching)
+            if (!cachedCongestionData || (now - cachedCongestionTime) > CONGESTION_CACHE_DURATION) {
+                try {
+                    const response = await fetch('/api/live-map/directions/v2');
+                    cachedCongestionData = await response.json();
+                    cachedCongestionTime = now;
+                    console.log('🔄 Fetched fresh congestion data');
+                } catch (e) {
+                    console.log('Could not fetch congestion alerts:', e);
+                    cachedCongestionData = { northbound: {}, southbound: {} };
+                }
+            } else {
+                console.log('📦 Using cached congestion data');
+            }
+            
+            // Add congestion alerts from cached data
+            const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
+                "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+                "Ayala Ave", "Magallanes", "Taft"];
+            
+            if (cachedCongestionData && cachedCongestionData.northbound && cachedCongestionData.southbound) {
+                for (const station of STATIONS) {
+                    const northData = cachedCongestionData.northbound[station];
+                    const southData = cachedCongestionData.southbound[station];
+                    
+                    if (northData && northData.congestion > 0) {
+                        allAlerts.push({ id: `congestion-${station}-northbound` });
+                    }
+                    if (southData && southData.congestion > 0) {
+                        allAlerts.push({ id: `congestion-${station}-southbound` });
+                    }
+                }
+            }
+            
+            // 6. Broadcasts
+            try {
+                const broadcastResponse = await fetch('/api/broadcasts/public');
+                const broadcastData = await broadcastResponse.json();
+                if (broadcastData.success && broadcastData.broadcasts) {
+                    broadcastData.broadcasts.forEach(b => {
+                        allAlerts.push({ id: `broadcast-${b.id}` });
+                    });
+                }
+            } catch (e) {
+                console.log('Could not fetch broadcasts:', e);
+            }
+            
+            // Count unread alerts
+            let unreadCount = 0;
+            for (const alert of allAlerts) {
+                if (!readAlerts.has(alert.id)) {
+                    unreadCount++;
+                }
+            }
+            
+            // Cache the result
+            cachedAlertCount = unreadCount;
+            cachedAlertCountTime = now;
+            
+            console.log('Report page unread alert count:', unreadCount);
+            return unreadCount;
+            
+        } catch (error) {
+            console.error('Error calculating alert count:', error);
+            return 0;
+        }
+    }
+
+    // ========== CHECK ALERT COUNT AND UPDATE BADGE ==========
+    async function checkAlertCount() {
+        const alertCount = await fetchAlertCount();
+       
+        
+        const badge = document.getElementById('alertBadge');
+        const sidebarBadge = document.getElementById('sidebarAlertCount');
+        const mobileBadge = document.getElementById('mobileAlertBadge');
+        
+        // Bell badge: Show 9+ for counts > 9
+        const bellDisplayValue = alertCount > 9 ? '9+' : alertCount;
+        
+        if (badge) {
+            if (alertCount > 0) {
+                badge.textContent = bellDisplayValue;
+                badge.style.backgroundColor = 'var(--red)';
+                badge.style.display = 'flex';
+            } else {
+                badge.textContent = '0';
+                badge.style.backgroundColor = '#94A3B8';
+                badge.style.display = 'flex';
+            }
+        }
+        
+        if (sidebarBadge) {
+            if (alertCount > 0) {
+                sidebarBadge.textContent = alertCount;
+                sidebarBadge.style.display = 'block';
+            } else {
+                
+                sidebarBadge.style.display = 'none';
+            }
+        }
+        
+        if (mobileBadge) {
+            if (alertCount > 0) {
+                mobileBadge.textContent = bellDisplayValue;
+                mobileBadge.style.display = 'flex';
+            } else {
+                mobileBadge.style.display = 'none';
+            }
+        }
+    }
+
+    // ========== DIRECTION SELECTION ==========
     function selectDirection(direction) {
         selectedDirection = direction;
         
@@ -2139,7 +2166,7 @@ function syncMobileAlertBadge() {
         document.getElementById(`dir-${direction}`).classList.add('selected');
     }
 
-    // Load saved limits from localStorage on page load
+    // ========== RATE LIMITS ==========
     function loadRateLimits() {
         const savedCount = localStorage.getItem('submitCount');
         const savedTime = localStorage.getItem('lastSubmitTime');
@@ -2148,10 +2175,8 @@ function syncMobileAlertBadge() {
         if (savedCount) submitCount = parseInt(savedCount);
         if (savedTime) lastSubmitTime = parseInt(savedTime);
         
-        // Check if the saved data is still within the hour
         const now = Date.now();
         if (lastSubmitTime && (now - lastSubmitTime) > 3600000) {
-            // Hour has passed, reset everything
             submitCount = 0;
             lastSubmitTime = 0;
             localStorage.removeItem('submitCount');
@@ -2160,7 +2185,6 @@ function syncMobileAlertBadge() {
         }
     }
 
-    // Save limits to localStorage
     function saveRateLimits() {
         localStorage.setItem('submitCount', submitCount);
         localStorage.setItem('lastSubmitTime', lastSubmitTime);
@@ -2169,11 +2193,9 @@ function syncMobileAlertBadge() {
         }
     }
 
-    // Updated canSubmitReport with persistence
     function canSubmitReport() {
         const now = Date.now();
         
-        // Load saved limits first
         loadRateLimits();
         
         if (isSubmitting) {
@@ -2187,7 +2209,6 @@ function syncMobileAlertBadge() {
             return false;
         }
         
-        // Reset counter every hour
         if (submitResetTimer === null) {
             const savedResetTime = localStorage.getItem('submitResetTime');
             if (savedResetTime) {
@@ -2219,177 +2240,175 @@ function syncMobileAlertBadge() {
         return true;
     }
 
-    // Toggle filter dropdown
+    // ========== FILTER FUNCTIONS ==========
     function toggleFilterDropdown() {
         const dropdown = document.getElementById('filterDropdown');
         dropdown.classList.toggle('show');
     }
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(event) {
-        const filterContainer = document.querySelector('.filter-container');
-        const dropdown = document.getElementById('filterDropdown');
-        if (filterContainer && !filterContainer.contains(event.target) && dropdown) {
-            dropdown.classList.remove('show');
-        }
+function applyFilters() {
+    console.log("========== APPLYING FILTERS ==========");
+    
+    const selectedLevels = [];
+    document.querySelectorAll('.badge-filter.active-filter').forEach(badge => {
+        selectedLevels.push(badge.dataset.level);
     });
-
-    // Apply filters
-    function applyFilters() {
-        console.log("========== APPLYING FILTERS ==========");
-        
-        // Get selected congestion levels
-        const selectedLevels = [];
-        document.querySelectorAll('.badge-filter.active-filter').forEach(badge => {
-            selectedLevels.push(badge.dataset.level);
-        });
-        console.log("Selected congestion levels:", selectedLevels);
-        
-        // Get selected stations
-        const selectedStations = [];
-        document.querySelectorAll('#stationsGrid input:checked').forEach(cb => {
+    
+    const selectedStations = [];
+    document.querySelectorAll('#stationsGrid input:checked').forEach(cb => {
+        selectedStations.push(cb.value);
+    });
+    
+    let dateRange = null;
+    const activeChip = document.querySelector('.chip.active');
+    if (activeChip) {
+        dateRange = activeChip.dataset.date;
+        console.log("Selected date range:", dateRange);
+    }
+    
+    // If no stations are selected, select all stations by default
+    if (selectedStations.length === 0) {
+        document.querySelectorAll('#stationsGrid input').forEach(cb => {
+            cb.checked = true;
             selectedStations.push(cb.value);
         });
-        console.log("Selected stations from checkboxes:", selectedStations);
-        
-        // Get date range
-        let dateRange = null;
-        const activeChip = document.querySelector('.chip.active');
-        if (activeChip) {
-            dateRange = activeChip.dataset.date;
-            console.log("Selected date range:", dateRange);
-        }
-        
-        activeFilters = {
-            congestionLevels: selectedLevels,
-            stations: selectedStations,
-            dateRange: dateRange
-        };
-        
-        console.log("Active filters object:", activeFilters);
-        
-        // Apply filters
-        filterAndDisplayReports();
-        
-        // Close dropdown
-        toggleFilterDropdown();
+        console.log("No stations selected, defaulting to all stations");
     }
-
-    // Filter and display reports
-    function filterAndDisplayReports() {
-        console.log("========== FILTERING REPORTS ==========");
-        console.log("Total reports before filter:", allReportsData.length);
+    
+    activeFilters = {
+        congestionLevels: selectedLevels,
+        stations: selectedStations,
+        dateRange: dateRange
+    };
+    
+    console.log("Active filters set:", activeFilters);
+    
+    filterAndDisplayReports();
+    toggleFilterDropdown();
+}
+function filterAndDisplayReports() {
+    console.log("========== FILTERING REPORTS ==========");
+    console.log("Total reports before filter:", allReportsData.length);
+    console.log("Active filters:", activeFilters);
+    
+    if (!allReportsData || allReportsData.length === 0) {
+        const reportsList = document.getElementById('reportsList');
+        reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports available</h3></div>`;
+        return;
+    }
+    
+    let filteredReports = [...allReportsData];
+    
+    // Filter by stations
+    if (activeFilters.stations && activeFilters.stations.length > 0) {
+        filteredReports = filteredReports.filter(report => {
+            return activeFilters.stations.includes(report.station);
+        });
+        console.log("After station filter:", filteredReports.length);
+    }
+    
+    // Filter by congestion levels
+    if (activeFilters.congestionLevels && activeFilters.congestionLevels.length > 0) {
+        filteredReports = filteredReports.filter(report => {
+            let level = '';
+            if (report.reported_congestion > 80) level = 'severe';
+            else if (report.reported_congestion > 60) level = 'congested';
+            else if (report.reported_congestion > 30) level = 'moderate';
+            else level = 'light';
+            return activeFilters.congestionLevels.includes(level);
+        });
+        console.log("After congestion filter:", filteredReports.length);
+    }
+    
+    // Filter by date range
+    if (activeFilters.dateRange && filteredReports.length > 0) {
+        const now = new Date();
         
-        if (!allReportsData || allReportsData.length === 0) {
-            console.log("No reports data available");
-            const reportsList = document.getElementById('reportsList');
-            reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports available</h3></div>`;
-            return;
+        // Check if reports are from a different year (e.g., 2025)
+        let reportYear = null;
+        let useReportYear = false;
+        
+        // Check first few reports to detect year mismatch
+        for (let i = 0; i < Math.min(5, allReportsData.length); i++) {
+            if (allReportsData[i].timestamp) {
+                const testDate = new Date(allReportsData[i].timestamp);
+                if (testDate.getFullYear() !== now.getFullYear()) {
+                    reportYear = testDate.getFullYear();
+                    useReportYear = true;
+                    console.log(`Detected report year: ${reportYear} vs system year: ${now.getFullYear()}`);
+                    break;
+                }
+            }
         }
         
-        let filteredReports = [...allReportsData];
-        
-        // Filter by station
-        if (activeFilters.stations.length > 0) {
-            console.log("Filtering by stations:", activeFilters.stations);
-            filteredReports = filteredReports.filter(report => {
-                return activeFilters.stations.includes(report.station);
-            });
-            console.log(`After station filter: ${filteredReports.length} reports remaining`);
+        let today;
+        if (useReportYear && reportYear) {
+            // Use the report's year for filtering
+            today = new Date(reportYear, now.getMonth(), now.getDate());
         } else {
-            console.log("⚠️ No stations selected - showing 0 reports");
-            filteredReports = [];
+            today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         }
+        today.setHours(0, 0, 0, 0);
         
-        // Filter by congestion level
-        if (activeFilters.congestionLevels.length > 0 && filteredReports.length > 0) {
-            console.log("Filtering by congestion levels:", activeFilters.congestionLevels);
-            filteredReports = filteredReports.filter(report => {
-                let level = '';
-                if (report.reported_congestion > 80) level = 'severe';
-                else if (report.reported_congestion > 60) level = 'congested';
-                else if (report.reported_congestion > 30) level = 'moderate';
-                else level = 'light';
-                return activeFilters.congestionLevels.includes(level);
-            });
-            console.log(`After congestion filter: ${filteredReports.length} reports remaining`);
-        }
+        console.log("Filtering by date range:", activeFilters.dateRange);
+        console.log("Using date base:", today);
         
-        // Filter by date range
-        if (activeFilters.dateRange && filteredReports.length > 0) {
-            let startDate = null;
-            let endDate = null;
+        filteredReports = filteredReports.filter(report => {
+            if (!report.timestamp) return false;
             
-            switch(activeFilters.dateRange) {
-                case 'today':
-                    startDate = new Date();
-                    startDate.setHours(0, 0, 0, 0);
-                    endDate = new Date();
-                    endDate.setHours(23, 59, 59, 999);
-                    break;
-                case 'yesterday':
-                    startDate = new Date();
-                    startDate.setDate(startDate.getDate() - 1);
-                    startDate.setHours(0, 0, 0, 0);
-                    endDate = new Date();
-                    endDate.setDate(endDate.getDate() - 1);
-                    endDate.setHours(23, 59, 59, 999);
-                    break;
-                case 'week':
-                    startDate = new Date();
-                    startDate.setDate(startDate.getDate() - 7);
-                    startDate.setHours(0, 0, 0, 0);
-                    break;
-                case 'month':
-                    startDate = new Date();
-                    startDate.setDate(startDate.getDate() - 30);
-                    startDate.setHours(0, 0, 0, 0);
-                    break;
-            }
-            
-            if (startDate) {
-                filteredReports = filteredReports.filter(report => {
-                    const reportDate = new Date(report.timestamp);
-                    if (activeFilters.dateRange === 'today' || activeFilters.dateRange === 'yesterday') {
-                        return reportDate >= startDate && reportDate <= endDate;
-                    } else {
-                        return reportDate >= startDate;
+            try {
+                const reportDate = new Date(report.timestamp);
+                const reportDateOnly = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
+                reportDateOnly.setHours(0, 0, 0, 0);
+                
+                switch(activeFilters.dateRange) {
+                    case 'today': {
+                        return reportDateOnly.getTime() === today.getTime();
                     }
-                });
-                console.log(`After date filter: ${filteredReports.length} reports remaining`);
-            }
-        }
-        
-        console.log(`FINAL FILTERED COUNT: ${filteredReports.length}`);
-        displayReports(filteredReports);
-    }
-
-    function selectLevel(level) {
-        document.querySelectorAll('.report-card').forEach(card => {
-            card.classList.remove('selected');
-        });
-        document.getElementById(`card-${level}`).classList.add('selected');
-        selectedLevel = level;
-    }
-
-    document.getElementById('imageInput').addEventListener('change', function(e) {
-        const files = Array.from(e.target.files);
-        
-        if (selectedFiles.length + files.length > 5) {
-            showToast(`Maximum 5 photos allowed. You already have ${selectedFiles.length} selected.`, 'error');
-            return;
-        }
-        
-        files.forEach(file => {
-            if (file.type.startsWith('image/')) {
-                selectedFiles.push(file);
+                    case 'yesterday': {
+                        const yesterday = new Date(today);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        return reportDateOnly.getTime() === yesterday.getTime();
+                    }
+                    case 'week': {
+                        const weekAgo = new Date(today);
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return reportDateOnly >= weekAgo;
+                    }
+                    case 'month': {
+                        // Show reports from 30 days ago and older (30 days +)
+                        const monthAgo = new Date(today);
+                        monthAgo.setDate(monthAgo.getDate() - 30);
+                        return reportDateOnly <= monthAgo;  // Changed from >= to <=
+                    }
+                    default:
+                        return true;
+                }
+            } catch(e) {
+                console.error("Error parsing date for report:", report.id, e);
+                return false;
             }
         });
-        
-        updateImagePreview();
-        updatePhotoUploadText();
-    });
-
+        console.log("After date filter:", filteredReports.length);
+    }
+    
+    // If no filters are applied, show all reports
+    if ((!activeFilters.congestionLevels || activeFilters.congestionLevels.length === 0) && 
+        (!activeFilters.stations || activeFilters.stations.length === 0) && 
+        !activeFilters.dateRange) {
+        filteredReports = allReportsData;
+        console.log("No filters applied, showing all reports");
+    }
+    
+    console.log(`FINAL FILTERED COUNT: ${filteredReports.length}`);
+    
+    if (filteredReports.length === 0) {
+        const reportsList = document.getElementById('reportsList');
+        reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports match your filters</h3><p>Try adjusting your filter criteria</p></div>`;
+        return;
+    }
+    
+    displayReports(filteredReports);
+}
     function updateImagePreview() {
         const previewContainer = document.getElementById('previewContainer');
         const previewGrid = document.getElementById('imagePreviewGrid');
@@ -2442,6 +2461,7 @@ function syncMobileAlertBadge() {
         }
     }
 
+    // ========== TOGGLE REPORTS VIEW ==========
     function toggleReports() {
         const reportFormView = document.getElementById('reportFormView');
         const reportsView = document.getElementById('reportsView');
@@ -2468,9 +2488,8 @@ function syncMobileAlertBadge() {
         fetchReports();
     }
 
-    // THE FIXED openConfirmModal - Operating hours check works here
+    // ========== CONFIRM MODAL ==========
     function openConfirmModal() {
-        // Check if MRT is operating
         if (!isOperatingHours()) {
             const nextOpen = getNextOpeningTime();
             showToast(`MRT-3 is currently closed. Operating hours: 4:30 AM - 10:30 PM. Please come back at ${nextOpen}.`, 'error');
@@ -2521,7 +2540,6 @@ function syncMobileAlertBadge() {
         if (modal) modal.classList.remove('active');
     }
 
-    // THE FIXED confirmSubmit - REMOVED THE BROKEN CONDITION
     function confirmSubmit() {
         if (!canSubmitReport()) {
             return;
@@ -2532,7 +2550,6 @@ function syncMobileAlertBadge() {
         const station = document.getElementById('stationSelect').value;
         const remarks = document.getElementById('remarks').value;
         
-        // IMPORTANT: Make sure direction is included!
         if (!selectedDirection) {
             showToast('Please select a direction (Northbound, Southbound, or Both)', 'error');
             return;
@@ -2601,6 +2618,7 @@ function syncMobileAlertBadge() {
         });
     }
 
+    // ========== FETCH REPORTS ==========
     function fetchReports() {
         const reportsList = document.getElementById('reportsList');
         reportsList.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading reports...</p></div>`;
@@ -2619,7 +2637,6 @@ function syncMobileAlertBadge() {
                 if (Array.isArray(data)) {
                     reports = data;
                     console.log("Total reports fetched:", reports.length);
-                    
                 } else {
                     console.error("Unexpected response format:", data);
                     reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Invalid response format from server</h3></div>`;
@@ -2633,14 +2650,12 @@ function syncMobileAlertBadge() {
                 
                 allReportsData = reports;
                 
-                // Reset filters to show all
                 activeFilters = {
                     dateRange: null,
                     congestionLevels: [],
                     stations: []
                 };
                 
-                // Reset UI filter selections
                 document.querySelectorAll('.badge-filter').forEach(b => b.classList.remove('active-filter'));
                 document.querySelectorAll('#stationsGrid input').forEach(cb => cb.checked = true);
                 document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
@@ -2656,349 +2671,207 @@ function syncMobileAlertBadge() {
             });
     }
 
- // Remove the old fetchAlertCount and checkAlertCount functions, and replace with these:
-
-// OPTIMIZED: Cache alert count aggressively
-let cachedAlertCount = null;
-let cachedAlertCountTime = 0;
-let cachedCongestionData = null;
-let cachedCongestionTime = 0;
-const ALERT_CACHE_DURATION = 60000; // 60 seconds cache
-const CONGESTION_CACHE_DURATION = 120000; // 2 minutes for congestion data
-// Replace the fetchAlertCount function with this version that includes congestion alerts:
-async function fetchAlertCount() {
-    const now = Date.now();
+  function displayReports(reports) {
+    const reportsList = document.getElementById('reportsList');
     
-    // Use cached alert count if still valid
-    if (cachedAlertCount !== null && (now - cachedAlertCountTime) < ALERT_CACHE_DURATION) {
-        console.log('📦 Using cached alert count:', cachedAlertCount);
-        return cachedAlertCount;
+    if (!reports || reports.length === 0) {
+        reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports match your filters</h3><p>Try adjusting your filter criteria</p></div>`;
+        return;
     }
     
-    try {
-        // Get read status from localStorage
-        let readAlerts = new Set();
-        const saved = localStorage.getItem('readAlerts');
-        if (saved) {
-            readAlerts = new Set(JSON.parse(saved));
-        }
+    let html = '';
+    reports.forEach((report, idx) => {
+        let levelText = '';
+        let levelColor = '';
+        let bgColor = '';
+        let borderColor = '';
         
-        // Calculate base alerts (time-based, no API calls)
-        let allAlerts = [];
-        const nowDate = new Date();
-        const hour = nowDate.getHours();
-        
-        // 1. Rush Hour Alert
-        if ((hour >= 7 && hour <= 9)) {
-            allAlerts.push({ id: 'rush-morning-permanent' });
-        } else if ((hour >= 17 && hour <= 19)) {
-            allAlerts.push({ id: 'rush-evening-permanent' });
-        }
-        
-        // 2. Advisory Alert
-        if (hour >= 0 && hour < 5) {
-            allAlerts.push({ id: 'advisory-early-morning-permanent' });
-        } else if (hour >= 5 && hour < 7) {
-            allAlerts.push({ id: 'advisory-pre-rush-permanent' });
-        } else if (hour >= 10 && hour < 16) {
-            allAlerts.push({ id: 'advisory-midday-permanent' });
-        } else if (hour >= 20 && hour < 22.5) {
-            allAlerts.push({ id: 'advisory-late-evening-permanent' });
-        } else if (hour >= 22.5 || hour === 23) {
-            allAlerts.push({ id: 'advisory-service-ended-permanent' });
-        }
-        
-        // 3. Congestion Advisory
-        if (hour >= 21 || hour < 5) {
-            allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
-        } else if (hour >= 14 && hour < 17) {
-            allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
-        }
-        
-        // 4. Service Notices
-        const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
-        if (isWeekend) {
-            allAlerts.push({ id: 'service-weekend-permanent' });
-        }
-        if (hour >= 23 || hour <= 3) {
-            allAlerts.push({ id: 'service-maintenance-night-permanent' });
-        }
-        
-        // 5. Congestion alerts - fetch from API (with caching)
-        if (!cachedCongestionData || (now - cachedCongestionTime) > CONGESTION_CACHE_DURATION) {
-            try {
-                const response = await fetch('/api/live-map/directions/v2');
-                cachedCongestionData = await response.json();
-                cachedCongestionTime = now;
-                console.log('🔄 Fetched fresh congestion data');
-            } catch (e) {
-                console.log('Could not fetch congestion alerts:', e);
-                cachedCongestionData = { northbound: {}, southbound: {} };
-            }
+        if (report.reported_congestion > 80) {
+            levelText = 'Severe';
+            levelColor = '#EF4444';
+            bgColor = '#FEE2E2';
+            borderColor = '#EF4444';
+        } else if (report.reported_congestion > 60) {
+            levelText = 'Congested';
+            levelColor = '#F97316';
+            bgColor = '#FED7AA';
+            borderColor = '#F97316';
+        } else if (report.reported_congestion > 30) {
+            levelText = 'Moderate';
+            levelColor = '#EAB308';
+            bgColor = '#FEF9C3';
+            borderColor = '#EAB308';
         } else {
-            console.log('📦 Using cached congestion data');
+            levelText = 'Light';
+            levelColor = '#22C55E';
+            bgColor = '#DCFCE7';
+            borderColor = '#22C55E';
         }
         
-        // Add congestion alerts from cached data
-        const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-            "Ayala Ave", "Magallanes", "Taft"];
+        const reportTime = new Date(report.timestamp);
+        const now = new Date();
+        const diffMs = now - reportTime;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
         
-        if (cachedCongestionData && cachedCongestionData.northbound && cachedCongestionData.southbound) {
-            for (const station of STATIONS) {
-                const northData = cachedCongestionData.northbound[station];
-                const southData = cachedCongestionData.southbound[station];
-                
-                if (northData && northData.congestion > 0) {
-                    allAlerts.push({ id: `congestion-${station}-northbound` });
-                }
-                if (southData && southData.congestion > 0) {
-                    allAlerts.push({ id: `congestion-${station}-southbound` });
-                }
-            }
-        }
-        
-        // Count unread alerts
-        let unreadCount = 0;
-        for (const alert of allAlerts) {
-            if (!readAlerts.has(alert.id)) {
-                unreadCount++;
-            }
-        }
-        
-        // Cache the result
-        cachedAlertCount = unreadCount;
-        cachedAlertCountTime = now;
-        
-        console.log('Report page total alerts:', allAlerts.length);
-        console.log('Report page unread alert count:', unreadCount);
-        return unreadCount;
-        
-    } catch (error) {
-        console.error('Error calculating alert count:', error);
-        return 0;
-    }
-}
-
-// Simple checkAlertCount that uses the cached fetchAlertCount
-async function checkAlertCount() {
-    const alertCount = await fetchAlertCount();
-    
-    const badge = document.getElementById('alertBadge');
-    const mobileBadge = document.getElementById('mobileAlertBadge');
-    
-    // Bell badge: Show 9+ for counts > 9
-    const bellDisplayValue = alertCount > 9 ? '9+' : alertCount;
-    
-    if (badge) {
-        if (alertCount > 0) {
-            badge.textContent = bellDisplayValue;
-            badge.style.backgroundColor = 'var(--red)';
+        let timeAgo = '';
+        if (diffMins < 1) {
+            timeAgo = 'just now';
+        } else if (diffMins < 60) {
+            timeAgo = `${diffMins} mins ago`;
+        } else if (diffHours < 24) {
+            timeAgo = `${diffHours} hours ago`;
         } else {
-            badge.textContent = '0';
-            badge.style.backgroundColor = '#94A3B8';
-        }
-    }
-    
-    if (mobileBadge) {
-        if (alertCount > 0) {
-            mobileBadge.textContent = bellDisplayValue;
-            mobileBadge.style.display = 'flex';
-        } else {
-            mobileBadge.style.display = 'none';
-        }
-    }
-}
-    // ========== DISPLAY REPORTS WITH 3-DOT MENU ==========
-    function displayReports(reports) {
-        const reportsList = document.getElementById('reportsList');
-        
-        if (!reports || reports.length === 0) {
-            reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports match your filters</h3><p>Try adjusting your filter criteria</p></div>`;
-            return;
+            timeAgo = `${diffDays} days ago`;
         }
         
-        let html = '';
-        reports.forEach((report, idx) => {
-            let levelText = '';
-            let levelColor = '';
-            let borderColor = '';
-            
-            if (report.reported_congestion > 80) {
-                levelText = 'Severe Congestion';
-                levelColor = '#EF4444';
-                borderColor = '#EF4444';
-            } else if (report.reported_congestion > 60) {
-                levelText = 'Congested';
-                levelColor = '#F97316';
-                borderColor = '#F97316';
-            } else if (report.reported_congestion > 30) {
-                levelText = 'Moderate';
-                levelColor = '#EAB308';
-                borderColor = '#EAB308';
+        let displayName = '';
+        let avatarLetter = '?';
+        
+        if (report.anonymous) {
+            displayName = 'Anonymous';
+            avatarLetter = 'A';
+        } else if (report.username) {
+            const username = report.username;
+            if (username && username.includes('@')) {
+                displayName = username.split('@')[0];
+            } else if (username) {
+                displayName = username;
             } else {
-                levelText = 'Light';
-                levelColor = '#22C55E';
-                borderColor = '#22C55E';
-            }
-            
-            const reportTime = new Date(report.timestamp);
-            const now = new Date();
-            const diffMs = now - reportTime;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMins / 60);
-            const diffDays = Math.floor(diffHours / 24);
-            
-            let timeAgo = '';
-            if (diffMins < 1) {
-                timeAgo = 'just now';
-            } else if (diffMins < 60) {
-                timeAgo = `${diffMins} mins ago`;
-            } else if (diffHours < 24) {
-                timeAgo = `${diffHours} hours ago`;
-            } else {
-                timeAgo = `${diffDays} days ago`;
-            }
-            
-            let displayName = '';
-            let avatarLetter = '?';
-            
-            if (report.anonymous) {
-                displayName = 'Anonymous';
-                avatarLetter = 'A';
-           } else if (report.username) {
-    const username = report.username;
-    if (username && username.includes('@')) {
-        displayName = username.split('@')[0];
-    } else if (username) {
-        displayName = username;
-    } else {
-        displayName = 'Commuter';
-        avatarLetter = 'C';
-    }
-    avatarLetter = displayName.charAt(0).toUpperCase();
-} else {
                 displayName = 'Commuter';
                 avatarLetter = 'C';
             }
-            
-            const hasRemarks = report.remarks && report.remarks.trim() !== '';
-            
-            let hasPhotos = false;
-            let photoCount = 0;
-            let photoUrls = [];
-            
-            if (report.photo_paths && Array.isArray(report.photo_paths) && report.photo_paths.length > 0) {
-                photoUrls = report.photo_paths;
-                photoCount = photoUrls.length;
-                hasPhotos = true;
-            } 
-            else if (report.photo_path) {
-                try {
-                    if (typeof report.photo_path === 'string' && report.photo_path.startsWith('[')) {
-                        photoUrls = JSON.parse(report.photo_path);
-                        photoCount = photoUrls.length;
-                        hasPhotos = photoCount > 0;
-                    } else if (typeof report.photo_path === 'string' && report.photo_path.length > 0) {
-                        photoUrls = [report.photo_path];
-                        photoCount = 1;
-                        hasPhotos = true;
-                    } else if (Array.isArray(report.photo_path)) {
-                        photoUrls = report.photo_path;
-                        photoCount = photoUrls.length;
-                        hasPhotos = true;
-                    }
-                } catch(e) {
-                    if (report.photo_path && report.photo_path.length > 0) {
-                        photoUrls = [report.photo_path];
-                        photoCount = 1;
-                        hasPhotos = true;
-                    }
+            avatarLetter = displayName.charAt(0).toUpperCase();
+        } else {
+            displayName = 'Commuter';
+            avatarLetter = 'C';
+        }
+        
+        const hasRemarks = report.remarks && report.remarks.trim() !== '';
+        
+        let hasPhotos = false;
+        let photoCount = 0;
+        let photoUrls = [];
+        
+        if (report.photo_paths && Array.isArray(report.photo_paths) && report.photo_paths.length > 0) {
+            photoUrls = report.photo_paths;
+            photoCount = photoUrls.length;
+            hasPhotos = true;
+        } 
+        else if (report.photo_path) {
+            try {
+                if (typeof report.photo_path === 'string' && report.photo_path.startsWith('[')) {
+                    photoUrls = JSON.parse(report.photo_path);
+                    photoCount = photoUrls.length;
+                    hasPhotos = photoCount > 0;
+                } else if (typeof report.photo_path === 'string' && report.photo_path.length > 0) {
+                    photoUrls = [report.photo_path];
+                    photoCount = 1;
+                    hasPhotos = true;
+                } else if (Array.isArray(report.photo_path)) {
+                    photoUrls = report.photo_path;
+                    photoCount = photoUrls.length;
+                    hasPhotos = true;
+                }
+            } catch(e) {
+                if (report.photo_path && report.photo_path.length > 0) {
+                    photoUrls = [report.photo_path];
+                    photoCount = 1;
+                    hasPhotos = true;
                 }
             }
-            
-            const contentId = `content-${report.id}-${idx}`;
-            const menuId = `menu-${report.id}-${idx}`;
-            
-            html += `
-                <div class="report-item" style="border: 2px solid ${borderColor}; border-radius: 16px; padding: 18px; margin-bottom: 12px; background: white; position: relative;">
-                    <!-- 3-Dots Menu Button -->
-                    <div style="position: absolute; top: 18px; right: 18px;">
-                        <button onclick="toggleReportMenu('${menuId}', event)" style="background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%;">
-                            <i class="fas fa-ellipsis-v" style="color: #94A3B8; font-size: 18px;"></i>
-                        </button>
-                        <div id="${menuId}" class="report-menu" style="display: none; position: absolute; right: 0; top: 40px; background: white; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; min-width: 160px;">
-                            <div onclick="flagReport(${report.id}, '${escapeHtml(report.station)}')" style="padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px;">
-                                <i class="fas fa-flag" style="color: #F59E0B; width: 18px;"></i>
-                                <span style="font-size: 13px;">Flag this report</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; padding-right: 45px;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 36px; height: 36px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-weight: bold;">
-                                ${escapeHtml(avatarLetter)}
-                            </div>
-                            <div style="font-weight: 600; font-size: 14px;">${escapeHtml(displayName)}</div>
-                            ${report.flagged ? `<span style="background: #FEE2E2; color: #DC2626; padding: 2px 8px; border-radius: 12px; font-size: 10px;"><i class="fas fa-flag"></i> Flagged</span>` : ''}
-                        </div>
-                        <div style="font-size: 11px; color: #64748B;"><i class="far fa-clock"></i> ${timeAgo}</div>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <span style="font-weight: 700; font-size: 18px;">${escapeHtml(report.station)}</span>
-                            <span style="font-size: 13px; font-weight: 600; color: ${levelColor};"> - ${levelText}</span>
-                            ${report.direction ? `
-                                <span style="display: inline-block; margin-left: 10px; padding: 2px 8px; background: #EFF6FF; border-radius: 20px; font-size: 11px; font-weight: 500; color: #3B82F6;">
-                                    <i class="fas ${report.direction === 'northbound' ? 'fa-arrow-up' : (report.direction === 'southbound' ? 'fa-arrow-down' : 'fa-exchange-alt')}" style="font-size: 10px; margin-right: 4px;"></i>
-                                    ${report.direction === 'northbound' ? 'Northbound' : (report.direction === 'southbound' ? 'Southbound' : 'Both Directions')}
-                                </span>
-                            ` : ''}
-                        </div>
-                        
-                        <button onclick="toggleReportContent('${contentId}', this)" style="background: none; border: none; color: #3B82F6; cursor: pointer; font-size: 13px;">
-                            <i class="fas fa-chevron-down"></i> View more
-                        </button>
-                    </div>
-                    
-                    <div id="${contentId}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
-                      ${hasRemarks ? `<div class="remark-text" style="background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 12px;"><i class="fas fa-quote-left" style="color: #3B82F6; margin-right: 8px;"></i>${escapeHtml(report.remarks)}</div>` : ''}
-                        
-                        ${hasPhotos ? `
-                        <div style="margin-top: 10px;">
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                <i class="fas fa-camera" style="color: #3B82F6;"></i>
-                                <span style="font-size: 13px; font-weight: 500;">${photoCount} photo(s) attached</span>
-                            </div>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px;">
-                                ${photoUrls.map(url => `
-                                    <div style="position: relative; aspect-ratio: 1; cursor: pointer;" onclick="window.open('${url}', '_blank')">
-                                        <img src="${url}" 
-                                             style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #E2E8F0;"
-                                             onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;background:#F1F5F9;border-radius:8px\'><i class=\'fas fa-image\' style=\'color:#94A3B8;font-size:24px\'></i></div>'">
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                        ` : ''}
-                        
-                        ${!hasRemarks && !hasPhotos ? `<div class="remark-none" style="color: #94A3B8; text-align: center; padding: 12px;">No additional details</div>` : ''}
-                    </div>
-                </div>
-            `;
-        });
+        }
         
-        reportsList.innerHTML = html;
-    }
+        const contentId = `content-${report.id}-${idx}`;
+        const menuId = `menu-${report.id}-${idx}`;
+        
+        // Build photo HTML separately to avoid escaping issues
+        let photosHtml = '';
+        if (hasPhotos) {
+            photosHtml = `
+            <div style="margin-top: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <i class="fas fa-camera" style="color: #3B82F6;"></i>
+                    <span style="font-size: 12px; color: #64748B;">${photoCount} photo(s)</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px;">`;
+            
+            photoUrls.forEach(url => {
+                photosHtml += `
+                <div style="position: relative; aspect-ratio: 1; cursor: pointer;" onclick="window.open('${url}', '_blank')">
+                    <img src="${url}" 
+                         style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #E2E8F0;"
+                         onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;background:#F1F5F9;border-radius:8px\\'><i class=\\'fas fa-image\\' style=\\'color:#94A3B8;font-size:24px\\'></i></div>'">
+                </div>`;
+            });
+            
+            photosHtml += `
+                </div>
+            </div>`;
+        }
+        
+        html += `
+    <div class="report-item" style="border: 2px solid ${borderColor}; border-radius: 16px; padding: 18px; margin-bottom: 12px; background: white; position: relative;">
+        <div style="position: absolute; top: 18px; right: 18px;">
+            <button onclick="toggleReportMenu('${menuId}', event)" style="background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%;">
+                <i class="fas fa-ellipsis-v" style="color: #94A3B8; font-size: 18px;"></i>
+            </button>
+            <div id="${menuId}" class="report-menu" style="display: none; position: absolute; right: 0; top: 40px; background: white; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; min-width: 160px;">
+                <div onclick="flagReport(${report.id}, '${escapeHtml(report.station)}')" style="padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-flag" style="color: #F59E0B; width: 18px;"></i>
+                    <span style="font-size: 13px;">Flag this report</span>
+                </div>
+            </div>
+        </div>
 
-    // Menu toggle function
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; padding-right: 50px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 36px; height: 36px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-weight: bold;">
+                    ${escapeHtml(avatarLetter)}
+                </div>
+                <div style="font-weight: 600; font-size: 14px;">${escapeHtml(displayName)}</div>
+                ${report.flagged ? `<span style="background: #FEE2E2; color: #DC2626; padding: 2px 8px; border-radius: 12px; font-size: 10px;"><i class="fas fa-flag"></i> Flagged</span>` : ''}
+            </div>
+            <div style="font-size: 10px; color: #64748B;"><i class="far fa-clock"></i> ${timeAgo}</div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span style="font-weight: 700; font-size: 18px;">${escapeHtml(report.station)}</span>
+                
+                <!-- CONGESTION PILL BADGE -->
+                <span class="pill" style="display: inline-block; background: ${bgColor}; color: ${levelColor}; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid ${levelColor};">
+                    ${levelText}
+                </span>
+                
+                ${report.direction ? `
+                    <span style="display: inline-block; padding: 4px 12px; background: #EFF6FF; border-radius: 20px; font-size: 11px; font-weight: 500; color: #3B82F6;">
+                        <i class="fas ${report.direction === 'northbound' ? 'fa-arrow-up' : (report.direction === 'southbound' ? 'fa-arrow-down' : 'fa-exchange-alt')}" style="font-size: 10px; margin-right: 4px;"></i>
+                        ${report.direction === 'northbound' ? 'Northbound' : (report.direction === 'southbound' ? 'Southbound' : 'Both')}
+                    </span>
+                ` : ''}
+            </div>
+            <button onclick="toggleReportContent('${contentId}', this)" style="background: none; border: none; color: #3B82F6; cursor: pointer; font-size: 13px;">
+                <i class="fas fa-chevron-down"></i> View more
+            </button>
+        </div>
+        
+        <div id="${contentId}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
+            ${hasRemarks ? `<div class="remark-text" style="background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 12px;"><i class="fas fa-quote-left" style="color: #3B82F6; margin-right: 8px;"></i>${escapeHtml(report.remarks)}</div>` : ''}
+            ${photosHtml}
+            ${!hasRemarks && !hasPhotos ? `<div class="remark-none" style="color: #94A3B8; text-align: center; padding: 12px;">No additional details</div>` : ''}
+        </div>
+    </div>`;
+    });
+    
+    reportsList.innerHTML = html;
+}
+    // ========== MENU TOGGLE ==========
     function toggleReportMenu(menuId, event) {
         event.stopPropagation();
         const menu = document.getElementById(menuId);
         
-        // Close all other menus
         document.querySelectorAll('.report-menu').forEach(m => {
             if (m.id !== menuId) m.style.display = 'none';
         });
@@ -3006,92 +2879,86 @@ async function checkAlertCount() {
         menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     }
 
-    // Close menu when clicking outside
     document.addEventListener('click', function() {
         document.querySelectorAll('.report-menu').forEach(menu => {
             menu.style.display = 'none';
         });
     });
 
+    // ========== FLAG REPORT ==========
     function flagReport(reportId, stationName) {
-    console.log('========== FLAG REPORT CALLED ==========');
-    console.log('reportId parameter:', reportId);
-    console.log('reportId type:', typeof reportId);
-    console.log('stationName:', stationName);
-    
-    if (!reportId) {
-        console.error('❌ reportId is null or undefined!');
-        showToast('Error: Cannot flag this report', 'error');
-        return;
+        console.log('========== FLAG REPORT CALLED ==========');
+        console.log('reportId parameter:', reportId);
+        console.log('stationName:', stationName);
+        
+        if (!reportId) {
+            console.error('❌ reportId is null or undefined!');
+            showToast('Error: Cannot flag this report', 'error');
+            return;
+        }
+        
+        currentFlagReportId = reportId;
+        currentFlagStationName = stationName;
+        
+        console.log('✅ currentFlagReportId set to:', currentFlagReportId);
+        
+        document.getElementById('flagModalMessage').innerHTML = `Flag report from <strong>${escapeHtml(stationName)}</strong> as inappropriate?`;
+        
+        document.getElementById('flagModal').classList.add('active');
     }
-    
-    currentFlagReportId = reportId;
-    currentFlagStationName = stationName;
-    
-    console.log('✅ currentFlagReportId set to:', currentFlagReportId);
-    
-    // Update modal message
-    document.getElementById('flagModalMessage').innerHTML = `Flag report from <strong>${escapeHtml(stationName)}</strong> as inappropriate?`;
-    
-    // Show modal
-    document.getElementById('flagModal').classList.add('active');
-}
 
-   function closeFlagModal() {
-    document.getElementById('flagModal').classList.remove('active');
-    // Don't clear currentFlagReportId here! Let confirmFlagReport handle it.
-}
-function confirmFlagReport() {
-    // Store the ID in a local variable first
-    const reportIdToFlag = currentFlagReportId;
-    const stationNameToFlag = currentFlagStationName;
-    
-    console.log('Confirm flag - report ID to flag:', reportIdToFlag);
-    
-    if (!reportIdToFlag) {
-        console.error('No report ID to flag!');
-        showToast('Error: No report selected', 'error');
-        return;
+    function closeFlagModal() {
+        document.getElementById('flagModal').classList.remove('active');
     }
-    
-    // Close modal first (don't clear the global var yet)
-    document.getElementById('flagModal').classList.remove('active');
-    
-    // Show loading toast
-    showToast('Flagging report...', 'info');
-    
-    console.log('Sending flag request for ID:', reportIdToFlag);
-    
-    fetch(`/api/user-reports/${reportIdToFlag}/flag`, { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    })
-    .then(res => {
-        console.log('Response status:', res.status);
-        if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
+
+    function confirmFlagReport() {
+        const reportIdToFlag = currentFlagReportId;
+        const stationNameToFlag = currentFlagStationName;
+        
+        console.log('Confirm flag - report ID to flag:', reportIdToFlag);
+        
+        if (!reportIdToFlag) {
+            console.error('No report ID to flag!');
+            showToast('Error: No report selected', 'error');
+            return;
         }
-        return res.json();
-    })
-    .then(data => {
-        console.log('Flag response:', data);
-        if (data.success) {
-            showToast(`Report from ${stationNameToFlag} has been flagged`, 'success');
-            fetchReports(); // Refresh to show flagged badge
-        } else {
-            showToast(data.error || 'Failed to flag report', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error flagging report:', error);
-        showToast('Error flagging report', 'error');
-    })
-    .finally(() => {
-        // Clear global vars after request completes
-        currentFlagReportId = null;
-        currentFlagStationName = null;
-    });
-}
+        
+        document.getElementById('flagModal').classList.remove('active');
+        
+        showToast('Flagging report...', 'info');
+        
+        console.log('Sending flag request for ID:', reportIdToFlag);
+        
+        fetch(`/api/user-reports/${reportIdToFlag}/flag`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => {
+            console.log('Response status:', res.status);
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+            return res.json();
+        })
+        .then(data => {
+            console.log('Flag response:', data);
+            if (data.success) {
+                showToast(`Report from ${stationNameToFlag} has been flagged`, 'success');
+                fetchReports();
+            } else {
+                showToast(data.error || 'Failed to flag report', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error flagging report:', error);
+            showToast('Error flagging report', 'error');
+        })
+        .finally(() => {
+            currentFlagReportId = null;
+            currentFlagStationName = null;
+        });
+    }
+
     function toggleReportContent(contentId, button) {
         const content = document.getElementById(contentId);
         const icon = button.querySelector('i');
@@ -3140,8 +3007,6 @@ function confirmFlagReport() {
         });
     }
 
-   
-
     function showToast(message, type = 'success') {
         const existingToast = document.querySelector('.success-message');
         if (existingToast) existingToast.remove();
@@ -3172,59 +3037,74 @@ function confirmFlagReport() {
         }, 3000);
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-          checkAlertCount();
-  
+    // ========== DOM CONTENT LOADED ==========
+    // ========== DOM CONTENT LOADED ==========
+document.addEventListener('DOMContentLoaded', function() {
+    // Alert badge setup - using the same logic as Live Map
+    checkAlertCount();
     setInterval(checkAlertCount, 60000);
-        
-        const chips = document.querySelectorAll('.chip');
-        if (chips.length > 0) {
-            chips[0].classList.add('active');
-        }
-        
-        chips.forEach(chip => {
-            chip.addEventListener('click', function() {
-                chips.forEach(c => c.classList.remove('active'));
-                this.classList.add('active');
-            });
+    
+    const chips = document.querySelectorAll('.chip');
+    if (chips.length > 0) {
+        chips[0].classList.add('active');
+    }
+    
+    chips.forEach(chip => {
+        chip.addEventListener('click', function() {
+            chips.forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
         });
-        
-        document.querySelectorAll('.badge-filter').forEach(badge => {
-            badge.addEventListener('click', function() {
-                this.classList.toggle('active-filter');
-            });
+    });
+    
+    document.querySelectorAll('.badge-filter').forEach(badge => {
+        badge.addEventListener('click', function() {
+            this.classList.toggle('active-filter');
         });
-        
-        const selectAllBtn = document.querySelector('.select-all');
-        if (selectAllBtn) {
-            selectAllBtn.addEventListener('click', function() {
-                const checkboxes = document.querySelectorAll('#stationsGrid input');
-                const allChecked = Array.from(checkboxes).every(c => c.checked);
-                checkboxes.forEach(c => c.checked = !allChecked);
-            });
-        }
+    });
+    
+    const selectAllBtn = document.querySelector('.select-all');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function() {
+            const checkboxes = document.querySelectorAll('#stationsGrid input');
+            const allChecked = Array.from(checkboxes).every(c => c.checked);
+            checkboxes.forEach(c => c.checked = !allChecked);
+        });
+    }
 
-        // Flag modal confirm button
-        const confirmFlagBtn = document.getElementById('confirmFlagBtn');
-        if (confirmFlagBtn) {
-            confirmFlagBtn.onclick = confirmFlagReport;
-        }
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const stationParam = urlParams.get('station');
-        if (stationParam) {
-            const stationName = decodeURIComponent(stationParam);
-            const stationSelect = document.getElementById('stationSelect');
-            for (let i = 0; i < stationSelect.options.length; i++) {
-                if (stationSelect.options[i].value === stationName) {
-                    stationSelect.selectedIndex = i;
-                    break;
-                }
+    const confirmFlagBtn = document.getElementById('confirmFlagBtn');
+    if (confirmFlagBtn) {
+        confirmFlagBtn.onclick = confirmFlagReport;
+    }
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const stationParam = urlParams.get('station');
+    if (stationParam) {
+        const stationName = decodeURIComponent(stationParam);
+        const stationSelect = document.getElementById('stationSelect');
+        for (let i = 0; i < stationSelect.options.length; i++) {
+            if (stationSelect.options[i].value === stationName) {
+                stationSelect.selectedIndex = i;
+                break;
             }
         }
-        
-        fetchReports();
+    }
+    
+    // Initialize all stations as selected
+    document.querySelectorAll('#stationsGrid input').forEach(cb => {
+        cb.checked = true;
     });
+    
+    fetchReports();
+
+    // Close filter dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const filterContainer = document.querySelector('.filter-container');
+        const dropdown = document.getElementById('filterDropdown');
+        if (filterContainer && !filterContainer.contains(event.target) && dropdown) {
+            dropdown.classList.remove('show');
+        }
+    });
+});
 </script>
 </body>
 </html>

@@ -183,7 +183,7 @@ def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
     result = {
         "station": station,
         "is_operating": headway_info.get("is_operating", True),
-        "is_closed": not headway_info.get("is_operating", True),  # ADD THIS
+        "is_closed": not headway_info.get("is_operating", True),
         "headway": headway_info.get("headway_avg", 5),
         "headway_description": headway_info.get("description", ""),
         "period": headway_info.get("period", ""),
@@ -204,76 +204,165 @@ def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
     except ValueError:
         return result
     
-    # Southbound calculation (to Taft)
+    # ===== SOUTHBOUND CALCULATION (going TO Taft) =====
     if sb_last and current_time > sb_last:
         result["southbound"]["available"] = False
         result["southbound"]["last_train"] = sb_last.strftime("%I:%M %p")
-        result["southbound"]["origin"] = "N/A"
+        result["southbound"]["origin"] = "Last train departed"
     elif sb_open and current_time < sb_open:
         open_delta = (datetime.combine(target_time.date(), sb_open) - target_time).total_seconds() / 60
-        result["southbound"]["minutes"] = int(open_delta) + 2
-        result["southbound"]["origin"] = "Will open soon"
+        result["southbound"]["minutes"] = max(1, int(open_delta))
+        result["southbound"]["origin"] = "Opens at " + sb_open.strftime("%I:%M %p")
     else:
-        # Calculate next train
-        travel_to_station = station_idx * 3
-        minutes_since_midnight = target_time.hour * 60 + target_time.minute
+        travel_to_station = station_idx * 3  # ~3 minutes per station
         
-        # First train from North Ave at ~4:30
-        first_train_minutes = 4 * 60 + 30
+        # FIX: Use target_time, not current time
+        minutes_since_midnight = target_time.hour * 60 + target_time.minute + target_time.second / 60.0
+        
+        first_train_minutes = 4 * 60 + 30  # 4:30 AM from North Ave
+        
         if minutes_since_midnight < first_train_minutes:
-            minutes_since_midnight = first_train_minutes
-        
-        cycle_pos = (minutes_since_midnight - first_train_minutes) % headway_min
-        wait_time = 0 if cycle_pos == 0 else headway_min - cycle_pos
-        
-        total_minutes = wait_time + travel_to_station
-        result["southbound"]["minutes"] = max(1, int(total_minutes))
-        # Add which station the train is coming from
-        from_idx = max(0, station_idx - 1)
-        result["southbound"]["origin"] = STATIONS[from_idx] if from_idx >= 0 else "North Ave"
+            wait_until_first = first_train_minutes - minutes_since_midnight
+            total_minutes = wait_until_first + travel_to_station
+            result["southbound"]["minutes"] = max(1, int(total_minutes))
+            result["southbound"]["origin"] = "First train from North Ave"
+        else:
+            time_since_first = minutes_since_midnight - first_train_minutes
+            cycle_pos = time_since_first % headway_min
+            wait_time = 0 if cycle_pos == 0 else headway_min - cycle_pos
+            total_minutes = wait_time + travel_to_station
+            result["southbound"]["minutes"] = max(1, int(total_minutes))
+            
+            # SOUTHBOUND: Train comes from NORTH
+            if station_idx == 0:
+                result["southbound"]["origin"] = "North Ave (Terminal)"
+            else:
+                from_idx = station_idx - 1
+                result["southbound"]["origin"] = STATIONS[from_idx]
     
-    # Northbound calculation (to North Ave)
+    # ===== NORTHBOUND CALCULATION (going TO North Ave) =====
     if nb_last and current_time > nb_last:
         result["northbound"]["available"] = False
         result["northbound"]["last_train"] = nb_last.strftime("%I:%M %p")
-        result["northbound"]["origin"] = "N/A"
+        result["northbound"]["origin"] = "Last train departed"
     elif nb_open and current_time < nb_open:
         open_delta = (datetime.combine(target_time.date(), nb_open) - target_time).total_seconds() / 60
-        result["northbound"]["minutes"] = int(open_delta) + 2
-        result["northbound"]["origin"] = "Will open soon"
+        result["northbound"]["minutes"] = max(1, int(open_delta))
+        result["northbound"]["origin"] = "Opens at " + nb_open.strftime("%I:%M %p")
     else:
         travel_to_station = (len(STATIONS) - 1 - station_idx) * 3
-        minutes_since_midnight = target_time.hour * 60 + target_time.minute
+        minutes_since_midnight = target_time.hour * 60 + target_time.minute + target_time.second / 60.0
         
-        # First northbound train from Taft at ~4:55
-        first_train_minutes = 4 * 60 + 55
+        first_train_minutes = 5 * 60 + 5  # 5:05 AM from Taft
+        
         if minutes_since_midnight < first_train_minutes:
-            minutes_since_midnight = first_train_minutes
-        
-        cycle_pos = (minutes_since_midnight - first_train_minutes) % headway_min
-        wait_time = 0 if cycle_pos == 0 else headway_min - cycle_pos
-        
-        total_minutes = wait_time + travel_to_station
-        result["northbound"]["minutes"] = max(1, int(total_minutes))
-        # Add which station the train is coming from
-        from_idx = min(len(STATIONS) - 1, station_idx + 1)
-        result["northbound"]["origin"] = STATIONS[from_idx] if from_idx < len(STATIONS) else "Taft"
+            wait_until_first = first_train_minutes - minutes_since_midnight
+            total_minutes = wait_until_first + travel_to_station
+            result["northbound"]["minutes"] = max(1, int(total_minutes))
+            result["northbound"]["origin"] = "First train from Taft"
+        else:
+            time_since_first = minutes_since_midnight - first_train_minutes
+            cycle_pos = time_since_first % headway_min
+            wait_time = 0 if cycle_pos == 0 else headway_min - cycle_pos
+            total_minutes = wait_time + travel_to_station
+            result["northbound"]["minutes"] = max(1, int(total_minutes))
+            
+            # NORTHBOUND: Train comes from SOUTH
+            if station_idx == 0:
+                result["northbound"]["origin"] = "Taft"
+            elif station_idx < len(STATIONS) - 1:
+                from_idx = station_idx + 1
+                result["northbound"]["origin"] = STATIONS[from_idx]
+            else:
+                result["northbound"]["origin"] = "Taft (Terminal)"
     
     return result
 
+@api_schedule_bp.route('/schedule/compare')
+def compare_stations():
+    """Compare wait times at different stations"""
+    now = datetime.now()
+    results = {}
+    
+    stations_to_test = ["North Ave", "Cubao", "Taft"]
+    
+    for station in stations_to_test:
+        result = calculate_next_trains(station, now)
+        results[station] = {
+            "southbound": result["southbound"]["minutes"],
+            "northbound": result["northbound"]["minutes"]
+        }
+    
+    return jsonify({
+        "current_time": now.strftime("%I:%M:%S %p"),
+        "stations": results
+    })
+    
+@api_schedule_bp.route('/schedule/debug/<station_name>')
+def debug_schedule(station_name):
+    """See how time affects the calculation"""
+    name = station_name.replace('%20', ' ')
+    
+    results = {}
+    
+    # Test at different times on the same day
+    base_date = datetime.now().date()
+    
+    test_times = [
+        ("Now", datetime.now()),
+        ("+1 min", datetime.now() + timedelta(minutes=1)),
+        ("+5 min", datetime.now() + timedelta(minutes=5)),
+        ("+10 min", datetime.now() + timedelta(minutes=10)),
+        ("+30 min", datetime.now() + timedelta(minutes=30)),
+    ]
+    
+    for label, test_time in test_times:
+        result = calculate_next_trains(name, test_time)
+        results[label] = {
+            "time": test_time.strftime("%I:%M:%S %p"),
+            "southbound_minutes": result["southbound"]["minutes"],
+            "northbound_minutes": result["northbound"]["minutes"],
+            "is_closed": result["is_closed"]
+        }
+    
+    return jsonify({
+        "station": name,
+        "current_time": datetime.now().strftime("%I:%M:%S %p"),
+        "scenarios": results
+    })
+    
 # ========== ROUTES ==========
 
 @api_schedule_bp.route('/schedule/headway')
 def get_headway_route():
     headway = get_current_headway()
     return jsonify(headway)
-
 @api_schedule_bp.route('/schedule/next-trains/<station_name>')
 def get_next_trains_route(station_name):
     name = station_name.replace('%20', ' ')
     result = calculate_next_trains(name)
-    return jsonify(result)
-
+    
+    # Ensure consistent field names
+    return jsonify({
+        "station": result.get("station"),
+        "is_operating": result.get("is_operating", True),
+        "is_closed": result.get("is_closed", False),
+        "headway": result.get("headway", 5),
+        "headway_description": result.get("headway_description", ""),
+        "period": result.get("period", ""),
+        "northbound": {
+            "available": result.get("northbound", {}).get("available", True),
+            "minutes": result.get("northbound", {}).get("minutes"),
+            "last_train": result.get("northbound", {}).get("last_train"),
+            "origin": result.get("northbound", {}).get("origin", "Taft")
+        },
+        "southbound": {
+            "available": result.get("southbound", {}).get("available", True),
+            "minutes": result.get("southbound", {}).get("minutes"),
+            "last_train": result.get("southbound", {}).get("last_train"),
+            "origin": result.get("southbound", {}).get("origin", "North Ave")
+        }
+    })
 @api_schedule_bp.route('/schedule/station-info/<station_name>')
 def station_info_route(station_name):
     name = station_name.replace('%20', ' ')

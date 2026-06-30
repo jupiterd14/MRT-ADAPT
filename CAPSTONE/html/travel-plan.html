@@ -1486,10 +1486,10 @@ nav {
     background: var(--blue-bg);
     color: var(--accent-blue);
     border: none;
-    padding:12px 15px;
+    padding:5px 10px;
     border: 1px solid var(--accent-blue);
     border-radius: 20px;
-    font-size: 13px;
+    font-size: 10px;
     font-weight: 600;
     display: flex;
     align-items: center;
@@ -1501,7 +1501,7 @@ nav {
 
 
 .help-btn h3 {
-    font-size: 13px;
+    font-size: 10px;
 }
 
 .help-btn:hover {
@@ -1814,7 +1814,11 @@ nav {
     .header-subtitle {
         font-size: 12px;
     }
-}
+    
+    .info {
+        font-size: 10px;
+    }
+
 
 /* Animated button press effect */
 .btn-plan, .btn-cancel {
@@ -1843,6 +1847,74 @@ nav {
 .btn-cancel:hover {
     box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
 }
+
+.modal-content {
+    font-size: 10px;
+}
+
+  .modal-content {
+        max-width: 320px !important;
+        width: 92% !important;
+        max-height: 70vh !important;
+        border-radius: 16px !important;
+    }
+    
+    .modal-header {
+        padding: 12px 16px !important;
+    }
+    
+    .modal-header h3 {
+        font-size: 14px !important;
+        gap: 6px !important;
+    }
+    
+    .modal-header h3 i {
+        font-size: 14px !important;
+    }
+    
+    .modal-body {
+        padding: 12px 16px !important;
+    }
+    
+    .modal-step {
+        gap: 10px !important;
+        margin-bottom: 14px !important;
+    }
+    
+    .step-number {
+        width: 24px !important;
+        height: 24px !important;
+        font-size: 11px !important;
+        flex-shrink: 0 !important;
+    }
+    
+    .step-content h4 {
+        font-size: 12px !important;
+        margin-bottom: 2px !important;
+    }
+    
+    .step-content p {
+        font-size: 10px !important;
+        line-height: 1.3 !important;
+    }
+    
+    .modal-tip {
+        padding: 8px 12px !important;
+        gap: 8px !important;
+        margin-top: 12px !important;
+    }
+    
+    .modal-tip i {
+        font-size: 14px !important;
+    }
+    
+    .modal-tip span {
+        font-size: 10px !important;
+        line-height: 1.3 !important;
+    }
+
+}
+
 
 
 </style>
@@ -1958,7 +2030,7 @@ nav {
                     <i class="far fa-calendar-alt"></i>
                     <span id="currentDateTime"></span>
                 </div>
-                <span class="icon-btn" onclick="refreshPlan()"><i class="fas fa-sync-alt"></i></span>
+                <span class="icon-btn" onclick="refreshPlan()" style="display:none;"><i class="fas fa-sync-alt"></i></span>
                 <span class="icon-btn" onclick="window.location.href='/alerts'">
     <i class="fas fa-bell"></i>
     <span class="badge" id="alertBadge">0</span>
@@ -2019,8 +2091,8 @@ nav {
                <div class="detail-item">
     <label class="detail-item-i"><i class="far fa-calendar"></i> Travel Date</label>
     <input type="date" class="datetime-input" id="travelDate" value="">
-    <small style="display: block; margin-top: 5px; font-size: 10px; color: var(--text-light);">
-        <i class="fas fa-info-circle"></i> You can only plan trips up to 7 days in advance
+    <small class="info" style="display: block; margin-top: 5px; font-size: 10px; color: var(--text-light);">
+        <i class="fas fa-info-circle"></i> Plan trips up to 7 days only in advance
     </small>
 </div>
                 
@@ -2519,19 +2591,19 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     const toStatus = getStatus(toCongestion);
     
     const getWaitTime = (cong) => {
-        if (cong > 80) return '15-20m';
-        if (cong > 60) return '10-15m';
-        if (cong > 30) return '5-10m';
-        return '2-5m';
+        if (cong > 80) return '';
+        if (cong > 60) return '';
+        if (cong > 30) return '';
+        return '';
     };
     const waitTime = getWaitTime(fromCongestion);
     
     // Short messages
     const getShortMessage = (congestion, station) => {
         if (congestion > 80) return `${station} severely congested. Long queues expected.`;
-        if (congestion > 60) return `${station} congested. Allow extra boarding time.`;
+        if (congestion > 60) return `${station} congested. Delay boarding time.`;
         if (congestion > 40) return `${station} moderate. Normal commute.`;
-        return `${station} light. Smooth journey.`;
+        return `${station} Smooth journey.`;
     };
     
     const getShortTip = (congestion) => {
@@ -2565,13 +2637,13 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
             </div>
         </div>
         <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid #F1F5F9; display: flex; gap: 10px;">
-            <div style="flex:1; text-align:center; background:#F8FAFC; border-radius:8px; padding:10px;">
+            <div style="flex:1; text-align:center; background:#F8FAFC; border: 1px solid grey; border-radius:8px; padding:10px;">
                 <div style="font-size:10px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">BOARDING</div>
                 <div style="font-weight:700; font-size:16px; color:${fromStatus.color};">${fromStatus.text}</div>
             </div>
-            <div style="flex:1; text-align:center; background:#F8FAFC; border-radius:8px; padding:10px;">
-                <div style="font-size:10px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">TRAVEL TIME</div>
-                <div style="font-weight:700; font-size:16px; color:#1E293B;">${adjustedTravelTime}m</div>
+            <div style="flex:1; text-align:center; background:#F8FAFC; border: 1px solid grey; border-radius:8px; padding:10px;">
+                <div style="font-size:10px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">ESTIMAATED RAVEL TIME</div>
+                <div style="font-weight:700; font-size:16px; color:#1E293B;">${adjustedTravelTime}m~</div>
             </div>
             
         </div>
@@ -2648,27 +2720,27 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     
     if (isMorningRush) {
         rushLabel = 'MORNING RUSH HOUR';
-        rushNote = `Peak commuting · ${from} is ${fromStatus.text.toLowerCase()}`;
-        rushAdvice = 'Arrive 15-20 min early · Use first/last car for less crowding';
+        rushNote = `Peak rush hour · ${from} has ${fromStatus.text.toLowerCase()} congestion`;
+        rushAdvice = 'Arrive 15-40 min early · Use first/last car for less crowding';
         rushColor = '#F97316';
     } else if (isEveningRush) {
         rushLabel = 'EVENING RUSH HOUR';
-        rushNote = `Office hours · ${from} is ${fromStatus.text.toLowerCase()}`;
-        rushAdvice = 'Allow extra boarding time · Trains may be delayed 5-10 min';
+        rushNote = `Peak rush hour · ${from} haas ${fromStatus.text.toLowerCase()} congestion`;
+        rushAdvice = 'Allow extra boarding time · Trains may be delayed 5-30 min';
         rushColor = '#F97316';
     } else if (hour >= 21) {
         rushLabel = 'LATE NIGHT SERVICE';
-        rushNote = `Last trains · ${from} is ${fromStatus.text.toLowerCase()}`;
+        rushNote = `Last trains · ${from} ha ${fromStatus.text.toLowerCase()} congestion`;
         rushAdvice = 'Final train at 10:30 PM · Arrive early to board';
         rushColor = '#3B82F6';
     } else if (hour >= 5 && hour < 7) {
         rushLabel = 'EARLY MORNING SERVICE';
-        rushNote = `Service starting · ${from} is ${fromStatus.text.toLowerCase()}`;
-        rushAdvice = 'Trains every 5-7 min · Light crowds expected';
+        rushNote = `Service starting · ${from} has ${fromStatus.text.toLowerCase()} congestion`;
+        rushAdvice = 'Trains every 5-15 min · Light crowds expected';
         rushColor = '#22C55E';
     } else {
         rushLabel = 'REGULAR SERVICE HOURS';
-        rushNote = `${from} is ${fromStatus.text.toLowerCase()}`;
+        rushNote = `${from} has ${fromStatus.text.toLowerCase()} congestion`;
         rushAdvice = 'Normal schedule · No significant delays expected';
         rushColor = '#3B82F6';
     }
@@ -2879,7 +2951,7 @@ async function fetchAlertCount() {
     }
 }
 
-// Replace the existing checkAlertCount function with this:
+
 async function checkAlertCount() {
     const alertCount = await fetchAlertCount();
     

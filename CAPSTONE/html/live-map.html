@@ -325,12 +325,185 @@ nav {
 }
 
 
+    /* Glowing "You are HERE" marker */
+    .you-are-here {
+        background: #3B82F6;
+        border: 3px solid white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        box-shadow: 
+            0 0 0 4px rgba(59, 130, 246, 0.3),
+            0 0 20px 10px rgba(59, 130, 246, 0.2),
+            0 0 60px 20px rgba(59, 130, 246, 0.1);
+        animation: pulse-glow 2s infinite;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .you-are-here::after {
+        content: '';
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(59, 130, 246, 0.1);
+        animation: ripple 2s infinite;
+    }
+    
+    @keyframes pulse-glow {
+        0% {
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3),
+                        0 0 20px 10px rgba(59, 130, 246, 0.2),
+                        0 0 60px 20px rgba(59, 130, 246, 0.1);
+        }
+        50% {
+            box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.2),
+                        0 0 30px 20px rgba(59, 130, 246, 0.3),
+                        0 0 80px 40px rgba(59, 130, 246, 0.15);
+        }
+        100% {
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3),
+                        0 0 20px 10px rgba(59, 130, 246, 0.2),
+                        0 0 60px 20px rgba(59, 130, 246, 0.1);
+        }
+    }
+    
+    @keyframes ripple {
+        0% {
+            transform: scale(0.5);
+            opacity: 1;
+        }
+        100% {
+            transform: scale(2);
+            opacity: 0;
+        }
+    }
+    
+    /* Glowing station marker - FIXED: Only affects the circle */
+    .station-glow {
+        animation: station-pulse 2s infinite;
+    }
+    
+    @keyframes station-pulse {
+        0% {
+            filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0));
+        }
+        50% {
+            filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.8));
+        }
+        100% {
+            filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0));
+        }
+    }
+    
+    /* Location button with glow */
+    .location-btn {
+        background: white;
+        border: none;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        cursor: pointer;
+        font-size: 20px;
+        color: var(--accent-blue);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    
+    .location-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+    }
+    
+    .location-btn.has-location {
+        background: var(--accent-blue);
+        color: white;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2),
+                    0 4px 16px rgba(59, 130, 246, 0.4);
+        animation: pulse-glow 2s infinite;
+    }
+    
+    /* Floating "You are HERE" label */
+    .you-here-label {
+        background: rgba(59, 130, 246, 0.95);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        border: 2px solid white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        white-space: nowrap;
+        animation: label-pulse 2s infinite;
+    }
+    
+    @keyframes label-pulse {
+        0% {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        50% {
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        }
+        100% {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+    }
+    
+    /* Congestion glow ring for stations - FIXED: Only affects the circle */
+    .station-ring {
+        border-radius: 50%;
+        border: 3px solid transparent;
+        animation: ring-pulse 2s infinite;
+    }
+    
+    .station-ring.critical {
+        border-color: #EF4444;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    }
+    
+    .station-ring.congested {
+        border-color: #F97316;
+        box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+    }
+    
+    .station-ring.moderate {
+        border-color: #F59E0B;
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+    }
+    
+    .station-ring.light {
+        border-color: #22C55E;
+        box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+    }
+    
+    @keyframes ring-pulse {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.1);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+
+
+
 .gps-info {
     display: flex;
     align-items: center;
     gap: 12px;
     font-size: 13px;
 }
+
 
 
 .gps-info i {
@@ -504,6 +677,8 @@ nav {
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
     transition: transform 0.2s;
     cursor: pointer;
+    position: relative;
+    z-index: 2;
 }
 
 
@@ -871,12 +1046,16 @@ nav {
     animation: fadeInUp 0.3s ease-out;
 }
 
+
 /* ========== MOBILE RESPONSIVE - HIDE SIDEBAR, SHOW BOTTOM NAV ========== */
 @media screen and (max-width: 768px) {
     /* Hide desktop sidebar completely */
 
+    
+
      .header-subtitle {
-        font-size: 11px;
+        font-size: 12px;
+        margin-top: -20px;
     }
     
     
@@ -1089,25 +1268,101 @@ nav {
     }
 }
  
- /* ========== USER LIVE LOCATION GLOW EFFECT ========== */
+/* ========== USER LIVE LOCATION GLOW EFFECT - FIXED: Only affects the circle ========== */
 .nearest-station {
     position: relative;
-    background-color: rgba(59, 130, 246, 0.08) !important;
 }
 
-/* An invisible, expanding circle behind the nearest station dot */
+.nearest-station .station-marker::before {
+    content: '' !important;
+    position: absolute !important;
+    width: 60px !important;
+    height: 60px !important;
+    border-radius: 50% !important;
+    background: rgba(59, 130, 246, 0.25) !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) scale(0.3) !important;
+    animation: glowPulse 1.5s infinite ease-out !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
+    border: 3px solid rgba(59, 130, 246, 0.5) !important;
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.3) !important;
+}
+
+
 .nearest-station .station-marker::after {
     content: '';
     position: absolute;
-    width: 100%;
-    height: 100%;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
-    border: 3px solid var(--accent-blue);
-    top: 0;
-    left: 0;
-    animation: stationGlowPulse 2s infinite ease-out;
+    background: rgba(59, 130, 246, 0.08);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: stationGlowPulse 1.5s infinite ease-out 0.3s;
     pointer-events: none;
-    box-shadow: 0 0 15px var(--accent-blue);
+    z-index: 0;
+}
+
+.nearest-station .station-marker .glow-ring {
+    content: '' !important;
+    position: absolute !important;
+    width: 90px !important;
+    height: 90px !important;
+    border-radius: 50% !important;
+    background: rgba(59, 130, 246, 0.05) !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) scale(0.5) !important;
+    animation: glowPulse 1.5s infinite ease-out 0.6s !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
+    border: 2px solid rgba(59, 130, 246, 0.1) !important;
+}
+
+.nearest-station .station-marker {
+    position: relative !important;
+    z-index: 2 !important;
+    /* Keep the original background - don't override it */
+    animation: markerPulse 1.5s infinite ease-in-out !important;
+}
+
+.nearest-station .station-marker i {
+    color: white !important;
+    position: relative !important;
+    z-index: 3 !important;
+}
+
+@keyframes markerPulse {
+    0% {
+        box-shadow: 0 0 25px rgba(59, 130, 246, 0.4), 0 3px 10px rgba(0, 0, 0, 0.2);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 45px rgba(59, 130, 246, 0.8), 0 3px 15px rgba(59, 130, 246, 0.3);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: 0 0 25px rgba(59, 130, 246, 0.4), 0 3px 10px rgba(0, 0, 0, 0.2);
+        transform: scale(1);
+    }
+}
+
+@keyframes stationGlowPulse {
+    0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0.8;
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 0.4;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1.8);
+        opacity: 0;
+    }
 }
 
 /* Accent badge to label the closest station text */
@@ -1126,17 +1381,6 @@ nav {
 
 .station-row:nth-child(odd) .nearest-badge {
     margin-left: auto; /* Keeps text right-aligned on odd rows */
-}
-
-@keyframes stationGlowPulse {
-    0% {
-        transform: scale(1);
-        opacity: 0.8;
-    }
-    100% {
-        transform: scale(1.6);
-        opacity: 0;
-    }
 }
 </style>
 
@@ -1201,7 +1445,7 @@ nav {
             <h1>Live Map</h1>
 
             <div class="header-icons">
-                <span class="icon-btn" onclick="refreshMap()"><i class="fas fa-sync-alt"></i></span>
+                <span class="icon-btn" onclick="refreshMap()" style="display:none;"><i class="fas fa-sync-alt"></i></span>
                 <span class="icon-btn" onclick="window.location.href='/alerts'">
                     <i class="fas fa-bell"></i>
                     <span class="badge" id="alertBadge">0</span>
@@ -1210,7 +1454,7 @@ nav {
         </div>
 
          <div class="header-subtitle">
-       Overall stations from Northbound and Southbound
+       Overall stations of MRT-3
     </div>
 
         <!-- Direction Toggle -->
@@ -1292,10 +1536,11 @@ const STATION_COORDINATES = {
     "Buendia":      { lat: 14.5542, lon: 121.0343 },
     "Ayala Ave":    { lat: 14.5491, lon: 121.0278 },
     "Magallanes":   { lat: 14.5420, lon: 121.0194 },
-    "Taft":         { lat: 14.5376, lon: 120.9940 } // Corrected terminal alignment coordinate variant
+    "Taft":         { lat: 14.5376, lon: 120.9940 }
 };
 
 let nearestStationName = null; // Holds the live calculation state
+let userLocation = null; // Store user's actual location
 
 const stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
 
@@ -1305,6 +1550,11 @@ let cachedData = null;
 let lastFetchTime = 0;
 const CACHE_DURATION = 30000; // 30 seconds cache
 let isUpdating = false;
+
+// ========== TEST MODE: Force a station to glow ==========
+// Set this to true to test the glow without GPS
+const TEST_MODE = false;
+const TEST_STATION = "Cubao"; // Change this to any station name
 
 // Pre-compute station mapping for faster access
 const stationIndex = {};
@@ -1340,45 +1590,300 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 function findNearestStation(userLat, userLon) {
     let shortestDistance = Infinity;
     let closestStation = null;
+    let allDistances = [];
 
+    console.log(`📍 Finding nearest station to: ${userLat}, ${userLon}`);
+    
     for (const [stationName, coords] of Object.entries(STATION_COORDINATES)) {
         const dist = calculateDistance(userLat, userLon, coords.lat, coords.lon);
+        allDistances.push({ station: stationName, distance: dist });
+        console.log(`  ${stationName}: ${dist.toFixed(2)} km`);
         if (dist < shortestDistance) {
             shortestDistance = dist;
             closestStation = stationName;
         }
     }
     
-    // Only flag if user is reasonably close to the rail line (e.g., within 5km)
-    if (shortestDistance < 5.0) {
-        if (nearestStationName !== closestStation) {
-            nearestStationName = closestStation;
-            console.log(`🎯 Nearest station identified: ${closestStation} (${shortestDistance.toFixed(2)} km away)`);
-        }
+    // Sort by distance to see which is closest
+    allDistances.sort((a, b) => a.distance - b.distance);
+    console.log(`📊 Closest station: ${allDistances[0].station} (${allDistances[0].distance.toFixed(2)} km)`);
+    console.log(`📊 Second closest: ${allDistances[1].station} (${allDistances[1].distance.toFixed(2)} km)`);
+    
+    userLocation = { lat: userLat, lon: userLon };
+    
+    // Calculate distance to each station and find the closest
+    // Remove the 5km limit - just find the closest station
+    if (closestStation) {
+        nearestStationName = closestStation;
+        console.log(`🎯 Nearest station identified: ${closestStation} (${shortestDistance.toFixed(2)} km away)`);
+        
+        // Save to localStorage
+        localStorage.setItem('nearestStation', closestStation);
+        localStorage.setItem('userLat', userLat);
+        localStorage.setItem('userLon', userLon);
+        
+        
+        
+        // Update the "You are HERE" indicator
+        showYouHereIndicator(closestStation);
+        renderStations();
     } else {
-        nearestStationName = null; // User is traveling outside Metro Manila limits (e.g., Beach/Baguio)
+        console.log("⚠️ No stations found! Using fallback.");
+        nearestStationName = "Cubao";
+        localStorage.setItem('nearestStation', 'Cubao');
     }
+}
+function showLocationToast(message) {
+    // Remove existing toast
+    const existing = document.querySelector('.location-toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'location-toast';
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        padding: 14px 28px;
+        border-radius: 16px;
+        font-size: 14px;
+        z-index: 9999;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        animation: slideUpToast 0.4s ease-out;
+        max-width: 90%;
+        text-align: center;
+        border: 2px solid #3B82F6;
+    `;
+    toast.innerHTML = `<i class="fas fa-location-dot" style="color: #3B82F6; margin-right: 10px;"></i> ${message}`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(20px)';
+        toast.style.transition = 'all 0.4s ease';
+        setTimeout(() => toast.remove(), 400);
+    }, 6000);
+}
+
+// Add CSS for toast animation if not exists
+if (!document.getElementById('locationToastStyles')) {
+    const style = document.createElement('style');
+    style.id = 'locationToastStyles';
+    style.textContent = `
+        @keyframes slideUpToast {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 function trackUserLocation() {
+    // If test mode is on, use test station
+    if (TEST_MODE) {
+        console.log(`🧪 TEST MODE: Forcing glow on "${TEST_STATION}"`);
+        nearestStationName = TEST_STATION;
+        renderStations();
+        showYouHereIndicator(TEST_STATION);
+        return;
+    }
+    
+    console.log("📍 Starting location tracking...");
+    
+    // Check if we have saved location from before
+    const savedLat = localStorage.getItem('userLat');
+    const savedLon = localStorage.getItem('userLon');
+    const savedStation = localStorage.getItem('nearestStation');
+    
+    console.log("📦 Saved location:", savedStation, savedLat, savedLon);
+    
+    // Use saved location immediately if available
+    if (savedLat && savedLon && savedStation) {
+        const lat = parseFloat(savedLat);
+        const lon = parseFloat(savedLon);
+        nearestStationName = savedStation;
+        userLocation = { lat, lon };
+        console.log(`📍 Using saved location: ${savedStation} (${lat}, ${lon})`);
+        showYouHereIndicator(savedStation);
+        renderStations();
+    }
+    
+    // Check if geolocation is available
     if (!navigator.geolocation) {
-        console.log("❌ Geolocation services unexposed by window frame client.");
+        console.log("❌ Geolocation not supported by browser.");
+        if (!nearestStationName) {
+            nearestStationName = "Cubao";
+            renderStations();
+            showYouHereIndicator("Cubao (fallback - no GPS)");
+        }
         return;
     }
 
-    navigator.geolocation.watchPosition(
+    // Try to get real location
+    console.log("📍 Requesting GPS location from browser...");
+    console.log("🔄 Make sure you've allowed location permissions in your browser!");
+    
+    // Set a timeout - if geolocation takes too long, use fallback
+    const timeoutId = setTimeout(() => {
+        if (!nearestStationName) {
+            console.log("⏰ Geolocation timeout - using fallback station");
+            nearestStationName = "Cubao";
+            renderStations();
+            showYouHereIndicator("Cubao (location timeout)");
+        }
+    }, 8000); // 8 second timeout
+    
+    navigator.geolocation.getCurrentPosition(
         (position) => {
+            clearTimeout(timeoutId);
             const { latitude, longitude } = position.coords;
+            console.log(`📍 GPS SUCCESS! Got location: ${latitude}, ${longitude}`);
+            console.log(`📊 Accuracy: ${position.coords.accuracy} meters`);
+            
+            // Find nearest station
             findNearestStation(latitude, longitude);
-            renderStations(); // Instantly push calculations to view frames without refresh
+            
+            if (nearestStationName) {
+                console.log(`🎯 Found nearest station: ${nearestStationName}`);
+                showYouHereIndicator(nearestStationName);
+                renderStations();
+            } else {
+                console.log("⚠️ No station found within 5km, using fallback");
+                nearestStationName = "Cubao";
+                renderStations();
+                showYouHereIndicator("Cubao (fallback)");
+            }
         },
         (error) => {
-            console.log("⚠️ Standalone GPS connection lost or permission blocked:", error.message);
+            clearTimeout(timeoutId);
+            console.log("⚠️ Geolocation ERROR:", error.message);
+            console.log("📋 Error code:", error.code);
+            
+            // Different error codes:
+            // 1 = PERMISSION_DENIED
+            // 2 = POSITION_UNAVAILABLE
+            // 3 = TIMEOUT
+            
+            if (error.code === 1) {
+                console.log("🔴 PERMISSION DENIED! Please allow location access in your browser.");
+                // Show a message to the user
+                alert("Please allow location access to find your nearest MRT station. Using Cubao as fallback.");
+            }
+            
+            // If we have saved location, keep using it
+            if (savedStation) {
+                console.log(`📍 Using saved location: ${savedStation}`);
+                return;
+            }
+            
+            // Otherwise use fallback
+            if (!nearestStationName) {
+                nearestStationName = "Cubao";
+                renderStations();
+                showYouHereIndicator("Cubao (location unavailable)");
+            }
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { 
+            enableHighAccuracy: true, 
+            timeout: 10000, 
+            maximumAge: 60000 
+        }
     );
 }
 
+// Add this function to check geolocation status
+function checkGeolocationStatus() {
+    if (!navigator.geolocation) {
+        console.log("❌ Browser doesn't support geolocation");
+        return false;
+    }
+    
+    console.log("✅ Browser supports geolocation");
+    
+    // Test if geolocation is actually working
+    navigator.geolocation.getCurrentPosition(
+        () => {
+            console.log("✅ Geolocation is working!");
+        },
+        (error) => {
+            console.log("❌ Geolocation test failed:", error.message);
+            if (error.code === 1) {
+                console.log("🔴 You need to allow location permissions in your browser!");
+                console.log("🔴 Look for the location icon in your address bar and click 'Allow'");
+            }
+        },
+        { timeout: 3000 }
+    );
+    return true;
+}
+
+function showYouHereIndicator(stationName) {
+    let indicator = document.getElementById('youHereIndicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+       
+      
+        
+        // Add styles for the indicator if not already present
+        if (!document.getElementById('youHereStyles')) {
+            const style = document.createElement('style');
+            style.id = 'youHereStyles';
+            style.textContent = `
+                .you-here-indicator {
+                    position: fixed;
+                    bottom: 180px;
+                    right: 20px;
+                    background: linear-gradient(135deg, #3B82F6, #2563EB);
+                    color: white;
+                    padding: 12px 20px;
+                    border-radius: 30px;
+                    font-size: 13px;
+                    font-weight: 600;
+                    z-index: 1000;
+                    box-shadow: 0 4px 25px rgba(59, 130, 246, 0.5);
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    animation: floatIndicator 2s infinite ease-in-out;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    backdrop-filter: blur(10px);
+                    letter-spacing: 0.3px;
+                }
+                .you-here-indicator i {
+                    font-size: 18px;
+                    animation: pulseIcon 1.5s infinite;
+                }
+                @keyframes floatIndicator {
+                    0% { transform: translateY(0px); box-shadow: 0 4px 25px rgba(59, 130, 246, 0.4); }
+                    50% { transform: translateY(-5px); box-shadow: 0 8px 35px rgba(59, 130, 246, 0.6); }
+                    100% { transform: translateY(0px); box-shadow: 0 4px 25px rgba(59, 130, 246, 0.4); }
+                }
+                @keyframes pulseIcon {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.2); }
+                    100% { transform: scale(1); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    } else {
+        const stationSpan = document.getElementById('youHereStation');
+        if (stationSpan) stationSpan.textContent = stationName;
+    }
+    
+    indicator.classList.add('show');
+    indicator.style.display = 'flex';
+}
 function getStatusMessage(stationName, congestion) {
     const status = getStatusText(congestion);
     
@@ -1566,6 +2071,8 @@ async function fetchStationData() {
             isUpdating = false;
             
             console.log('✅ Map data loaded, overrides preserved');
+            
+            console.log("Forecast here: ", processedData);
             return processedData;
             
         } else {
@@ -1578,6 +2085,7 @@ async function fetchStationData() {
                     if (forecastResponse.ok) {
                         const forecastData = await forecastResponse.json();
                         return { station, data: forecastData };
+
                     }
                 } catch (e) {
                     console.error(`Error fetching forecast for ${station}:`, e);
@@ -1638,6 +2146,7 @@ function renderStations() {
         const stationInfo = data[station];
         const row = document.createElement('div');
         
+        // Check if this is the nearest station
         const isNearest = (station === nearestStationName);
         row.className = `station-row ${isNearest ? 'nearest-station' : ''}`;
         row.onclick = (function(s) { return function() { openModal(s); }; })(station);
@@ -1675,14 +2184,14 @@ function renderStations() {
         
         const colorClass = getStatusClass(congestion);
         const overrideBadge = isOverridden ? `<span style="font-size: 9px; color: #8B5CF6; background: #EDE9FE; padding: 1px 6px; border-radius: 10px; margin-left: 4px; border: 1px solid #8B5CF6;"><i class="fas fa-pen"></i></span>` : '';
-        const nearestBadgeHTML = isNearest ? `<span class="nearest-badge"><i class="fas fa-street-view"></i> Nearest</span>` : '';
+        const nearestBadgeHTML = isNearest ? `<span class="nearest-badge"><i class="fas fa-street-view"></i> YOU ARE NEAR</span>` : '';
         
         // If status is CLOSED and not overridden, use gray color
         const displayColorClass = (status === 'CLOSED' && !isOverridden) ? 'bg-light' : colorClass;
         
         row.innerHTML = `
             <div class="station-text-group">
-                <span class="st-name">${station} ${overrideBadge}</span>
+                <span class="st-name">${station}</span>
                 <span class="st-time" style="${status === 'CLOSED' && !isOverridden ? 'color: #94A3B8;' : ''}">${waitTime}</span>
                 ${nearestBadgeHTML}
             </div>
@@ -1940,6 +2449,7 @@ function initializeMap() {
     // Render initial structures
     renderStations();
     
+    checkGeolocationStatus();
     // Activate location tracking engine via hardware GPS
     trackUserLocation();
     
@@ -2010,4 +2520,3 @@ window.goToReport = goToReport;
 </script>
 </body>
 </html>
-
