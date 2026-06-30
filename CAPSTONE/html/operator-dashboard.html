@@ -1563,7 +1563,7 @@ input:checked + .slider:before {
             <div class="nav-item" onclick="showPage('userReports', this)"><i class="fas fa-flag-checkered"></i><span>User Reports</span></div>
         </nav>
 
-        <div class="user-profile">
+        <div class="user-profile" onclick="window.location.href='/html/profile.html'">
             <div class="user-avatar" id="operatorAvatar">O</div>
             <div class="user-info">
                 <div class="user-name" id="operatorName">{{ session.get('username', 'Operator') }}</div>

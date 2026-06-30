@@ -71,30 +71,146 @@ def get_active_overrides():
 
 def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name):
     """
-    Convert model prediction to congestion percentage using CAPACITY-BASED scaling.
-    This matches the fix in api_predict.py - uses station capacity, NOT scaler_max.
+    Convert model prediction to congestion percentage.
+    MATCHES api_other.py implementation for consistency.
     """
-    raw_output = float(pred_scaled[0][0])
+    raw_value = float(pred_scaled[0][0]) if hasattr(pred_scaled, '__getitem__') else float(pred_scaled)
+    
+    # Inverse transform using target scaler
+    if target_scaler is not None:
+        try:
+            passenger_count = float(target_scaler.inverse_transform([[raw_value]])[0][0])
+        except Exception as e:
+            print(f"   ⚠️ Inverse transform failed: {e}")
+            capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+            passenger_count = raw_value * capacity * 1.5
+    else:
+        # Fallback
+        capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        passenger_count = raw_value * capacity * 1.5
+    
+    # ========== FIX: Cap passenger_count at 0 ==========
+    passenger_count = max(0, passenger_count)
     
     # Get station capacity
     capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
     
-    # Apply sigmoid to normalize raw output to 0-1
-    center = 0.5
-    temperature = 0.8
-    normalized = 1 / (1 + math.exp(-(raw_output - center) / temperature))
-    
-    # Scale to passenger count based on capacity (never exceed capacity)
-    pred_passengers = normalized * capacity
+    # Cap at station capacity for congestion percentage
+    capped_passengers = min(passenger_count, capacity)
     
     # Calculate congestion percentage (0-100%)
-    congestion = (pred_passengers / capacity * 100)
+    congestion = (capped_passengers / capacity * 100)
+    congestion = max(0, min(congestion, 100))
     
-    # Cap at 100%
-    congestion = min(congestion, 100)
-    
-    return congestion, pred_passengers
+    return congestion, passenger_count
 
+@operator_bp.route('/api/reports', methods=['GET'])
+def get_reports():
+    """Get reports for operator dashboard - ONLY non-archived reports"""
+    try:
+        # Debug: Check total reports count
+        total_reports = Report.query.count()
+        archived_count = Report.query.filter(Report.archived == True).count()
+        active_count = Report.query.filter(Report.archived == False).count()
+        
+        print(f"📊 REPORT STATS: Total={total_reports}, Archived={archived_count}, Active={active_count}")
+        
+        # Get all reports that are NOT archived
+        reports = Report.query.filter(
+            Report.archived == False
+        ).order_by(Report.timestamp.desc()).all()
+        
+        print(f"📊 Found {len(reports)} active reports")
+        
+        result = []
+        for report in reports:
+            # Handle photo paths safely
+            photo_paths = []
+            if report.photo_path:
+                try:
+                    if report.photo_path.startswith('['):
+                        import json
+                        photo_paths = json.loads(report.photo_path)
+                    else:
+                        photo_paths = [report.photo_path]
+                except:
+                    photo_paths = []
+            
+            # Get username safely
+            username = None
+            if report.user:
+                username = report.user.username
+            
+            result.append({
+                'id': report.id,
+                'station': report.station,
+                'direction': getattr(report, 'direction', 'both'),
+                'reported_congestion': report.reported_congestion,
+                'remarks': report.remarks,
+                'timestamp': report.timestamp.isoformat(),
+                'username': username,
+                'anonymous': report.anonymous,
+                'flagged': report.flagged,
+                'flag_count': getattr(report, 'flag_count', 0),
+                'archived': report.archived,
+                'photo_paths': photo_paths,
+                'photo_path': report.photo_path
+            })
+        
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error fetching reports: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify([]), 500
+    
+@operator_bp.route('/api/broadcasts/active', methods=['GET'])
+def get_active_broadcasts():
+    """Get only active broadcasts for user dashboard"""
+    try:
+        now = datetime.now()
+        
+        # Auto-expire old broadcasts
+        expired_by_date = Broadcast.query.filter(
+            Broadcast.is_active == True,
+            Broadcast.expires_at != None,
+            Broadcast.expires_at <= now
+        ).all()
+        
+        for broadcast in expired_by_date:
+            broadcast.is_active = False
+        
+        if expired_by_date:
+            db.session.commit()
+            print(f"Auto-expired {len(expired_by_date)} broadcasts")
+        
+        # Only return active broadcasts
+        active_broadcasts = Broadcast.query.filter(
+            Broadcast.is_active == True
+        ).order_by(Broadcast.created_at.desc()).all()
+        
+        result = []
+        for broadcast in active_broadcasts:
+            stations = json.loads(broadcast.stations) if broadcast.stations else []
+            result.append({
+                'id': broadcast.id,
+                'title': broadcast.title,
+                'message': broadcast.message,
+                'disruption_type': broadcast.disruption_type,
+                'stations': stations,
+                'severity': broadcast.severity,
+                'direction': getattr(broadcast, 'direction', 'both'),
+                'created_at': broadcast.created_at.isoformat(),
+                'expires_at': broadcast.expires_at.isoformat() if broadcast.expires_at else None,
+                'is_active': broadcast.is_active,
+                'time': broadcast.created_at.isoformat()
+            })
+        
+        return jsonify({'success': True, 'broadcasts': result})
+    except Exception as e:
+        print(f"Error getting active broadcasts: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
 @operator_bp.route('/api/operator/station-status')
 def operator_station_status():
     """Get station status for operator dashboard - SHOWS ALL STATIONS with overrides"""
@@ -169,8 +285,7 @@ def operator_station_status():
                     target_scaler = directional_scalers.get(f'{model_key}_target')
                     
                     if feature_scaler and target_scaler:
-                        scaled_sequence = feature_scaler.transform(sequence)
-                        input_sequence = scaled_sequence.reshape(1, 24, -1)
+                        input_sequence = sequence.reshape(1, 24, -1)
                         pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
                         congestion, _ = _get_congestion_from_prediction(
                             pred_scaled, target_scaler, station_name
@@ -202,6 +317,10 @@ def operator_station_status():
         for station in stations_to_show:
             north_congestion, north_overridden = get_congestion(station, 'Northbound')
             south_congestion, south_overridden = get_congestion(station, 'Southbound')
+            
+            print("Operator status north: ", north_congestion)
+            print("Operator status south: ", south_congestion)
+            
             
             # If overridden, show the override value even if MRT is closed
             # But if not overridden and MRT is closed, show CLOSED
@@ -311,50 +430,36 @@ def operator_dashboard():
     else:
         return redirect(url_for('user.user_dashboard'))
 
-# ========== ADD THIS MISSING ENDPOINT ==========
 @operator_bp.route('/api/operator/broadcasts', methods=['GET'])
 def get_operator_broadcasts():
-    """Get broadcasts for operator's stations"""
+    """Get ALL broadcasts for operator's stations - no auto-deletion"""
     try:
         user_id = session.get('user_id')
         if not user_id:
             return jsonify({'success': False, 'error': 'Not logged in'}), 401
         
-        # Auto-expire old broadcasts (but DON'T delete them from history)
         now = datetime.now()
         
-        # Expire broadcasts older than 7 days
-        auto_expire_cutoff = now - timedelta(days=7)
-        old_broadcasts = Broadcast.query.filter(
-            Broadcast.is_active == True,
-            Broadcast.created_at < auto_expire_cutoff
-        ).all()
-        
-        for broadcast in old_broadcasts:
-            broadcast.is_active = False
-        
-        # Also expire by expires_at if set
+        # ✅ ONLY expire broadcasts by their set expiration time
+        # DO NOT auto-expire based on age
         expired_by_date = Broadcast.query.filter(
             Broadcast.is_active == True,
             Broadcast.expires_at != None,
             Broadcast.expires_at <= now
         ).all()
         
-        for broadcast in expired_by_date:
-            broadcast.is_active = False
-        
-        if old_broadcasts or expired_by_date:
+        if expired_by_date:
+            for broadcast in expired_by_date:
+                broadcast.is_active = False
             db.session.commit()
-            print(f"Auto-expired {len(old_broadcasts) + len(expired_by_date)} broadcasts")
+            print(f"Auto-expired {len(expired_by_date)} broadcasts by expiry date")
         
         managed_stations = get_operator_stations(user_id)
         
-        # Get ALL broadcasts (active AND inactive) for history
-        # But limit to last 30 days to avoid overwhelming the UI
-        thirty_days_ago = now - timedelta(days=30)
-        all_broadcasts = Broadcast.query.filter(
-            Broadcast.created_at >= thirty_days_ago
-        ).order_by(Broadcast.created_at.desc()).limit(100).all()
+        # ✅ Get ALL broadcasts - NO time limit, NO auto-deletion
+        all_broadcasts = Broadcast.query.order_by(
+            Broadcast.created_at.desc()
+        ).all()
         
         typeIcons = {
             "Train Breakdown": "fa-train", "Overcrowding": "fa-users", 
@@ -378,7 +483,7 @@ def get_operator_broadcasts():
                     'created_at': broadcast.created_at.isoformat(),
                     'expires_at': broadcast.expires_at.isoformat() if broadcast.expires_at else None,
                     'duration_minutes': getattr(broadcast, 'duration_minutes', 60),
-                    'is_active': broadcast.is_active,  # IMPORTANT: Include this field
+                    'is_active': broadcast.is_active,  # CRITICAL: Include this field
                     'icon': typeIcons.get(broadcast.disruption_type, 'fa-bullhorn')
                 })
         
@@ -387,34 +492,29 @@ def get_operator_broadcasts():
         print(f"Error getting broadcasts: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# ========== BROADCAST CRUD ENDPOINTS ==========
-@operator_bp.route('/api/operator/broadcast/<int:broadcast_id>', methods=['GET'])
-def get_broadcast(broadcast_id):
-    """Get a single broadcast by ID"""
-    try:
-        broadcast = Broadcast.query.get(broadcast_id)
-        if not broadcast:
-            return jsonify({'success': False, 'error': 'Broadcast not found'}), 404
-        
-        return jsonify({
-            'success': True,
-            'broadcast': {
-                'id': broadcast.id,
-                'title': broadcast.title,
-                'message': broadcast.message,
-                'severity': broadcast.severity,
-                'disruption_type': broadcast.disruption_type,
-                'direction': getattr(broadcast, 'direction', 'both'),
-                'stations': json.loads(broadcast.stations) if broadcast.stations else []
-            }
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
+@operator_bp.route('/profile')
+@operator_bp.route('/profile.html')
+def operator_profile():
+    """Operator profile page"""
+    if 'user_id' not in session:
+        flash('Please log in to access this page.', 'warning')
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        flash('User not found.', 'danger')
+        return redirect(url_for('auth.login'))
+    
+    managed_stations = get_operator_stations(user.id)
+    
+    return render_template('profile.html',
+                         user=user,
+                         managed_stations=managed_stations,
+                         all_stations=STATIONS)
+    
 @operator_bp.route('/api/operator/broadcast/<int:broadcast_id>', methods=['PUT'])
 def update_broadcast(broadcast_id):
-    """Update a broadcast"""
+    """Update a broadcast - handles both editing and archiving"""
     try:
         data = request.json
         broadcast = Broadcast.query.get(broadcast_id)
@@ -422,25 +522,39 @@ def update_broadcast(broadcast_id):
         if not broadcast:
             return jsonify({'success': False, 'error': 'Broadcast not found'}), 404
         
-        # Update fields
-        if 'title' in data:
-            broadcast.title = data['title']
-        if 'message' in data:
-            broadcast.message = data['message']
-        if 'severity' in data:
-            broadcast.severity = data['severity']
+        # Check if this is an archive request
+        if 'is_active' in data:
+            # Archive/restore broadcast
+            broadcast.is_active = data['is_active']
+            if data['is_active'] == False:
+                broadcast.archived_at = datetime.now()
+                broadcast.archived_by = session.get('username', 'operator')
+            else:
+                # Restoring - clear archive info
+                broadcast.archived_at = None
+                broadcast.archived_by = None
+        else:
+            # Update fields for editing
+            if 'title' in data:
+                broadcast.title = data['title']
+            if 'message' in data:
+                broadcast.message = data['message']
+            if 'severity' in data:
+                broadcast.severity = data['severity']
         
         db.session.commit()
         
         log_activity(session.get('user_id'), 'operator', session.get('username'), 
-                    'edit_broadcast', f'Edited broadcast #{broadcast_id}: {broadcast.title}')
+                    'edit_broadcast', f'Updated broadcast #{broadcast_id}: {broadcast.title}')
         
         return jsonify({'success': True, 'message': 'Broadcast updated'})
     except Exception as e:
         db.session.rollback()
+        print(f"Error updating broadcast: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
-
-
+    
 @operator_bp.route('/api/operator/broadcast/<int:broadcast_id>', methods=['DELETE'])
 def delete_broadcast(broadcast_id):
     """Archive a broadcast (soft delete)"""
@@ -689,13 +803,9 @@ def keep_report(report_id):
         print(f"Error keeping report: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 @operator_bp.route('/api/operator/archive-report/<int:report_id>', methods=['POST'])
 def archive_report(report_id):
-    """
-    Archive a report (soft delete)
-    Called by archiveReport() in frontend
-    """
+    """Archive a report (soft delete)"""
     try:
         data = request.json
         user_id = session.get('user_id')
@@ -705,11 +815,15 @@ def archive_report(report_id):
         if not report:
             return jsonify({'success': False, 'error': 'Report not found'}), 404
         
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
         # Check permission
         managed_stations = get_operator_stations(user_id)
         if report.station not in managed_stations and user.role != 'admin':
             return jsonify({'success': False, 'error': 'You cannot archive reports from this station'}), 403
         
+        # Archive the report - NOW THESE COLUMNS EXIST!
         report.archived = True
         report.archived_at = datetime.now()
         report.archived_by = user.username
@@ -727,6 +841,54 @@ def archive_report(report_id):
     except Exception as e:
         db.session.rollback()
         print(f"Error archiving report: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    
+@operator_bp.route('/api/operator/broadcast/<int:broadcast_id>', methods=['GET'])
+def get_broadcast(broadcast_id):
+    """Get a single broadcast for editing"""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Not logged in'}), 401
+        
+        broadcast = Broadcast.query.get(broadcast_id)
+        
+        if not broadcast:
+            return jsonify({'success': False, 'error': 'Broadcast not found'}), 404
+        
+        # Check if user has permission (broadcast affects their stations)
+        managed_stations = get_operator_stations(user_id)
+        stations = json.loads(broadcast.stations) if broadcast.stations else []
+        
+        if not any(s in managed_stations for s in stations):
+            # Check if user is admin or has line_wide access
+            user = User.query.get(user_id)
+            if user.access_level != 'line_wide' and user.role != 'admin':
+                return jsonify({'success': False, 'error': 'Permission denied'}), 403
+        
+        return jsonify({
+            'success': True,
+            'broadcast': {
+                'id': broadcast.id,
+                'title': broadcast.title,
+                'message': broadcast.message,
+                'disruption_type': broadcast.disruption_type,
+                'stations': stations,
+                'severity': broadcast.severity,
+                'direction': getattr(broadcast, 'direction', 'both'),
+                'duration_minutes': getattr(broadcast, 'duration_minutes', 60),
+                'is_active': broadcast.is_active,
+                'created_at': broadcast.created_at.isoformat(),
+                'expires_at': broadcast.expires_at.isoformat() if broadcast.expires_at else None
+            }
+        })
+    except Exception as e:
+        print(f"Error getting broadcast: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
     
     

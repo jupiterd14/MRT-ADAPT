@@ -2,12 +2,29 @@ from flask import Blueprint, render_template, session, request, jsonify, redirec
 from models import User, SavedRoute, db
 from datetime import datetime
 from .auth import login_required
+from werkzeug.security import generate_password_hash, check_password_hash
 
 user_bp = Blueprint('user', __name__)
 
 STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
             "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
             "Ayala Ave", "Magallanes", "Taft"]
+
+# ========== PASSWORD METHODS FOR USER MODEL ==========
+def check_password(self, password):
+    """Check if password matches hash"""
+    return check_password_hash(self.password_hash, password)
+
+def set_password(self, password):
+    """Set password hash"""
+    self.password_hash = generate_password_hash(password)
+
+# Add methods to User model (if not already present)
+if not hasattr(User, 'check_password'):
+    User.check_password = check_password
+
+if not hasattr(User, 'set_password'):
+    User.set_password = set_password
 
 @user_bp.route('/user-dashboard')
 def user_dashboard():
@@ -128,4 +145,45 @@ def update_favorite_station():
         
         return jsonify({'success': True, 'message': 'Favorite station updated'})
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ========== USER PASSWORD PROFILE ENDPOINT (ONLY UPDATE PASSWORD) ==========
+@user_bp.route('/api/profile/update-password', methods=['POST'])
+@login_required
+def update_password():
+    """Update user password"""
+    try:
+        data = request.json
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        
+        if not current_password or not new_password:
+            return jsonify({'success': False, 'error': 'Current password and new password are required'}), 400
+        
+        user_id = session.get('user_id')
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        # Verify current password
+        if not check_password_hash(user.password_hash, current_password):
+            return jsonify({'success': False, 'error': 'Current password is incorrect'}), 400
+        
+        # Validate new password
+        if len(new_password) < 8:
+            return jsonify({'success': False, 'error': 'Password must be at least 8 characters'}), 400
+        
+        # Update password
+        user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        
+        from .auth import log_activity
+        log_activity(user.id, user.role, user.username, 'password_change', 
+                    'Password updated successfully')
+        
+        return jsonify({'success': True, 'message': 'Password updated successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating password: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

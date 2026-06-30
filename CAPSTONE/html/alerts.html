@@ -38,7 +38,6 @@ body {
     overflow: hidden;
 }
 
-
 .sidebar {
     width: 300px !important;
     background-color: var(--sidebar-bg);
@@ -159,7 +158,7 @@ nav {
     font-weight: bold; 
 }
 
-/* Filter Bar Styles - KEPT ABOVE ALERTS */
+/* Filter Bar Styles */
 .filter-bar {
     display: flex;
     gap: 10px;
@@ -226,6 +225,16 @@ nav {
     background: #E2E8F0; 
 }
 
+/* FIX: Bell icon color based on unread count */
+.icon-btn.has-unread {
+    color: var(--accent-blue);
+    background: #EFF6FF;
+}
+
+.icon-btn.has-unread:hover {
+    background: #DBEAFE;
+}
+
 .mark-read-btn { 
     background: #4F46E5; 
     color: white; 
@@ -280,7 +289,6 @@ nav {
 .alert-icon.red { color: var(--red); background: #FEE2E2; }
 .alert-icon.blue { color: var(--accent-blue); background: #EFF6FF; }
 .alert-icon.orange { color: var(--orange); background: #FFEDD5; }
-.alert-icon.yellow { color: #D97706; background: #FEF3C7; }  /* ← ADD THIS LINE */
 .alert-icon.purple { color: var(--purple); background: #EDE9FE; }
 .alert-icon.green { color: var(--green); background: #DCFCE7; }
 
@@ -420,7 +428,7 @@ nav {
     display: none; 
 }
 
-/* ========== MOBILE BOTTOM NAVIGATION BAR ========== */
+/* MOBILE BOTTOM NAVIGATION BAR */
 .bottom-nav {
     display: none;
     position: fixed;
@@ -513,9 +521,6 @@ nav {
     background: linear-gradient(90deg, transparent, var(--border), transparent);
 }
 
-.alert-icon.yellow { color: #D97706; background: #FEF3C7; }
-
-
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -531,19 +536,36 @@ nav {
     animation: fadeInUp 0.3s ease-out;
 }
 
-/* ========== MOBILE RESPONSIVE - Filter stays above ========== */
+/* STATION NAME HIGHLIGHTING */
+.alert-text .station-name {
+    font-weight: 400;
+    color: var(--accent-blue);
+    display: inline;
+    margin: 0 2px;
+    font-size: 12px;
+}
+
+.alert-text .station-name.critical {
+    color: var(--red);
+}
+
+.alert-text .station-name.moderate {
+    color: var(--orange);
+}
+
+.alert-text .station-name.light {
+    color: var(--green);
+}
+
 @media screen and (max-width: 768px) {
-    /* Hide sidebar on mobile */
     .sidebar {
         display: none !important;
     }
     
-    /* Show bottom navigation */
     .bottom-nav {
         display: block;
     }
     
-    /* Adjust main content */
     .main-content {
         padding: 12px 12px !important;
         margin-bottom: 70px !important;
@@ -557,21 +579,18 @@ nav {
         height: auto !important;
     }
     
-    /* FILTER BAR - Stays at top, scrollable horizontally */
-  /* Force filter bar to always show */
-.filter-bar {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    min-height: 50px !important;
-}
-
-.filter-bar .filter-btn {
-    display: inline-flex !important;
-    visibility: visible !important;
-}
+    .filter-bar {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        min-height: 50px !important;
+    }
     
-    /* Smaller alert cards */
+    .filter-bar .filter-btn {
+        display: inline-flex !important;
+        visibility: visible !important;
+    }
+    
     .alert-card {
         padding: 10px 12px !important;
         margin-bottom: 8px !important;
@@ -619,8 +638,6 @@ nav {
         font-size: 11px !important;
     }
     
-    /* Header adjustments */
-       /* Adjust header */
     .header-top {
         margin-bottom: 20px;
     }
@@ -648,9 +665,13 @@ nav {
         font-size: 9px !important;
         margin-bottom: 3px !important;
     }
+    
+    .alert-text .station-name {
+        font-size: 11px;
+        padding: 1px 4px;
+    }
 }
 
-/* Extra small devices */
 @media screen and (max-width: 480px) {
     .alert-card {
         padding: 8px 10px !important;
@@ -737,18 +758,14 @@ nav {
     </div>
 
     <div class="main-content">
-        <div class="greeting">GOOD {{ 'MORNING' if now.hour < 12 else 'AFTERNOON' if now.hour < 18 else 'EVENING' }}, Commuter</div>
+        <div class="greeting">GOOD MORNING, Commuter</div>
         <div class="header-top">
             <h1>Alerts <span class="new-badge" id="newAlertBadge">0 New</span></h1>
             <div class="header-icons">
-                <span class="icon-btn" onclick="refreshAlerts()"><i class="fas fa-sync-alt"></i></span>
+                <span class="icon-btn" id="refreshBtn" onclick="refreshAlerts()" style="display:none;"><i class="fas fa-sync-alt"></i></span>
                 <button class="mark-read-btn" id="markAllBtn" onclick="markAllAsRead()"><i class="far fa-envelope-open"></i> Mark all as read</button>
             </div>
         </div>
-
-        
-
-        
 
         <!-- Filter Bar -->
         <div class="filter-bar">
@@ -766,430 +783,661 @@ nav {
         </div>
         <div id="alertsContainer"></div>
     </div>
-    <script>
-        let currentAlerts = [];
-        let readAlerts = new Set();
-        let isLoading = false;
-        let currentFilter = 'all';
+  <script>
+    let currentAlerts = [];
+    let readAlerts = new Set();
+    let isLoading = false;
+    let currentFilter = 'all';
+    let _lastAlertLoadTime = 0;
+    let _cachedUnreadCount = 0;
 
-        const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-            "Ayala Ave", "Magallanes", "Taft"];
+    const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
+        "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+        "Ayala Ave", "Magallanes", "Taft"];
 
-        function loadReadStatus() { 
-            const saved = localStorage.getItem('readAlerts'); 
-            if (saved) readAlerts = new Set(JSON.parse(saved)); 
+    function loadReadStatus() { 
+        const saved = localStorage.getItem('readAlerts'); 
+        if (saved) readAlerts = new Set(JSON.parse(saved)); 
+        console.log('📖 Loaded read status from localStorage:', readAlerts.size, 'items');
+    }
+    
+    function saveReadStatus() { 
+        localStorage.setItem('readAlerts', JSON.stringify([...readAlerts])); 
+        console.log('💾 Saved read status to localStorage:', readAlerts.size, 'items');
+    }
+
+    function showLoading() {
+        document.getElementById('loadingScreen').classList.remove('hidden');
+        document.getElementById('alertsContainer').classList.remove('loaded');
+    }
+    
+    function hideLoading() {
+        document.getElementById('loadingScreen').classList.add('hidden');
+        document.getElementById('alertsContainer').classList.add('loaded');
+    }
+
+    function setupFilters() {
+        document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                displayFilteredAlerts();
+            });
+        });
+    }
+
+    function displayFilteredAlerts() {
+        let filtered = [...currentAlerts];
+        
+        if (currentFilter !== 'all') {
+            filtered = filtered.filter(alert => alert.type === currentFilter);
         }
         
-        function saveReadStatus() { 
-            localStorage.setItem('readAlerts', JSON.stringify([...readAlerts])); 
-        }
+        renderAlerts(filtered);
+    }
 
-        function showLoading() {
-            document.getElementById('loadingScreen').classList.remove('hidden');
-            document.getElementById('alertsContainer').classList.remove('loaded');
-        }
+    function clearFilters() {
+        document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
+        const allBtn = document.querySelector('.filter-btn[data-filter="all"]');
+        if (allBtn) allBtn.classList.add('active');
+        currentFilter = 'all';
+        displayFilteredAlerts();
+        showToast('Filters cleared');
+    }
+
+    // Rush Hour Alert
+    function getRushHourAlert() {
+        const now = new Date();
+        const hour = now.getHours();
         
-        function hideLoading() {
-            document.getElementById('loadingScreen').classList.add('hidden');
-            document.getElementById('alertsContainer').classList.add('loaded');
+        if (hour >= 7 && hour <= 9) {
+            return {
+                id: 'rush-morning-permanent',
+                type: 'rush_hour',
+                icon: 'clock',
+                icon_color: 'orange',
+                title: 'MORNING RUSH HOUR',
+                message: 'Rush hour in progress (7:00 AM - 9:00 AM). Expect heavy congestion at North Ave, Cubao, and Ayala stations. Allow extra travel time.',
+                time: 'Just now',
+                unread: true
+            };
+        } else if (hour >= 17 && hour <= 19) {
+            return {
+                id: 'rush-evening-permanent',
+                type: 'rush_hour',
+                icon: 'clock',
+                icon_color: 'orange',
+                title: 'EVENING RUSH HOUR',
+                message: 'Rush hour in progress (5:00 PM - 7:00 PM). Heavy congestion expected at Ayala, Magallanes, and Taft stations.',
+                time: 'Just now',
+                unread: true
+            };
         }
+        return null;
+    }
 
-        function setupFilters() {
-            document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentFilter = btn.dataset.filter;
-                    displayFilteredAlerts();
-                });
+    // Advisory Alert
+    function getAdvisoryAlert() {
+        const now = new Date();
+        const hour = now.getHours();
+        
+        if (hour >= 0 && hour < 5) {
+            return {
+                id: 'advisory-early-morning-permanent',
+                type: 'advisory',
+                icon: 'info-circle',
+                icon_color: 'blue',
+                title: 'EARLY MORNING ADVISORY',
+                message: 'Trains are running on schedule. First trips start at 4:30 AM. Limited frequency (8-10 min intervals).',
+                time: 'Just now',
+                unread: true
+            };
+        } else if (hour >= 5 && hour < 7) {
+            return {
+                id: 'advisory-pre-rush-permanent',
+                type: 'advisory',
+                icon: 'info-circle',
+                icon_color: 'blue',
+                title: 'PRE-RUSH ADVISORY',
+                message: 'Morning rush starting soon. Be prepared!',
+                time: 'Just now',
+                unread: true
+            };
+        } else if (hour >= 10 && hour < 16) {
+            return {
+                id: 'advisory-midday-permanent',
+                type: 'advisory',
+                icon: 'info-circle',
+                icon_color: 'blue',
+                title: 'MIDDAY ADVISORY',
+                message: 'Moderate passenger volume. Comfortable travel conditions.',
+                time: 'Just now',
+                unread: true
+            };
+        } else if (hour >= 20 && hour < 22.5) {
+            return {
+                id: 'advisory-late-evening-permanent',
+                type: 'advisory',
+                icon: 'info-circle',
+                icon_color: 'blue',
+                title: 'LAST TRAIN ADVISORY',
+                message: 'Last trains departing soon. Service ends at 10:30 PM. Please plan your trip accordingly.',
+                time: 'Just now',
+                unread: true
+            };
+        } 
+        return null;
+    }
+
+    function getCongestionAdvisory() {
+        try {
+            const now = new Date();
+            const hour = now.getHours();
+            
+            if (hour >= 14 && hour < 17) {
+                return {
+                    id: 'congestion-advisory-midafternoon-permanent',
+                    type: 'advisory',
+                    icon: 'info-circle',
+                    icon_color: 'green',
+                    title: 'MODERATE CONGESTION',
+                    message: 'Light to moderate congestion expected. Average wait times: 2-4 minutes. Smooth travel conditions.',
+                    time: 'Just now',
+                    unread: true
+                };
+            }
+        } catch (error) {
+            console.log("Cant get congestion", {error})
+        }
+        return null;
+    }
+
+    function getServiceNotices() {
+        const now = new Date();
+        const hour = now.getHours();
+        const alerts = [];
+        
+        const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+        if (isWeekend) {
+            alerts.push({
+                id: 'service-weekend-permanent',
+                type: 'broadcast',
+                icon: 'calendar-alt',
+                icon_color: 'purple',
+                title: 'WEEKEND SCHEDULE',
+                message: 'Weekend schedule active. Trains every 6-8 minutes. Reduced frequency but comfortable travel conditions.',
+                time: 'Just now',
+                unread: true
             });
         }
-
-        function displayFilteredAlerts() {
-            let filtered = [...currentAlerts];
-            
-            if (currentFilter !== 'all') {
-                filtered = filtered.filter(alert => alert.type === currentFilter);
-            }
-            
-            renderAlerts(filtered);
+        
+        if (hour >= 23 || hour <= 3) {
+            alerts.push({
+                id: 'service-maintenance-night-permanent',
+                type: 'broadcast',
+                icon: 'tools',
+                icon_color: 'purple',
+                title: 'SCHEDULED MAINTENANCE',
+                message: `Track maintenance ongoing. Service continues with minimal disruption.`,
+                time: 'Just now',
+                unread: true
+            });
         }
+        return alerts;
+    }
 
-        function clearFilters() {
-            document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
-            const allBtn = document.querySelector('.filter-btn[data-filter="all"]');
-            if (allBtn) allBtn.classList.add('active');
-            currentFilter = 'all';
-            displayFilteredAlerts();
-            showToast('Filters cleared');
-        }
-
-        // Rush Hour Alert
-        function getRushHourAlert() {
+    async function getCongestionAlerts() {
+        const alerts = [];
+        try {
             const now = new Date();
             const hour = now.getHours();
+            const minutes = now.getMinutes();
+            const timeDecimal = hour + minutes / 60;
+            const OPERATING_START = 4.5;
+            const OPERATING_END = 22.5;
+            const isClosed = timeDecimal < OPERATING_START || timeDecimal >= OPERATING_END;
             
-            if (hour >= 7 && hour <= 9) {
-                return {
-                    id: 'rush-morning-permanent',
-                    type: 'rush_hour',
+            if (isClosed) {
+                alerts.push({
+                    id: 'service-closed-permanent',
+                    type: 'advisory',
                     icon: 'clock',
-                    icon_color: 'orange',
-                    title: 'MORNING RUSH HOUR',
-                    message: 'Rush hour in progress (7:00 AM - 9:00 AM). Expect heavy congestion at North Ave, Cubao, and Ayala stations. Allow extra travel time.',
-                    time: 'Just now',
-                    unread: true
-                };
-            } else if (hour >= 17 && hour <= 19) {
-                return {
-                    id: 'rush-evening-permanent',
-                    type: 'rush_hour',
-                    icon: 'clock',
-                    icon_color: 'orange',
-                    title: 'EVENING RUSH HOUR',
-                    message: 'Rush hour in progress (5:00 PM - 7:00 PM). Heavy congestion expected at Ayala, Magallanes, and Taft stations.',
-                    time: 'Just now',
-                    unread: true
-                };
-            }
-            return null;
-        }
-
-        // Advisory Alert
-        function getAdvisoryAlert() {
-            const now = new Date();
-            const hour = now.getHours();
-            
-            if (hour >= 0 && hour < 5) {
-                return {
-                    id: 'advisory-early-morning-permanent',
-                    type: 'advisory',
-                    icon: 'info-circle',
                     icon_color: 'blue',
-                    title: 'EARLY MORNING ADVISORY',
-                    message: 'Trains are running on schedule. First trips start at 4:30 AM. Limited frequency (8-10 min intervals).',
-                    time: 'Just now',
-                    unread: true
-                };
-            } else if (hour >= 5 && hour < 7) {
-                return {
-                    id: 'advisory-pre-rush-permanent',
-                    type: 'advisory',
-                    icon: 'info-circle',
-                    icon_color: 'blue',
-                    title: 'PRE-RUSH ADVISORY',
-                    message: 'Train frequency increasing to 5-7 minutes. Morning rush starting soon. Plan ahead!',
-                    time: 'Just now',
-                    unread: true
-                };
-            } else if (hour >= 10 && hour < 16) {
-                return {
-                    id: 'advisory-midday-permanent',
-                    type: 'advisory',
-                    icon: 'info-circle',
-                    icon_color: 'blue',
-                    title: 'MIDDAY ADVISORY',
-                    message: 'Moderate passenger volume. Comfortable travel conditions. Trains every 5-6 minutes.',
-                    time: 'Just now',
-                    unread: true
-                };
-            } else if (hour >= 20 && hour < 22.5) {
-                return {
-                    id: 'advisory-late-evening-permanent',
-                    type: 'advisory',
-                    icon: 'info-circle',
-                    icon_color: 'blue',
-                    title: 'LAST TRAIN ADVISORY',
-                    message: 'Last trains departing soon. Service ends at 10:30 PM. Please plan your trip accordingly.',
-                    time: 'Just now',
-                    unread: true
-                };
-            } else if (hour >= 22.5 || hour === 23) {
-                return {
-                    id: 'advisory-service-ended-permanent',
-                    type: 'advisory',
-                    icon: 'info-circle',
-                    icon_color: 'blue',
-                    title: 'SERVICE ENDED',
+                    title: 'MRT-3 SERVICE ENDED',
                     message: 'MRT-3 operations have ended for the day. Service resumes at 4:30 AM.',
                     time: 'Just now',
                     unread: true
-                };
-            }
-            return null;
-        }
-
-        // Congestion Advisory
-        function getCongestionAdvisory() {
-            try {
-                const now = new Date();
-                const hour = now.getHours();
-                
-                if (hour >= 21 || hour < 5) {
-                    return {
-                        id: 'congestion-advisory-offpeak-permanent',
-                        type: 'advisory',
-                        icon: 'info-circle',
-                        icon_color: 'green',
-                        title: 'LIGHT PASSENGER VOLUME',
-                        message: 'Low congestion across all stations. Trains are running with minimal waiting time. Perfect time for travel!',
-                        time: 'Just now',
-                        unread: true
-                    };
-                }
-                
-                if (hour >= 14 && hour < 17) {
-                    return {
-                        id: 'congestion-advisory-midafternoon-permanent',
-                        type: 'advisory',
-                        icon: 'info-circle',
-                        icon_color: 'green',
-                        title: 'MODERATE CONGESTION',
-                        message: 'Light to moderate congestion expected. Average wait times: 2-4 minutes. Smooth travel conditions.',
-                        time: 'Just now',
-                        unread: true
-                    };
-                }
-            } catch (error) {
-                console.log("Cant get congestion", {error})
-            }
-            return null;
-        }
-
-        // Service Notices
-        function getServiceNotices() {
-            const now = new Date();
-            const hour = now.getHours();
-            const alerts = [];
-            
-            const isWeekend = now.getDay() === 0 || now.getDay() === 6;
-            if (isWeekend) {
-                alerts.push({
-                    id: 'service-weekend-permanent',
-                    type: 'broadcast',
-                    icon: 'calendar-alt',
-                    icon_color: 'purple',
-                    title: 'WEEKEND SCHEDULE',
-                    message: 'Weekend schedule active. Trains every 6-8 minutes. Reduced frequency but comfortable travel conditions.',
-                    time: 'Just now',
-                    unread: true
                 });
+                return alerts;
             }
             
-            if (hour >= 23 || hour <= 3) {
-                alerts.push({
-                    id: 'service-maintenance-night-permanent',
-                    type: 'broadcast',
-                    icon: 'tools',
-                    icon_color: 'purple',
-                    title: 'SCHEDULED MAINTENANCE',
-                    message: `Track maintenance ongoing. Service continues with minimal disruption.`,
-                    time: 'Just now',
-                    unread: true
-                });
-            }
-            return alerts;
-        }
-
-    // Congestion Alerts - WITH PROPER ICONS
-async function getCongestionAlerts() {
-    const alerts = [];
-    try {
-        const response = await fetch('/api/live-map/directions/v2');
-        const data = await response.json();
-        
-        if (data && data.northbound && data.southbound) {
-            for (const station of STATIONS) {
-                const northData = data.northbound[station];
-                const southData = data.southbound[station];
-                
-                // NORTHBOUND - ALL congestion levels with icons
-                if (northData && northData.congestion > 0) {
-                    let icon = 'subway';
-                    let icon_color = 'green';
-                    let titlePrefix = 'LIGHT';
+            const response = await fetch('/api/live-map/directions/v2');
+            if (!response.ok) throw new Error('Failed to fetch congestion data');
+            const data = await response.json();
+            
+            console.log('API Data received:', data);
+            
+            // Track stations by direction and severity
+            let northSevere = [];
+            let northCongested = [];
+            let northModerate = [];
+            let northLight = [];
+            let southSevere = [];
+            let southCongested = [];
+            let southModerate = [];
+            let southLight = [];
+            
+            // Process northbound data
+            if (data.northbound) {
+                for (const [station, stationData] of Object.entries(data.northbound)) {
+                    const congestion = stationData.congestion || 0;
+                    const status = stationData.status || 'LIGHT';
                     
-                    if (northData.congestion > 80) {
-                        icon = 'exclamation-triangle';
-                        icon_color = 'red';
-                        titlePrefix = 'SEVERE';
-                    } else if (northData.congestion > 60) {
-                        icon = 'exclamation-circle';
-                        icon_color = 'orange';
-                        titlePrefix = 'CONGESTED';
-                    } else if (northData.congestion > 30) {
-                        icon = 'chart-line';
-                        icon_color = 'yellow';
-                        titlePrefix = 'MODERATE';
-                    } else {
-                        icon = 'check-circle';
-                        icon_color = 'green';
-                        titlePrefix = 'LIGHT';
+                    console.log(`📊 ${station} Northbound: ${congestion}% - ${status}`);
+                    
+                    if (congestion > 80) {
+                        northSevere.push(station);
+                    } else if (congestion > 60) {
+                        northCongested.push(station);
+                    } else if (congestion > 30) {
+                        northModerate.push(station);
+                    } else if (congestion > 20) {
+                        northLight.push(station);
                     }
-                    
-                    alerts.push({
-                        id: `congestion-${station}-northbound`,
-                        type: 'congestion',
-                        icon: icon,
-                        icon_color: icon_color,
-                        title: `${titlePrefix}: ${station} (Northbound)`,
-                        message: `${titlePrefix} congestion at ${station} northbound. ${northData.wait_time || 'Expected wait time'}. Congestion: ${northData.congestion}%`,
-                        time: 'Just now',
-                        unread: true,
-                        station: station,
-                        direction: 'northbound'
-                    });
                 }
-                
-                // SOUTHBOUND
-                if (southData && southData.congestion > 0) {
-                    let icon = 'subway';
-                    let icon_color = 'green';
-                    let titlePrefix = 'LIGHT';
+            }
+            
+            // Process southbound data
+            if (data.southbound) {
+                for (const [station, stationData] of Object.entries(data.southbound)) {
+                    const congestion = stationData.congestion || 0;
+                    const status = stationData.status || 'LIGHT';
                     
-                    if (southData.congestion > 80) {
-                        icon = 'exclamation-triangle';
-                        icon_color = 'red';
-                        titlePrefix = 'SEVERE';
-                    } else if (southData.congestion > 60) {
-                        icon = 'exclamation-circle';
-                        icon_color = 'orange';
-                        titlePrefix = 'CONGESTED';
-                    } else if (southData.congestion > 30) {
-                        icon = 'chart-line';
-                        icon_color = 'yellow';
-                        titlePrefix = 'MODERATE';
-                    } else {
-                        icon = 'check-circle';
-                        icon_color = 'green';
-                        titlePrefix = 'LIGHT';
+                    console.log(`📊 ${station} Southbound: ${congestion}% - ${status}`);
+                    
+                    if (congestion > 80) {
+                        southSevere.push(station);
+                    } else if (congestion > 60) {
+                        southCongested.push(station);
+                    } else if (congestion > 30) {
+                        southModerate.push(station);
+                    } else if (congestion > 20) {
+                        southLight.push(station);
                     }
-                    
-                    alerts.push({
-                        id: `congestion-${station}-southbound`,
-                        type: 'congestion',
-                        icon: icon,
-                        icon_color: icon_color,
-                        title: `${titlePrefix}: ${station} (Southbound)`,
-                        message: `${titlePrefix} congestion at ${station} southbound. ${southData.wait_time || 'Expected wait time'}. Congestion: ${southData.congestion}%`,
-                        time: 'Just now',
-                        unread: true,
-                        station: station,
-                        direction: 'southbound'
-                    });
                 }
             }
-        }
-    } catch (error) {
-        console.error('Error fetching V2 congestion data:', error);
-    }
-    return alerts;
-}
-
-        // Operator Broadcasts
-        async function getOperatorBroadcasts() {
-            try {
-                const response = await fetch('/api/broadcasts/public');
-                const data = await response.json();
+            
+            console.log('Northbound - Severe:', northSevere.length, northSevere);
+            console.log('Northbound - Congested:', northCongested.length, northCongested);
+            console.log('Northbound - Moderate:', northModerate.length, northModerate);
+            console.log('Northbound - Light:', northLight.length, northLight);
+            console.log('Southbound - Severe:', southSevere.length, southSevere);
+            console.log('Southbound - Congested:', southCongested.length, southCongested);
+            console.log('Southbound - Moderate:', southModerate.length, southModerate);
+            console.log('Southbound - Light:', southLight.length, southLight);
+            
+            // Helper to format station list with highlighting
+            function formatStationListWithHighlight(stations, severity) {
+                if (stations.length === 0) return '';
                 
-                if (data.success && data.broadcasts && data.broadcasts.length > 0) {
-                    return data.broadcasts.map(b => {
-                        let icon = 'bullhorn';
-                        let icon_color = 'purple';
-                        let title = '';
-                        
-                        let stationsText = '';
-                        if (b.stations && Array.isArray(b.stations) && b.stations.length > 0) {
-                            const stationsList = b.stations;
-                            stationsText = stationsList.length > 3 
-                                ? `${stationsList.slice(0, 3).join(', ')} +${stationsList.length - 3} more`
-                                : stationsList.join(', ');
-                        } else {
-                            stationsText = 'All stations';
-                        }
-                        
-                        switch(b.disruption_type) {
-                            case 'Train Breakdown':
-                                icon = 'train';
-                                icon_color = 'red';
-                                title = 'TRAIN BREAKDOWN';
-                                break;
-                            case 'Overcrowding':
-                                icon = 'users';
-                                icon_color = 'orange';
-                                title = 'OVERCROWDING';
-                                break;
-                            case 'Maintenance':
-                                icon = 'tools';
-                                icon_color = 'purple';
-                                title = 'MAINTENANCE';
-                                break;
-                            case 'Signal Issue':
-                                icon = 'satellite-dish';
-                                icon_color = 'red';
-                                title = 'SIGNAL ISSUE';
-                                break;
-                            case 'Gate Closure':
-                                icon = 'door-closed';
-                                icon_color = 'orange';
-                                title = 'GATE CLOSURE';
-                                break;
-                            default:
-                                icon = 'bullhorn';
-                                icon_color = 'purple';
-                                title = 'SERVICE NOTICE';
-                        }
-                        
-                        let timeStr = 'Recently';
-                        if (b.time) {
-                            try {
-                                timeStr = new Date(b.time).toLocaleString();
-                            } catch(e) {
-                                timeStr = b.time;
-                            }
-                        }
-                        
-                        return {
-                            id: `broadcast-${b.id}`,
-                            type: 'broadcast',
-                            priority: 1,
-                            icon: icon,
-                            icon_color: icon_color,
-                            title: `${title}: ${b.title || 'Alert'}`,
-                            message: `${b.message || 'No message'} [Affected: ${stationsText}]`,
-                            time: timeStr,
-                            unread: true
-                        };
-                    });
+                let displayStations = stations;
+                let extraCount = 0;
+                if (stations.length > 5) {
+                    displayStations = stations.slice(0, 5);
+                    extraCount = stations.length - 5;
                 }
-            } catch (error) {
-                console.error('Error fetching operator broadcasts:', error);
-            }
-            return [];
-        }
-
-        // Sync mobile alert badge
-        function syncMobileAlertBadge() {
-            const desktopBadge = document.getElementById('newAlertBadge');
-            const mobileBadge = document.getElementById('mobileAlertBadge');
-            if (desktopBadge && mobileBadge) {
-                const count = parseInt(desktopBadge.textContent) || 0;
-                if (count > 0) {
-                    mobileBadge.textContent = count > 9 ? '9+' : count;
-                    mobileBadge.style.display = 'flex';
+                
+                const className = severity === 'severe' ? 'critical' : 
+                                 severity === 'congested' ? 'critical' :
+                                 severity === 'moderate' ? 'moderate' : 'light';
+                const stationSpans = displayStations.map(s => 
+                    `<span class="station-name ${className}">${s}</span>`
+                );
+                
+                let result = '';
+                if (stationSpans.length === 1) {
+                    result = stationSpans[0];
+                } else if (stationSpans.length === 2) {
+                    result = stationSpans.join(' and ');
                 } else {
-                    mobileBadge.style.display = 'none';
+                    const last = stationSpans.pop();
+                    result = stationSpans.join(', ') + ', and ' + last;
                 }
+                
+                if (extraCount > 0) {
+                    result += ` and ${extraCount} more station${extraCount > 1 ? 's' : ''}`;
+                }
+                return result;
+            }
+            
+            // ========== NORTHBOUND ALERTS ==========
+            if (northSevere.length > 0) {
+                const stationList = formatStationListWithHighlight(northSevere, 'severe');
+                alerts.push({
+                    id: 'north-severe-permanent',
+                    type: 'congestion',
+                    icon: 'arrow-up',
+                    icon_color: 'red',
+                    title: `⬆️ NORTHBOUND: ${northSevere.length} SEVERE`,
+                    message: `${stationList} — Expect delays of 15-20 minutes.`,
+                    time: 'Just now',
+                    unread: true,
+                    priority: 1
+                });
+            }
+            
+            if (northCongested.length > 0) {
+                const stationList = formatStationListWithHighlight(northCongested, 'congested');
+                alerts.push({
+                    id: 'north-congested-permanent',
+                    type: 'congestion',
+                    icon: 'arrow-up',
+                    icon_color: 'red',
+                    title: `⬆️ NORTHBOUND: ${northCongested.length} CONGESTED`,
+                    message: `${stationList} — Expect delays of 10-15 minutes.`,
+                    time: 'Just now',
+                    unread: true,
+                    priority: 1
+                });
+            }
+            
+            if (northModerate.length > 0) {
+                const stationList = formatStationListWithHighlight(northModerate, 'moderate');
+                alerts.push({
+                    id: 'north-moderate-permanent',
+                    type: 'congestion',
+                    icon: 'arrow-up',
+                    icon_color: 'orange',
+                    title: `⬆️ NORTHBOUND: ${northModerate.length} MODERATE`,
+                    message: `${stationList} — Expect delays of 5-10 minutes.`,
+                    time: 'Just now',
+                    unread: true,
+                    priority: 2
+                });
+            }
+            
+            if (northLight.length > 0) {
+                const stationList = formatStationListWithHighlight(northLight, 'light');
+                alerts.push({
+                    id: 'north-light-permanent',
+                    type: 'congestion',
+                    icon: 'arrow-up',
+                    icon_color: 'green',
+                    title: `⬆️ NORTHBOUND: ${northLight.length} LIGHT`,
+                    message: `${stationList} — Normal travel conditions.`,
+                    time: 'Just now',
+                    unread: true,
+                    priority: 3
+                });
+            }
+            
+            // ========== SOUTHBOUND ALERTS ==========
+            if (southSevere.length > 0) {
+                const stationList = formatStationListWithHighlight(southSevere, 'severe');
+                alerts.push({
+                    id: 'south-severe-permanent',
+                    type: 'congestion',
+                    icon: 'arrow-down',
+                    icon_color: 'red',
+                    title: `⬇️ SOUTHBOUND: ${southSevere.length} SEVERE`,
+                    message: `${stationList} — Expect delays of 15-20 minutes.`,
+                    time: 'Just now',
+                    unread: true,
+                    priority: 1
+                });
+            }
+            
+            if (southCongested.length > 0) {
+                const stationList = formatStationListWithHighlight(southCongested, 'congested');
+                alerts.push({
+                    id: 'south-congested-permanent',
+                    type: 'congestion',
+                    icon: 'arrow-down',
+                    icon_color: 'red',
+                    title: `⬇️ SOUTHBOUND: ${southCongested.length} CONGESTED`,
+                    message: `${stationList} — Expect delays of 10-15 minutes.`,
+                    time: 'Just now',
+                    unread: true,
+                    priority: 1
+                });
+            }
+            
+            if (southModerate.length > 0) {
+                const stationList = formatStationListWithHighlight(southModerate, 'moderate');
+                alerts.push({
+                    id: 'south-moderate-permanent',
+                    type: 'congestion',
+                    icon: 'arrow-down',
+                    icon_color: 'orange',
+                    title: `⬇️ SOUTHBOUND: ${southModerate.length} MODERATE`,
+                    message: `${stationList} — Expect delays of 5-10 minutes.`,
+                    time: 'Just now',
+                    unread: true,
+                    priority: 2
+                });
+            }
+            
+            if (southLight.length > 0) {
+                const stationList = formatStationListWithHighlight(southLight, 'light');
+                alerts.push({
+                    id: 'south-light-permanent',
+                    type: 'congestion',
+                    icon: 'arrow-down',
+                    icon_color: 'green',
+                    title: `⬇️ SOUTHBOUND: ${southLight.length} LIGHT`,
+                    message: `${stationList} — Normal travel conditions.`,
+                    time: 'Just now',
+                    unread: true,
+                    priority: 3
+                });
+            }
+            
+            // ========== CLEAR ALERTS ==========
+            const hasNorthCongestion = northSevere.length > 0 || northCongested.length > 0 || 
+                                       northModerate.length > 0 || northLight.length > 0;
+            const hasSouthCongestion = southSevere.length > 0 || southCongested.length > 0 || 
+                                       southModerate.length > 0 || southLight.length > 0;
+            
+            if (!hasNorthCongestion && !hasSouthCongestion) {
+                alerts.push({
+                    id: 'congestion-clear-permanent',
+                    type: 'congestion',
+                    icon: 'check-circle',
+                    icon_color: 'green',
+                    title: ' ALL CLEAR',
+                    message: 'All directions are operating normally. Enjoy your commute!',
+                    time: 'Just now',
+                    unread: true,
+                    priority: 4
+                });
+            }
+            
+        } catch (error) {
+            console.error('Error fetching congestion data:', error);
+            alerts.push({
+                id: 'congestion-unavailable-permanent',
+                type: 'congestion',
+                icon: 'exclamation-triangle',
+                icon_color: 'orange',
+                title: '⚠️ CONGESTION DATA UNAVAILABLE',
+                message: 'Unable to fetch current congestion data. Please check the live map for updates.',
+                time: 'Just now',
+                unread: true,
+                priority: 4
+            });
+        }
+        return alerts;
+    }
+
+    async function getOperatorBroadcasts() {
+        try {
+            const response = await fetch('/api/broadcasts/public');
+            const data = await response.json();
+            
+            if (data.success && data.broadcasts && data.broadcasts.length > 0) {
+                return data.broadcasts.map(b => {
+                    const iconMap = {
+                        'Train Breakdown': 'train',
+                        'Overcrowding': 'users',
+                        'Maintenance': 'wrench',
+                        'Signal Issue': 'satellite-dish',
+                        'Gate Closure': 'door-closed',
+                        'General Notice': 'bullhorn'
+                    };
+                    
+                    const colorMap = {
+                        'critical': 'red',
+                        'warning': 'orange',
+                        'info': 'blue'
+                    };
+                    
+                    return {
+                        id: `broadcast-${b.id}`,
+                        type: 'broadcast',
+                        icon: iconMap[b.type] || 'bullhorn',
+                        icon_color: colorMap[b.severity] || 'blue',
+                        title: b.title || 'Service Notice',
+                        message: b.message || 'Please check for updates.',
+                        time: b.time || 'Just now',
+                        unread: true,
+                        priority: b.severity === 'critical' ? 1 : 2
+                    };
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching operator broadcasts:', error);
+        }
+        return [];
+    }
+
+    // Sync mobile alert badge
+    function syncMobileAlertBadge() {
+        const desktopBadge = document.getElementById('newAlertBadge');
+        const mobileBadge = document.getElementById('mobileAlertBadge');
+        if (desktopBadge && mobileBadge) {
+            let count = _cachedUnreadCount;
+            if (count === 0 && desktopBadge) {
+                const text = desktopBadge.textContent || '0';
+                count = parseInt(text) || 0;
+            }
+            
+            if (count > 0) {
+                mobileBadge.textContent = count > 9 ? '9+' : count;
+                mobileBadge.style.display = 'flex';
+            } else {
+                mobileBadge.style.display = 'none';
             }
         }
+    }
 
-        // Main Alert Loader
-        async function loadAlerts() {
-            if (isLoading) return;
-            isLoading = true;
-            showLoading();
-            
+    // Update bell icon color
+    function updateBellIcon(unreadCount) {
+        const refreshBtn = document.getElementById('refreshBtn');
+        if (refreshBtn) {
+            if (unreadCount > 0) {
+                refreshBtn.classList.add('has-unread');
+            } else {
+                refreshBtn.classList.remove('has-unread');
+            }
+        }
+    }
+
+    // ========== UPDATED: Alert Badge UI with sessionStorage persistence ==========
+    function updateAlertBadgeUI(count) {
+        // Store in session storage for persistence across tabs
+        try {
+            sessionStorage.setItem('alertCount', count.toString());
+        } catch (e) {}
+        
+        const badge = document.getElementById('newAlertBadge');
+        const sidebarBadge = document.getElementById('sidebarAlertCount');
+        const mobileBadge = document.getElementById('mobileAlertBadge');
+        
+        _cachedUnreadCount = count;
+        
+        // Bell badge: Show 9+ for counts > 9
+        const bellDisplayValue = count > 9 ? '9+' : count;
+        
+        if (badge) {
+            if (count > 0) {
+                badge.textContent = count + ' New';
+                badge.style.background = 'var(--red)';
+                badge.style.display = 'inline-block';
+            } else {
+                badge.textContent = '0 New';
+                badge.style.background = '#94A3B8';
+                badge.style.display = 'inline-block';
+            }
+        }
+        
+        // Sidebar badge
+        if (sidebarBadge) {
+            if (count > 0) {
+                sidebarBadge.textContent = count;
+                sidebarBadge.style.display = 'block';
+            } else {
+                sidebarBadge.style.display = 'none';
+            }
+        }
+        
+        // Mobile badge
+        if (mobileBadge) {
+            if (count > 0) {
+                mobileBadge.textContent = bellDisplayValue;
+                mobileBadge.style.display = 'flex';
+            } else {
+                mobileBadge.style.display = 'none';
+            }
+        }
+        
+        // Update bell icon
+        const refreshBtn = document.getElementById('refreshBtn');
+        if (refreshBtn) {
+            if (count > 0) {
+                refreshBtn.classList.add('has-unread');
+            } else {
+                refreshBtn.classList.remove('has-unread');
+            }
+        }
+    }
+
+    // ========== UPDATED: Restore badge count from session storage ==========
+    function restoreAlertBadge() {
+        try {
+            const savedCount = sessionStorage.getItem('alertCount');
+            if (savedCount) {
+                const count = parseInt(savedCount);
+                if (count > 0) {
+                    _cachedUnreadCount = count;
+                    updateAlertBadgeUI(count);
+                    syncMobileAlertBadge();
+                }
+            }
+        } catch (e) {}
+    }
+
+    // ========== DEBUG: Check API directly ==========
+    async function debugAlertCount() {
+        try {
+            const response = await fetch('/api/alerts/count');
+            const data = await response.json();
+            console.log('🔍 Alert Count API Response:', data);
+            return data;
+        } catch (e) {
+            console.error('Error fetching alert count:', e);
+            return { count: 0 };
+        }
+    }
+
+    // Main Alert Loader
+    async function loadAlerts() {
+        if (isLoading) return;
+        isLoading = true;
+        _lastAlertLoadTime = Date.now();
+        showLoading();
+        
+        try {
             const allAlerts = [];
             
             const rushAlert = getRushHourAlert();
@@ -1215,6 +1463,9 @@ async function getCongestionAlerts() {
             for (const alert of allAlerts) {
                 if (!seenIds.has(alert.id)) {
                     seenIds.add(alert.id);
+                    if (readAlerts.has(alert.id)) {
+                        alert.unread = false;
+                    }
                     uniqueAlerts.push(alert);
                 }
             }
@@ -1231,145 +1482,303 @@ async function getCongestionAlerts() {
             
             currentAlerts = uniqueAlerts.slice(0, 30);
             displayFilteredAlerts();
-            updateAlertCounts(currentAlerts);
-            hideLoading();
             
+            // Count unread alerts properly
+            const unreadCount = currentAlerts.filter(a => a.unread === true && !readAlerts.has(a.id)).length;
+            _cachedUnreadCount = unreadCount;
+            updateAlertBadgeUI(unreadCount);
+            
+            // Also get count from API for verification
+            const apiData = await debugAlertCount();
+            if (apiData.count !== unreadCount) {
+                console.log('⚠️ Alert count mismatch - API:', apiData.count, 'Local:', unreadCount);
+            }
+            
+            console.log('📊 Loaded alerts:', currentAlerts.length, 'total,', unreadCount, 'unread');
+        } catch (error) {
+            console.error('Error loading alerts:', error);
+        } finally {
+            hideLoading();
             isLoading = false;
         }
-
-        function renderAlerts(alerts) {
-            const container = document.getElementById('alertsContainer');
-            if (!alerts || alerts.length === 0) {
-                container.innerHTML = `<div class="empty-state"><i class="fas fa-bell-slash"></i><h3>No alerts found</h3><p>Try changing your filter or check back later</p></div>`;
-                return;
-            }
-            
-            const unreadCount = alerts.filter(a => a.unread && !readAlerts.has(a.id)).length;
-            const markAllBtn = document.getElementById('markAllBtn');
-            if (markAllBtn) markAllBtn.disabled = unreadCount === 0;
-            
-            let html = '';
-            alerts.forEach(alert => {
-                const isRead = readAlerts.has(alert.id) || !alert.unread;
-                const unreadClass = (!isRead && alert.unread) ? 'unread' : '';
-                const unreadDot = (!isRead && alert.unread) ? '<div class="unread-dot"></div>' : '';
-                const markedClass = isRead ? 'marked' : '';
-                html += `
-                    <div class="alert-card ${unreadClass}" data-alert-id="${alert.id}">
-                        <div class="alert-content">
-                            <div class="alert-icon ${alert.icon_color}"><i class="fas fa-${alert.icon}"></i></div>
-                            <div class="alert-text">
-                                <h3>${escapeHtml(alert.title)}</h3>
-                                <p>${escapeHtml(alert.message)}</p>
-                                <div class="alert-time"><i class="far fa-clock"></i> ${alert.time}</div>
-                            </div>
-                        </div>
-                        <div class="alert-actions">
-                            <button class="alert-action-btn ${markedClass}" onclick="markAsRead('${alert.id}')">
-                                <i class="far ${isRead ? 'fa-check-circle' : 'fa-circle'}"></i>
-                            </button>
-                        </div>
-                        ${unreadDot}
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
-        }
-
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-function updateAlertCounts(alerts) {
-    const unreadCount = alerts.filter(a => a.unread && !readAlerts.has(a.id)).length;
-    const badge = document.getElementById('newAlertBadge');
-    if (badge) {
-        // Bell badge: Show 9+ for counts > 9
-        const bellDisplayValue = unreadCount > 9 ? '9+' : unreadCount;
-        badge.textContent = unreadCount > 0 ? bellDisplayValue + ' New' : '0 New';
-        badge.style.background = unreadCount > 0 ? 'var(--red)' : '#94A3B8';
     }
-    
-    const sidebarBadge = document.getElementById('sidebarAlertCount');
-    if (sidebarBadge) {
-        if (unreadCount > 0) { 
-            // Sidebar badge: Show actual number (no truncation)
-            sidebarBadge.textContent = unreadCount;
-            sidebarBadge.style.display = 'block'; 
-        } else { 
-            sidebarBadge.style.display = 'none'; 
-        }
-    }
-    syncMobileAlertBadge();
-}
 
-        function markAsRead(alertId) {
-            readAlerts.add(alertId);
-            saveReadStatus();
-            const card = document.querySelector(`[data-alert-id="${alertId}"]`);
-            if (card) {
-                card.classList.remove('unread');
-                const dot = card.querySelector('.unread-dot');
-                if (dot) dot.remove();
-                const btn = card.querySelector('.alert-action-btn');
-                if (btn) { 
-                    btn.classList.add('marked'); 
-                    btn.innerHTML = '<i class="far fa-check-circle"></i>'; 
-                }
-            }
-            updateAlertCounts(currentAlerts);
-            showToast('Marked as read');
-        }
-
-        function markAllAsRead() {
-            const btn = document.getElementById('markAllBtn');
-            if (btn) {
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Marking...';
-                btn.disabled = true;
-            }
-            currentAlerts.forEach(alert => { if (alert.unread) readAlerts.add(alert.id); });
-            saveReadStatus();
-            document.querySelectorAll('.alert-card.unread').forEach(card => {
-                card.classList.remove('unread');
-                const dot = card.querySelector('.unread-dot');
-                if (dot) dot.remove();
-                const btn = card.querySelector('.alert-action-btn');
-                if (btn) { 
-                    btn.classList.add('marked'); 
-                    btn.innerHTML = '<i class="far fa-check-circle"></i>'; 
-                }
-            });
-            updateAlertCounts(currentAlerts);
-            setTimeout(() => { 
-                if (btn) {
-                    btn.innerHTML = '<i class="far fa-envelope-open"></i> Mark all as read'; 
-                    btn.disabled = false; 
-                }
-            }, 300);
-            showToast('All alerts marked as read');
-        }
-
-        function refreshAlerts() { 
-            loadAlerts(); 
+    function renderAlerts(alerts) {
+        const container = document.getElementById('alertsContainer');
+        if (!alerts || alerts.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-bell-slash"></i><h3>No alerts found</h3><p>Try changing your filter or check back later</p></div>`;
+            return;
         }
         
-        function showToast(msg) { 
-            const toast = document.createElement('div'); 
-            toast.className = 'toast success'; 
-            toast.textContent = '✓ ' + msg; 
-            document.body.appendChild(toast); 
-            setTimeout(() => toast.remove(), 2000); 
-        }
+        const unreadCount = alerts.filter(a => a.unread === true && !readAlerts.has(a.id)).length;
+        const markAllBtn = document.getElementById('markAllBtn');
+        if (markAllBtn) markAllBtn.disabled = unreadCount === 0;
+        
+        let html = '';
+        alerts.forEach(alert => {
+            const isRead = readAlerts.has(alert.id) || !alert.unread;
+            const unreadClass = (!isRead && alert.unread) ? 'unread' : '';
+            const unreadDot = (!isRead && alert.unread) ? '<div class="unread-dot"></div>' : '';
+            const markedClass = isRead ? 'marked' : '';
+            
+            let messageHtml = alert.message;
+            if (messageHtml.includes('<span class="station-name')) {
+                messageHtml = messageHtml;
+            } else {
+                messageHtml = escapeHtml(messageHtml);
+            }
+            
+            html += `
+                <div class="alert-card ${unreadClass}" data-alert-id="${alert.id}">
+                    <div class="alert-content">
+                        <div class="alert-icon ${alert.icon_color}"><i class="fas fa-${alert.icon}"></i></div>
+                        <div class="alert-text">
+                            <h3>${escapeHtml(alert.title)}</h3>
+                            <p>${messageHtml}</p>
+                            <div class="alert-time"><i class="far fa-clock"></i> ${alert.time}</div>
+                        </div>
+                    </div>
+                    <div class="alert-actions">
+                        <button class="alert-action-btn ${markedClass}" onclick="markAsRead('${alert.id}')">
+                            <i class="far ${isRead ? 'fa-check-circle' : 'fa-circle'}"></i>
+                        </button>
+                    </div>
+                    ${unreadDot}
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
 
-        // Initialize
-        loadReadStatus();
-        setupFilters();
-        loadAlerts();
-        setInterval(() => { 
-            if (!isLoading) loadAlerts(); 
-        }, 60000);
-    </script>
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function updateAlertCounts(alerts) {
+        const unreadCount = alerts.filter(a => {
+            return a.unread === true && !readAlerts.has(a.id);
+        }).length;
+        
+        _cachedUnreadCount = unreadCount;
+        updateAlertBadgeUI(unreadCount);
+    }
+
+    // ========== FIX: markAsRead with proper state update ==========
+    function markAsRead(alertId) {
+        readAlerts.add(alertId);
+        saveReadStatus();
+        
+        const alert = currentAlerts.find(a => a.id === alertId);
+        if (alert) {
+            alert.unread = false;
+        }
+        
+        const card = document.querySelector(`[data-alert-id="${alertId}"]`);
+        if (card) {
+            card.classList.remove('unread');
+            const dot = card.querySelector('.unread-dot');
+            if (dot) dot.remove();
+            const btn = card.querySelector('.alert-action-btn');
+            if (btn) { 
+                btn.classList.add('marked'); 
+                btn.innerHTML = '<i class="far fa-check-circle"></i>'; 
+            }
+        }
+        
+        const unreadCount = currentAlerts.filter(a => a.unread === true && !readAlerts.has(a.id)).length;
+        _cachedUnreadCount = unreadCount;
+        updateAlertBadgeUI(unreadCount);
+        showToast('Marked as read');
+    }
+
+    // ========== FIX: markAllAsRead with proper state update ==========
+    function markAllAsRead() {
+        const btn = document.getElementById('markAllBtn');
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Marking...';
+            btn.disabled = true;
+        }
+        
+        currentAlerts.forEach(alert => { 
+            if (alert.unread) {
+                readAlerts.add(alert.id);
+                alert.unread = false;
+            }
+        });
+        saveReadStatus();
+        
+        document.querySelectorAll('.alert-card.unread').forEach(card => {
+            card.classList.remove('unread');
+            const dot = card.querySelector('.unread-dot');
+            if (dot) dot.remove();
+            const btn = card.querySelector('.alert-action-btn');
+            if (btn) { 
+                btn.classList.add('marked'); 
+                btn.innerHTML = '<i class="far fa-check-circle"></i>'; 
+            }
+        });
+        
+        _cachedUnreadCount = 0;
+        updateAlertBadgeUI(0);
+        
+        // Clear session storage
+        try {
+            sessionStorage.setItem('alertCount', '0');
+        } catch (e) {}
+        
+        setTimeout(() => { 
+            if (btn) {
+                btn.innerHTML = '<i class="far fa-envelope-open"></i> Mark all as read'; 
+                btn.disabled = false; 
+            }
+        }, 300);
+        showToast('All alerts marked as read');
+    }
+
+    function refreshAlerts() { 
+        loadAlerts(); 
+    }
+    
+    function showToast(msg) { 
+        const toast = document.createElement('div'); 
+        toast.className = 'toast success'; 
+        toast.textContent = '✓ ' + msg; 
+        document.body.appendChild(toast); 
+        setTimeout(() => toast.remove(), 2000); 
+    }
+
+    // ========== UPDATED: RELOAD ALERTS WHEN TAB BECOMES VISIBLE ==========
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            console.log('🔄 Page became visible, checking alerts...');
+            
+            // Always restore badges from sessionStorage FIRST
+            const savedCount = sessionStorage.getItem('alertCount');
+            if (savedCount) {
+                const count = parseInt(savedCount);
+                if (count > 0) {
+                    console.log('📊 Restoring badge from sessionStorage:', count);
+                    _cachedUnreadCount = count;
+                    updateAlertBadgeUI(count);
+                    syncMobileAlertBadge();
+                    
+                    const sidebarBadge = document.getElementById('sidebarAlertCount');
+                    if (sidebarBadge) {
+                        sidebarBadge.textContent = count;
+                        sidebarBadge.style.display = 'block';
+                    }
+                }
+            }
+            
+            // Check API for latest count
+            debugAlertCount().then(data => {
+                console.log('📊 API unread count:', data.count);
+                if (data.count !== _cachedUnreadCount) {
+                    console.log('🔄 Updating badge from', _cachedUnreadCount, 'to', data.count);
+                    _cachedUnreadCount = data.count;
+                    updateAlertBadgeUI(data.count);
+                    syncMobileAlertBadge();
+                }
+            });
+            
+            // Refresh alerts if stale
+            if (!isLoading && currentAlerts.length > 0) {
+                const now = Date.now();
+                if (now - _lastAlertLoadTime > 30000) {
+                    console.log('🔄 Refreshing alerts (stale)...');
+                    loadAlerts();
+                }
+            } else if (currentAlerts.length === 0) {
+                loadAlerts();
+            }
+        }
+    });
+
+    // ========== RELOAD ON PAGESHOW ==========
+    window.addEventListener('pageshow', function(event) {
+        console.log('🔄 Page shown event, persisted:', event.persisted);
+        
+        // Restore from sessionStorage
+        const savedCount = sessionStorage.getItem('alertCount');
+        if (savedCount) {
+            const count = parseInt(savedCount);
+            if (count > 0) {
+                _cachedUnreadCount = count;
+                updateAlertBadgeUI(count);
+                syncMobileAlertBadge();
+            }
+        }
+        
+        if (event.persisted) {
+            console.log('🔄 Page restored from bfcache, reloading alerts...');
+            if (!isLoading) {
+                loadAlerts();
+            }
+        }
+    });
+
+    // ========== RELOAD ON WINDOW FOCUS ==========
+    window.addEventListener('focus', function() {
+        console.log('🔄 Window focused');
+        
+        // Restore from sessionStorage
+        const savedCount = sessionStorage.getItem('alertCount');
+        if (savedCount) {
+            const count = parseInt(savedCount);
+            if (count > 0) {
+                _cachedUnreadCount = count;
+                updateAlertBadgeUI(count);
+                syncMobileAlertBadge();
+            }
+        }
+        
+        // Check API
+        debugAlertCount().then(data => {
+            if (data.count !== _cachedUnreadCount) {
+                _cachedUnreadCount = data.count;
+                updateAlertBadgeUI(data.count);
+                syncMobileAlertBadge();
+            }
+        });
+        
+        if (!isLoading && currentAlerts.length > 0) {
+            const now = Date.now();
+            if (now - _lastAlertLoadTime > 30000) {
+                console.log('🔄 Window focused and alerts stale, reloading...');
+                loadAlerts();
+            }
+        }
+    });
+
+    // ========== INITIALIZE ==========
+    loadReadStatus();
+    restoreAlertBadge();
+    setupFilters();
+    
+    // Initial load
+    loadAlerts();
+
+    // ========== AUTO-REFRESH EVERY 60 SECONDS ==========
+    setInterval(() => { 
+        if (!isLoading) {
+            // Check API for count
+            debugAlertCount().then(data => {
+                if (data.count !== _cachedUnreadCount) {
+                    _cachedUnreadCount = data.count;
+                    updateAlertBadgeUI(data.count);
+                    syncMobileAlertBadge();
+                }
+            });
+            loadAlerts(); 
+        }
+    }, 60000);
+
+    console.log('✅ Alerts page initialized with visibility tracking and sessionStorage persistence');
+    console.log('📊 Current read alerts:', readAlerts.size);
+    console.log('📊 Cached unread count:', _cachedUnreadCount);
+</script>
 </body>
 </html>

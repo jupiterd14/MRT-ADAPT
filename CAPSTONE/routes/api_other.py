@@ -15,7 +15,7 @@ import time
 import traceback
 import math
 from config import Config
-TESTING_MODE = True
+TESTING_MODE = False
 
 api_other_bp = Blueprint('api_other', __name__)
 
@@ -108,33 +108,28 @@ def get_stations_from_config():
         return current_app.config['STATIONS']
     return STATIONS
 
-
 def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name):
-    """
-    Convert model prediction to congestion percentage using CAPACITY-BASED scaling.
-    This matches the fix in api_predict.py - uses station capacity, NOT scaler_max.
-    """
-    raw_output = float(pred_scaled[0][0])
+    raw_value = float(pred_scaled[0][0]) if hasattr(pred_scaled, '__getitem__') else float(pred_scaled)
     
-    # Get station capacity
+    if target_scaler is not None:
+        try:
+            passenger_count = float(target_scaler.inverse_transform([[raw_value]])[0][0])
+        except Exception as e:
+            capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+            passenger_count = raw_value * capacity * 1.5
+    else:
+        capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        passenger_count = raw_value * capacity * 1.5
+    
+    # ========== FIX: Cap passenger_count at 0 ==========
+    passenger_count = max(0, passenger_count)
+    
     capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+    capped_passengers = min(passenger_count, capacity)
+    congestion = (capped_passengers / capacity * 100)
+    congestion = max(0, min(congestion, 100))
     
-    # Apply sigmoid to normalize raw output to 0-1
-    center = 0.5
-    temperature = 0.8
-    normalized = 1 / (1 + math.exp(-(raw_output - center) / temperature))
-    
-    # Scale to passenger count based on capacity (never exceed capacity)
-    pred_passengers = normalized * capacity
-    
-    # Calculate congestion percentage (0-100%)
-    congestion = (pred_passengers / capacity * 100)
-    
-    # Cap at 100%
-    congestion = min(congestion, 100)
-    
-    return congestion, pred_passengers
-
+    return congestion, passenger_count
 
 @api_other_bp.route('/travel-prediction')
 def travel_prediction():
@@ -174,15 +169,15 @@ def travel_prediction():
         model_key_north = f"{station}_Northbound"
         if model_key_north in directional_models:
             try:
+                # Get features (ALREADY SCALED by feature_engineering)
                 sequence = get_feature_sequence_for_station(station, 'Northbound', target_datetime)
                 if sequence is not None and len(sequence) == 24:
-                    feature_scaler = directional_scalers.get(f'{model_key_north}_feature')
                     target_scaler = directional_scalers.get(f'{model_key_north}_target')
-                    if feature_scaler and target_scaler:
-                        scaled_sequence = feature_scaler.transform(sequence)
-                        input_sequence = scaled_sequence.reshape(1, 24, -1)
+                    if target_scaler:
+                        # ========== FIX: DO NOT apply feature scaler again! ==========
+                        # sequence is already scaled (feature scaler applied in get_feature_sequence_for_station)
+                        input_sequence = sequence.reshape(1, 24, -1)
                         pred_scaled = directional_models[model_key_north].predict(input_sequence, verbose=0)
-                        # Convert passenger count to congestion % using capacity-based scaling
                         north_pred, north_passengers = _get_congestion_from_prediction(
                             pred_scaled, target_scaler, station
                         )
@@ -194,15 +189,14 @@ def travel_prediction():
         model_key_south = f"{station}_Southbound"
         if model_key_south in directional_models:
             try:
+                # Get features (ALREADY SCALED by feature_engineering)
                 sequence = get_feature_sequence_for_station(station, 'Southbound', target_datetime)
                 if sequence is not None and len(sequence) == 24:
-                    feature_scaler = directional_scalers.get(f'{model_key_south}_feature')
                     target_scaler = directional_scalers.get(f'{model_key_south}_target')
-                    if feature_scaler and target_scaler:
-                        scaled_sequence = feature_scaler.transform(sequence)
-                        input_sequence = scaled_sequence.reshape(1, 24, -1)
+                    if target_scaler:
+                        # ========== FIX: DO NOT apply feature scaler again! ==========
+                        input_sequence = sequence.reshape(1, 24, -1)
                         pred_scaled = directional_models[model_key_south].predict(input_sequence, verbose=0)
-                        # Convert passenger count to congestion % using capacity-based scaling
                         south_pred, south_passengers = _get_congestion_from_prediction(
                             pred_scaled, target_scaler, station
                         )
@@ -240,7 +234,7 @@ def travel_prediction():
 
 @api_other_bp.route('/live-map/directions/v2')
 def live_map_directions_v2():
-    """New version using directional models - WITH CAPACITY-BASED SCALING"""
+    """New version using directional models - WITH PROPER SCALING"""
     print("\n" + "="*60)
     print("📍 LIVE MAP V2 API CALLED")
     print("="*60)
@@ -288,8 +282,7 @@ def live_map_directions_v2():
         OPERATING_END = 22.5
         is_closed = current_time < OPERATING_START or current_time >= OPERATING_END
         
-        # ========== TESTING MODE: Force overrides to show even when closed ==========
-        TESTING_MODE = True  # Set to False for production
+   
         
         print(f"📍 Processing {len(stations_list)} stations... (is_closed: {is_closed}, TESTING_MODE: {TESTING_MODE})")
         
@@ -306,7 +299,6 @@ def live_map_directions_v2():
             is_north_overridden = north_override_key in active_overrides
             is_south_overridden = south_override_key in active_overrides
             
-            # DEBUG: Print override check for first few stations
             if i < 3:
                 print(f"   Checking {station}: North override: {is_north_overridden}, South override: {is_south_overridden}")
             
@@ -318,12 +310,9 @@ def live_map_directions_v2():
                 north_passengers = int((north_pred / 100) * capacity)
                 print(f"  🔧 OVERRIDE: {station} Northbound = {north_pred}%")
             elif is_closed and not TESTING_MODE:
-                # MRT is closed and no override (only in production mode)
                 north_pred = 0
                 north_passengers = 0
             elif is_closed and TESTING_MODE:
-                # TESTING MODE: Show simulated data even when closed
-                # Use time-based simulation for testing
                 hour = now.hour
                 if 7 <= hour <= 9 or 17 <= hour <= 19:
                     north_pred = 65 + (hour - 7) * 5 if hour <= 9 else 60 + (hour - 17) * 5
@@ -336,18 +325,20 @@ def live_map_directions_v2():
                 north_passengers = int((north_pred / 100) * MRT3_PLATFORM_CAPACITY.get(station, 1000))
                 print(f"  📊 TEST MODE: {station} Northbound = {north_pred}% (simulated)")
             else:
-                # Normal model prediction for northbound
+                # ========== FIX: Normal model prediction for northbound ==========
                 model_key_north = f"{station}_Northbound"
                 if model_key_north in directional_models:
                     try:
+                        # Get features (ALREADY SCALED by feature_engineering)
                         sequence = get_feature_sequence_for_station(station, 'Northbound', now)
                         if sequence is not None and len(sequence) == 24:
-                            feature_scaler = directional_scalers.get(f'{model_key_north}_feature')
                             target_scaler = directional_scalers.get(f'{model_key_north}_target')
                             
-                            if feature_scaler and target_scaler:
-                                scaled_sequence = feature_scaler.transform(sequence)
-                                input_sequence = scaled_sequence.reshape(1, 24, -1)
+                            if target_scaler:
+                                # ========== CRITICAL FIX: DO NOT apply feature scaler again! ==========
+                                # sequence is already scaled (feature scaler applied in get_feature_sequence_for_station)
+                                # Just reshape for LSTM
+                                input_sequence = sequence.reshape(1, 24, -1)
                                 pred_scaled = directional_models[model_key_north].predict(input_sequence, verbose=0)
                                 north_pred, north_passengers = _get_congestion_from_prediction(
                                     pred_scaled, target_scaler, station
@@ -363,11 +354,9 @@ def live_map_directions_v2():
                 south_passengers = int((south_pred / 100) * capacity)
                 print(f"  🔧 OVERRIDE: {station} Southbound = {south_pred}%")
             elif is_closed and not TESTING_MODE:
-                # MRT is closed and no override (only in production mode)
                 south_pred = 0
                 south_passengers = 0
             elif is_closed and TESTING_MODE:
-                # TESTING MODE: Show simulated data even when closed
                 hour = now.hour
                 if 7 <= hour <= 9 or 17 <= hour <= 19:
                     south_pred = 65 + (hour - 7) * 5 if hour <= 9 else 60 + (hour - 17) * 5
@@ -378,20 +367,20 @@ def live_map_directions_v2():
                 else:
                     south_pred = 10
                 south_passengers = int((south_pred / 100) * MRT3_PLATFORM_CAPACITY.get(station, 1000))
-                print(f"  📊 TEST MODE: {station} Southbound = {south_pred}% (simulated)")
+             
             else:
-                # Normal model prediction for southbound
+                # ========== FIX: Normal model prediction for southbound ==========
                 model_key_south = f"{station}_Southbound"
                 if model_key_south in directional_models:
                     try:
+                        # Get features (ALREADY SCALED by feature_engineering)
                         sequence = get_feature_sequence_for_station(station, 'Southbound', now)
                         if sequence is not None and len(sequence) == 24:
-                            feature_scaler = directional_scalers.get(f'{model_key_south}_feature')
                             target_scaler = directional_scalers.get(f'{model_key_south}_target')
                             
-                            if feature_scaler and target_scaler:
-                                scaled_sequence = feature_scaler.transform(sequence)
-                                input_sequence = scaled_sequence.reshape(1, 24, -1)
+                            if target_scaler:
+                                # ========== CRITICAL FIX: DO NOT apply feature scaler again! ==========
+                                input_sequence = sequence.reshape(1, 24, -1)
                                 pred_scaled = directional_models[model_key_south].predict(input_sequence, verbose=0)
                                 south_pred, south_passengers = _get_congestion_from_prediction(
                                     pred_scaled, target_scaler, station
@@ -399,7 +388,6 @@ def live_map_directions_v2():
                     except Exception as e:
                         print(f"  ⚠️ Error predicting {station} Southbound: {e}")
             
-            # Print first few for debugging
             if i < 3:
                 print(f"  📍 {station}: North={north_pred:.1f}%, South={south_pred:.1f}%")
             
@@ -413,7 +401,6 @@ def live_map_directions_v2():
                 else:
                     return "LIGHT", "2-5 min"
             
-            # Status text - In TESTING MODE, only show CLOSED if no override and not testing
             if is_closed and not is_north_overridden and not TESTING_MODE:
                 north_status = "CLOSED"
                 north_wait = "Closed"
@@ -431,7 +418,7 @@ def live_map_directions_v2():
                 "wait_time": north_wait,
                 "status": north_status,
                 "ridership": int(north_passengers),
-                "overridden": is_north_overridden,
+                "overridden": is_north_overridden,  
                 "testing_mode": TESTING_MODE and is_closed and not is_north_overridden
             }
             
@@ -642,7 +629,6 @@ def debug_clear_data_cache():
     else:
         return jsonify({"success": False, "message": "Failed to reload data"})
 
-
 @api_other_bp.route('/live-map/directions')
 def live_map_directions():
     """Get congestion data for both directions - uses DIRECT model access with capacity-based scaling"""
@@ -668,7 +654,7 @@ def live_map_directions():
             current_app.config['overrides'] = {}
         
         current_timestamp = time.time()
-        active_overrides =  get_active_overrides()
+        active_overrides = get_active_overrides()
         for key, override in current_app.config['overrides'].items():
             if override.get('expiry') is None or override.get('expiry', 0) > current_timestamp:
                 active_overrides[key] = override
@@ -685,16 +671,15 @@ def live_map_directions():
                 return 35, 0
             
             try:
+                # Get features (ALREADY SCALED by feature_engineering)
                 sequence = get_feature_sequence_for_station(station_name, direction, now)
                 if sequence is not None and len(sequence) == 24:
-                    feature_scaler = directional_scalers.get(f'{model_key}_feature')
                     target_scaler = directional_scalers.get(f'{model_key}_target')
                     
-                    if feature_scaler and target_scaler:
-                        scaled_sequence = feature_scaler.transform(sequence)
-                        input_sequence = scaled_sequence.reshape(1, 24, -1)
+                    if target_scaler:
+                        # ========== FIX: DO NOT apply feature scaler again! ==========
+                        input_sequence = sequence.reshape(1, 24, -1)
                         pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
-                        # Convert passenger count to congestion % using capacity-based scaling
                         congestion, passengers = _get_congestion_from_prediction(
                             pred_scaled, target_scaler, station_name
                         )
@@ -798,7 +783,6 @@ def live_map_directions():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
 
 @api_other_bp.route('/debug/raw-prediction')
 def debug_raw_prediction():
@@ -971,12 +955,17 @@ def test_api():
         "stations": get_stations_from_config()
     })
 
+# Fix the /alerts/count endpoint in api_other.py
 
 @api_other_bp.route('/alerts/count')
 def alerts_count():
+    """Get alert count with breakdown by severity level"""
     try:
         stations_list = get_stations_from_config()
         critical_count = 0
+        moderate_count = 0
+        light_count = 0
+        station_statuses = {}
         
         # Use the V2 directional API to get real congestion data
         try:
@@ -985,13 +974,10 @@ def alerts_count():
             from services import get_feature_sequence_for_station
             import numpy as np
             
-            # Use Config.get_current_time() instead of datetime.now()
             now = Config.get_current_time()
-            
             print(f"🔍 Checking congestion for {len(stations_list)} stations at {now.strftime('%H:%M')}")
             
             for station in stations_list:
-                # Check northbound congestion
                 north_cong = 0
                 south_cong = 0
                 
@@ -1000,11 +986,9 @@ def alerts_count():
                     if model_key_north in directional_models:
                         sequence = get_feature_sequence_for_station(station, 'Northbound', now)
                         if sequence is not None and len(sequence) == 24:
-                            feature_scaler = directional_scalers.get(f'{model_key_north}_feature')
                             target_scaler = directional_scalers.get(f'{model_key_north}_target')
-                            if feature_scaler and target_scaler:
-                                scaled_sequence = feature_scaler.transform(sequence)
-                                input_sequence = scaled_sequence.reshape(1, 24, -1)
+                            if target_scaler:
+                                input_sequence = sequence.reshape(1, 24, -1)
                                 pred_scaled = directional_models[model_key_north].predict(input_sequence, verbose=0)
                                 north_cong, _ = _get_congestion_from_prediction(
                                     pred_scaled, target_scaler, station
@@ -1017,11 +1001,9 @@ def alerts_count():
                     if model_key_south in directional_models:
                         sequence = get_feature_sequence_for_station(station, 'Southbound', now)
                         if sequence is not None and len(sequence) == 24:
-                            feature_scaler = directional_scalers.get(f'{model_key_south}_feature')
                             target_scaler = directional_scalers.get(f'{model_key_south}_target')
-                            if feature_scaler and target_scaler:
-                                scaled_sequence = feature_scaler.transform(sequence)
-                                input_sequence = scaled_sequence.reshape(1, 24, -1)
+                            if target_scaler:
+                                input_sequence = sequence.reshape(1, 24, -1)
                                 pred_scaled = directional_models[model_key_south].predict(input_sequence, verbose=0)
                                 south_cong, _ = _get_congestion_from_prediction(
                                     pred_scaled, target_scaler, station
@@ -1029,17 +1011,48 @@ def alerts_count():
                 except Exception as e:
                     print(f"⚠️ Error getting southbound for {station}: {e}")
                 
-                # Count if EITHER direction has critical congestion (>70%)
-                max_cong = max(north_cong, south_cong)
-                if max_cong > 70:
+                # ========== FIX: Use AVERAGE congestion instead of MAX ==========
+                # This matches what the dashboard shows
+                avg_cong = (north_cong + south_cong) / 2
+                
+                # ========== FIX: Use the same thresholds as the dashboard ==========
+                # Dashboard uses: Severe > 80, Congested > 60, Moderate > 40, Light > 20
+                # So we should use: Critical > 60, Moderate > 40, Light > 20
+                # But the alerts endpoint should use the SAME thresholds as the live map
+                
+                # Use the same thresholds as the live map V2 endpoint
+                # The V2 endpoint uses: SEVERE > 80, CONGESTED > 60, MODERATE > 30, LIGHT <= 30
+                # But for alerts, we want to show moderate stations too
+                
+                # Let's use the dashboard thresholds:
+                # Congested (> 60%) = CRITICAL for alerts
+                # Moderate (40-60%) = MODERATE for alerts
+                # Light (20-40%) = LIGHT for alerts
+                
+                if avg_cong > 60:  # Congested/Severe
                     critical_count += 1
-                    print(f"  🔴 CRITICAL: {station} - {max_cong:.1f}% (N:{north_cong:.1f}%, S:{south_cong:.1f}%)")
-                elif max_cong > 30:
-                    print(f"  🟡 MODERATE: {station} - {max_cong:.1f}%")
+                    severity = 'critical'
+                    print(f"  🔴 CRITICAL: {station} - {avg_cong:.1f}% (N:{north_cong:.1f}%, S:{south_cong:.1f}%)")
+                elif avg_cong > 40:  # Moderate
+                    moderate_count += 1
+                    severity = 'moderate'
+                    print(f"  🟡 MODERATE: {station} - {avg_cong:.1f}%")
+                elif avg_cong > 20:  # Light
+                    light_count += 1
+                    severity = 'light'
+                    print(f"  🟢 LIGHT: {station} - {avg_cong:.1f}%")
                 else:
-                    print(f"  🟢 LIGHT: {station} - {max_cong:.1f}%")
+                    severity = 'low'
+                    print(f"  ⚪ LOW: {station} - {avg_cong:.1f}%")
+                
+                station_statuses[station] = {
+                    'congestion': round(avg_cong, 1),
+                    'northbound': round(north_cong, 1),
+                    'southbound': round(south_cong, 1),
+                    'severity': severity
+                }
             
-            print(f"✅ Total critical stations: {critical_count}")
+            print(f"✅ Station breakdown - Critical: {critical_count}, Moderate: {moderate_count}, Light: {light_count}")
             
         except Exception as e:
             print(f"❌ Error using models: {e}")
@@ -1056,25 +1069,39 @@ def alerts_count():
                         for station in stations_list:
                             north_cong = data['northbound'].get(station, {}).get('congestion', 0)
                             south_cong = data['southbound'].get(station, {}).get('congestion', 0)
-                            max_cong = max(north_cong, south_cong)
-                            if max_cong > 70:
+                            avg_cong = (north_cong + south_cong) / 2
+                            
+                            if avg_cong > 60:
                                 critical_count += 1
-                    print(f"✅ Fallback count: {critical_count}")
+                            elif avg_cong > 40:
+                                moderate_count += 1
+                            elif avg_cong > 20:
+                                light_count += 1
+                    print(f"✅ Fallback breakdown - Critical: {critical_count}, Moderate: {moderate_count}, Light: {light_count}")
             except Exception as e2:
                 print(f"❌ Fallback also failed: {e2}")
         
-        total = critical_count
+        total = critical_count + moderate_count + light_count
         display = str(total) if total < 10 else "9+"
         
-        return jsonify({"count": total, "display": display})
+        return jsonify({
+            "count": total,
+            "display": display,
+            "breakdown": {
+                "critical": critical_count,
+                "moderate": moderate_count,
+                "light": light_count,
+                "total_stations": len(stations_list)
+            },
+            "station_statuses": station_statuses
+        })
         
     except Exception as e:
         print(f"❌ Error in alerts_count: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"count": 0, "display": "0"})
-
-
+    
 @api_other_bp.route('/alerts/list')
 def alerts_list():
     """Get list of active alerts"""
@@ -1160,9 +1187,15 @@ def get_public_broadcasts():
             if not broadcast.title.startswith(title_prefix):
                 final_title = f'{title_prefix}: {broadcast.title}'
             
-            stations_text = ', '.join(stations[:3])
-            if len(stations) > 3:
-                stations_text += f' +{len(stations) - 3} more'
+            # FIX: Only show affected stations if there are any
+            if stations:
+                stations_text = ', '.join(stations[:3])
+                if len(stations) > 3:
+                    stations_text += f' +{len(stations) - 3} more'
+                message = f'{broadcast.message} Affected Station(s): {stations_text}'
+            else:
+                # No affected stations - just show the message without the Affected part
+                message = broadcast.message
             
             result.append({
                 'id': broadcast.id,
@@ -1171,7 +1204,7 @@ def get_public_broadcasts():
                 'icon': icon,
                 'icon_color': icon_color,
                 'title': final_title,
-                'message': f'{broadcast.message} [Affected: {stations_text}]',
+                'message': message,
                 'time': broadcast.created_at.isoformat(),
                 'unread': True,
                 'direction': getattr(broadcast, 'direction', 'both')
@@ -1258,7 +1291,7 @@ def station_info(station_name):
             color = "moderate"
             description = "Moderate crowds. Normal wait times."
         else:
-            status = "LIGHT"
+            status = "n"
             color = "light"
             description = "Light traffic. Good time to travel."
         
@@ -1271,7 +1304,61 @@ def station_info(station_name):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
+@api_other_bp.route('/operator/review-report/<int:report_id>', methods=['POST'])
+def review_report(report_id):
+    """Operator reviews a flagged report - True Positive or False Positive"""
+    try:
+        data = request.get_json()
+        verdict = data.get('verdict')
+        reason = data.get('reason', '')
+        reviewed_by = data.get('reviewed_by', 'Operator')
+        
+        if verdict not in ['true_positive', 'false_positive']:
+            return jsonify({'success': False, 'error': 'Invalid verdict'}), 400
+        
+        # Get the report
+        report = Report.query.get(report_id)
+        if not report:
+            return jsonify({'success': False, 'error': 'Report not found'}), 404
+        
+        # Update based on verdict
+        if verdict == 'true_positive':
+            # Keep the report, remove flags
+            report.flagged = False
+            report.flag_count = 0
+            report.reviewed = True
+            report.reviewed_by = reviewed_by
+            report.reviewed_at = datetime.utcnow()
+            report.review_notes = reason
+            report.status = 'confirmed'
+            
+        else:  # false_positive
+            # Archive the report
+            report.flagged = False
+            report.flag_count = 0
+            report.reviewed = True
+            report.reviewed_by = reviewed_by
+            report.reviewed_at = datetime.utcnow()
+            report.review_notes = reason
+            report.archived = True
+            report.archived_at = datetime.utcnow()
+            report.archived_by = reviewed_by
+            report.status = 'archived'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Report {verdict}',
+            'verdict': verdict,
+            'report_id': report_id
+        })
+        
+    except Exception as e:
+        print(f"Error reviewing report: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
 @api_other_bp.route('/historical-patterns')
 def historical_patterns():
     """Get historical congestion patterns"""

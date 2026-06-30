@@ -10,6 +10,7 @@
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
 
+    
 :root {
     --sidebar-bg: #00224D;
     --main-bg: #F8FAFC;
@@ -98,6 +99,47 @@ body {
     color: var(--accent-blue);
 }
 
+
+/* Location Modal Animations */
+@keyframes fadeInModal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUpModal {
+    from { transform: translateY(30px) scale(0.95); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Location button pulse animation */
+@keyframes pulseLocation {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+.location-pulse {
+    animation: pulseLocation 2s infinite;
+}
+
+/* Location badge */
+#locationBadge {
+    background: var(--accent-blue);
+    color: white;
+    font-size: 8px;
+    width: 16px;
+    height: 16px;
+}
+
+/* Location button hover */
+#locationBtn:hover {
+    background: #EFF6FF;
+}
 .btn-use-location {
     background: var(--accent-blue);
     color: white;
@@ -357,7 +399,7 @@ nav {
     text-align: center; 
     align-items: center; 
     gap: 8px; 
-    color: black;
+    color: rgb(77, 77, 77);
 }
 
 .station-label {
@@ -554,6 +596,23 @@ nav {
 .congestion h3 {
     font-size: 15px;
     margin-bottom: 15px;
+}
+
+.congestion-closed {
+    background: #6B7280 !important;  /* Gray */
+    color: white !important;
+}
+
+/* Also make sure the text is uppercase and styled properly */
+.congestion-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: white;
 }
 
 .congestion .forecast-toggle {
@@ -892,18 +951,27 @@ canvas {
     }
     
     /* Keep train grid as 2 columns on mobile - SIDE BY SIDE */
-    .train-grid {
+ .train-grid {
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        gap: 8px;
+        width: 100%;
     }
     
     /* Make cards slightly smaller on mobile */
     .train-direction-card {
-        padding: 8px;
+        padding: 8px 4px;
+        min-width: 0;
+        width: 100%;
+        overflow: hidden;
+        border-radius: 10px;
     }
     
     .arrival-timer {
         font-size: 28px;
+    }
+
+     .station-label {
+        font-size: 12px;
     }
 
     .station-label i {
@@ -911,7 +979,7 @@ canvas {
     }
 
     .station-label-2 {
-        font-size: 13px;
+        font-size: 12px;
     }
     
     .arrival-timer span {
@@ -936,7 +1004,7 @@ canvas {
     
     /* Adjust hero card */
     .hero-card {
-        padding: 15px;
+        padding: 15px  !important;
     }
     
     /* Adjust forecast card */
@@ -1003,7 +1071,7 @@ canvas {
     
     /* Chart container */
     .chart-container {
-        height: 200px;
+      width: 300px;
     }
     
     /* Congestion section */
@@ -1101,7 +1169,7 @@ canvas {
 .congestion-light {
     background: #d4ffe4;
     border: 1px solid #22C55E;
-    color: 22C55E;
+    color: #22C55E;
     box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
 }
 
@@ -1275,7 +1343,7 @@ canvas {
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
-        padding: 12px 16px;
+        padding: 12px 16px !important;
         gap: 12px;
     }
     
@@ -1567,7 +1635,7 @@ canvas {
 
 /* Station Title - Clean */
 .station-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: bold;
     color: black;
     display: inline-block;
@@ -1664,6 +1732,192 @@ canvas {
     align-items: center;
     gap: 12px;
 }   
+
+
+/* ========== TRAVEL TIPS CAROUSEL ========== */
+.tips-container {
+    background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+    border: 2px solid var(--accent-blue);
+    border-radius: 16px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 70px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    flex-wrap: nowrap;
+}
+
+.tips-container:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+}
+
+.tips-icon {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    background: var(--accent-blue);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    animation: tipsPulse 2s infinite;
+}
+
+@keyframes tipsPulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+}
+
+.tips-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.tips-text {
+    font-size: 15px;
+    color: var(--text-dark);
+    line-height: 1.5;
+    font-weight: 500;
+    transition: opacity 0.3s ease;
+}
+
+.tips-text .highlight {
+    color: var(--accent-blue);
+    font-weight: 700;
+}
+
+.tips-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: var(--accent-blue);
+    border-radius: 0 3px 3px 0;
+    transition: width 0.1s linear;
+    width: 0%;
+}
+
+.tips-dots {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.tips-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #CBD5E1;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.tips-dot.active {
+    background: var(--accent-blue);
+    transform: scale(1.2);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.tips-dot:hover {
+    transform: scale(1.1);
+    background: #94A3B8;
+}
+
+.tips-dot.active:hover {
+    background: var(--accent-blue);
+    transform: scale(1.3);
+}
+
+/* Mobile adjustments */
+@media screen and (max-width: 768px) {
+     .tips-container {
+        padding: 12px 14px;
+        min-height: 56px;
+        gap: 10px;
+        flex-wrap: nowrap;
+    }
+    
+    .tips-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+    
+    .tips-text {
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    
+    .tips-dots {
+        gap: 4px;
+        flex-shrink: 0;
+    }
+    
+    .tips-dot {
+        width: 6px;
+        height: 6px;
+        flex-shrink: 0;
+    }
+}
+
+@media screen and (max-width: 480px) {
+      .tips-container {
+        padding: 10px 12px;
+        min-height: 48px;
+        gap: 8px;
+        flex-wrap: nowrap;
+        align-items: center;
+    }
+    
+    .tips-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+        flex-shrink: 0;
+    }
+    
+    .tips-text {
+        font-size: 11px;
+        line-height: 1.3;
+    }
+    
+    .tips-dots {
+        gap: 3px;
+        flex-shrink: 0;
+    }
+    
+    .tips-dot {
+        width: 5px;
+        height: 5px;
+        flex-shrink: 0;
+    }
+    
+    /* Hide progress bar on very small screens to save space */
+    .tips-progress {
+        height: 2px;
+    }
+}
+
 </style>
 </head>
 <body>
@@ -1749,25 +2003,106 @@ canvas {
 </div>
 
 
-      <div class="header-top">
+  <div class="header-top">
     <h1>Dashboard</h1>
     
-
     <div class="header-icons">
-    
-        <span class="icon-btn" onclick="requestLocationPermission()" title="Find nearest station">
-            <i class="fas fa-location-dot"></i>
+        <!-- Location button with indicator -->
+        <span class="icon-btn" onclick="requestLocation()" id="locationBtn" title="Find my nearest station">
+            <i class="fas fa-location-dot" id="locationIcon"></i>
+            <span class="badge" id="locationBadge" style="background: var(--accent-blue); display: none;">?</span>
         </span>
-        <span class="icon-btn" onclick="refreshData()"><i class="fas fa-sync-alt"></i></span>
+        <span class="icon-btn" onclick="refreshData()" style="display:none;"><i class="fas fa-sync-alt"></i></span>
         <span class="icon-btn" onclick="window.location.href='/alerts'">
             <i class="fas fa-bell"></i>
             <span class="badge" id="alertBadge">0</span>
         </span>
-
-        
     </div>
+</div>
 
-    
+<!-- Travel Tips Carousel -->
+<div class="tips-container" id="tipsContainer">
+    <div class="tips-icon">
+        <i class="fas fa-lightbulb"></i>
+    </div>
+    <div class="tips-content">
+        <div class="tips-text" id="tipsText">
+            <span class="highlight"></span> <span id="tipMessage">Loading travel tips...</span>
+        </div>
+    </div>
+    <div class="tips-dots" id="tipsDots">
+        <span class="tips-dot active" data-index="0"></span>
+        <span class="tips-dot" data-index="1"></span>
+        <span class="tips-dot" data-index="2"></span>
+        <span class="tips-dot" data-index="3"></span>
+        <span class="tips-dot" data-index="4"></span>
+    </div>
+    <div class="tips-progress" id="tipsProgress"></div>
+</div>
+
+<!-- Location Request Modal -->
+<div id="locationModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; animation: fadeInModal 0.3s ease-out;">
+    <div style="background: white; border-radius: 24px; max-width: 420px; width: 90%; padding: 35px 30px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); text-align: center; position: relative; animation: slideUpModal 0.3s ease-out;">
+        
+        <!-- Close button -->
+        <button onclick="closeLocationModal()" style="position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 24px; color: #94A3B8; cursor: pointer; transition: 0.3s;">
+            <i class="fas fa-times"></i>
+        </button>
+        
+        <!-- Icon -->
+        <div style="width: 80px; height: 80px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; border: 3px solid var(--accent-blue);">
+            <i class="fas fa-location-dot" style="font-size: 36px; color: var(--accent-blue);"></i>
+        </div>
+        
+        <!-- Title -->
+        <h2 style="font-size: 22px; color: var(--text-dark); margin-bottom: 10px; font-weight: 700;">
+            Enable Location
+        </h2>
+        
+        <!-- Description -->
+        <p style="color: var(--text-light); font-size: 15px; line-height: 1.6; margin-bottom: 25px;">
+            Allow MRT-ADAPT to access your location so we can show you the nearest station and personalized travel recommendations.
+        </p>
+        
+        <!-- Benefits -->
+        <div style="background: #F8FAFC; border-radius: 12px; padding: 15px 20px; margin-bottom: 25px; text-align: left;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <i class="fas fa-check-circle" style="color: #22C55E; font-size: 16px;"></i>
+                <span style="font-size: 13px; color: var(--text-dark);">Find nearest station automatically</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <i class="fas fa-check-circle" style="color: #22C55E; font-size: 16px;"></i>
+                <span style="font-size: 13px; color: var(--text-dark);">Get personalized congestion alerts</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <i class="fas fa-check-circle" style="color: #22C55E; font-size: 16px;"></i>
+                <span style="font-size: 13px; color: var(--text-dark);">Better travel recommendations</span>
+            </div>
+        </div>
+        
+        <!-- Buttons -->
+        <div style="display: flex; gap: 12px; flex-direction: column;">
+            <button onclick="allowLocation()" style="background: var(--accent-blue); color: white; border: none; padding: 14px 30px; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <i class="fas fa-location-arrow"></i>
+                Allow Location Access
+            </button>
+            <button onclick="skipLocationModal()" style="background: transparent; color: var(--text-light); border: 2px solid var(--border); padding: 12px 30px; border-radius: 12px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.3s ease; width: 100%;">
+                Skip for now
+            </button>
+        </div>
+        
+        <!-- Privacy note -->
+        <p style="font-size: 11px; color: #94A3B8; margin-top: 20px;">
+            <i class="fas fa-shield-alt" style="margin-right: 5px;"></i>
+            Your location is not stored and is only used for station detection
+        </p>
+    </div>
+</div>
+
+<!-- Location Status Toast (floating notification) -->
+<div id="locationToast" style="position: fixed; bottom: 100px; right: 20px; background: var(--text-dark); color: white; padding: 12px 20px; border-radius: 12px; font-size: 14px; z-index: 100000; display: none; align-items: center; gap: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); animation: slideInRight 0.3s ease-out;">
+    <i class="fas fa-location-dot" style="color: var(--accent-blue);"></i>
+    <span id="locationToastMessage">Loading...</span>
 </div>
 
 
@@ -1888,6 +2223,9 @@ let cachedData = null;
 let lastFetchTime = 0;
 const CACHE_DURATION = 600000; // 10 minutes cache (600,000 ms)
 let isRefreshing = false; // Prevent concurrent refreshes
+let cachedAlertCount = null;
+let cachedAlertCountTime = 0;
+const ALERT_CACHE_DURATION = 30000;
 
 // Station coordinates
 const stationCoordinates = {
@@ -1931,6 +2269,156 @@ function debounce(func, wait) {
         timeout = setTimeout(later, wait);
     };
 }
+
+// ========== TRAVEL TIPS CAROUSEL ==========
+const travelTips = [
+    {
+        tip: 'Crowds are significantly lighter during off-peak hours.'
+    },
+    {
+        tip: 'Use a Beep card for faster entry and exit. Save more time'
+    },
+    {
+        tip: 'Plan your trip more efficiently by using Travel Plan'
+    },
+    {
+        tip: 'Bring headphones to enjoy music during your commute.'
+    },
+    {
+        tip: 'Keep your things safe during commute.'
+    },
+    {
+        tip: 'Stay calm and patient while waiting!'
+    },
+    {
+        tip: 'Reading during your commute is a great way to make use of travel time.'
+    },
+    {
+        tip: 'Charge your phone before leaving. There are no charging ports on the train, so come prepared.'
+    },
+    {
+        tip: 'Check the weather before heading out. Bring an umbrella if rain is forecasted for your travel time.'
+    },
+    {
+        tip: 'Wear comfortable shoes. You might need to stand during peak hours'
+    },
+    {
+        tip: 'Stay hydrated! Bring a water bottle, but remember to keep it sealed while on the train.'
+    },
+    {
+        tip: 'Arrive at the station 10-15 minutes early to avoid rushing and to secure a good spot on the platform.'
+    }
+];
+
+let currentTipIndex = 0;
+let tipsInterval = null;
+let tipsProgressInterval = null;
+let tipsProgress = 0;
+
+function initializeTips() {
+    const tipMessage = document.getElementById('tipMessage');
+    if (!tipMessage) return;
+    
+    // Show first tip
+    showTip(0);
+    
+    // Start auto-rotation
+    startTipsRotation();
+    
+    // Add click handlers for dots
+    document.querySelectorAll('.tips-dot').forEach(dot => {
+        dot.addEventListener('click', function() {
+            const index = parseInt(this.dataset.index);
+            stopTipsRotation();
+            showTip(index);
+            startTipsRotation();
+        });
+    });
+}
+
+function showTip(index) {
+    const tip = travelTips[index % travelTips.length];
+    const tipMessage = document.getElementById('tipMessage');
+    const dots = document.querySelectorAll('.tips-dot');
+    
+    if (!tipMessage) return;
+    
+    // Update text with smooth transition
+    tipMessage.style.opacity = '0';
+    setTimeout(() => {
+        tipMessage.innerHTML = `<span class="highlight">Tip:</span> ${tip.tip}`;
+        tipMessage.style.opacity = '1';
+    }, 150);
+    
+    // Update dots
+    dots.forEach((dot, i) => {
+        dot.classList.toggle('active', i === index);
+    });
+    
+    // Update progress bar
+    const progressBar = document.getElementById('tipsProgress');
+    if (progressBar) {
+        progressBar.style.width = '0%';
+    }
+    
+    currentTipIndex = index;
+    tipsProgress = 0;
+}
+
+function startTipsRotation() {
+    const intervalTime = 7000; // 7 seconds per tip
+    const progressUpdateInterval = 50; // Update progress every 50ms
+    
+    // Clear any existing intervals
+    stopTipsRotation();
+    
+    // Progress bar animation
+    tipsProgressInterval = setInterval(() => {
+        tipsProgress += (50 / intervalTime) * 100;
+        const progressBar = document.getElementById('tipsProgress');
+        if (progressBar) {
+            progressBar.style.width = Math.min(tipsProgress, 100) + '%';
+        }
+    }, progressUpdateInterval);
+    
+    // Tip rotation
+    tipsInterval = setInterval(() => {
+        showTip((currentTipIndex + 1) % travelTips.length);
+    }, intervalTime);
+}
+
+function stopTipsRotation() {
+    if (tipsInterval) {
+        clearInterval(tipsInterval);
+        tipsInterval = null;
+    }
+    if (tipsProgressInterval) {
+        clearInterval(tipsProgressInterval);
+        tipsProgressInterval = null;
+    }
+}
+
+// Add hover pause functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const tipsContainer = document.getElementById('tipsContainer');
+    if (tipsContainer) {
+        tipsContainer.addEventListener('mouseenter', stopTipsRotation);
+        tipsContainer.addEventListener('mouseleave', startTipsRotation);
+        
+        // For touch devices
+        tipsContainer.addEventListener('touchstart', stopTipsRotation);
+        tipsContainer.addEventListener('touchend', startTipsRotation);
+    }
+    
+    // Initialize tips after a short delay
+    setTimeout(initializeTips, 1000);
+});
+
+// Make tips accessible globally
+window.travelTips = travelTips;
+window.showTip = showTip;
+window.startTipsRotation = startTipsRotation;
+window.stopTipsRotation = stopTipsRotation;
 
 // ========== Sync mobile alert badge ==========
 function syncMobileAlertBadge() {
@@ -2012,8 +2500,12 @@ async function fetchAllData() {
                 return res.json();
             }).catch(() => ({ count: 0 }))
         ]);
+
+        if (forecastData) {
+              console.log("Here:", forecastData);
+        }
         
-        console.log("Here:", forecastData);
+      
         console.log('✅ Data fetched successfully');
         
         cachedData = { 
@@ -2063,6 +2555,7 @@ function updateLastUpdatedTime() {
 function setDirection(direction) {
     console.log('🔄 Setting direction to:', direction);
     currentDirection = direction;
+
     
     const northBtn = document.getElementById('toggleNorthBtn');
     const southBtn = document.getElementById('toggleSouthBtn');
@@ -2086,10 +2579,26 @@ function setDirection(direction) {
 
 // ========== CONGESTION HELPER ==========
 function getCongestionLevel(percentage) {
+    const OPERATING_START = 4.5;
+    const OPERATING_END = 22.5;
+
+    const now = new Date();
+    // Hint: .getHours() returns whole integers (0-23). 
+    // Since your constants use decimals (.5), converting time to a float helps!
+    const hour = now.getHours() + (now.getMinutes() / 60);
+
+    // 1. Check heavy congestion thresholds first
     if (percentage > 80) return { level: 'severe', text: 'SEVERE', color: '#EF4444' };
     if (percentage > 60) return { level: 'congested', text: 'CONGESTED', color: '#F97316' };
     if (percentage > 30) return { level: 'moderate', text: 'MODERATE', color: '#F59E0B' };
-    return { level: 'light', text: 'LIGHT', color: '#22C55E' };
+
+    // 2. If it's under 30, check if the station is operational or closed
+    if (hour < OPERATING_START || hour > OPERATING_END) {
+        return { level: 'closed', text: 'CLOSED', color: '#6B7280' }; // Gray color for closed hours
+    }
+
+    // 3. If it's under 30 and the station IS open, it's just normal light traffic
+    return { level: 'light', text: 'LIGHT', color: '#00000' };
 }
 
 function createCongestionPill(percentage, size = 'xs') {
@@ -2167,7 +2676,7 @@ function updateForecastUI(data) {
     }
     
     const labels = data.forecasts.map((f, index) => {
-        return index === 0 ? `NOW (${f.time})` : f.time;
+        return index === 0 ? `${f.time}` : f.time;
     });
     
     const rawMetrics = currentDirection === 'north' 
@@ -2185,7 +2694,6 @@ function updateStationStatusUI(data) {
     
     if (!northEl || !southEl) return;
     
-    // FIX: Get current hour from system time, not forecast data
     const now = new Date();
     let currentHour = now.getHours();
     let currentMinute = now.getMinutes();
@@ -2217,7 +2725,6 @@ function updateStationStatusUI(data) {
     southEl.innerHTML = createCongestionPill(southCong, 'xs');
 }
 
-// ========== UPDATE TRAIN SCHEDULE ==========
 function updateTrainScheduleUI(data) {
     const northEl = document.getElementById('northTime');
     const southEl = document.getElementById('southTime');
@@ -2226,35 +2733,69 @@ function updateTrainScheduleUI(data) {
     
     if (!northEl || !southEl) return;
     
-    // FIX: Use system time to determine if operating
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTime = currentHour + (currentMinute / 60);
-    const OPERATING_START = 4.5;
-    const OPERATING_END = 22.5;
-    const isOperating = (currentTime >= OPERATING_START && currentTime < OPERATING_END);
-    
-    if (!isOperating) {
+    // Check if station is closed from API response
+    if (data && data.is_closed === true) {
         northEl.innerHTML = '<span>CLOSED</span>';
         southEl.innerHTML = '<span>CLOSED</span>';
-        if (northOriginEl) northOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
-        if (southOriginEl) southOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
+        if (northOriginEl) northOriginEl.textContent = 'MRT-3 is currently closed';
+        if (southOriginEl) southOriginEl.textContent = 'MRT-3 is currently closed';
         return;
     }
     
-    // Use schedule data if available, otherwise fallback
-    const northMinutes = data?.northbound?.minutes || data?.northbound?.arrival_minutes || 5;
-    const southMinutes = data?.southbound?.minutes || data?.southbound?.arrival_minutes || 3;
-    const northOrigin = data?.northbound?.origin || data?.northbound?.from_station || 'Taft';
-    const southOrigin = data?.southbound?.origin || data?.southbound?.from_station || 'North Ave';
-    
-    northEl.innerHTML = `${northMinutes} <span>min</span>`;
-    southEl.innerHTML = `${southMinutes} <span>min</span>`;
-    
-    if (northOriginEl) northOriginEl.textContent = `Arriving from ${northOrigin}`;
-    if (southOriginEl) southOriginEl.textContent = `Arriving from ${southOrigin}`;
+    // Use data from API response
+    if (data && data.southbound && data.northbound) {
+        const northMinutes = data.northbound.minutes;
+        const southMinutes = data.southbound.minutes;
+        const northOrigin = data.northbound.origin || 'Taft';
+        const southOrigin = data.southbound.origin || 'North Ave';
+        
+        // Check if trains are available in each direction
+        if (data.northbound.available === false) {
+            northEl.innerHTML = '<span>LAST TRAIN</span>';
+            if (northOriginEl) northOriginEl.textContent = `Last train: ${data.northbound.last_train || 'N/A'}`;
+        } else if (northMinutes !== null && northMinutes !== undefined) {
+            northEl.innerHTML = `${northMinutes} <span>min</span>`;
+            if (northOriginEl) northOriginEl.textContent = `Arriving from ${northOrigin}`;
+        } else {
+            northEl.innerHTML = '<span>--</span>';
+            if (northOriginEl) northOriginEl.textContent = 'No train data available';
+        }
+        
+        if (data.southbound.available === false) {
+            southEl.innerHTML = '<span>LAST TRAIN</span>';
+            if (southOriginEl) southOriginEl.textContent = `Last train: ${data.southbound.last_train || 'N/A'}`;
+        } else if (southMinutes !== null && southMinutes !== undefined) {
+            southEl.innerHTML = `${southMinutes} <span>min</span>`;
+            if (southOriginEl) southOriginEl.textContent = `Arriving from ${southOrigin}`;
+        } else {
+            southEl.innerHTML = '<span>--</span>';
+            if (southOriginEl) southOriginEl.textContent = 'No train data available';
+        }
+    } else {
+        // Fallback: use system time to determine if operating
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentTime = currentHour + (currentMinute / 60);
+        const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
+        const isOperating = (currentTime >= OPERATING_START && currentTime < OPERATING_END);
+        
+        if (!isOperating) {
+            northEl.innerHTML = '<span>CLOSED</span>';
+            southEl.innerHTML = '<span>CLOSED</span>';
+            if (northOriginEl) northOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
+            if (southOriginEl) southOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
+        } else {
+            // Generic fallback
+            northEl.innerHTML = '5 <span>min</span>';
+            southEl.innerHTML = '3 <span>min</span>';
+            if (northOriginEl) northOriginEl.textContent = 'Arriving from Taft';
+            if (southOriginEl) southOriginEl.textContent = 'Arriving from North Ave';
+        }
+    }
 }
+
 // ========== UPDATE BEST TIME UI ==========
 function updateBestTimeUI(data) {
     const bestTimeText = document.getElementById('bestTimeText');
@@ -2263,7 +2804,7 @@ function updateBestTimeUI(data) {
     let northCong = 0;
     let southCong = 0;
     
-    if (data.forecastData && data.forecastData.forecasts && data.forecastData.forecasts[0]) {
+    if (data && data.forecastData && data.forecastData.forecasts && data.forecastData.forecasts[0])  {
         northCong = data.forecastData.forecasts[0].northbound || 0;
         southCong = data.forecastData.forecasts[0].southbound || 0;
     }
@@ -2273,16 +2814,27 @@ function updateBestTimeUI(data) {
     const currentHour = now.getHours();
     const isRushHour = (currentHour >= 7 && currentHour < 9) || (currentHour >= 17 && currentHour < 19);
     
+      const OPERATING_START = 4.5;
+    const OPERATING_END = 22.5;
+
+    const hour = now.getHours() + (now.getMinutes() / 60);
+
     const getAdvice = (cong) => {
         if (cong > 80) return "Expect 30-60 min delays - Severe congestion";
         if (cong > 60) return "Expect 15-30 min delays - Heavy traffic";
         if (cong > 30) return "Allow extra 5-10 min - Moderate congestion";
-        return "Smooth travel expected - Light traffic";
+
+          // 2. If it's under 30, check if the station is operational or closed
+    if (hour < OPERATING_START || hour > OPERATING_END) {
+        return "MRT opens at 4:30 AM"; // Gray color for closed hours
+    }
+
+        return "Fast travel expected - Light traffic";
     };
     
     // Add rush hour warning
     const rushWarning = isRushHour ? 
-        '<div style="color: #EF4444; font-weight: bold; margin-bottom: 8px;">⚠️ RUSH HOUR - Expect delays</div>' : '';
+        '<div style="color: #EF4444; font-weight: bold; margin-bottom: 8px;"></div>' : '';
     
     bestTimeText.innerHTML = rushWarning + `
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; margin-bottom: 12px;">
@@ -2305,42 +2857,159 @@ function updateBestTimeUI(data) {
 }
 // ========== UPDATE ALERT FUNCTIONS ==========
 async function fetchAlertCount() {
+    const now = Date.now();
+    
+    // Use cached alert count if still valid
+    if (cachedAlertCount !== null && (now - cachedAlertCountTime) < ALERT_CACHE_DURATION) {
+        return cachedAlertCount;
+    }
+    
     try {
-        const response = await fetch('/api/alerts/count');
-        const data = await response.json();
-        return data.count || 0;
+        let readAlerts = new Set();
+        const saved = localStorage.getItem('readAlerts');
+        if (saved) {
+            readAlerts = new Set(JSON.parse(saved));
+        }
+        
+        let congestionData = {};
+        
+        // Try to get congestion data from live map
+        try {
+            const response = await fetch('/api/live-map/directions/v2');
+            congestionData = await response.json();
+        } catch (e) {
+            congestionData = { northbound: {}, southbound: {} };
+        }
+        
+        const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
+        
+        let allAlerts = [];
+        const currentHour = new Date().getHours();
+        const nowDate = new Date();
+        const hour = currentHour;
+        
+        // Rush Hour Alert
+        if ((hour >= 7 && hour <= 9)) {
+            allAlerts.push({ id: 'rush-morning-permanent' });
+        } else if ((hour >= 17 && hour <= 19)) {
+            allAlerts.push({ id: 'rush-evening-permanent' });
+        }
+        
+        // Advisory Alerts
+        if (hour >= 0 && hour < 5) {
+            allAlerts.push({ id: 'advisory-early-morning-permanent' });
+        } else if (hour >= 5 && hour < 7) {
+            allAlerts.push({ id: 'advisory-pre-rush-permanent' });
+        } else if (hour >= 10 && hour < 16) {
+            allAlerts.push({ id: 'advisory-midday-permanent' });
+        } else if (hour >= 20 && hour < 22.5) {
+            allAlerts.push({ id: 'advisory-late-evening-permanent' });
+        } else if (hour >= 22.5 || hour === 23) {
+            allAlerts.push({ id: 'advisory-service-ended-permanent' });
+        }
+        
+        // Congestion Advisory
+        if (hour >= 21 || hour < 5) {
+            allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
+        } else if (hour >= 14 && hour < 17) {
+            allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
+        }
+        
+        // Service Notices
+        const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
+        if (isWeekend) {
+            allAlerts.push({ id: 'service-weekend-permanent' });
+        }
+        if (hour >= 23 || hour <= 3) {
+            allAlerts.push({ id: 'service-maintenance-night-permanent' });
+        }
+        
+        // Congestion alerts from V2
+        if (congestionData && congestionData.northbound && congestionData.southbound) {
+            for (const station of STATIONS) {
+                const northData = congestionData.northbound[station];
+                const southData = congestionData.southbound[station];
+                
+                if (northData && northData.congestion > 0) {
+                    allAlerts.push({ id: `congestion-${station}-northbound` });
+                }
+                if (southData && southData.congestion > 0) {
+                    allAlerts.push({ id: `congestion-${station}-southbound` });
+                }
+            }
+        }
+        
+        // Broadcasts
+        try {
+            const broadcastResponse = await fetch('/api/broadcasts/public');
+            const broadcastData = await broadcastResponse.json();
+            if (broadcastData.success && broadcastData.broadcasts) {
+                broadcastData.broadcasts.forEach(b => {
+                    allAlerts.push({ id: `broadcast-${b.id}` });
+                });
+            }
+        } catch (e) {
+            console.log('Could not fetch broadcasts:', e);
+        }
+        
+        // Count unread alerts
+        let unreadCount = 0;
+        for (const alert of allAlerts) {
+            if (!readAlerts.has(alert.id)) {
+                unreadCount++;
+            }
+        }
+        
+        cachedAlertCount = unreadCount;
+        cachedAlertCountTime = now;
+        
+        return unreadCount;
+        
     } catch (error) {
-        console.error('Error fetching alert count:', error);
+        console.error('Error calculating alert count:', error);
         return 0;
     }
 }
-
 function updateAlertBadgeUI(count) {
     const badge = document.getElementById('alertBadge');
     const sidebarBadge = document.getElementById('sidebarAlertCount');
+    const mobileBadge = document.getElementById('mobileAlertBadge');
     
-    const displayValue = count > 9 ? '9+' : count;
+    // Bell badge: Show 9+ for counts > 9
+    const bellDisplayValue = count > 9 ? '9+' : count;
     
     if (badge) {
         if (count > 0) {
-            badge.textContent = displayValue;
+            badge.textContent = bellDisplayValue;
+            badge.style.backgroundColor = 'var(--red)';
             badge.style.display = 'flex';
         } else {
             badge.textContent = '0';
+            badge.style.backgroundColor = '#94A3B8';
             badge.style.display = 'flex';
         }
     }
     
+    // Sidebar badge: Show actual number (no truncation)
     if (sidebarBadge) {
-        if (count > 0) {
+        if (count > 0) { 
             sidebarBadge.textContent = count;
-            sidebarBadge.style.display = 'block';
-        } else {
-            sidebarBadge.style.display = 'none';
+            sidebarBadge.style.display = 'block'; 
+        } else { 
+            sidebarBadge.style.display = 'none'; 
         }
     }
     
-    syncMobileAlertBadge();
+    // Mobile badge: Show 9+ for counts > 9
+    if (mobileBadge) {
+        if (count > 0) {
+            const mobileDisplay = count > 9 ? '9+' : count;
+            mobileBadge.textContent = mobileDisplay;
+            mobileBadge.style.display = 'flex';
+        } else {
+            mobileBadge.style.display = 'none';
+        }
+    }
 }
 
 // ========== RUSH HOUR ALERT ==========
@@ -2354,7 +3023,7 @@ function updateRushAlert() {
         rushAlert.style.display = 'flex';
         const alertMessage = document.getElementById('alertMessage');
         if (alertMessage) {
-            alertMessage.innerHTML = `<strong>RUSH HOUR NOW</strong> · Expect delays of 10-20 minutes`;
+            alertMessage.innerHTML = `<strong>RUSH HOUR NOW</strong> · Expect delays of 10-50 minutes delay`;
         }
     } else {
         rushAlert.style.display = 'none';
@@ -2376,13 +3045,308 @@ async function updateAllUI() {
     updateBestTimeUI(data);
     updateTrainScheduleUI(data.scheduleData);
     
-    if (data.alertData) {
-        updateAlertBadgeUI(data.alertData.count || 0);
-    } else {
-        const count = await fetchAlertCount();
-        updateAlertBadgeUI(count);
+    // ========== FIX: Always use fetchAlertCount for consistency ==========
+    const count = await fetchAlertCount();
+    updateAlertBadgeUI(count);
+}
+
+// ========== LOCATION FUNCTIONS ==========
+
+// Check if location was previously granted
+function checkLocationPermission() {
+    // Check if already granted
+    if (localStorage.getItem('locationGranted') === 'true') {
+        // Try to get location silently
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { station } = findNearestStation(position.coords.latitude, position.coords.longitude);
+                    localStorage.setItem('nearestStation', station);
+                    updateLocationButton('✅');
+                   
+                },
+                () => {
+                    // Silent fail - user might have revoked permission
+                    localStorage.removeItem('locationGranted');
+                }
+            );
+        }
+        return true;
+    }
+    
+    // Check if skipped
+    if (localStorage.getItem('locationSkipped') === 'true') {
+        return false;
+    }
+    
+    // Show modal
+    setTimeout(() => {
+        showLocationModal();
+    }, 1500);
+    
+    return false;
+}
+
+// Show location modal
+function showLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
     }
 }
+
+// Close location modal
+function closeLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+// Allow location
+function allowLocation() {
+    closeLocationModal();
+    
+    if (!navigator.geolocation) {
+        showLocationToast('❌ Geolocation is not supported by your browser');
+        return;
+    }
+    
+    // Show loading state
+    updateLocationButton('⏳');
+    showLocationToast('📍 Detecting your location...');
+    
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { station, distance } = findNearestStation(
+                position.coords.latitude,
+                position.coords.longitude
+            );
+            
+            // Save to localStorage
+            localStorage.setItem('locationGranted', 'true');
+            localStorage.setItem('nearestStation', station);
+            localStorage.removeItem('locationSkipped');
+            
+            let distanceText = distance < 1 
+                ? `${(distance * 1000).toFixed(0)} meters` 
+                : `${distance.toFixed(1)} km`;
+            
+            // Update UI
+            updateLocationButton('📍');
+            showLocationToast(`📍 Nearest station: ${station} (${distanceText})`);
+            
+            // Change to nearest station
+            changeStation(station);
+            
+            // Update location banner
+            const banner = document.getElementById('locationBanner');
+            if (banner) {
+                banner.style.display = 'block';
+                const text = document.getElementById('nearestStationText');
+                if (text) {
+                    text.innerHTML = `<strong>${station}</strong> (${distanceText} away)`;
+                }
+            }
+        },
+        (error) => {
+            console.error('Location error:', error);
+            localStorage.removeItem('locationGranted');
+            
+            let errorMsg = 'Could not detect location';
+            if (error.code === 1) errorMsg = 'Location permission denied';
+            else if (error.code === 2) errorMsg = 'Location unavailable';
+            else if (error.code === 3) errorMsg = 'Location request timed out';
+            
+            showLocationToast(`❌ ${errorMsg}`);
+            updateLocationButton('❌');
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+        }
+    );
+}
+
+// Skip location
+function skipLocationModal() {
+    closeLocationModal();
+    localStorage.setItem('locationSkipped', 'true');
+    localStorage.removeItem('locationGranted');
+    updateLocationButton('⏭️');
+    showLocationToast('Location skipped. You can enable it later.');
+}
+
+// Manual location request (from header button)
+function requestLocation() {
+    // If already granted, try to get location again
+    if (localStorage.getItem('locationGranted') === 'true') {
+        allowLocation();
+        return;
+    }
+    
+    // If skipped, show modal again
+    if (localStorage.getItem('locationSkipped') === 'true') {
+        localStorage.removeItem('locationSkipped');
+        showLocationModal();
+        return;
+    }
+    
+    // Otherwise show modal
+    showLocationModal();
+}
+
+// Show location toast notification
+function showLocationToast(message) {
+    const toast = document.getElementById('locationToast');
+    const messageEl = document.getElementById('locationToastMessage');
+    
+    if (toast && messageEl) {
+        messageEl.textContent = message;
+        toast.style.display = 'flex';
+        
+        // Auto-hide after 5 seconds
+        clearTimeout(window.locationToastTimeout);
+        window.locationToastTimeout = setTimeout(() => {
+            toast.style.display = 'none';
+        }, 5000);
+    }
+}
+
+// Update location button icon
+function updateLocationButton(status) {
+    const icon = document.getElementById('locationIcon');
+    const badge = document.getElementById('locationBadge');
+    
+    if (icon) {
+        // Keep the same icon but change color/style
+        if (status === '✅' || status === '📍') {
+            icon.style.color = '#22C55E';
+        } else if (status === '⏳') {
+            icon.style.color = '#F59E0B';
+        } else if (status === '❌' || status === '⏭️') {
+            icon.style.color = '#94A3B8';
+        }
+    }
+    
+    if (badge) {
+        if (status === '📍' || status === '✅') {
+            badge.textContent = '✓';
+            badge.style.display = 'flex';
+            badge.style.background = '#22C55E';
+        } else if (status === '⏳') {
+            badge.textContent = '...';
+            badge.style.display = 'flex';
+            badge.style.background = '#F59E0B';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+// Find nearest station (uses coordinates from earlier)
+function findNearestStation(userLat, userLng) {
+    let nearestStation = null;
+    let shortestDistance = Infinity;
+    
+    for (const [station, coords] of Object.entries(stationCoordinates)) {
+        const distance = calculateDistance(userLat, userLng, coords.lat, coords.lng);
+        if (distance < shortestDistance) {
+            shortestDistance = distance;
+            nearestStation = station;
+        }
+    }
+    
+    return { station: nearestStation, distance: shortestDistance };
+}
+
+// ========== SINGLE INITIALIZATION - FIXED ==========
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log(' Page loaded, initializing dashboard...');
+    console.log(' Cache duration: ' + CACHE_DURATION/60000 + ' minutes');
+    
+    // ========== FIX: Check if user is operator ==========
+    const userRole = '{{ session.get("role", "commuter") }}';
+    const isOperator = (userRole === 'operator' || userRole === 'admin');
+    
+    // For operators/admins, always use North Ave (ignore saved location)
+    if (isOperator) {
+        console.log('👤 Operator/Admin detected - forcing North Ave');
+        currentStation = 'North Ave';
+        // Clear any saved location for operators
+        localStorage.removeItem('nearestStation');
+    } else {
+        // For commuters, check location permission and saved station
+        const hasLocation = checkLocationPermission();
+        
+        // Check for saved station from localStorage
+        const savedStation = localStorage.getItem('nearestStation');
+        if (savedStation && hasLocation) {
+            currentStation = savedStation;
+            console.log('📍 Using saved station:', currentStation);
+        } else {
+            // Default to favorite_station from server
+            const defaultStation = '{{ favorite_station if favorite_station else "North Ave" }}';
+            currentStation = defaultStation;
+        }
+    }
+    
+    // ========== UPDATE ALL UI ELEMENTS ==========
+    // Set dropdown values
+    const forecastSelector = document.getElementById('forecastStationSelect');
+    if (forecastSelector) {
+        forecastSelector.value = currentStation;
+        // Force the dropdown to show the correct station
+        if (forecastSelector.value !== currentStation) {
+            // Find and select the correct option
+            const options = forecastSelector.querySelectorAll('option');
+            options.forEach(opt => {
+                if (opt.value === currentStation) {
+                    opt.selected = true;
+                }
+            });
+        }
+    }
+    
+    // Set station names
+    const bestStationName = document.getElementById('bestStationName');
+    if (bestStationName) {
+        bestStationName.innerHTML = `<i class="far fa-clock" style="padding-right:5px;"></i>${currentStation}`;
+    }
+    
+    const mainStationName = document.getElementById('mainStationName');
+    if (mainStationName) {
+        mainStationName.textContent = currentStation;
+    }
+    
+    // Update chart title
+    const chartTitleElements = document.querySelectorAll('.chartTitle');
+    chartTitleElements.forEach(el => {
+        if (el) el.textContent = currentStation.toUpperCase() + ': NEXT 6 HOURS';
+    });
+    
+    // Check if the dropdown actually has the station we want
+    if (forecastSelector) {
+        const hasOption = Array.from(forecastSelector.options).some(opt => opt.value === currentStation);
+        if (!hasOption && currentStation !== 'North Ave') {
+            console.warn('⚠️ Station not in dropdown, falling back to North Ave');
+            currentStation = 'North Ave';
+            forecastSelector.value = 'North Ave';
+            // Update names again
+            if (bestStationName) bestStationName.innerHTML = `<i class="far fa-clock" style="padding-right:5px;"></i>North Ave`;
+            if (mainStationName) mainStationName.textContent = 'North Ave';
+        }
+    }
+    
+    // Initial data load
+    await updateAllUI();
+    startAutoRefresh();
+    updateRushAlert();
+    updateLastUpdatedTime();
+});
 
 // ========== STATION CHANGE ==========
 const debouncedStationChange = debounce((station) => {
@@ -2453,7 +3417,7 @@ function requestLocationPermission() {
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const { station, distance } = findNearestStation(position.coords.latitude, position.coords.longitude);
-            sessionStorage.setItem('nearestStation', station);
+            localStorage.setItem('nearestStation', station);
             let distanceText = distance < 1 ? `${(distance * 1000).toFixed(0)} meters` : `${distance.toFixed(1)} km`;
             if (nearestStationText) {
                 nearestStationText.innerHTML = `<strong>${station}</strong> (${distanceText} away)`;
@@ -2471,7 +3435,7 @@ function requestLocationPermission() {
 }
 
 function useNearestStation() {
-    const nearest = sessionStorage.getItem('nearestStation');
+    const nearest = localStorage.getItem('nearestStation');
     if (nearest) {
         changeStation(nearest);
         dismissLocationBanner();
@@ -2481,7 +3445,7 @@ function useNearestStation() {
 function dismissLocationBanner() {
     const banner = document.getElementById('locationBanner');
     if (banner) banner.style.display = 'none';
-    sessionStorage.setItem('locationBannerDismissed', 'true');
+    localStorage.setItem('locationBannerDismissed', 'true');
 }
 
 // ========== AUTO REFRESH ==========
@@ -2504,31 +3468,7 @@ function startAutoRefresh() {
 }
 
 // ========== INITIALIZATION ==========
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('✅ Page loaded, initializing dashboard...');
-    console.log('📦 Cache duration: ' + CACHE_DURATION/60000 + ' minutes');
-    
-    // Set dropdown values
-    const forecastSelector = document.getElementById('forecastStationSelect');
-    if (forecastSelector) forecastSelector.value = currentStation;
-    
-    // Set station names
-    const bestStationName = document.getElementById('bestStationName');
-    if (bestStationName) {
-        bestStationName.innerHTML = `<i class="far fa-clock" style="padding-right:5px;"></i>${currentStation}`;
-    }
-    
-    const mainStationName = document.getElementById('mainStationName');
-    if (mainStationName) mainStationName.textContent = currentStation;
-    
-    // Initial data load
-    updateAllUI();
-    startAutoRefresh();
-    updateRushAlert();
-    
-    // Update last updated time
-    updateLastUpdatedTime();
-});
+
 
 // Make functions global for onclick handlers
 window.setDirection = setDirection;

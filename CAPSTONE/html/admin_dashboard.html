@@ -243,7 +243,18 @@
         background: #DCFCE7;
         color: #166534;
     }
-
+    
+    .status-closed {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 30px;
+        font-size: 12px;
+        font-weight: 600;
+        background: #e4e4e4;
+        color: #414141;
+    }
     .status-severe {
         display: inline-flex;
         align-items: center;
@@ -253,9 +264,10 @@
         font-size: 12px;
         font-weight: 600;
         background: #FEE2E2;
-        color: #DC2626;
+        color: #991B1B;
     }
-
+    
+   
     .status-congested {
         display: inline-flex;
         align-items: center;
@@ -295,14 +307,20 @@
 
         .nav-item i { width: 20px; font-size: 18px; }
 
-        .user-profile { 
-            margin-top: auto; 
-            padding: 20px 24px; 
-            border-top: 1px solid rgba(255, 255, 255, 0.1); 
-            display: flex; 
-            align-items: center; 
-            gap: 12px; 
-        }
+       .user-profile { 
+    margin-top: auto; 
+    padding: 15px 25px; 
+    border-top: 1px solid rgba(255, 255, 255, 0.1); 
+    display: flex; 
+    align-items: center; 
+    gap: 12px; 
+    cursor: pointer; /* Add this line */
+    transition: background-color 0.2s; /* Add this line */
+}
+
+.user-profile:hover {
+    background-color: rgba(255, 255, 255, 0.05); /* Add this line - hover effect */
+}
 
         .user-avatar { 
             width: 40px; 
@@ -1276,13 +1294,15 @@
         <div class="nav-item" onclick="showPage('audit', this)"><i class="fas fa-history"></i><span>Audit Log</span></div>
         <div class="nav-item" onclick="showPage('model-performance', this)"><i class="fas fa-chart-line"></i><span>Model Performance</span></div>
     </nav>
-    <div class="user-profile">
+    <div class="user-profile" onclick="showProfile()" style="cursor: pointer;">
         <div class="user-avatar" id="userAvatar">AD</div>
-        <div class="user-info"><div class="user-name" id="adminName">Admin</div><div class="user-role">System Administrator</div></div>
+        <div class="user-info">
+            <div class="user-name" id="adminName">Admin</div>
+            <div class="user-role">System Administrator</div>
+        </div>
     </div>
-    <a href="/logout" style="text-decoration: none;"><button class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button></a>
+    <button class="logout-btn" onclick="window.location.href='/logout'"><i class="fas fa-sign-out-alt"></i> Logout</button>
 </div>
-
 <div class="main-content">
     <div class="topbar">
         <div class="page-title" id="pageTitle">Analytics Dashboard</div>
@@ -1614,6 +1634,11 @@ function showToast(icon, msg) {
     setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
+function showProfile() {
+    // Navigate to profile page
+    window.location.href = '/profile.html';
+}
+
 function updateDate() {
     document.getElementById('currentDate').innerText = new Date().toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -1645,10 +1670,20 @@ function getStatusClass(congestion) {
 }
 
 function getStatusText(congestion) {
+    const OPERATING_START = 4.5;
+    const OPERATING_END = 22.5;
+    const now = new Date();
+    const hour = now.getHours() + (now.getMinutes() / 60);
+
+
     if (congestion > 80) return 'SEVERE';
     if (congestion > 60) return 'CONGESTED';
     if (congestion > 30) return 'MODERATE';
+    if (hour < OPERATING_START || hour > OPERATING_END) {
+        return 'CLOSED'; // Gray color for closed hours
+    }
     return 'LIGHT';
+
 }
 
 // ========== MODEL PERFORMANCE – TABLE HEADERS ==========
@@ -2276,7 +2311,13 @@ async function loadStationStatus() {
     const tbody = document.getElementById('stationStatusBody');
     tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Loading...</td></tr>';
     try {
-        const now = Date.now();
+       const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
+
+        const now = new Date();
+        // Hint: .getHours() returns whole integers (0-23). 
+        // Since your constants use decimals (.5), converting time to a float helps!
+        const hour = now.getHours() + (now.getMinutes() / 60);
         if (!cachedStationData || (now - lastFetchTime) > CACHE_DURATION) {
             // ========== USE THE SAME API AS LIVE MAP ==========
             const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
@@ -2288,8 +2329,11 @@ async function loadStationStatus() {
             
             // Convert live map data format to station list format
             const stations = Object.keys(data.northbound).map(station => {
+
+                
                 const northData = data.northbound[station] || { congestion: 0, status: 'LIGHT' };
                 const southData = data.southbound[station] || { congestion: 0, status: 'LIGHT' };
+                
                 
                 return {
                     name: station,
@@ -2360,8 +2404,8 @@ async function loadStationStatus() {
             } else if (s.status_text === 'MODERATE' || s.status_text === 'Moderate') {
                 statusClass = 'status-moderate';
                 displayText = 'MODERATE';
-            } else if (s.status_text === 'CLOSED') {
-                statusClass = 'status-light';
+            } else if (hour < OPERATING_START || hour > OPERATING_END) {
+                statusClass = 'status-closed';
                 displayText = 'CLOSED';
             } else {
                 statusClass = 'status-light';
@@ -2827,7 +2871,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const response = await fetch(`/api/admin/deactivate-operator/${currentOperatorToDeactivate.id}`, { method: 'POST' });
                     const data = await response.json();
                     if (data.success) {
-                        showToast('✅', `Operator ${currentOperatorToDeactivate.name} deactivated`);
+                        showToast('', `Operator ${currentOperatorToDeactivate.name} deactivated`);
                         loadOperators();
                         closeDeactivateModal();
                     } else { showToast('❌', data.error || 'Failed to deactivate'); }
