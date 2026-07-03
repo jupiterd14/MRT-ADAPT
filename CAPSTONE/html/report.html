@@ -301,25 +301,7 @@ nav {
             cursor: pointer;
         }
 
-        @media (min-width: 1024px) {
-    .report-card {
-        min-height: 260px;
-        padding: 40px 20px;
-        gap: 20px;
-    }
-    
-    .report-card i {
-        font-size: 56px;
-    }
-    
-    .report-card h3 {
-        font-size: 24px;
-    }
-    
-    .report-card p {
-        font-size: 14px;
-    }
-}
+     
 
 /* For very large desktops (1440px+) */
 @media (min-width: 1440px) {
@@ -342,41 +324,44 @@ nav {
     }
 }
 
-      .report-grid {
+   .report-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
-    margin-bottom: 30px;
+    gap: 16px;
+    margin-bottom: 24px;
+    max-width: 100%;
 }
 
-  .report-card {
+.report-card {
     background: white;
-    border-radius: 20px;
-    padding: 30px 20px;
+    border-radius: 8px;
+    padding: 12px 12px !important;
     text-align: center;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.15s ease;
     border: 2px solid var(--border);
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;  /* Added to center content vertically */
-    gap: 15px;
-    min-height: 220px;  /* Increased from 160px to 220px */
-    height: auto;  /* Allow natural height */
+    justify-content: center;
+    gap: 1px;
+    min-height: 200px !important;
+    height: auto;
+    max-height: 100px !important;
+    overflow: hidden;
 }
 
 
 
 
 
-       .report-card i { 
-    font-size: 44px;  /* Increased from 36px */
-    margin-bottom: 6px;
+.report-card i { 
+    font-size: 30px !important;
+    margin-bottom: 20px;
 }
         
         .report-card h3 { 
-            font-size: 18px; 
+            font-size: 24px !important; 
             font-weight: 700; 
             margin-bottom: 2px;
         }
@@ -386,47 +371,6 @@ nav {
             color: var(--text-light);
             line-height: 1.4;
         }
-
-        @media (min-width: 1024px) {
-    .report-card {
-        min-height: 260px;
-        padding: 40px 20px;
-        gap: 20px;
-    }
-    
-    .report-card i {
-        font-size: 56px;
-    }
-    
-    .report-card h3 {
-        font-size: 24px;
-    }
-    
-    .report-card p {
-        font-size: 14px;
-    }
-}
-
-/* For very large desktops (1440px+) */
-@media (min-width: 1440px) {
-    .report-card {
-        min-height: 300px;
-        padding: 50px 30px;
-        gap: 24px;
-    }
-    
-    .report-card i {
-        font-size: 64px;
-    }
-    
-    .report-card h3 {
-        font-size: 28px;
-    }
-    
-    .report-card p {
-        font-size: 15px;
-    }
-}
 
         .card-low { border-color: var(--green); }
         .card-low i, .card-low h3 { color: var(--green); }
@@ -1161,6 +1105,12 @@ nav {
         padding: 10px 14px;
         font-size: 13px;
     }
+
+    .report-textarea {
+    /* Add these lines */
+    color: var(--text-dark) !important;
+    caret-color: var(--accent-blue) !important;
+}
     
     /* Adjust report grid - 2 columns but smaller */
     .report-grid {
@@ -1917,6 +1867,7 @@ nav {
     let selectedFiles = [];
     let reportsVisible = false;
     let allReportsData = [];
+    
     let activeFilters = {
         dateRange: null,
         congestionLevels: [],
@@ -1939,6 +1890,27 @@ nav {
     let cachedCongestionTime = 0;
     const ALERT_CACHE_DURATION = 60000; // 60 seconds cache
     const CONGESTION_CACHE_DURATION = 120000; // 2 minutes for congestion data
+
+
+    sessionStorage.removeItem('alertCount');
+console.log('🗑️ Cleared alert count cache');
+
+    function selectLevel(level) {
+    // Remove selected class from all cards
+    document.querySelectorAll('.report-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Add selected class to the clicked card
+    const cardId = `card-${level}`;
+    const card = document.getElementById(cardId);
+    if (card) {
+        card.classList.add('selected');
+    }
+    
+    // Store the selected level
+    selectedLevel = level;
+}
 
     // ========== OPERATING HOURS ==========
     function isOperatingHours() {
@@ -1983,133 +1955,149 @@ nav {
         }
     }
 
-    // ========== FETCH ALERT COUNT WITH CACHING ==========
     async function fetchAlertCount() {
-        const now = Date.now();
-        
-        // Use cached alert count if still valid
-        if (cachedAlertCount !== null && (now - cachedAlertCountTime) < ALERT_CACHE_DURATION) {
-            console.log('📦 Using cached alert count:', cachedAlertCount);
-            return cachedAlertCount;
-        }
-        
-        try {
-            // Get read status from localStorage
-            let readAlerts = new Set();
-            const saved = localStorage.getItem('readAlerts');
-            if (saved) {
-                readAlerts = new Set(JSON.parse(saved));
-            }
-            
-            // Calculate base alerts (time-based, no API calls)
-            let allAlerts = [];
-            
-            const nowDate = new Date();
-            const hour = nowDate.getHours();
-            
-            // 1. Rush Hour Alert
-            if ((hour >= 7 && hour <= 9)) {
-                allAlerts.push({ id: 'rush-morning-permanent' });
-            } else if ((hour >= 17 && hour <= 19)) {
-                allAlerts.push({ id: 'rush-evening-permanent' });
-            }
-            
-            // 2. Advisory Alert
-            if (hour >= 0 && hour < 5) {
-                allAlerts.push({ id: 'advisory-early-morning-permanent' });
-            } else if (hour >= 5 && hour < 7) {
-                allAlerts.push({ id: 'advisory-pre-rush-permanent' });
-            } else if (hour >= 10 && hour < 16) {
-                allAlerts.push({ id: 'advisory-midday-permanent' });
-            } else if (hour >= 20 && hour < 22.5) {
-                allAlerts.push({ id: 'advisory-late-evening-permanent' });
-            } else if (hour >= 22.5 || hour === 23) {
-                allAlerts.push({ id: 'advisory-service-ended-permanent' });
-            }
-            
-            // 3. Congestion Advisory
-            if (hour >= 21 || hour < 5) {
-                allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
-            } else if (hour >= 14 && hour < 17) {
-                allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
-            }
-            
-            // 4. Service Notices
-            const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
-            if (isWeekend) {
-                allAlerts.push({ id: 'service-weekend-permanent' });
-            }
-            if (hour >= 23 || hour <= 3) {
-                allAlerts.push({ id: 'service-maintenance-night-permanent' });
-            }
-            
-            // 5. Congestion alerts - fetch from API (with caching)
-            if (!cachedCongestionData || (now - cachedCongestionTime) > CONGESTION_CACHE_DURATION) {
-                try {
-                    const response = await fetch('/api/live-map/directions/v2');
-                    cachedCongestionData = await response.json();
-                    cachedCongestionTime = now;
-                    console.log('🔄 Fetched fresh congestion data');
-                } catch (e) {
-                    console.log('Could not fetch congestion alerts:', e);
-                    cachedCongestionData = { northbound: {}, southbound: {} };
-                }
-            } else {
-                console.log('📦 Using cached congestion data');
-            }
-            
-            // Add congestion alerts from cached data
-            const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-                "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-                "Ayala Ave", "Magallanes", "Taft"];
-            
-            if (cachedCongestionData && cachedCongestionData.northbound && cachedCongestionData.southbound) {
-                for (const station of STATIONS) {
-                    const northData = cachedCongestionData.northbound[station];
-                    const southData = cachedCongestionData.southbound[station];
-                    
-                    if (northData && northData.congestion > 0) {
-                        allAlerts.push({ id: `congestion-${station}-northbound` });
-                    }
-                    if (southData && southData.congestion > 0) {
-                        allAlerts.push({ id: `congestion-${station}-southbound` });
-                    }
-                }
-            }
-            
-            // 6. Broadcasts
-            try {
-                const broadcastResponse = await fetch('/api/broadcasts/public');
-                const broadcastData = await broadcastResponse.json();
-                if (broadcastData.success && broadcastData.broadcasts) {
-                    broadcastData.broadcasts.forEach(b => {
-                        allAlerts.push({ id: `broadcast-${b.id}` });
-                    });
-                }
-            } catch (e) {
-                console.log('Could not fetch broadcasts:', e);
-            }
-            
-            // Count unread alerts
-            let unreadCount = 0;
-            for (const alert of allAlerts) {
-                if (!readAlerts.has(alert.id)) {
-                    unreadCount++;
-                }
-            }
-            
-            // Cache the result
-            cachedAlertCount = unreadCount;
-            cachedAlertCountTime = now;
-            
-            console.log('Report page unread alert count:', unreadCount);
-            return unreadCount;
-            
-        } catch (error) {
-            console.error('Error calculating alert count:', error);
-            return 0;
-        }
+    const now = Date.now();
+    
+    // Use cached alert count if still valid
+    if (cachedAlertCount !== null && (now - cachedAlertCountTime) < ALERT_CACHE_DURATION) {
+        console.log('📦 Using cached alert count:', cachedAlertCount);
+        return cachedAlertCount;
     }
+    
+    try {
+        // Get read status from localStorage
+        let readAlerts = new Set();
+        const saved = localStorage.getItem('readAlerts');
+        if (saved) {
+            readAlerts = new Set(JSON.parse(saved));
+        }
+        
+        let allAlerts = [];
+        const nowDate = new Date();
+        const hour = nowDate.getHours();
+        
+        // ========== 1. Rush Hour Alert ==========
+        if ((hour >= 7 && hour <= 9)) {
+            allAlerts.push({ id: 'rush-morning-permanent' });
+        } else if ((hour >= 17 && hour <= 19)) {
+            allAlerts.push({ id: 'rush-evening-permanent' });
+        }
+        
+        // ========== 2. Advisory Alert ==========
+        if (hour >= 0 && hour < 5) {
+            allAlerts.push({ id: 'advisory-early-morning-permanent' });
+        } else if (hour >= 5 && hour < 7) {
+            allAlerts.push({ id: 'advisory-pre-rush-permanent' });
+        } else if (hour >= 10 && hour < 16) {
+            allAlerts.push({ id: 'advisory-midday-permanent' });
+        } else if (hour >= 20 && hour < 22.5) {
+            allAlerts.push({ id: 'advisory-late-evening-permanent' });
+        } else if (hour >= 22.5 || hour === 23) {
+            allAlerts.push({ id: 'advisory-service-ended-permanent' });
+        }
+        
+        // ========== 3. Congestion Advisory ==========
+        if (hour >= 21 || hour < 5) {
+            allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
+        } else if (hour >= 14 && hour < 17) {
+            allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
+        }
+        
+        // ========== 4. Service Notices ==========
+        const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
+        if (isWeekend) {
+            allAlerts.push({ id: 'service-weekend-permanent' });
+        }
+        if (hour >= 23 || hour <= 3) {
+            allAlerts.push({ id: 'service-maintenance-night-permanent' });
+        }
+        
+        // ========== 5. Congestion alerts from live map (GROUPED) ==========
+        try {
+            const response = await fetch('/api/live-map/directions/v2');
+            const data = await response.json();
+            
+            if (data && data.northbound && data.southbound) {
+                // Group stations by severity
+                const grouped = {
+                    northbound: { severe: [], congested: [], moderate: [], light: [] },
+                    southbound: { severe: [], congested: [], moderate: [], light: [] }
+                };
+                
+                // Process northbound
+                for (const [station, stationData] of Object.entries(data.northbound)) {
+                    const congestion = stationData.congestion || 0;
+                    if (congestion > 80) grouped.northbound.severe.push(station);
+                    else if (congestion > 60) grouped.northbound.congested.push(station);
+                    else if (congestion > 30) grouped.northbound.moderate.push(station);
+                    else if (congestion > 0) grouped.northbound.light.push(station);
+                }
+                
+                // Process southbound
+                for (const [station, stationData] of Object.entries(data.southbound)) {
+                    const congestion = stationData.congestion || 0;
+                    if (congestion > 80) grouped.southbound.severe.push(station);
+                    else if (congestion > 60) grouped.southbound.congested.push(station);
+                    else if (congestion > 30) grouped.southbound.moderate.push(station);
+                    else if (congestion > 0) grouped.southbound.light.push(station);
+                }
+                
+                // ONLY COUNT GROUPS THAT HAVE STATIONS
+                if (grouped.northbound.severe.length > 0) allAlerts.push({ id: 'north-severe-permanent' });
+                if (grouped.northbound.congested.length > 0) allAlerts.push({ id: 'north-congested-permanent' });
+                if (grouped.northbound.moderate.length > 0) allAlerts.push({ id: 'north-moderate-permanent' });
+                if (grouped.northbound.light.length > 0) allAlerts.push({ id: 'north-light-permanent' });
+                
+                if (grouped.southbound.severe.length > 0) allAlerts.push({ id: 'south-severe-permanent' });
+                if (grouped.southbound.congested.length > 0) allAlerts.push({ id: 'south-congested-permanent' });
+                if (grouped.southbound.moderate.length > 0) allAlerts.push({ id: 'south-moderate-permanent' });
+                if (grouped.southbound.light.length > 0) allAlerts.push({ id: 'south-light-permanent' });
+            }
+        } catch (e) {
+            console.log('Could not fetch congestion alerts:', e);
+        }
+        
+        // ========== 6. Broadcasts ==========
+        try {
+            const broadcastResponse = await fetch('/api/broadcasts/public');
+            const broadcastData = await broadcastResponse.json();
+            if (broadcastData.success && broadcastData.broadcasts) {
+                broadcastData.broadcasts.forEach(b => {
+                    allAlerts.push({ id: `broadcast-${b.id}` });
+                });
+            }
+        } catch (e) {
+            console.log('Could not fetch broadcasts:', e);
+        }
+        
+        // ========== ONLY COUNT CONGESTION ALERTS ==========
+        const congestionAlertIds = [
+            'north-severe-permanent', 'north-congested-permanent', 
+            'north-moderate-permanent', 'north-light-permanent',
+            'south-severe-permanent', 'south-congested-permanent',
+            'south-moderate-permanent', 'south-light-permanent'
+        ];
+        
+        let congestionCount = 0;
+        for (const alert of allAlerts) {
+            if (congestionAlertIds.includes(alert.id)) {
+                congestionCount++;
+            }
+        }
+
+        // Cache the result - ONLY congestion alerts
+        cachedAlertCount = congestionCount;
+        cachedAlertCountTime = now;
+
+        console.log('📊 Travel Plan - Congestion alerts only:', congestionCount);
+        console.log('📊 Total alerts (all types):', allAlerts.length);
+        return congestionCount;
+        
+    } catch (error) {
+        console.error('Error calculating alert count:', error);
+        return 0;
+    }
+}
 
     // ========== CHECK ALERT COUNT AND UPDATE BADGE ==========
     async function checkAlertCount() {
@@ -2672,6 +2660,9 @@ function filterAndDisplayReports() {
     }
 
   function displayReports(reports) {
+
+     reports.sort((a, b) => b.id - a.id);
+     
     const reportsList = document.getElementById('reportsList');
     
     if (!reports || reports.length === 0) {
@@ -2708,23 +2699,27 @@ function filterAndDisplayReports() {
             borderColor = '#22C55E';
         }
         
-        const reportTime = new Date(report.timestamp);
-        const now = new Date();
-        const diffMs = now - reportTime;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
-        
-        let timeAgo = '';
-        if (diffMins < 1) {
-            timeAgo = 'just now';
-        } else if (diffMins < 60) {
-            timeAgo = `${diffMins} mins ago`;
-        } else if (diffHours < 24) {
-            timeAgo = `${diffHours} hours ago`;
-        } else {
-            timeAgo = `${diffDays} days ago`;
-        }
+       const reportTime = new Date(report.timestamp);
+const now = new Date();
+const diffMs = now - reportTime;
+const diffMins = Math.floor(diffMs / 60000);
+const diffHours = Math.floor(diffMins / 60);
+const diffDays = Math.floor(diffHours / 24);
+
+let timeAgo = '';
+if (diffMins < 1) {
+    timeAgo = 'just now';
+} else if (diffMins < 60) {
+    timeAgo = `${diffMins} mins ago`;
+} else if (diffHours < 24) {
+    timeAgo = `${diffHours} hours ago`;
+} else if (diffDays < 30) {
+    timeAgo = `${diffDays} days ago`;
+} else {
+    // For older reports (30+ days), show the actual date
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    timeAgo = reportTime.toLocaleDateString('en-US', options);
+}
         
         let displayName = '';
         let avatarLetter = '?';

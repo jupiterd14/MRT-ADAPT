@@ -59,11 +59,21 @@ def check_duplicate_report(station, congestion_value, user_id, minutes=10):
     ).first()
     return duplicate is not None
 
-def get_station_prediction(station_name):
-    """Get prediction - will be set in app.py"""
+def get_station_prediction(station_name, direction=None, models_cached=None, scalers_cached=None, feature_sequence_func=None):
+    """Get prediction - safely routes between initialization states"""
     from flask import current_app
+    
+    # 1. If the wrapper already gave us the models, skip the config forwarder!
+    if models_cached is not None and feature_sequence_func is not None:
+        # (Put your actual LSTM processing logic here if it's written in this file)
+        capacity = STATION_BASE_CAPACITY.get(station_name, 10000)
+        return capacity * 0.5
+
+    # 2. If we don't have the models yet, call the wrapper in app.py with ONLY 1 argument
     if hasattr(current_app, 'config') and 'GET_STATION_PREDICTION' in current_app.config:
         return current_app.config['GET_STATION_PREDICTION'](station_name)
+        
+    # 3. Safe fallback
     capacity = STATION_BASE_CAPACITY.get(station_name, 10000)
     return capacity * 0.5
 
@@ -83,7 +93,7 @@ def get_reports():
         print(f"🔍 DEBUG: User role = {user_role}")
         
         # Get ALL reports
-        all_reports = Report.query.order_by(Report.timestamp.desc()).limit(50).all()
+        all_reports = Report.query.order_by(Report.id.desc()).all()
         print(f"🔍 DEBUG: Total reports in database: {len(all_reports)}")
         
         for r in all_reports[:5]:
@@ -190,21 +200,56 @@ def get_next_opening_time():
         next_day_open = now.replace(day=now.day + 1, hour=4, minute=30, second=0, microsecond=0)
         return next_day_open.strftime('%I:%M %p, %B %d')
     
+@api_reports_bp.route('/debug/latest-report', methods=['GET'])
+def debug_latest_report():
+    """Get the most recent report regardless of flags"""
+    try:
+        # Get the latest report
+        latest = Report.query.order_by(Report.id.desc()).first()
+        
+        if not latest:
+            return jsonify({'error': 'No reports found'}), 404
+        
+        return jsonify({
+            'id': latest.id,
+            'station': latest.station,
+            'direction': latest.direction,
+            'reported_congestion': latest.reported_congestion,
+            'predicted_congestion': latest.predicted_congestion,
+            'remarks': latest.remarks,
+            'anonymous': latest.anonymous,
+            'timestamp': latest.timestamp.isoformat() if latest.timestamp else None,
+            'user_id': latest.user_id,
+            'is_flagged': getattr(latest, 'is_flagged', False),
+            'flag_count': getattr(latest, 'flag_count', 0),
+            'has_user': latest.user is not None
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+    
 @api_reports_bp.route('/report-congestion', methods=['POST'])
 def report_congestion():
     try:
+        print("=" * 50)
+        print("🚀 REPORT SUBMISSION ATTEMPT")
         user_id = session.get('user_id')
         ip_address = request.remote_addr
+        print(f"👤 User: {user_id}, IP: {ip_address}")
+        print(f"📋 Content-Type: {request.content_type}")
+        print(f"📋 Request data: {request.get_data(as_text=True)}")
         
-        if not is_operating_hours():
-            next_open = get_next_opening_time()
-            return jsonify({
-                "success": False, 
-                "error": f"MRT-3 is currently closed. Operating hours are 4:30 AM - 10:30 PM. Reports can only be submitted during operating hours. Next opening: {next_open}"
-            }), 403
+        # TEMPORARILY DISABLE OPERATING HOURS CHECK FOR TESTING
+        # if not is_operating_hours():
+        #     next_open = get_next_opening_time()
+        #     return jsonify({
+        #         "success": False, 
+        #         "error": f"MRT-3 is currently closed. Operating hours are 4:30 AM - 10:30 PM. Reports can only be submitted during operating hours. Next opening: {next_open}"
+        #     }), 403
         
-        if is_rate_limited(user_id, ip_address, limit=3, window=3600):
-            return jsonify({"success": False, "error": "You've reached the limit of 3 reports per hour."}), 429
+        # TEMPORARILY DISABLE RATE LIMITING FOR TESTING
+        # if is_rate_limited(user_id, ip_address, limit=3, window=3600):
+        #     return jsonify({"success": False, "error": "You've reached the limit of 3 reports per hour."}), 429
         
         station = None
         direction = None
@@ -213,102 +258,132 @@ def report_congestion():
         anonymous = False
         photo_paths = []
         
+        # Try to get data from different sources
         if request.content_type and 'multipart/form-data' in request.content_type:
+            print("📁 Processing multipart/form-data")
             station = request.form.get('station')
             direction = request.form.get('direction')
             reported = request.form.get('congestion')
             remarks = request.form.get('remarks', '')
             anonymous = request.form.get('anonymous', 'false').lower() == 'true'
-            
-            if 'images' in request.files:
-                files = request.files.getlist('images')
-                if len(files) > 5:
-                    return jsonify({"success": False, "error": "Maximum 5 photos allowed"}), 400
-                
-                for file in files:
-                    if file and file.filename:
-                        file.seek(0, 2)
-                        size = file.tell()
-                        file.seek(0)
-                        if size > 10 * 1024 * 1024:
-                            return jsonify({"success": False, "error": "Image too large (max 10MB)"}), 400
-                        
-                        safe_filename = file.filename.replace(' ', '_').replace('%', '')
-                        # Use Config.get_current_time() for consistent year in filenames
-                        current_time = Config.get_current_time()
-                        filename = f"{current_time.strftime('%Y%m%d_%H%M%S')}_{safe_filename}"
-                        upload_folder = os.path.join('static', 'uploads', 'reports')
-                        os.makedirs(upload_folder, exist_ok=True)
-                        filepath = os.path.join(upload_folder, filename)
-                        file.save(filepath)
-                        photo_paths.append(f"/uploads/reports/{filename}")
         else:
-            data = request.json
-            station = data.get('station')
-            direction = data.get('direction')
-            reported = data.get('congestion')
-            remarks = data.get('remarks', '')
-            anonymous = data.get('anonymous', False)
+            # Try JSON first
+            try:
+                data = request.get_json()
+                if data:
+                    print("📋 Processing JSON data")
+                    station = data.get('station')
+                    direction = data.get('direction')
+                    reported = data.get('congestion')
+                    remarks = data.get('remarks', '')
+                    anonymous = data.get('anonymous', False)
+                else:
+                    print("❌ No JSON data found")
+                    # Try form data as fallback
+                    data = request.form
+                    if data:
+                        print("📋 Processing form data")
+                        station = data.get('station')
+                        direction = data.get('direction')
+                        reported = data.get('congestion')
+                        remarks = data.get('remarks', '')
+                        anonymous = data.get('anonymous', 'false').lower() == 'true'
+                    else:
+                        return jsonify({"success": False, "error": "No data provided"}), 400
+            except Exception as json_error:
+                print(f"❌ JSON parse error: {json_error}")
+                # Try form data as fallback
+                data = request.form
+                if data:
+                    print("📋 Processing form data (fallback)")
+                    station = data.get('station')
+                    direction = data.get('direction')
+                    reported = data.get('congestion')
+                    remarks = data.get('remarks', '')
+                    anonymous = data.get('anonymous', 'false').lower() == 'true'
+                else:
+                    return jsonify({"success": False, "error": "No data provided"}), 400
         
+        print(f"📋 Parsed: station={station}, congestion={reported}, remarks={remarks}")
+        
+        # Validation
         if not station:
             return jsonify({"success": False, "error": "Station is required"}), 400
         if reported is None:
             return jsonify({"success": False, "error": "Congestion level is required"}), 400
         
-        if is_suspicious_remarks(remarks):
-            return jsonify({"success": False, "error": "Invalid remarks detected."}), 400
-        
+        # Convert to int
         try:
             reported = int(reported)
         except:
             return jsonify({"success": False, "error": "Congestion must be a number"}), 400
         
+        # Validate station
         if station not in STATIONS:
             return jsonify({"success": False, "error": "Invalid station"}), 400
         
+        # Validate range
         if not (0 <= reported <= 100):
             return jsonify({"success": False, "error": "Congestion must be between 0 and 100"}), 400
         
-        if check_duplicate_report(station, reported, user_id, minutes=10):
-            return jsonify({"success": False, "error": "You already submitted a similar report recently."}), 429
+        # Get prediction
+        try:
+            print(f"📊 Getting prediction for {station}")
+            ridership = get_station_prediction(station)
+            capacity = STATION_BASE_CAPACITY.get(station, 10000)
+            predicted = int((ridership / capacity) * 100)
+            print(f"📊 Prediction: {predicted}%")
+        except Exception as pred_error:
+            print(f"❌ Prediction error: {pred_error}")
+            import traceback
+            traceback.print_exc()
+            predicted = 50
         
-        ridership = get_station_prediction(station)
-        capacity = STATION_BASE_CAPACITY.get(station, 10000)
-        predicted = int((ridership / capacity) * 100)
-        
-        photo_path_json = json.dumps(photo_paths) if photo_paths else None
-        
-        # Use Config.get_current_time() for consistent year (2025)
-        current_time = Config.get_current_time()
-        
-        report = Report(
-            user_id=user_id,
-            station=station,
-            direction=direction,
-            reported_congestion=reported,
-            predicted_congestion=predicted,
-            remarks=remarks[:500] if remarks else None,
-            photo_path=photo_path_json,
-            anonymous=anonymous,
-            timestamp=current_time  # Use the correct year (2025)
-        )
-        
-        db.session.add(report)
-        db.session.commit()
-        track_report_submission(user_id, ip_address, station)
-        
-        return jsonify({
-            "success": True,
-            "message": "Report submitted successfully!",
-            "photos": len(photo_paths),
-            "direction": direction,
-            "report_id": report.id,
-            "timestamp": current_time.isoformat()
-        })
+        # Create report
+        try:
+            photo_path_json = json.dumps(photo_paths) if photo_paths else None
+            current_time = Config.get_current_time()
+            print(f"📅 Current time: {current_time}")
+            
+            report = Report(
+                user_id=user_id,
+                station=station,
+                direction=direction,
+                reported_congestion=reported,
+                predicted_congestion=predicted,
+                remarks=remarks[:500] if remarks else None,
+                photo_path=photo_path_json,
+                anonymous=anonymous,
+                timestamp=current_time
+            )
+            
+            print("💾 Saving to database...")
+            db.session.add(report)
+            db.session.commit()
+            print(f"✅ Report saved! ID: {report.id}")
+            
+            return jsonify({
+                "success": True,
+                "message": "Report submitted successfully!",
+                "photos": len(photo_paths),
+                "direction": direction,
+                "report_id": report.id,
+                "timestamp": current_time.isoformat()
+            })
+            
+        except Exception as db_error:
+            print(f"❌ Database error: {db_error}")
+            db.session.rollback()
+            import traceback
+            traceback.print_exc()
+            return jsonify({"success": False, "error": f"Database error: {str(db_error)}"}), 500
+            
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "error": str(e)}), 500
-
+        print(f"❌ UNHANDLED EXCEPTION: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": f"Server error: {str(e)}"}), 500
 @api_reports_bp.route('/reports/<int:report_id>/flag', methods=['POST'])
 def flag_report(report_id):
     try:

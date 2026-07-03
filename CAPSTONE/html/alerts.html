@@ -986,289 +986,282 @@ nav {
         }
         return alerts;
     }
-
-    async function getCongestionAlerts() {
-        const alerts = [];
-        try {
-            const now = new Date();
-            const hour = now.getHours();
-            const minutes = now.getMinutes();
-            const timeDecimal = hour + minutes / 60;
-            const OPERATING_START = 4.5;
-            const OPERATING_END = 22.5;
-            const isClosed = timeDecimal < OPERATING_START || timeDecimal >= OPERATING_END;
-            
-            if (isClosed) {
-                alerts.push({
-                    id: 'service-closed-permanent',
-                    type: 'advisory',
-                    icon: 'clock',
-                    icon_color: 'blue',
-                    title: 'MRT-3 SERVICE ENDED',
-                    message: 'MRT-3 operations have ended for the day. Service resumes at 4:30 AM.',
-                    time: 'Just now',
-                    unread: true
-                });
-                return alerts;
-            }
-            
-            const response = await fetch('/api/live-map/directions/v2');
-            if (!response.ok) throw new Error('Failed to fetch congestion data');
-            const data = await response.json();
-            
-            console.log('API Data received:', data);
-            
-            // Track stations by direction and severity
-            let northSevere = [];
-            let northCongested = [];
-            let northModerate = [];
-            let northLight = [];
-            let southSevere = [];
-            let southCongested = [];
-            let southModerate = [];
-            let southLight = [];
-            
-            // Process northbound data
-            if (data.northbound) {
-                for (const [station, stationData] of Object.entries(data.northbound)) {
-                    const congestion = stationData.congestion || 0;
-                    const status = stationData.status || 'LIGHT';
-                    
-                    console.log(`📊 ${station} Northbound: ${congestion}% - ${status}`);
-                    
-                    if (congestion > 80) {
-                        northSevere.push(station);
-                    } else if (congestion > 60) {
-                        northCongested.push(station);
-                    } else if (congestion > 30) {
-                        northModerate.push(station);
-                    } else if (congestion > 20) {
-                        northLight.push(station);
-                    }
-                }
-            }
-            
-            // Process southbound data
-            if (data.southbound) {
-                for (const [station, stationData] of Object.entries(data.southbound)) {
-                    const congestion = stationData.congestion || 0;
-                    const status = stationData.status || 'LIGHT';
-                    
-                    console.log(`📊 ${station} Southbound: ${congestion}% - ${status}`);
-                    
-                    if (congestion > 80) {
-                        southSevere.push(station);
-                    } else if (congestion > 60) {
-                        southCongested.push(station);
-                    } else if (congestion > 30) {
-                        southModerate.push(station);
-                    } else if (congestion > 20) {
-                        southLight.push(station);
-                    }
-                }
-            }
-            
-            console.log('Northbound - Severe:', northSevere.length, northSevere);
-            console.log('Northbound - Congested:', northCongested.length, northCongested);
-            console.log('Northbound - Moderate:', northModerate.length, northModerate);
-            console.log('Northbound - Light:', northLight.length, northLight);
-            console.log('Southbound - Severe:', southSevere.length, southSevere);
-            console.log('Southbound - Congested:', southCongested.length, southCongested);
-            console.log('Southbound - Moderate:', southModerate.length, southModerate);
-            console.log('Southbound - Light:', southLight.length, southLight);
-            
-            // Helper to format station list with highlighting
-            function formatStationListWithHighlight(stations, severity) {
-                if (stations.length === 0) return '';
-                
-                let displayStations = stations;
-                let extraCount = 0;
-                if (stations.length > 5) {
-                    displayStations = stations.slice(0, 5);
-                    extraCount = stations.length - 5;
-                }
-                
-                const className = severity === 'severe' ? 'critical' : 
-                                 severity === 'congested' ? 'critical' :
-                                 severity === 'moderate' ? 'moderate' : 'light';
-                const stationSpans = displayStations.map(s => 
-                    `<span class="station-name ${className}">${s}</span>`
-                );
-                
-                let result = '';
-                if (stationSpans.length === 1) {
-                    result = stationSpans[0];
-                } else if (stationSpans.length === 2) {
-                    result = stationSpans.join(' and ');
-                } else {
-                    const last = stationSpans.pop();
-                    result = stationSpans.join(', ') + ', and ' + last;
-                }
-                
-                if (extraCount > 0) {
-                    result += ` and ${extraCount} more station${extraCount > 1 ? 's' : ''}`;
-                }
-                return result;
-            }
-            
-            // ========== NORTHBOUND ALERTS ==========
-            if (northSevere.length > 0) {
-                const stationList = formatStationListWithHighlight(northSevere, 'severe');
-                alerts.push({
-                    id: 'north-severe-permanent',
-                    type: 'congestion',
-                    icon: 'arrow-up',
-                    icon_color: 'red',
-                    title: `⬆️ NORTHBOUND: ${northSevere.length} SEVERE`,
-                    message: `${stationList} — Expect delays of 15-20 minutes.`,
-                    time: 'Just now',
-                    unread: true,
-                    priority: 1
-                });
-            }
-            
-            if (northCongested.length > 0) {
-                const stationList = formatStationListWithHighlight(northCongested, 'congested');
-                alerts.push({
-                    id: 'north-congested-permanent',
-                    type: 'congestion',
-                    icon: 'arrow-up',
-                    icon_color: 'red',
-                    title: `⬆️ NORTHBOUND: ${northCongested.length} CONGESTED`,
-                    message: `${stationList} — Expect delays of 10-15 minutes.`,
-                    time: 'Just now',
-                    unread: true,
-                    priority: 1
-                });
-            }
-            
-            if (northModerate.length > 0) {
-                const stationList = formatStationListWithHighlight(northModerate, 'moderate');
-                alerts.push({
-                    id: 'north-moderate-permanent',
-                    type: 'congestion',
-                    icon: 'arrow-up',
-                    icon_color: 'orange',
-                    title: `⬆️ NORTHBOUND: ${northModerate.length} MODERATE`,
-                    message: `${stationList} — Expect delays of 5-10 minutes.`,
-                    time: 'Just now',
-                    unread: true,
-                    priority: 2
-                });
-            }
-            
-            if (northLight.length > 0) {
-                const stationList = formatStationListWithHighlight(northLight, 'light');
-                alerts.push({
-                    id: 'north-light-permanent',
-                    type: 'congestion',
-                    icon: 'arrow-up',
-                    icon_color: 'green',
-                    title: `⬆️ NORTHBOUND: ${northLight.length} LIGHT`,
-                    message: `${stationList} — Normal travel conditions.`,
-                    time: 'Just now',
-                    unread: true,
-                    priority: 3
-                });
-            }
-            
-            // ========== SOUTHBOUND ALERTS ==========
-            if (southSevere.length > 0) {
-                const stationList = formatStationListWithHighlight(southSevere, 'severe');
-                alerts.push({
-                    id: 'south-severe-permanent',
-                    type: 'congestion',
-                    icon: 'arrow-down',
-                    icon_color: 'red',
-                    title: `⬇️ SOUTHBOUND: ${southSevere.length} SEVERE`,
-                    message: `${stationList} — Expect delays of 15-20 minutes.`,
-                    time: 'Just now',
-                    unread: true,
-                    priority: 1
-                });
-            }
-            
-            if (southCongested.length > 0) {
-                const stationList = formatStationListWithHighlight(southCongested, 'congested');
-                alerts.push({
-                    id: 'south-congested-permanent',
-                    type: 'congestion',
-                    icon: 'arrow-down',
-                    icon_color: 'red',
-                    title: `⬇️ SOUTHBOUND: ${southCongested.length} CONGESTED`,
-                    message: `${stationList} — Expect delays of 10-15 minutes.`,
-                    time: 'Just now',
-                    unread: true,
-                    priority: 1
-                });
-            }
-            
-            if (southModerate.length > 0) {
-                const stationList = formatStationListWithHighlight(southModerate, 'moderate');
-                alerts.push({
-                    id: 'south-moderate-permanent',
-                    type: 'congestion',
-                    icon: 'arrow-down',
-                    icon_color: 'orange',
-                    title: `⬇️ SOUTHBOUND: ${southModerate.length} MODERATE`,
-                    message: `${stationList} — Expect delays of 5-10 minutes.`,
-                    time: 'Just now',
-                    unread: true,
-                    priority: 2
-                });
-            }
-            
-            if (southLight.length > 0) {
-                const stationList = formatStationListWithHighlight(southLight, 'light');
-                alerts.push({
-                    id: 'south-light-permanent',
-                    type: 'congestion',
-                    icon: 'arrow-down',
-                    icon_color: 'green',
-                    title: `⬇️ SOUTHBOUND: ${southLight.length} LIGHT`,
-                    message: `${stationList} — Normal travel conditions.`,
-                    time: 'Just now',
-                    unread: true,
-                    priority: 3
-                });
-            }
-            
-            // ========== CLEAR ALERTS ==========
-            const hasNorthCongestion = northSevere.length > 0 || northCongested.length > 0 || 
-                                       northModerate.length > 0 || northLight.length > 0;
-            const hasSouthCongestion = southSevere.length > 0 || southCongested.length > 0 || 
-                                       southModerate.length > 0 || southLight.length > 0;
-            
-            if (!hasNorthCongestion && !hasSouthCongestion) {
-                alerts.push({
-                    id: 'congestion-clear-permanent',
-                    type: 'congestion',
-                    icon: 'check-circle',
-                    icon_color: 'green',
-                    title: ' ALL CLEAR',
-                    message: 'All directions are operating normally. Enjoy your commute!',
-                    time: 'Just now',
-                    unread: true,
-                    priority: 4
-                });
-            }
-            
-        } catch (error) {
-            console.error('Error fetching congestion data:', error);
+async function getCongestionAlerts() {
+    const alerts = [];
+    try {
+        const now = new Date();
+        const hour = now.getHours();
+        const minutes = now.getMinutes();
+        const timeDecimal = hour + minutes / 60;
+        const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
+        const isClosed = timeDecimal < OPERATING_START || timeDecimal >= OPERATING_END;
+        
+        if (isClosed) {
             alerts.push({
-                id: 'congestion-unavailable-permanent',
+                id: 'service-closed-permanent',
+                type: 'advisory',
+                icon: 'clock',
+                icon_color: 'blue',
+                title: 'MRT-3 SERVICE ENDED',
+                message: 'MRT-3 operations have ended for the day. Service resumes at 4:30 AM.',
+                time: 'Just now',
+                unread: true
+            });
+            return alerts;
+        }
+        
+        const response = await fetch('/api/live-map/directions/v2');
+        if (!response.ok) throw new Error('Failed to fetch congestion data');
+        const data = await response.json();
+        
+        console.log('API Data received:', data);
+        
+        // ========== GROUP STATIONS BY SEVERITY ==========
+        const northbound = { severe: [], congested: [], moderate: [], light: [] };
+        const southbound = { severe: [], congested: [], moderate: [], light: [] };
+        
+        // Process northbound data
+        if (data.northbound) {
+            for (const [station, stationData] of Object.entries(data.northbound)) {
+                const congestion = stationData.congestion || 0;
+                
+                if (congestion > 80) {
+                    northbound.severe.push(station);
+                } else if (congestion > 60) {
+                    northbound.congested.push(station);
+                } else if (congestion > 30) {
+                    northbound.moderate.push(station);
+                } else if (congestion > 0) {
+                    northbound.light.push(station);
+                }
+                // congestion === 0 means no congestion, skip it
+            }
+        }
+        
+        // Process southbound data
+        if (data.southbound) {
+            for (const [station, stationData] of Object.entries(data.southbound)) {
+                const congestion = stationData.congestion || 0;
+                
+                if (congestion > 80) {
+                    southbound.severe.push(station);
+                } else if (congestion > 60) {
+                    southbound.congested.push(station);
+                } else if (congestion > 30) {
+                    southbound.moderate.push(station);
+                } else if (congestion > 0) {
+                    southbound.light.push(station);
+                }
+                // congestion === 0 means no congestion, skip it
+            }
+        }
+        
+        console.log('📊 Northbound grouping:', northbound);
+        console.log('📊 Southbound grouping:', southbound);
+        
+        // Helper to format station list
+        function formatStationList(stations, severity) {
+            if (stations.length === 0) return '';
+            
+            let displayStations = stations;
+            let extraCount = 0;
+            if (stations.length > 5) {
+                displayStations = stations.slice(0, 5);
+                extraCount = stations.length - 5;
+            }
+            
+            const className = severity === 'severe' || severity === 'congested' ? 'critical' : 
+                             severity === 'moderate' ? 'moderate' : 'light';
+            const stationSpans = displayStations.map(s => 
+                `<span class="station-name ${className}">${s}</span>`
+            );
+            
+            let result = '';
+            if (stationSpans.length === 1) {
+                result = stationSpans[0];
+            } else if (stationSpans.length === 2) {
+                result = stationSpans.join(' and ');
+            } else {
+                const last = stationSpans.pop();
+                result = stationSpans.join(', ') + ', and ' + last;
+            }
+            
+            if (extraCount > 0) {
+                result += ` and ${extraCount} more station${extraCount > 1 ? 's' : ''}`;
+            }
+            return result;
+        }
+        
+        // ========== CREATE ONE ALERT PER SEVERITY PER DIRECTION ==========
+        
+        // NORTHBOUND - Severe
+        if (northbound.severe.length > 0) {
+            const stationList = formatStationList(northbound.severe, 'severe');
+            alerts.push({
+                id: 'north-severe-permanent',
                 type: 'congestion',
-                icon: 'exclamation-triangle',
+                icon: 'arrow-up',
+                icon_color: 'red',
+                title: `⬆️ NORTHBOUND: ${northbound.severe.length} SEVERE`,
+                message: `${stationList} — Expect delays of 15-20 minutes.`,
+                time: 'Just now',
+                unread: true,
+                priority: 1
+            });
+        }
+        
+        // NORTHBOUND - Congested
+        if (northbound.congested.length > 0) {
+            const stationList = formatStationList(northbound.congested, 'congested');
+            alerts.push({
+                id: 'north-congested-permanent',
+                type: 'congestion',
+                icon: 'arrow-up',
+                icon_color: 'red',
+                title: `⬆️ NORTHBOUND: ${northbound.congested.length} CONGESTED`,
+                message: `${stationList} — Expect delays of 10-15 minutes.`,
+                time: 'Just now',
+                unread: true,
+                priority: 1
+            });
+        }
+        
+        // NORTHBOUND - Moderate
+        if (northbound.moderate.length > 0) {
+            const stationList = formatStationList(northbound.moderate, 'moderate');
+            alerts.push({
+                id: 'north-moderate-permanent',
+                type: 'congestion',
+                icon: 'arrow-up',
                 icon_color: 'orange',
-                title: '⚠️ CONGESTION DATA UNAVAILABLE',
-                message: 'Unable to fetch current congestion data. Please check the live map for updates.',
+                title: `⬆️ NORTHBOUND: ${northbound.moderate.length} MODERATE`,
+                message: `${stationList} — Expect delays of 5-10 minutes.`,
+                time: 'Just now',
+                unread: true,
+                priority: 2
+            });
+        }
+        
+        // NORTHBOUND - Light (ALL light stations in ONE alert)
+        if (northbound.light.length > 0) {
+            const stationList = formatStationList(northbound.light, 'light');
+            alerts.push({
+                id: 'north-light-permanent',
+                type: 'congestion',
+                icon: 'arrow-up',
+                icon_color: 'green',
+                title: `⬆️ NORTHBOUND: ${northbound.light.length} LIGHT`,
+                message: `${stationList} — Normal travel conditions.`,
+                time: 'Just now',
+                unread: true,
+                priority: 3
+            });
+        }
+        
+        // SOUTHBOUND - Severe
+        if (southbound.severe.length > 0) {
+            const stationList = formatStationList(southbound.severe, 'severe');
+            alerts.push({
+                id: 'south-severe-permanent',
+                type: 'congestion',
+                icon: 'arrow-down',
+                icon_color: 'red',
+                title: `⬇️ SOUTHBOUND: ${southbound.severe.length} SEVERE`,
+                message: `${stationList} — Expect delays of 15-20 minutes.`,
+                time: 'Just now',
+                unread: true,
+                priority: 1
+            });
+        }
+        
+        // SOUTHBOUND - Congested
+        if (southbound.congested.length > 0) {
+            const stationList = formatStationList(southbound.congested, 'congested');
+            alerts.push({
+                id: 'south-congested-permanent',
+                type: 'congestion',
+                icon: 'arrow-down',
+                icon_color: 'red',
+                title: `⬇️ SOUTHBOUND: ${southbound.congested.length} CONGESTED`,
+                message: `${stationList} — Expect delays of 10-15 minutes.`,
+                time: 'Just now',
+                unread: true,
+                priority: 1
+            });
+        }
+        
+        // SOUTHBOUND - Moderate
+        if (southbound.moderate.length > 0) {
+            const stationList = formatStationList(southbound.moderate, 'moderate');
+            alerts.push({
+                id: 'south-moderate-permanent',
+                type: 'congestion',
+                icon: 'arrow-down',
+                icon_color: 'orange',
+                title: `⬇️ SOUTHBOUND: ${southbound.moderate.length} MODERATE`,
+                message: `${stationList} — Expect delays of 5-10 minutes.`,
+                time: 'Just now',
+                unread: true,
+                priority: 2
+            });
+        }
+        
+        // SOUTHBOUND - Light (ALL light stations in ONE alert)
+        if (southbound.light.length > 0) {
+            const stationList = formatStationList(southbound.light, 'light');
+            alerts.push({
+                id: 'south-light-permanent',
+                type: 'congestion',
+                icon: 'arrow-down',
+                icon_color: 'green',
+                title: `⬇️ SOUTHBOUND: ${southbound.light.length} LIGHT`,
+                message: `${stationList} — Normal travel conditions.`,
+                time: 'Just now',
+                unread: true,
+                priority: 3
+            });
+        }
+        
+        // ========== CLEAR ALERTS ==========
+        const hasNorthCongestion = northbound.severe.length > 0 || northbound.congested.length > 0 || 
+                                   northbound.moderate.length > 0 || northbound.light.length > 0;
+        const hasSouthCongestion = southbound.severe.length > 0 || southbound.congested.length > 0 || 
+                                   southbound.moderate.length > 0 || southbound.light.length > 0;
+        
+        if (!hasNorthCongestion && !hasSouthCongestion) {
+            alerts.push({
+                id: 'congestion-clear-permanent',
+                type: 'congestion',
+                icon: 'check-circle',
+                icon_color: 'green',
+                title: '✅ ALL CLEAR',
+                message: 'All directions are operating normally. Enjoy your commute!',
                 time: 'Just now',
                 unread: true,
                 priority: 4
             });
         }
+        
+        console.log(`📊 Created ${alerts.length} congestion alerts (grouped by severity)`);
+        return alerts;
+        
+    } catch (error) {
+        console.error('Error fetching congestion data:', error);
+        alerts.push({
+            id: 'congestion-unavailable-permanent',
+            type: 'congestion',
+            icon: 'exclamation-triangle',
+            icon_color: 'orange',
+            title: '⚠️ CONGESTION DATA UNAVAILABLE',
+            message: 'Unable to fetch current congestion data. Please check the live map for updates.',
+            time: 'Just now',
+            unread: true,
+            priority: 4
+        });
         return alerts;
     }
+}
 
     async function getOperatorBroadcasts() {
         try {
@@ -1343,92 +1336,109 @@ nav {
         }
     }
 
-    // ========== UPDATED: Alert Badge UI with sessionStorage persistence ==========
     function updateAlertBadgeUI(count) {
-        // Store in session storage for persistence across tabs
-        try {
+    // Only store in sessionStorage if count > 0
+    try {
+        if (count > 0) {
             sessionStorage.setItem('alertCount', count.toString());
-        } catch (e) {}
-        
-        const badge = document.getElementById('newAlertBadge');
-        const sidebarBadge = document.getElementById('sidebarAlertCount');
-        const mobileBadge = document.getElementById('mobileAlertBadge');
-        
-        _cachedUnreadCount = count;
-        
-        // Bell badge: Show 9+ for counts > 9
-        const bellDisplayValue = count > 9 ? '9+' : count;
-        
-        if (badge) {
-            if (count > 0) {
-                badge.textContent = count + ' New';
-                badge.style.background = 'var(--red)';
-                badge.style.display = 'inline-block';
-            } else {
-                badge.textContent = '0 New';
-                badge.style.background = '#94A3B8';
-                badge.style.display = 'inline-block';
-            }
+        } else {
+            sessionStorage.removeItem('alertCount');
         }
-        
-        // Sidebar badge
-        if (sidebarBadge) {
-            if (count > 0) {
-                sidebarBadge.textContent = count;
-                sidebarBadge.style.display = 'block';
-            } else {
-                sidebarBadge.style.display = 'none';
-            }
-        }
-        
-        // Mobile badge
-        if (mobileBadge) {
-            if (count > 0) {
-                mobileBadge.textContent = bellDisplayValue;
-                mobileBadge.style.display = 'flex';
-            } else {
-                mobileBadge.style.display = 'none';
-            }
-        }
-        
-        // Update bell icon
-        const refreshBtn = document.getElementById('refreshBtn');
-        if (refreshBtn) {
-            if (count > 0) {
-                refreshBtn.classList.add('has-unread');
-            } else {
-                refreshBtn.classList.remove('has-unread');
-            }
+    } catch (e) {}
+    
+    const badge = document.getElementById('newAlertBadge');
+    const sidebarBadge = document.getElementById('sidebarAlertCount');
+    const mobileBadge = document.getElementById('mobileAlertBadge');
+    
+    _cachedUnreadCount = count;
+    
+    const bellDisplayValue = count > 9 ? '9+' : count;
+    
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count + ' New';
+            badge.style.background = 'var(--red)';
+            badge.style.display = 'inline-block';
+        } else {
+            badge.textContent = '0 New';
+            badge.style.background = '#94A3B8';
+            badge.style.display = 'inline-block';
         }
     }
+    
+    if (sidebarBadge) {
+        if (count > 0) {
+            sidebarBadge.textContent = count;
+            sidebarBadge.style.display = 'block';
+        } else {
+            sidebarBadge.style.display = 'none';
+        }
+    }
+    
+    if (mobileBadge) {
+        if (count > 0) {
+            mobileBadge.textContent = bellDisplayValue;
+            mobileBadge.style.display = 'flex';
+        } else {
+            mobileBadge.style.display = 'none';
+        }
+    }
+    
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        if (count > 0) {
+            refreshBtn.classList.add('has-unread');
+        } else {
+            refreshBtn.classList.remove('has-unread');
+        }
+    }
+}
 
     // ========== UPDATED: Restore badge count from session storage ==========
-    function restoreAlertBadge() {
-        try {
-            const savedCount = sessionStorage.getItem('alertCount');
-            if (savedCount) {
-                const count = parseInt(savedCount);
-                if (count > 0) {
-                    _cachedUnreadCount = count;
-                    updateAlertBadgeUI(count);
+   function restoreAlertBadge() {
+    try {
+        const savedCount = sessionStorage.getItem('alertCount');
+        if (savedCount) {
+            const count = parseInt(savedCount);
+            // Only restore if we have actual alerts data
+            if (currentAlerts && currentAlerts.length > 0) {
+                const actualUnread = currentAlerts.filter(a => a.unread === true && !readAlerts.has(a.id)).length;
+                if (actualUnread > 0) {
+                    _cachedUnreadCount = actualUnread;
+                    updateAlertBadgeUI(actualUnread);
                     syncMobileAlertBadge();
+                    return;
                 }
             }
-        } catch (e) {}
-    }
-
-    // ========== DEBUG: Check API directly ==========
-    async function debugAlertCount() {
-        try {
-            const response = await fetch('/api/alerts/count');
-            const data = await response.json();
-            console.log('🔍 Alert Count API Response:', data);
-            return data;
-        } catch (e) {
-            console.error('Error fetching alert count:', e);
-            return { count: 0 };
+            // If no actual unread alerts, clear the saved count
+            sessionStorage.removeItem('alertCount');
+            _cachedUnreadCount = 0;
+            updateAlertBadgeUI(0);
+            syncMobileAlertBadge();
         }
+    } catch (e) {}
+}
+
+  async function debugAlertCount() {
+    try {
+        // First check actual alerts
+        const actualUnread = currentAlerts.filter(a => a.unread === true && !readAlerts.has(a.id)).length;
+        
+        // If we have actual alerts, use that count
+        if (currentAlerts.length > 0) {
+            return { count: actualUnread };
+        }
+        
+        // Fallback to API if no alerts loaded
+        const response = await fetch('/api/alerts/count');
+        const data = await response.json();
+        console.log('🔍 Alert Count API Response:', data);
+        return data;
+    } catch (e) {
+        console.error('Error fetching alert count:', e);
+        return { count: 0 };
     }
+}
 
     // Main Alert Loader
     async function loadAlerts() {
