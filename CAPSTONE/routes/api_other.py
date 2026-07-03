@@ -959,10 +959,11 @@ def test_api():
 
 @api_other_bp.route('/alerts/count')
 def alerts_count():
-    """Get alert count with breakdown by severity level"""
+    """Get alert count - counts ALL congestion levels (Light, Moderate, Congested, Severe)"""
     try:
         stations_list = get_stations_from_config()
-        critical_count = 0
+        severe_count = 0
+        congested_count = 0
         moderate_count = 0
         light_count = 0
         station_statuses = {}
@@ -981,6 +982,7 @@ def alerts_count():
                 north_cong = 0
                 south_cong = 0
                 
+                # Get northbound prediction
                 try:
                     model_key_north = f"{station}_Northbound"
                     if model_key_north in directional_models:
@@ -996,6 +998,7 @@ def alerts_count():
                 except Exception as e:
                     print(f"⚠️ Error getting northbound for {station}: {e}")
                 
+                # Get southbound prediction
                 try:
                     model_key_south = f"{station}_Southbound"
                     if model_key_south in directional_models:
@@ -1011,39 +1014,34 @@ def alerts_count():
                 except Exception as e:
                     print(f"⚠️ Error getting southbound for {station}: {e}")
                 
-                # ========== FIX: Use AVERAGE congestion instead of MAX ==========
-                # This matches what the dashboard shows
+                # Use AVERAGE congestion (matches dashboard)
                 avg_cong = (north_cong + south_cong) / 2
                 
-                # ========== FIX: Use the same thresholds as the dashboard ==========
-                # Dashboard uses: Severe > 80, Congested > 60, Moderate > 40, Light > 20
-                # So we should use: Critical > 60, Moderate > 40, Light > 20
-                # But the alerts endpoint should use the SAME thresholds as the live map
+                # ========== COUNT ALL CONGESTION LEVELS ==========
+                # SEVERE: > 80%
+                # CONGESTED: 61-80%
+                # MODERATE: 31-60%
+                # LIGHT: 0-30% (any congestion > 0)
                 
-                # Use the same thresholds as the live map V2 endpoint
-                # The V2 endpoint uses: SEVERE > 80, CONGESTED > 60, MODERATE > 30, LIGHT <= 30
-                # But for alerts, we want to show moderate stations too
-                
-                # Let's use the dashboard thresholds:
-                # Congested (> 60%) = CRITICAL for alerts
-                # Moderate (40-60%) = MODERATE for alerts
-                # Light (20-40%) = LIGHT for alerts
-                
-                if avg_cong > 60:  # Congested/Severe
-                    critical_count += 1
-                    severity = 'critical'
-                    print(f"  🔴 CRITICAL: {station} - {avg_cong:.1f}% (N:{north_cong:.1f}%, S:{south_cong:.1f}%)")
-                elif avg_cong > 40:  # Moderate
+                if avg_cong > 80:  # SEVERE
+                    severe_count += 1
+                    severity = 'severe'
+                    print(f"  🔴 SEVERE: {station} - {avg_cong:.1f}%")
+                elif avg_cong > 60:  # CONGESTED
+                    congested_count += 1
+                    severity = 'congested'
+                    print(f"  🟠 CONGESTED: {station} - {avg_cong:.1f}%")
+                elif avg_cong > 30:  # MODERATE
                     moderate_count += 1
                     severity = 'moderate'
                     print(f"  🟡 MODERATE: {station} - {avg_cong:.1f}%")
-                elif avg_cong > 20:  # Light
+                elif avg_cong > 0:  # LIGHT (any congestion > 0)
                     light_count += 1
                     severity = 'light'
                     print(f"  🟢 LIGHT: {station} - {avg_cong:.1f}%")
-                else:
-                    severity = 'low'
-                    print(f"  ⚪ LOW: {station} - {avg_cong:.1f}%")
+                else:  # NO CONGESTION (0%)
+                    severity = 'none'
+                    print(f"  ⚪ NONE: {station} - {avg_cong:.1f}%")
                 
                 station_statuses[station] = {
                     'congestion': round(avg_cong, 1),
@@ -1052,7 +1050,10 @@ def alerts_count():
                     'severity': severity
                 }
             
-            print(f"✅ Station breakdown - Critical: {critical_count}, Moderate: {moderate_count}, Light: {light_count}")
+            # ========== COUNT ALL STATIONS WITH ANY CONGESTION > 0 ==========
+            alert_count = severe_count + congested_count + moderate_count + light_count
+            print(f"✅ Station breakdown - Severe: {severe_count}, Congested: {congested_count}, Moderate: {moderate_count}, Light: {light_count}")
+            print(f"🔔 Alert count (ALL congestion): {alert_count}")
             
         except Exception as e:
             print(f"❌ Error using models: {e}")
@@ -1071,24 +1072,42 @@ def alerts_count():
                             south_cong = data['southbound'].get(station, {}).get('congestion', 0)
                             avg_cong = (north_cong + south_cong) / 2
                             
-                            if avg_cong > 60:
-                                critical_count += 1
-                            elif avg_cong > 40:
+                            if avg_cong > 80:
+                                severe_count += 1
+                                severity = 'severe'
+                            elif avg_cong > 60:
+                                congested_count += 1
+                                severity = 'congested'
+                            elif avg_cong > 30:
                                 moderate_count += 1
-                            elif avg_cong > 20:
+                                severity = 'moderate'
+                            elif avg_cong > 0:
                                 light_count += 1
-                    print(f"✅ Fallback breakdown - Critical: {critical_count}, Moderate: {moderate_count}, Light: {light_count}")
+                                severity = 'light'
+                            else:
+                                severity = 'none'
+                            
+                            station_statuses[station] = {
+                                'congestion': round(avg_cong, 1),
+                                'northbound': round(north_cong, 1),
+                                'southbound': round(south_cong, 1),
+                                'severity': severity
+                            }
+                    alert_count = severe_count + congested_count + moderate_count + light_count
+                    print(f"✅ Fallback breakdown - Severe: {severe_count}, Congested: {congested_count}, Moderate: {moderate_count}, Light: {light_count}")
             except Exception as e2:
                 print(f"❌ Fallback also failed: {e2}")
+                alert_count = 0
         
-        total = critical_count + moderate_count + light_count
+        total = severe_count + congested_count + moderate_count + light_count
         display = str(total) if total < 10 else "9+"
         
         return jsonify({
-            "count": total,
+            "count": total,  # ALL congestion levels
             "display": display,
             "breakdown": {
-                "critical": critical_count,
+                "severe": severe_count,
+                "congested": congested_count,
                 "moderate": moderate_count,
                 "light": light_count,
                 "total_stations": len(stations_list)
@@ -1101,7 +1120,6 @@ def alerts_count():
         import traceback
         traceback.print_exc()
         return jsonify({"count": 0, "display": "0"})
-    
 @api_other_bp.route('/alerts/list')
 def alerts_list():
     """Get list of active alerts"""

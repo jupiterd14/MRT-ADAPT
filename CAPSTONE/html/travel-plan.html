@@ -1023,6 +1023,36 @@ nav {
     font-weight: bold;
 }
 
+
+
+.help-btn {
+    position: relative;
+    padding:10px 35px;
+    font-size: 20px;
+}
+
+.help-btn::after {
+    content: "Click for travel guide";
+    position: absolute;
+    bottom: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text-dark);
+    color: white;
+    font-size: 10px;
+  
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.help-btn:hover::after {
+    opacity: 1;
+}
+
+
 /* ========== MOBILE ONLY (max-width: 768px) ========== */
 @media screen and (max-width: 768px) {
     /* Make advisory container smaller on mobile */
@@ -1389,11 +1419,13 @@ nav {
     }
 }
 
+
+
 /* Extra small devices */
 @media screen and (max-width: 480px) {
 
     
-.help-btn {
+.help-btn { 
     background: var(--blue-bg);
     color: var(--accent-blue);
     border: none;
@@ -1486,7 +1518,7 @@ nav {
     background: var(--blue-bg);
     color: var(--accent-blue);
     border: none;
-    padding:5px 10px;
+    padding:5px 10px !important;
     border: 1px solid var(--accent-blue);
     border-radius: 20px;
     font-size: 10px;
@@ -1501,7 +1533,7 @@ nav {
 
 
 .help-btn h3 {
-    font-size: 10px;
+    font-size: 12px;
 }
 
 .help-btn:hover {
@@ -1640,32 +1672,6 @@ nav {
     color: #92400E;
     line-height: 1.4;
 }
-
-.help-btn {
-    position: relative;
-}
-
-.help-btn::after {
-    content: "Click for travel guide";
-    position: absolute;
-    bottom: -30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--text-dark);
-    color: white;
-    font-size: 10px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s;
-}
-
-.help-btn:hover::after {
-    opacity: 1;
-}
-
 /* Make dropdowns and inputs smaller for desktop */
 @media (min-width: 769px) {
     .station-dropdown {
@@ -2137,6 +2143,7 @@ nav {
 
     <script>
 let stations = [];
+
 
 // ========== DYNAMIC MESSAGE ARRAYS ==========
 const messageArrays = {
@@ -2642,8 +2649,8 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
                 <div style="font-weight:700; font-size:16px; color:${fromStatus.color};">${fromStatus.text}</div>
             </div>
             <div style="flex:1; text-align:center; background:#F8FAFC; border: 1px solid grey; border-radius:8px; padding:10px;">
-                <div style="font-size:10px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">ESTIMAATED RAVEL TIME</div>
-                <div style="font-weight:700; font-size:16px; color:#1E293B;">${adjustedTravelTime}m~</div>
+                <div style="font-size:10px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">ESTIMATED TRAVEL TIME</div>
+                <div style="font-weight:700; font-size:16px; color:#1E293B;">${adjustedTravelTime}min(s)~</div>
             </div>
             
         </div>
@@ -2725,7 +2732,7 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
         rushColor = '#F97316';
     } else if (isEveningRush) {
         rushLabel = 'EVENING RUSH HOUR';
-        rushNote = `Peak rush hour · ${from} haas ${fromStatus.text.toLowerCase()} congestion`;
+        rushNote = `Peak rush hour · ${from} has ${fromStatus.text.toLowerCase()} congestion`;
         rushAdvice = 'Allow extra boarding time · Trains may be delayed 5-30 min';
         rushColor = '#F97316';
     } else if (hour >= 21) {
@@ -2833,7 +2840,6 @@ function getPreviousStation(station) {
 let cachedAlertCount = null;
 let cachedAlertCountTime = 0;
 const ALERT_CACHE_DURATION = 30000;
-
 async function fetchAlertCount() {
     const now = Date.now();
     
@@ -2851,22 +2857,18 @@ async function fetchAlertCount() {
             readAlerts = new Set(JSON.parse(saved));
         }
         
-        const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-            "Ayala Ave", "Magallanes", "Taft"];
-        
         let allAlerts = [];
         const nowDate = new Date();
         const hour = nowDate.getHours();
         
-        // 1. Rush Hour Alert
+        // ========== 1. Rush Hour Alert ==========
         if ((hour >= 7 && hour <= 9)) {
             allAlerts.push({ id: 'rush-morning-permanent' });
         } else if ((hour >= 17 && hour <= 19)) {
             allAlerts.push({ id: 'rush-evening-permanent' });
         }
         
-        // 2. Advisory Alert
+        // ========== 2. Advisory Alert ==========
         if (hour >= 0 && hour < 5) {
             allAlerts.push({ id: 'advisory-early-morning-permanent' });
         } else if (hour >= 5 && hour < 7) {
@@ -2879,14 +2881,14 @@ async function fetchAlertCount() {
             allAlerts.push({ id: 'advisory-service-ended-permanent' });
         }
         
-        // 3. Congestion Advisory
+        // ========== 3. Congestion Advisory ==========
         if (hour >= 21 || hour < 5) {
             allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
         } else if (hour >= 14 && hour < 17) {
             allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
         }
         
-        // 4. Service Notices
+        // ========== 4. Service Notices ==========
         const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
         if (isWeekend) {
             allAlerts.push({ id: 'service-weekend-permanent' });
@@ -2895,29 +2897,52 @@ async function fetchAlertCount() {
             allAlerts.push({ id: 'service-maintenance-night-permanent' });
         }
         
-        // 5. Congestion alerts
+        // ========== 5. Congestion alerts from live map (GROUPED) ==========
         try {
             const response = await fetch('/api/live-map/directions/v2');
             const data = await response.json();
             
             if (data && data.northbound && data.southbound) {
-                for (const station of STATIONS) {
-                    const northData = data.northbound[station];
-                    const southData = data.southbound[station];
-                    
-                    if (northData && northData.congestion > 0) {
-                        allAlerts.push({ id: `congestion-${station}-northbound` });
-                    }
-                    if (southData && southData.congestion > 0) {
-                        allAlerts.push({ id: `congestion-${station}-southbound` });
-                    }
+                // Group stations by severity
+                const grouped = {
+                    northbound: { severe: [], congested: [], moderate: [], light: [] },
+                    southbound: { severe: [], congested: [], moderate: [], light: [] }
+                };
+                
+                // Process northbound
+                for (const [station, stationData] of Object.entries(data.northbound)) {
+                    const congestion = stationData.congestion || 0;
+                    if (congestion > 80) grouped.northbound.severe.push(station);
+                    else if (congestion > 60) grouped.northbound.congested.push(station);
+                    else if (congestion > 30) grouped.northbound.moderate.push(station);
+                    else if (congestion > 0) grouped.northbound.light.push(station);
                 }
+                
+                // Process southbound
+                for (const [station, stationData] of Object.entries(data.southbound)) {
+                    const congestion = stationData.congestion || 0;
+                    if (congestion > 80) grouped.southbound.severe.push(station);
+                    else if (congestion > 60) grouped.southbound.congested.push(station);
+                    else if (congestion > 30) grouped.southbound.moderate.push(station);
+                    else if (congestion > 0) grouped.southbound.light.push(station);
+                }
+                
+                // ONLY COUNT GROUPS THAT HAVE STATIONS
+                if (grouped.northbound.severe.length > 0) allAlerts.push({ id: 'north-severe-permanent' });
+                if (grouped.northbound.congested.length > 0) allAlerts.push({ id: 'north-congested-permanent' });
+                if (grouped.northbound.moderate.length > 0) allAlerts.push({ id: 'north-moderate-permanent' });
+                if (grouped.northbound.light.length > 0) allAlerts.push({ id: 'north-light-permanent' });
+                
+                if (grouped.southbound.severe.length > 0) allAlerts.push({ id: 'south-severe-permanent' });
+                if (grouped.southbound.congested.length > 0) allAlerts.push({ id: 'south-congested-permanent' });
+                if (grouped.southbound.moderate.length > 0) allAlerts.push({ id: 'south-moderate-permanent' });
+                if (grouped.southbound.light.length > 0) allAlerts.push({ id: 'south-light-permanent' });
             }
         } catch (e) {
             console.log('Could not fetch congestion alerts:', e);
         }
         
-        // 6. Broadcasts
+        // ========== 6. Broadcasts ==========
         try {
             const broadcastResponse = await fetch('/api/broadcasts/public');
             const broadcastData = await broadcastResponse.json();
@@ -2930,27 +2955,34 @@ async function fetchAlertCount() {
             console.log('Could not fetch broadcasts:', e);
         }
         
-        // Count unread alerts
-        let unreadCount = 0;
+        // ========== ONLY COUNT CONGESTION ALERTS ==========
+        const congestionAlertIds = [
+            'north-severe-permanent', 'north-congested-permanent', 
+            'north-moderate-permanent', 'north-light-permanent',
+            'south-severe-permanent', 'south-congested-permanent',
+            'south-moderate-permanent', 'south-light-permanent'
+        ];
+        
+        let congestionCount = 0;
         for (const alert of allAlerts) {
-            if (!readAlerts.has(alert.id)) {
-                unreadCount++;
+            if (congestionAlertIds.includes(alert.id)) {
+                congestionCount++;
             }
         }
-        
-        // Cache the result
-        cachedAlertCount = unreadCount;
+
+        // Cache the result - ONLY congestion alerts
+        cachedAlertCount = congestionCount;
         cachedAlertCountTime = now;
-        
-        console.log('Travel Plan unread alert count:', unreadCount);
-        return unreadCount;
+
+        console.log('📊 Travel Plan - Congestion alerts only:', congestionCount);
+        console.log('📊 Total alerts (all types):', allAlerts.length);
+        return congestionCount;
         
     } catch (error) {
         console.error('Error calculating alert count:', error);
         return 0;
     }
 }
-
 
 async function checkAlertCount() {
     const alertCount = await fetchAlertCount();
