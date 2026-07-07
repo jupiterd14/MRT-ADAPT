@@ -1283,6 +1283,102 @@
     </div>
 </div>
 
+<!-- MODEL HELP MODAL -->
+<div id="modelHelpModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 650px; max-height: 80vh; overflow-y: auto;">
+        <div class="modal-header">
+            <i class="fas fa-graduation-cap" style="color: #8B5CF6;"></i>
+            <h2>How to Use Model Performance</h2>
+            <button onclick="closeModelHelp()" style="margin-left: auto; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-light);">&times;</button>
+        </div>
+        
+        <div style="margin-bottom: 24px;">
+            <p style="color: var(--text-light); margin-bottom: 16px;">
+                This dashboard helps you test and evaluate your ML models. Here's how to use each section:
+            </p>
+
+            <!-- Section 1 -->
+            <div style="background: #EFF6FF; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #3B82F6;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span style="background: #3B82F6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">1</span>
+                    <strong style="color: var(--text-dark);">Run Tests</strong>
+                </div>
+                <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
+                    Click <strong>"Run Tests"</strong> to automatically test your models against 2025 data. 
+                    This generates predictions, compares them to actual values, and saves results.
+                </p>
+            </div>
+
+            <!-- Section 2 -->
+            <div style="background: #F0FDF4; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #22C55E;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span style="background: #22C55E; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">2</span>
+                    <strong style="color: var(--text-dark);">Check Metrics</strong>
+                </div>
+                <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
+                    Look at the <strong>MAE (Mean Absolute Error)</strong> - lower is better. 
+                    Aim for <strong>MAE &lt; 10%</strong> for good model performance.
+                </p>
+            </div>
+
+            <!-- Section 3 -->
+            <div style="background: #FEF3C7; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #F59E0B;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span style="background: #F59E0B; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">3</span>
+                    <strong style="color: var(--text-dark);">View Results by Station</strong>
+                </div>
+                <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
+                    Select a station from the dropdown to see detailed results. 
+                    The table shows each prediction with error and verdict.
+                </p>
+            </div>
+
+            <!-- Section 4 -->
+            <div style="background: #F3E8FF; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #8B5CF6;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span style="background: #8B5CF6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">4</span>
+                    <strong style="color: var(--text-dark);">Run Evaluation (Advanced)</strong>
+                </div>
+                <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
+                    Click <strong>"Run Evaluation"</strong> to generate a confusion matrix and 
+                    classification metrics (precision, recall, F1-score). This shows 
+                    <strong>where</strong> your model makes mistakes.
+                </p>
+            </div>
+
+            <!-- Section 5 -->
+            <div style="background: #FCE7F3; border-radius: 12px; padding: 16px; border-left: 4px solid #EC4899;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span style="background: #EC4899; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">5</span>
+                    <strong style="color: var(--text-dark);">Advanced Tools</strong>
+                </div>
+                <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
+                    <strong>Upload CSV:</strong> Test with your own data file.<br>
+                    <strong>Manual Test:</strong> Test a single specific prediction.<br>
+                    <strong>Chart:</strong> Visual comparison of predictions vs actuals.
+                </p>
+            </div>
+        </div>
+
+        <!-- Quick Tips -->
+        <div style="background: #F1F5F9; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+            <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-dark);">
+                <i class="fas fa-lightbulb" style="color: #F59E0B;"></i> Quick Tips
+            </div>
+            <ul style="color: var(--text-light); font-size: 13px; padding-left: 20px; line-height: 1.8;">
+                <li>🟢 <strong>EXCELLENT</strong> = Error ≤ 5% &nbsp;|&nbsp; 🟡 <strong>GOOD</strong> = Error ≤ 10%</li>
+                <li>🟠 <strong>OKAY</strong> = Error ≤ 15% &nbsp;|&nbsp; 🔴 <strong>NEEDS IMPROVEMENT</strong> = Error > 15%</li>
+                <li>Run tests weekly to monitor if your model is drifting</li>
+                <li>Focus on stations with high MAE - they need retraining</li>
+            </ul>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="closeModelHelp()">Got it!</button>
+        </div>
+    </div>
+</div>
+
 <div class="sidebar">
     <div class="logo-section">
         <div class="logo-icon"><i class="fas fa-user-shield"></i></div>
@@ -1442,6 +1538,23 @@
     <div class="info-box">
         <i class="fas fa-brain"></i>
         <div class="info-box-text"><strong>ML Model Performance Dashboard</strong><br>Evaluate prediction accuracy, upload test data, and monitor model drift</div>
+
+         <button onclick="showModelHelp()" style="
+            background: #3B82F6; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 10px; 
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            white-space: nowrap;
+        ">
+            <i class="fas fa-question-circle" style="background: white;  border-radius: 20px;"></i> How to Use
+        </button>
     </div>
 
     <div class="grid-4">
@@ -1450,6 +1563,8 @@
         <div class="stat-card"><div class="stat-icon"><i class="fas fa-database"></i></div><div class="stat-val" id="testSamples">0</div><div class="stat-label">Test Samples</div></div>
         <div class="stat-card"><div class="stat-icon"><i class="fas fa-calendar-week"></i></div><div class="stat-val" id="lastEvaluated">--</div><div class="stat-label">Last Evaluated</div></div>
     </div>
+
+
 
     <div class="grid-2">
       <!-- Test Results Details Table -->
@@ -1633,6 +1748,33 @@ function showToast(icon, msg) {
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 2500);
 }
+
+// ========== MODEL HELP FUNCTIONS ==========
+function showModelHelp() {
+    document.getElementById('modelHelpModal').style.display = 'flex';
+}
+
+function closeModelHelp() {
+    document.getElementById('modelHelpModal').style.display = 'none';
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('modelHelpModal');
+    if (event.target === modal) {
+        modal.style.display = 'none';
+    }
+});
+
+// Close with Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('modelHelpModal');
+        if (modal.style.display === 'flex') {
+            modal.style.display = 'none';
+        }
+    }
+});
 
 function showProfile() {
     // Navigate to profile page
@@ -2199,7 +2341,7 @@ function displayEvaluationResults(data) {
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
             ${Object.entries(perClass).map(([category, metrics]) => `
-                <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; border-left: 4px solid ${category === 'Severe' ? '#EF4444' : category === 'Heavy' ? '#F97316' : category === 'Moderate' ? '#F59E0B' : '#22C55E'};">
+                <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; border-left: 4px solid ${category === 'Severe' ? '#EF4444' : category === 'Congested' ? '#F97316' : category === 'Moderate' ? '#F59E0B' : '#22C55E'};">
                     <div style="font-weight: 600; font-size: 14px; color: var(--text-dark);">${category}</div>
                     <div style="font-size: 12px; color: var(--text-light); margin-top: 4px;">
                         Precision: <strong>${metrics.precision}%</strong> · Recall: <strong>${metrics.recall}%</strong> · F1: <strong>${metrics.f1_score}%</strong>

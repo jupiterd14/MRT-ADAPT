@@ -1718,8 +1718,9 @@
                             <div class="stat-card"><h2 id="light-count">0</h2><p>Light Stations</p></div>
                         </div>
                         <div class="status-tables">
+                               <div class="table-card"><h4><i class="fas fa-arrow-up"></i> Northbound</h4><div class="table-scroll-container"><table class="data-table"><thead><th>STATION</th><th>STATUS</th><th>ACTION</th></thead><tbody id="northbound-body"></tbody></table></div></div>
                             <div class="table-card"><h4><i class="fas fa-arrow-down"></i> Southbound</h4><div class="table-scroll-container"><table class="data-table"><thead><th>STATION</th><th>STATUS</th><th>ACTION</th></thead><tbody id="southbound-body"></tbody></table></div></div>
-                            <div class="table-card"><h4><i class="fas fa-arrow-up"></i> Northbound</h4><div class="table-scroll-container"><table class="data-table"><thead><th>STATION</th><th>STATUS</th><th>ACTION</th></thead><tbody id="northbound-body"></tbody></table></div></div>
+                         
                         </div>
                     <!-- Forecast Card with Direction Toggle - FIXED VERSION -->
         <div class="forecast-card">
@@ -2140,7 +2141,7 @@
 
             
         </div>
-      <script>
+    <script>
     console.log("🚇 Operator Dashboard Initializing...");
     console.log("Managed Stations:", {{ managed_stations | tojson }});
     
@@ -2168,7 +2169,7 @@
     // Cache metrics for layout consistency
     let cachedData = null;
     let lastFetchTime = 0;
-    const CACHE_DURATION = 30000; // 30 seconds local cache map string representation
+    const CACHE_DURATION = 30000;
 
     // Status mapping configurations matching client metrics
     function getWaitTime(congestion) {
@@ -2313,10 +2314,7 @@
         container.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading incidents...</p></div>';
         
         try {
-            // Load fresh data
             const broadcasts = await loadAllBroadcasts();
-            
-            // ✅ Filter: Only show ACTIVE broadcasts
             const activeBroadcasts = broadcasts.filter(b => b.is_active === true);
             
             if (activeBroadcasts.length === 0) {
@@ -2347,10 +2345,7 @@
         container.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading archived broadcasts...</p></div>';
         
         try {
-            // Load fresh data
             const broadcasts = await loadAllBroadcasts();
-            
-            // ✅ Filter: Only show INACTIVE broadcasts
             const archivedBroadcasts = broadcasts.filter(b => b.is_active === false);
             
             if (archivedBroadcasts.length === 0) {
@@ -3492,8 +3487,8 @@ function displayOperatorReports(reports) {
         else if (diffHours < 24) timeAgo = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
         else timeAgo = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
         
-        let displayName = '';
-        let avatarLetter = '?';
+        let displayName = 'Commuter';
+        let avatarLetter = 'C';
         
         if (report.anonymous) {
             displayName = 'Anonymous';
@@ -3934,11 +3929,8 @@ function displayOperatorReports(reports) {
             renderStationPills();
         } else if (pageId === 'dashboard') {
             loadCongestionData();
-            if (forecastChart) {
-                forecastChart.update();
-            } else {
-                updateForecastChart();
-            }
+            // ========== FIX: Use the new forecast function ==========
+            updateForecastUI();
         }
     };
 
@@ -4061,138 +4053,126 @@ function displayOperatorReports(reports) {
         broadcastDirection = 'both';
     }
         
-    // ========== FORECAST FUNCTIONS ==========
-    async function updateForecastChart() {
+    // ========== FORECAST FUNCTIONS - MATCH USER DASHBOARD ==========
+    function updateForecastChart(chartLabels, chartData, direction) {
         const canvas = document.getElementById('forecastChart');
         if (!canvas) return;
         
-        const station = currentForecastStation;
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-      
+        if (forecastChart) {
+            forecastChart.destroy();
+            forecastChart = null;
+        }
+        
+        const lineColor = direction === 'north' ? '#8B5CF6' : '#10B981';
+        const bgColor = direction === 'north' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+        
+        forecastChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartLabels,
+                datasets: [{
+                    label: direction === 'north' ? 'Northbound Congestion' : 'Southbound Congestion',
+                    data: chartData,
+                    borderColor: lineColor,
+                    backgroundColor: bgColor,
+                    borderWidth: 3,
+                    pointBackgroundColor: chartData.map(v => {
+                        if (v > 80) return '#EF4444';
+                        if (v > 60) return '#F97316';
+                        if (v > 30) return '#F59E0B';
+                        return '#22C55E';
+                    }),
+                    pointBorderColor: 'white',
+                    pointBorderWidth: 2,
+                    pointRadius: 6,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                let level = 'LIGHT';
+                                if (value > 80) level = 'SEVERE';
+                                else if (value > 60) level = 'CONGESTED';
+                                else if (value > 30) level = 'MODERATE';
+                                return `${level}: ${Math.round(value)}%`;
+                            }
+                        }
+                    }
+                },
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        max: 100, 
+                        title: { display: true, text: 'Congestion (%)', font: { size: 11, weight: 'bold' } },
+                        ticks: { callback: (v) => v + '%' }
+                    },
+                    x: {
+                        title: { display: true, text: 'Time', font: { size: 11, weight: 'bold' } }
+                    }
+                }
+            }
+        });
+    }
+
+    async function updateForecastUI() {
+        const station = currentForecastStation;
+        const canvas = document.getElementById('forecastChart');
+        if (!canvas) return;
         
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
-            
-            const response = await fetch(`/api/directional-forecast/${encodeURIComponent(station)}`, {
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
+            const response = await fetch(`/api/directional-forecast/${encodeURIComponent(station)}?_=${Date.now()}`);
             
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
             const data = await response.json();
-            console.log('📊 Forecast data:', data);
+            console.log('📊 Operator Forecast data:', data);
             
-            let forecastValues = [];
-            let currentCongestion = 0;
-            
-            if (data.forecasts && Array.isArray(data.forecasts)) {
-                forecastValues = data.forecasts.map(f => {
-                    if (currentForecastDirection === 'north') {
-                        return f.northbound || 0;
-                    } else {
-                        return f.southbound || 0;
-                    }
-                });
-            }
-            
+            // ========== CHECK FOR OVERRIDES ==========
             if (data.current) {
-                currentCongestion = currentForecastDirection === 'north' 
-                    ? (data.current.northbound || 0) 
-                    : (data.current.southbound || 0);
+                console.log(`🔧 Northbound overridden: ${data.current.northbound_overridden}`);
+                console.log(`🔧 Southbound overridden: ${data.current.southbound_overridden}`);
             }
             
-            const hasData = forecastValues.length > 0;
-            
-            if (!hasData) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.font = '14px Inter';
-                ctx.fillStyle = '#F59E0B';
-                ctx.textAlign = 'center';
-                ctx.fillText('No forecast data available.', canvas.width/2, canvas.height/2);
+            if (!data.forecasts || !Array.isArray(data.forecasts)) {
+                console.error('No forecasts array found:', data);
                 return;
             }
             
-            const chartData = [currentCongestion, ...forecastValues];
-            
-            const now = new Date();
-            const labels = ['NOW'];
-            for (let i = 1; i <= 6; i++) {
-                const futureTime = new Date(now.getTime() + i * 60 * 60 * 1000);
-                const hour = futureTime.getHours();
-                const hour12 = hour % 12 || 12;
-                const ampm = hour >= 12 ? 'PM' : 'AM';
-                labels.push(`${hour12}:00 ${ampm}`);
-            }
-            
-            if (forecastChart) {
-                forecastChart.destroy();
-                forecastChart = null;
-            }
-            
-            const lineColor = currentForecastDirection === 'north' ? '#8B5CF6' : '#10B981';
-            const bgColor = currentForecastDirection === 'north' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
-            
-            forecastChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: currentForecastDirection === 'north' ? 'Northbound Congestion' : 'Southbound Congestion',
-                        data: chartData,
-                        borderColor: lineColor,
-                        backgroundColor: bgColor,
-                        borderWidth: 3,
-                        pointRadius: 6,
-                        pointBorderColor: 'white',
-                        pointBorderWidth: 2,
-                        pointBackgroundColor: chartData.map(v => {
-                            if (v > 80) return '#EF4444';
-                            if (v > 60) return '#F97316';
-                            if (v > 30) return '#F59E0B';
-                            return '#22C55E';
-                        }),
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.raw;
-                                    let level = 'LIGHT';
-                                    if (value > 80) level = 'SEVERE';
-                                    else if (value > 60) level = 'CONGESTED';
-                                    else if (value > 30) level = 'MODERATE';
-                                    return `${level}: ${Math.round(value)}%`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            title: { display: true, text: 'Congestion (%)', font: { size: 11 } },
-                            grid: { color: '#e2e8f0' }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { font: { size: 10 } }
-                        }
-                    }
-                }
+            const labels = data.forecasts.map((f, index) => {
+                return index === 0 ? `NOW (${f.time})` : f.time;
             });
             
-            console.log('✅ Forecast chart updated successfully');
+            const rawMetrics = currentForecastDirection === 'north' 
+                ? data.forecasts.map(f => f.northbound)
+                : data.forecasts.map(f => f.southbound);
+                
+            const cleanData = rawMetrics.map(v => v !== null && v !== undefined ? v : 0);
+            
+            // Add current congestion as first data point
+            let currentCongestion = 0;
+            if (data.current) {
+                currentCongestion = currentForecastDirection === 'north' 
+                    ? data.current.northbound 
+                    : data.current.southbound;
+            }
+            
+            // Build full data: [current, +1, +2, +3, +4, +5, +6]
+            const fullData = [currentCongestion || 0, ...cleanData];
+            const fullLabels = ['NOW', ...labels];
+            
+            updateForecastChart(fullLabels, fullData, currentForecastDirection);
+            
+            console.log('✅ Operator forecast updated successfully');
             
         } catch (error) {
             console.error('❌ Error loading forecast:', error);
@@ -4204,7 +4184,7 @@ function displayOperatorReports(reports) {
             ctx.fillText(`Error: ${error.message}`, canvas.width/2, canvas.height/2);
         }
     }
-        
+
     function setForecastDirection(direction) {
         currentForecastDirection = direction;
         
@@ -4219,16 +4199,16 @@ function displayOperatorReports(reports) {
             if (northBtn) northBtn.classList.remove('active');
         }
         
-        updateForecastChart();
+        updateForecastUI();
     }
-        
+
     function changeForecastStation(station) {
         currentForecastStation = station;
         const nameEl = document.getElementById('forecastStationName');
         if (nameEl) nameEl.textContent = station;
-        updateForecastChart();
+        updateForecastUI();
     }
-        
+
     function initForecastSelect() {
         const select = document.getElementById('forecastStationSelect');
         if (select && managedStations.length > 0) {
@@ -4237,7 +4217,7 @@ function displayOperatorReports(reports) {
             const nameEl = document.getElementById('forecastStationName');
             if (nameEl) nameEl.textContent = managedStations[0];
         }
-        setTimeout(() => updateForecastChart(), 100);
+        setTimeout(() => updateForecastUI(), 100);
     }
         
     // ========== OVERRIDE FUNCTIONS ==========
@@ -4283,7 +4263,7 @@ function displayOperatorReports(reports) {
                 closeModal();
                 await loadCongestionData();
                 if (currentForecastStation === currentStation) {
-                    await updateForecastChart();
+                    await updateForecastUI();
                 }
             } else { 
                 showToast('⚠️', data.error || 'Failed to set override'); 
@@ -4337,7 +4317,7 @@ function displayOperatorReports(reports) {
                 showToast('', `Override removed for ${station} (${direction})`);
                 await loadCongestionData();
                 if (currentForecastStation === station) {
-                    await updateForecastChart();
+                    await updateForecastUI();
                 }
                 closeRemoveOverrideModal();
             } else {
@@ -4528,5 +4508,5 @@ if (confirmArchiveBtn) confirmArchiveBtn.onclick = confirmArchiveBroadcast;
         console.log("Initialization complete!");
     });
 </script>
-        </body>
-        </html>
+</body>
+</html>

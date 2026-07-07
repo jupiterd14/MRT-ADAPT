@@ -9,6 +9,7 @@ import pickle
 from datetime import datetime, timedelta
 from urllib.parse import unquote
 
+
 from config import Config
 
 # ========== GLOBAL CACHE ==========
@@ -115,7 +116,7 @@ def process_raw_data():
     df['is_weekend'] = (df['datetime'].dt.weekday >= 5).astype(np.int8)
     df['is_holiday'] = 0
     df['is_special_event'] = 0
-    df['is_christmas_season'] = df['datetime'].apply(is_christmas_season).astype(np.int8)
+    df['is_christmas_season'] = np.array([is_christmas_season(d) for d in df['datetime']], dtype=np.int8)
     df['is_payday'] = df['datetime'].apply(is_payday).astype(np.int8)
     df['is_friday'] = df['datetime'].apply(is_friday).astype(np.int8)
     df['is_rush_hour'] = ((df['hour'].between(7, 9)) | (df['hour'].between(17, 19))).astype(np.int8)
@@ -169,8 +170,83 @@ def load_data_fast():
     
     return _DATA_CACHE
 
+
+
+def categorize_congestion(congestion_value, capacity=None, station_name=None):
+    """
+    Categorize congestion into 4 levels based on passenger count or percentage.
+    
+    Args:
+        congestion_value: Raw passenger count or percentage
+        capacity: Station capacity (if using percentage)
+        station_name: Station name to get capacity from
+        
+    Returns:
+        int: Category 0-3
+            0 = Light (0-30% or 0-30% of capacity)
+            1 = Moderate (30-60% of capacity)
+            2 = Congested (60-90% of capacity)
+            3 = Severely Congested (90-100%+ of capacity)
+    """
+    # If capacity is provided, convert to percentage
+    if capacity is not None and capacity > 0:
+        percentage = (congestion_value / capacity) * 100
+    elif station_name is not None:
+        capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        percentage = (congestion_value / capacity) * 100
+    else:
+        # Assume congestion_value is already a percentage (0-100)
+        percentage = congestion_value
+    
+    # Categorize based on percentage
+    if percentage < 30:
+        return 0  # Light
+    elif percentage < 60:
+        return 1  # Moderate
+    elif percentage < 90:
+        return 2  # Congested
+    else:
+        return 3  # Severely Congested
+
+def get_congestion_category_name(category):
+    """Get the human-readable name for a congestion category"""
+    names = {
+        0: "Light",
+        1: "Moderate", 
+        2: "Congested",
+        3: "Severely Congested"
+    }
+    return names.get(category, "Unknown")
+
+
+def get_feature_scaler(station_name, direction):
+    """Get the feature scaler for a station-direction pair"""
+    cache_key = f"{station_name}_{direction}"
+    
+    # Check cache first
+    if cache_key in _FEATURE_SCALER_CACHE:
+        return _FEATURE_SCALER_CACHE[cache_key]
+    
+    # Try to load from disk
+    model_folder = 'models_2022-2024_v8'
+    scaler_path = f'{model_folder}/{cache_key}_feature_scaler.pkl'
+    
+    if os.path.exists(scaler_path):
+        try:
+            with open(scaler_path, 'rb') as f:
+                scaler = pickle.load(f)
+            _FEATURE_SCALER_CACHE[cache_key] = scaler
+            print(f"   ✅ Loaded feature scaler for {cache_key}")
+            return scaler
+        except Exception as e:
+            print(f"   ⚠️ Error loading feature scaler: {e}")
+            return None
+    else:
+        print(f"   ⚠️ No feature scaler found at: {scaler_path}")
+        return None
+    
 def get_station_dataframe(station_name, direction):
-    """Cache station-specific dataframes - USE RAW PASSENGER COUNTS FOR LOOKBACK"""
+    """Cache station-specific dataframes - SCALED CONGESTION TO MATCH TRAINING"""
     cache_key = f"{station_name}_{direction}"
     
     # Return from memory cache if available
@@ -240,6 +316,12 @@ def get_station_dataframe(station_name, direction):
         'is_maintenance_record': 'first', 'is_extended_hours': 'first'
     }).reset_index()
     
+    # DEBUG: After groupby
+    print(f"\n🔍 [DEBUG 0] AFTER groupby:")
+    print(f"   Type: {type(hourly)}")
+    print(f"   Shape: {hourly.shape if hasattr(hourly, 'shape') else 'N/A'}")
+    print(f"   Columns: {hourly.columns.tolist() if hasattr(hourly, 'columns') else 'N/A'}")
+    
     # Create complete hour range
     if len(hourly) > 0:
         min_date = hourly['hour_timestamp'].min().floor('D')
@@ -249,23 +331,101 @@ def get_station_dataframe(station_name, direction):
         hourly.set_index('hour_timestamp', inplace=True)
         hourly = hourly.reindex(all_hours)
         
-        # Fill closed hours with zeros
+        # ========== CRITICAL FIX: CONVERT BACK TO DATAFRAME ==========
+        if not isinstance(hourly, pd.DataFrame):
+            print(f"⚠️ Converting hourly from {type(hourly)} to DataFrame")
+            hourly = pd.DataFrame(hourly)
+        
+        # Now safely use the index
+        # Fill closed hours with zeros for passenger count
+        if 'TotalPassenger' not in hourly.columns:
+            hourly['TotalPassenger'] = 0
+        
         closed_hour_mask = (hourly.index.hour >= 22) | (hourly.index.hour <= 4)
-        if 'TotalPassenger' in hourly.columns:
-            hourly.loc[closed_hour_mask, 'TotalPassenger'] = 0
-        
-        # Forward fill remaining NaN values
-        hourly = hourly.ffill().bfill()
-        
-        # ========== CRITICAL FIX ==========
-        # The model expects RAW PASSENGER COUNTS in the 'congestion' column
-        # because it was trained on raw passenger counts
-        # DO NOT convert to percentage - keep as raw passenger counts!
-        hourly['congestion'] = hourly['TotalPassenger'].copy()
-        
-        # Also calculate actual congestion percentage for display (if needed elsewhere)
+        hourly.loc[closed_hour_mask, 'TotalPassenger'] = 0
+        hourly['TotalPassenger'] = hourly['TotalPassenger'].fillna(0)
+
+        # ========== RECOMPUTE ALL TIME-BASED FEATURES FROM THE INDEX ==========
+        hourly['hour'] = hourly.index.hour
+        hourly['weekday'] = hourly.index.weekday
+        hourly['month'] = hourly.index.month
+        hourly['minute'] = hourly.index.minute
+
+        print(f"\n🔍 [DEBUG 2] AFTER assigning hour/weekday/month/minute:")
+        print(f"   Type: {type(hourly)}")
+        print(f"   Shape: {hourly.shape}")
+        print(f"   First 8 hour values: {hourly['hour'].head(8).tolist()}")
+        print(f"   Last 8 hour values: {hourly['hour'].tail(8).tolist()}")
+
+        # Re-add cyclical and operational features
+        hourly = add_cyclical_time_features(hourly)
+        hourly = add_smart_operating_flags(hourly)
+
+        # Re-add flags that depend on the date
+        hourly['is_weekend'] = (hourly.index.weekday >= 5).astype(np.int8)
+        hourly['is_christmas_season'] = np.array([is_christmas_season(d) for d in hourly.index.date], dtype=np.int8)
+        hourly['is_payday'] = hourly.index.day.isin([15, 30, 31]).astype(np.int8)
+        hourly['is_friday'] = (hourly.index.weekday == 4).astype(np.int8)
+        hourly['is_rush_hour'] = ((hourly['hour'].between(7, 9)) | (hourly['hour'].between(17, 19))).astype(np.int8)
+
+        hourly['is_holiday'] = 0
+        hourly['is_special_event'] = 0
+
+        if not isinstance(hourly, pd.DataFrame):
+            hourly = pd.DataFrame(hourly)
+
+        # Recompute maintenance and extended hours flags
+        hourly = smart_data_cleaner(hourly)
+
+        if not isinstance(hourly, pd.DataFrame):
+            hourly = pd.DataFrame(hourly)
+
+        # ========== CONGESTION FEATURE AND CATEGORIES (FIXED) ==========
         capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-        hourly['congestion_percentage'] = (hourly['TotalPassenger'] / capacity * 100).clip(0, 100)
+
+        # Get the feature scaler to know the expected range for congestion
+        feature_scaler = get_feature_scaler(station_name, direction)
+        if feature_scaler is not None:
+            training_max = feature_scaler.data_max_[-1]  # The max value the scaler was trained on
+            training_min = feature_scaler.data_min_[-1]  # The min value (usually 0)
+        else:
+            # Fallback: estimate from capacity
+            training_max = min(capacity * 0.3, 50)  # Reasonable default
+            training_min = 0
+
+        # Scale congestion to match the training range:
+        # Step 1: Convert raw passenger counts to percentage of capacity (0-100%)
+        # Step 2: Scale percentage to the training range (0 to training_max)
+        percentage = (hourly['TotalPassenger'] / capacity * 100).clip(0, 100)
+        hourly['congestion'] = (percentage / 100) * training_max
+
+        # Store the percentage for display and categorization
+        hourly['congestion_percentage'] = percentage
+        hourly['raw_passengers'] = hourly['TotalPassenger']
+
+        # DEBUG: Check after setting (this shows the scaled values!)
+        print(f"\n🔍 DEBUG: After setting congestion (SCALED):")
+        print(f"   TotalPassenger (first 10): {hourly['TotalPassenger'].head(10).tolist()}")
+        print(f"   congestion (first 10): {hourly['congestion'].head(10).tolist()}")
+        print(f"   congestion_percentage (first 10): {hourly['congestion_percentage'].head(10).tolist()}")
+        
+        # 3. Add congestion categories for confusion matrix
+        hourly['congestion_category'] = 0  # Default to Light
+        hourly.loc[hourly['congestion_percentage'] >= 30, 'congestion_category'] = 1  # Moderate
+        hourly.loc[hourly['congestion_percentage'] >= 60, 'congestion_category'] = 2  # Congested
+        hourly.loc[hourly['congestion_percentage'] >= 90, 'congestion_category'] = 3  # Severely Congested
+        
+        # Add category names for readability
+        category_names = {
+            0: 'Light',
+            1: 'Moderate',
+            2: 'Congested',
+            3: 'Severely Congested'
+        }
+        hourly['congestion_category_name'] = hourly['congestion_category'].map(category_names)
+        
+        # FINAL CHECK: Force hour values from index one more time
+        hourly['hour'] = hourly.index.hour
         
         hourly = hourly.sort_index()
     
@@ -273,40 +433,122 @@ def get_station_dataframe(station_name, direction):
     _STATION_DATA_CACHE[cache_key] = hourly
     
     print(f"✅ Created hourly data for {station_name} {direction}")
-    print(f"   Raw passenger counts (lookback) - min: {hourly['congestion'].min():.0f}, max: {hourly['congestion'].max():.0f}, mean: {hourly['congestion'].mean():.0f}")
+    print(f"   Raw passenger counts - min: {hourly['TotalPassenger'].min():.0f}, max: {hourly['TotalPassenger'].max():.0f}, mean: {hourly['TotalPassenger'].mean():.0f}")
+    
+    # Print category distribution
+    if 'congestion_category_name' in hourly.columns:
+        print(f"\n   Congestion Categories Distribution:")
+        print(hourly['congestion_category_name'].value_counts().sort_index())
     
     return hourly
 
-def get_feature_scaler(station_name, direction):
-    """Cache feature scalers to avoid repeated disk I/O"""
-    cache_key = f"{station_name}_{direction}"
-    
-    if cache_key not in _FEATURE_SCALER_CACHE:
-        # ========== FIX: Use the correct model folder ==========
-        model_folder = 'models_2022-2024_v8'
-        scaler_path = f'{model_folder}/{cache_key}_feature_scaler.pkl'
-        
-        # Try alternative naming
-        if not os.path.exists(scaler_path):
-            # Check if file exists with different naming
-            alt_path = f'{model_folder}/{cache_key.replace(" ", "_")}_feature_scaler.pkl'
-            if os.path.exists(alt_path):
-                scaler_path = alt_path
-        
-        if os.path.exists(scaler_path):
-            try:
-                with open(scaler_path, 'rb') as f:
-                    _FEATURE_SCALER_CACHE[cache_key] = pickle.load(f)
-                print(f"   ✅ Loaded feature scaler for {cache_key}")
-            except Exception as e:
-                print(f"   ⚠️ Error loading scaler: {e}")
-                _FEATURE_SCALER_CACHE[cache_key] = None
-        else:
-            _FEATURE_SCALER_CACHE[cache_key] = None
-            print(f"   ⚠️ No feature scaler found at: {scaler_path}")
-    
-    return _FEATURE_SCALER_CACHE[cache_key]
 
+    
+def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
+    """Get feature sequence - congestion is scaled, then ALL 29 features go through scaler"""
+    station_name = unquote(station_name)
+    direction = unquote(direction)
+    
+    hourly = get_station_dataframe(station_name, direction)
+    
+    # ========== DEBUG: Check the data right after loading ==========
+    print("\n" + "="*60)
+    print("🔍 DEBUG: After get_station_dataframe:")
+    print("="*60)
+    print(hourly[["TotalPassenger", "congestion"]].head(10))
+    print(f"TotalPassenger type: {hourly['TotalPassenger'].dtype}")
+    print(f"congestion type: {hourly['congestion'].dtype}")
+    print("="*60 + "\n")
+    
+    if hourly is None:
+        print(f"⚠️ No hourly data for {station_name} {direction}, using baseline")
+        return get_baseline_features(target_datetime, seq_length)
+    
+    # Handle 2025 predictions
+    if target_datetime.year >= 2025:
+        try:
+            lookback_end = target_datetime.replace(year=2024)
+        except:
+            lookback_end = target_datetime.replace(year=2024, month=2, day=28)
+        start_lookback = lookback_end - timedelta(hours=seq_length)
+    else:
+        start_lookback = target_datetime - timedelta(hours=seq_length)
+        lookback_end = target_datetime
+    
+    # Get available data in the window
+    sequence_df = hourly[(hourly.index >= start_lookback) & (hourly.index < lookback_end)]
+    
+    # ========== DEBUG: Check after slicing ==========
+    print("\n" + "="*60)
+    print("🔍 DEBUG: After slicing the time window:")
+    print("="*60)
+    if len(sequence_df) > 0:
+        print(sequence_df[["TotalPassenger", "congestion"]].head(10))
+    else:
+        print("No data in the time window")
+    print("="*60 + "\n")
+    
+    available_rows = len(sequence_df)
+    
+    if available_rows == 0:
+        return get_baseline_features(target_datetime, seq_length)
+    
+    # Get features with raw passenger counts
+    if available_rows == seq_length:
+        features_df = sequence_df[FEATURE_COLS].copy()
+        features = features_df.values.astype(np.float32)
+    elif available_rows >= 10:
+        features_df = sequence_df[FEATURE_COLS].copy()
+        features = features_df.values.astype(np.float32)
+        if available_rows < seq_length:
+            missing_count = seq_length - available_rows
+            baseline_features = get_baseline_features(target_datetime, missing_count)
+            features = np.vstack([baseline_features, features])
+    else:
+        return get_baseline_features(target_datetime, seq_length)
+    
+    # Ensure exactly seq_length rows
+    if len(features) != seq_length:
+        if len(features) > seq_length:
+            features = features[:seq_length]
+        else:
+            while len(features) < seq_length:
+                features = np.vstack([features, features[-1:]])
+    
+    # ========== DEBUG: Check features before scaling ==========
+    print("\n" + "="*60)
+    print("🔍 DEBUG: Before scaling - congestion values from features array:")
+    print("="*60)
+    print(f"Congestion values: {features[:, -1][:10]}")
+    print("="*60 + "\n")
+    
+    # ========== APPLY FEATURE SCALER TO ALL 29 FEATURES ==========
+    feature_scaler = get_feature_scaler(station_name, direction)
+    
+    if feature_scaler is not None:
+        try:
+            print("\n========== BEFORE SCALING ==========")
+            print("First row:", features[0])
+            print("Congestion range:",
+                features[:, -1].min(),
+                features[:, -1].max())
+
+            # Scale all 29 features
+            features = feature_scaler.transform(features)
+
+            print("\n========== AFTER SCALING ==========")
+            print("First row:", features[0])
+            print("Congestion range:",
+                features[:, -1].min(),
+                features[:, -1].max())
+
+            print(f"✅ Scaled all {features.shape[1]} features")
+            print(f"✅ Final shape: {features.shape}")
+
+        except Exception as e:
+            print(f"⚠️ Feature scaling failed: {e}")
+    
+    return features
 def get_baseline_features(target_datetime, seq_length=24):
     """Cache baseline features for repeated lookups"""
     cache_key = f"{target_datetime.strftime('%Y%m%d%H')}_{seq_length}"
@@ -320,26 +562,26 @@ def get_baseline_features(target_datetime, seq_length=24):
             default_features[i, 0] = h_val
             default_features[i, 1] = loop_time.weekday()
             default_features[i, 2] = loop_time.month
-            default_features[i, 3] = np.sin(2 * np.pi * h_val / 24)  # hour_sin
-            default_features[i, 4] = np.cos(2 * np.pi * h_val / 24)  # hour_cos
-            default_features[i, 5] = np.sin(2 * np.pi * loop_time.weekday() / 7)  # dow_sin
-            default_features[i, 6] = np.cos(2 * np.pi * loop_time.weekday() / 7)  # dow_cos
-            default_features[i, 7] = np.sin(2 * np.pi * (loop_time.month - 1) / 12)  # month_sin
-            default_features[i, 8] = np.cos(2 * np.pi * (loop_time.month - 1) / 12)  # month_cos
+            default_features[i, 3] = np.sin(2 * np.pi * h_val / 24)
+            default_features[i, 4] = np.cos(2 * np.pi * h_val / 24)
+            default_features[i, 5] = np.sin(2 * np.pi * loop_time.weekday() / 7)
+            default_features[i, 6] = np.cos(2 * np.pi * loop_time.weekday() / 7)
+            default_features[i, 7] = np.sin(2 * np.pi * (loop_time.month - 1) / 12)
+            default_features[i, 8] = np.cos(2 * np.pi * (loop_time.month - 1) / 12)
             
-            # Set congestion based on rush hours
+            # ========== USE RAW PASSENGER COUNTS FOR BASELINE ==========
             if 7 <= h_val <= 9:
-                default_features[i, -1] = 3500.0  # Morning rush passenger count
+                default_features[i, -1] = 3500.0  # Morning rush - raw passengers
             elif 17 <= h_val <= 19:
-                default_features[i, -1] = 4000.0  # Evening rush passenger count
+                default_features[i, -1] = 4000.0  # Evening rush - raw passengers
             elif 10 <= h_val <= 16:
-                default_features[i, -1] = 2000.0  # Midday
+                default_features[i, -1] = 2000.0  # Midday - raw passengers
             elif 5 <= h_val <= 6:
-                default_features[i, -1] = 800.0   # Early morning
+                default_features[i, -1] = 800.0   # Early morning - raw passengers
             elif 20 <= h_val <= 21:
-                default_features[i, -1] = 1500.0  # Late evening
+                default_features[i, -1] = 1500.0  # Late evening - raw passengers
             else:
-                default_features[i, -1] = 100.0   # Very early/late
+                default_features[i, -1] = 100.0   # Very early/late - raw passengers
         
         _BASELINE_FEATURES_CACHE[cache_key] = default_features
     
@@ -396,50 +638,32 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
             while len(features) < seq_length:
                 features = np.vstack([features, features[-1:]])
     
-    # ========== SCALE CONGESTION USING TARGET SCALER ==========
-    target_scaler = get_target_scaler(station_name, direction)
-    congestion_idx = -1
-    
-    if target_scaler is not None:
-        try:
-            # Extract raw congestion and scale using target scaler
-            raw_congestion = features[:, congestion_idx].reshape(-1, 1)
-            scaled_congestion = target_scaler.transform(raw_congestion)
-            
-            # Replace the congestion column with the scaled version
-            features[:, congestion_idx] = scaled_congestion.flatten()
-            
-            print(f"   📊 {station_name} {direction}: Using target scaler max={target_scaler.data_max_[0]:.0f}")
-            print(f"   📊 Raw congestion: min={raw_congestion.min():.1f}, max={raw_congestion.max():.1f}")
-            print(f"   📊 Scaled congestion: min={features[:, congestion_idx].min():.4f}, max={features[:, congestion_idx].max():.4f}, mean={features[:, congestion_idx].mean():.4f}")
-            
-        except Exception as e:
-            print(f"   ⚠️ Target scaler failed: {e}")
-            # Fallback: use capacity-based scaling
-            capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-            max_scale = capacity * 2.0
-            features[:, congestion_idx] = features[:, congestion_idx] / max_scale
-            features[:, congestion_idx] = np.clip(features[:, congestion_idx], 0, 1)
-    else:
-        # Fallback: use capacity-based scaling
-        print(f"   ⚠️ No target scaler, using capacity fallback")
-        capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-        max_scale = capacity * 2.0
-        features[:, congestion_idx] = features[:, congestion_idx] / max_scale
-        features[:, congestion_idx] = np.clip(features[:, congestion_idx], 0, 1)
     
     # ========== APPLY FEATURE SCALER TO ALL 29 FEATURES ==========
     feature_scaler = get_feature_scaler(station_name, direction)
     
     if feature_scaler is not None:
         try:
-            # Scale ALL 29 features (including the now-scaled congestion column)
+            print("\n========== BEFORE SCALING ==========")
+            print("First row:", features[0])
+            print("Congestion range:",
+                features[:, -1].min(),
+                features[:, -1].max())
+
+            # Scale all 29 features
             features = feature_scaler.transform(features)
-            print(f"   ✅ Scaled all 29 features with feature scaler")
-            print(f"   ✅ Final shape: {features.shape}")
-            
+
+            print("\n========== AFTER SCALING ==========")
+            print("First row:", features[0])
+            print("Congestion range:",
+                features[:, -1].min(),
+                features[:, -1].max())
+
+            print(f"✅ Scaled all {features.shape[1]} features")
+            print(f"✅ Final shape: {features.shape}")
+
         except Exception as e:
-            print(f"   ⚠️ Feature scaling failed: {e}")
+            print(f"⚠️ Feature scaling failed: {e}")
     
     return features
 
@@ -483,41 +707,68 @@ def get_target_scaler(station_name, direction):
 def load_data():
     """Legacy function - now uses fast loading"""
     return load_data_fast()
-
 def add_cyclical_time_features(df):
-    df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
-    df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
-    df['dow_sin'] = np.sin(2 * np.pi * df['weekday'] / 7)
-    df['dow_cos'] = np.cos(2 * np.pi * df['weekday'] / 7)
-    df['month_sin'] = np.sin(2 * np.pi * (df['month'] - 1) / 12)
-    df['month_cos'] = np.cos(2 * np.pi * (df['month'] - 1) / 12)
-    df['time_decimal'] = df['hour'] + df['minute'] / 60
+    """Add cyclical time features using the DataFrame index"""
+    if not isinstance(df, pd.DataFrame):
+        df = pd.DataFrame(df)
+    
+    # Use numpy for all calculations to avoid Index vs Series issues
+    hours = df.index.hour
+    weekdays = df.index.weekday
+    months = df.index.month
+    minutes = df.index.minute
+    
+    df['hour_sin'] = np.sin(2 * np.pi * hours / 24)
+    df['hour_cos'] = np.cos(2 * np.pi * hours / 24)
+    df['dow_sin'] = np.sin(2 * np.pi * weekdays / 7)
+    df['dow_cos'] = np.cos(2 * np.pi * weekdays / 7)
+    df['month_sin'] = np.sin(2 * np.pi * (months - 1) / 12)
+    df['month_cos'] = np.cos(2 * np.pi * (months - 1) / 12)
+    df['time_decimal'] = hours + minutes / 60
     df['is_operating_hour'] = ((df['time_decimal'] >= 4.5) & (df['time_decimal'] < 23.0)).astype(np.int8)
-    df['minute_normalized'] = df['minute'] / 60.0
+    df['minute_normalized'] = minutes / 60.0
+    
     return df
 
 def add_smart_operating_flags(df):
-    time_decimal = df['time_decimal']
+    """Add operating flags using the DataFrame index"""
+    if not isinstance(df, pd.DataFrame):
+        df = pd.DataFrame(df)
+    
+    # Convert index time to numpy array for operations
+    time_decimal = df.index.hour + df.index.minute / 60
+    
+    # Use numpy for operations
     df['is_morning_rush'] = ((time_decimal >= 7.0) & (time_decimal <= 9.0)).astype(np.int8)
     df['is_evening_rush'] = ((time_decimal >= 17.0) & (time_decimal <= 19.0)).astype(np.int8)
     df['is_noon'] = ((time_decimal >= 12.0) & (time_decimal <= 13.0)).astype(np.int8)
     df['is_pre_opening'] = ((time_decimal >= 4.5) & (time_decimal < 5.0)).astype(np.int8)
     df['is_post_closing'] = ((time_decimal >= 22.5) & (time_decimal < 23.0)).astype(np.int8)
+    
+    # Use numpy for clip operations
     minutes_until = (23.0 - time_decimal) * 60
-    df['minutes_until_closing'] = minutes_until.clip(lower=0).astype(np.float32)
+    df['minutes_until_closing'] = np.clip(minutes_until, 0, None).astype(np.float32)
+    
     minutes_since = (time_decimal - 4.5) * 60
-    df['minutes_since_opening'] = minutes_since.clip(lower=0).astype(np.float32)
-    df['time_normalized'] = ((time_decimal - 4.5) / (23.0 - 4.5)).clip(0, 1)
+    df['minutes_since_opening'] = np.clip(minutes_since, 0, None).astype(np.float32)
+    
+    df['time_normalized'] = np.clip((time_decimal - 4.5) / (23.0 - 4.5), 0, 1)
+    
     return df
-
 def smart_data_cleaner(df):
-    time_decimal = df['time_decimal']
+    """Clean data and add maintenance flags using the DataFrame index"""
+    if not isinstance(df, pd.DataFrame):
+        df = pd.DataFrame(df)
+    
+    time_decimal = df.index.hour + df.index.minute / 60
     passenger_count = df['TotalPassenger']
+    
     df['is_maintenance_record'] = ((time_decimal < 5.0) & (passenger_count < 10)).astype(np.int8)
     df['is_extended_hours'] = ((time_decimal >= 22.0) & (time_decimal < 23.0) & (passenger_count >= 10)).astype(np.int8)
-    df.loc[df['is_maintenance_record'] == 1, 'congestion'] = 0
+    
+    # DON'T touch congestion here - let get_station_dataframe handle it
     return df
-
+    
 def is_christmas_season(date):
     month_day = date.strftime('%m-%d')
     return (month_day >= '12-15') or (month_day <= '01-05')

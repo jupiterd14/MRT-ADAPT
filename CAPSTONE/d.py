@@ -26,3 +26,4 @@ for station, capacity in capacities.items():
         max_pass = station_df['TotalPassenger'].max()
         max_cong = (max_pass / capacity * 100)
         print(f"{station}: Capacity={capacity}, Max Passenger={max_pass}, Max Congestion={max_cong:.1f}%")
+        
