@@ -269,20 +269,26 @@ def fix_target_scalers_to_passenger_counts(STATIONS):
     return fixed_count
 
 def fix_target_scalers_to_passenger_counts_auto(STATIONS):
-    """
-    Automatically fix scalers based on actual training data
-    Uses the historical data to determine correct passenger ranges
-    """
-    global directional_scalers, historical_entry
+    """Auto-fix scalers using raw training data"""
+    global directional_scalers
+    from sklearn.preprocessing import MinMaxScaler
+    import numpy as np
     
     print("\n" + "="*60)
-    print("🔧 AUTO-FIXING TARGET SCALERS USING HISTORICAL DATA")
+    print("🔧 AUTO-FIXING TARGET SCALERS USING RAW DATA")
     print("="*60)
     
-    fixed_count = 0
+    from services.feature_engineering import load_data_fast
+    df = load_data_fast()
     
-    # Get actual passenger ranges from training data
-    from services.feature_engineering import get_station_dataframe
+    station_numbers = {
+        "North Ave": 1, "Quezon Ave": 2, "Kamuning": 3, "Cubao": 4,
+        "Santolan": 5, "Ortigas": 6, "Shaw Blvd": 7, "Boni Ave": 8,
+        "Guadalupe": 9, "Buendia": 10, "Ayala Ave": 11, "Magallanes": 12,
+        "Taft": 13
+    }
+    
+    fixed_count = 0
     
     for station in STATIONS:
         for direction in ['Northbound', 'Southbound']:
@@ -292,54 +298,48 @@ def fix_target_scalers_to_passenger_counts_auto(STATIONS):
             if target_key not in directional_scalers:
                 continue
             
-            try:
-                # Get actual data for this station/direction
-                hourly = get_station_dataframe(station, direction)
-                
-                if hourly is not None and len(hourly) > 0:
-                    # Get actual passenger min/max from training data
-                    actual_min = float(hourly['TotalPassenger'].min())
-                    actual_max = float(hourly['TotalPassenger'].max())
-                    
-                    # Add 10% buffer to max
-                    max_passengers = int(actual_max * 1.1)
-                    
-                    # Create new scaler with actual data range
-                    new_scaler = MinMaxScaler()
-                    dummy_data = np.array([[actual_min], [max_passengers]])
-                    new_scaler.fit(dummy_data)
-                    
-                    new_scaler.data_min_ = np.array([actual_min])
-                    new_scaler.data_max_ = np.array([float(max_passengers)])
-                    new_scaler.scale_ = np.array([1.0 / (max_passengers - actual_min)]) if max_passengers > actual_min else np.array([1.0])
-                    new_scaler.min_ = np.array([actual_min])
-                    
-                    directional_scalers[target_key] = new_scaler
-                    fixed_count += 1
-                    print(f"   ✅ Fixed {target_key}: {actual_min:.0f} → {max_passengers} passengers (from actual data)")
+            station_num = station_numbers.get(station)
+            
+            if station == "North Ave":
+                if direction == 'Northbound':
+                    station_df = df[df['StationExit'] == station_num].copy()
                 else:
-                    print(f"   ⚠️ No data for {target_key}, using default range")
-                    # Use default fix
-                    from services.feature_engineering import MRT3_PLATFORM_CAPACITY
-                    capacity = MRT3_PLATFORM_CAPACITY.get(station, 1142)
-                    max_passengers = min(int(capacity * 6), 8000)
-                    
-                    new_scaler = MinMaxScaler()
-                    dummy_data = np.array([[0], [max_passengers]])
-                    new_scaler.fit(dummy_data)
-                    new_scaler.data_min_ = np.array([0.0])
-                    new_scaler.data_max_ = np.array([float(max_passengers)])
-                    new_scaler.scale_ = np.array([1.0 / max_passengers])
-                    new_scaler.min_ = np.array([0.0])
-                    
-                    directional_scalers[target_key] = new_scaler
-                    fixed_count += 1
-                    print(f"   ✅ Fixed {target_key}: 0 → {max_passengers} passengers (default range)")
-                    
-            except Exception as e:
-                print(f"   ❌ Error fixing {target_key}: {e}")
+                    station_df = df[df['StationEntry'] == station_num].copy()
+            elif station == "Taft":
+                if direction == 'Northbound':
+                    station_df = df[df['StationEntry'] == station_num].copy()
+                else:
+                    station_df = df[df['StationExit'] == station_num].copy()
+            else:
+                if direction == 'Northbound':
+                    station_df = df[df['StationExit'] == station_num].copy()
+                else:
+                    station_df = df[df['StationEntry'] == station_num].copy()
+            
+            station_df = station_df[station_df['Direction'] == direction]
+            
+            if len(station_df) > 0:
+                actual_max = float(station_df['TotalPassenger'].max())
+                
+                # IMPORTANT: Use min=0, not actual_min
+                actual_min = 0.0
+                
+                print(f"   {model_key}: max={actual_max:.0f}")
+                
+                new_scaler = MinMaxScaler()
+                dummy_data = np.array([[actual_min], [actual_max]])
+                new_scaler.fit(dummy_data)
+                
+                new_scaler.data_min_ = np.array([actual_min])
+                new_scaler.data_max_ = np.array([actual_max])
+                new_scaler.scale_ = np.array([1.0 / (actual_max - actual_min)]) if actual_max > actual_min else np.array([1.0])
+                new_scaler.min_ = np.array([actual_min])
+                
+                directional_scalers[target_key] = new_scaler
+                fixed_count += 1
+                print(f"   ✅ Fixed {model_key}: {actual_min:.0f} → {actual_max:.0f}")
     
-    print(f"\n✅ Auto-fixed {fixed_count} target scalers using historical data")
+    print(f"\n✅ Fixed {fixed_count} target scalers")
     return fixed_count
 
 def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY, 
@@ -459,12 +459,8 @@ print("\n" + "="*50)
 print("🔧 APPLYING CRITICAL FIX: Converting scalers to passenger counts...")
 print("="*50)
 
-# Option 1: Auto-fix using historical data (recommended)
 print("\nUsing auto-fix with historical data...")
 fix_target_scalers_to_passenger_counts_auto(STATIONS)
-
-# Option 2: Manual fix with station capacities (fallback)
-# fix_target_scalers_to_passenger_counts(STATIONS)
 
 # Print final scaler info
 print("\n" + "="*50)

@@ -1,0 +1,94 @@
+{
+  "station": "Cubao",
+  "direction": "northbound",
+  "total_samples": 30,
+  "timestamp": "2026-07-04T01:52:41.764507",
+  "confusion_matrix": {
+    "labels": [
+      "Light",
+      "Moderate",
+      "Heavy",
+      "Severe"
+    ],
+    "matrix": [
+      [
+        13,
+        4,
+        0,
+        0
+      ],
+      [
+        2,
+        8,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "accuracy": 73.33,
+  "precision_weighted": 78.39,
+  "recall_weighted": 72.41,
+  "f1_weighted": 75.22,
+  "regression_metrics": {
+    "mae": 9.97,
+    "rmse": 13.3,
+    "r2": 0.0835,
+    "mape": 38.47
+  },
+  "per_class_metrics": {
+    "Light": {
+      "precision": 86.7,
+      "recall": 76.5,
+      "f1_score": 81.2,
+      "support": 17.0
+    },
+    "Moderate": {
+      "precision": 66.7,
+      "recall": 66.7,
+      "f1_score": 66.7,
+      "support": 12.0
+    },
+    "Heavy": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 0.0
+    },
+    "Severe": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 0.0
+    }
+  },
+  "category_distribution": {
+    "Light": {
+      "actual": 17,
+      "predicted": 15
+    },
+    "Moderate": {
+      "actual": 12,
+      "predicted": 12
+    },
+    "Heavy": {
+      "actual": 0,
+      "predicted": 0
+    },
+    "Severe": {
+      "actual": 0,
+      "predicted": 0
+    }
+  }
+}

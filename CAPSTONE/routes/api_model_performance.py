@@ -11,6 +11,7 @@ import numpy as np
 import os
 import pickle
 import random
+import json
 from werkzeug.utils import secure_filename
 from sklearn.metrics import (
     confusion_matrix, 
@@ -27,6 +28,7 @@ import services
 from services.feature_engineering import get_feature_sequence_for_station
 from services import get_directional_prediction
 from services.model_loader import directional_models, directional_scalers
+from routes.api_other import MRT3_PLATFORM_CAPACITY
 
 model_perf_bp = Blueprint('model_performance', __name__)
 
@@ -36,19 +38,104 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs('test_results', exist_ok=True)
 os.makedirs('evaluation_results', exist_ok=True)
 
-# Load per-direction max passengers
-MAX_PATH = 'models_2022-2024_v8/per_direction_max_passengers.pkl'
-PER_DIRECTION_MAX = {}
-if os.path.exists(MAX_PATH):
-    with open(MAX_PATH, 'rb') as f:
-        PER_DIRECTION_MAX = pickle.load(f)
-        print(f"✅ Loaded {len(PER_DIRECTION_MAX)} per-direction max values")
+# ============================================================
+# STATIONS LIST (MUST MATCH api_predict.py)
+# ============================================================
+STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
+            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+            "Ayala Ave", "Magallanes", "Taft"]
 
-# Congestion categories
+# ============================================================
+# LOAD HISTORICAL PEAKS FOR REFERENCE ONLY (NOT used for congestion)
+# ============================================================
+HISTORICAL_PEAKS = {}
+
+def load_historical_peaks():
+    """Load historical peaks for REFERENCE ONLY - NOT used for congestion calculation"""
+    global HISTORICAL_PEAKS
+    
+    peaks_file = 'historical_peaks.json'
+    if os.path.exists(peaks_file):
+        try:
+            with open(peaks_file, 'r') as f:
+                HISTORICAL_PEAKS = json.load(f)
+            print(f"✅ Loaded historical peaks from {peaks_file} (for reference only)")
+            return HISTORICAL_PEAKS
+        except Exception as e:
+            print(f"⚠️ Could not load peaks file: {e}")
+    
+    print("📊 Calculating historical peaks for reference only...")
+    from services.feature_engineering import load_data_fast, get_station_dataframe
+    import numpy as np
+    
+    df = load_data_fast()
+    if df is None:
+        print("❌ Could not load data for peak calculation")
+        return {}
+    
+    for station in STATIONS:
+        for direction in ['Northbound', 'Southbound']:
+            hourly = get_station_dataframe(station, direction)
+            if hourly is not None and len(hourly) > 0:
+                passengers = hourly['TotalPassenger'].values
+                peak_abs = float(passengers.max())
+                key = f"{station}_{direction}"
+                HISTORICAL_PEAKS[key] = {
+                    "peak": peak_abs,
+                    "absolute_max": peak_abs,
+                    "percentile": 100
+                }
+                print(f"   {key}: abs max = {peak_abs:.0f}")
+    
+    try:
+        with open(peaks_file, 'w') as f:
+            json.dump(HISTORICAL_PEAKS, f, indent=2)
+        print(f"✅ Saved historical peaks to {peaks_file}")
+    except Exception as e:
+        print(f"⚠️ Could not save peaks file: {e}")
+    
+    return HISTORICAL_PEAKS
+
+# Load peaks on startup
+HISTORICAL_PEAKS = load_historical_peaks()
+
+# ============================================================
+# LOAD CORRECTION FACTORS (MATCHES api_predict.py)
+# ============================================================
+CORRECTION_FACTORS = {}
+
+
+def load_correction_factors():
+    """Load correction factors - MATCHES api_predict.py"""
+    global CORRECTION_FACTORS
+    correction_file = 'correction_factors.pkl'
+    if os.path.exists(correction_file):
+        try:
+            with open(correction_file, 'rb') as f:
+                CORRECTION_FACTORS = pickle.load(f)
+            print(f"✅ Loaded correction factors for {len(CORRECTION_FACTORS)} station-directions")
+        except Exception as e:
+            print(f"⚠️ Could not load correction factors: {e}")
+            CORRECTION_FACTORS = {}
+    else:
+        print("⚠️ No correction factors found – using 1.0")
+        CORRECTION_FACTORS = {}
+
+load_correction_factors()
+
+# ============================================================
+# CONGESTION CATEGORIES - Based on Platform Capacity
+# ============================================================
+# These categories are based on platform congestion:
+# - Light (< 30%): Platform underutilized
+# - Moderate (30-60%): Normal platform usage
+# - Heavy (60-80%): Platform busy
+# - Severe (> 80%): Platform overcrowded
+# ============================================================
 CATEGORY_ORDER = ['Light', 'Moderate', 'Heavy', 'Severe']
 
 def get_congestion_category(congestion_value):
-    """Convert congestion percentage to category"""
+    """Convert congestion percentage to category - MATCHES api_predict.py"""
     if congestion_value > 80:
         return 'Severe'
     elif congestion_value > 60:
@@ -57,6 +144,16 @@ def get_congestion_category(congestion_value):
         return 'Moderate'
     else:
         return 'Light'
+
+def get_capacity(station_name):
+    """Get platform capacity for a station"""
+    return MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+
+def calculate_congestion(passenger_count, station_name):
+    """Calculate congestion using platform capacity (MATCHES api_predict.py)"""
+    capacity = get_capacity(station_name)
+    congestion = (passenger_count / capacity) * 100
+    return min(congestion, 100)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -89,7 +186,7 @@ def add_cyclical_time_features(df):
     return df
 
 def add_smart_operating_flags(df):
-    """Add operating hour flags (CRITICAL for correct predictions)"""
+    """Add operating hour flags"""
     time_decimal = df['time_decimal']
     df['is_morning_rush'] = ((time_decimal >= 7.0) & (time_decimal <= 9.0)).astype(np.int8)
     df['is_evening_rush'] = ((time_decimal >= 17.0) & (time_decimal <= 19.0)).astype(np.int8)
@@ -158,6 +255,56 @@ def get_station_data_for_direction(df, station_num, direction):
         else:
             return df[df['StationEntry'] == station_num].copy()
 
+def get_historical_peak(station_name, direction):
+    """Get the historical peak for REFERENCE ONLY - NOT used for congestion"""
+    key = f"{station_name}_{direction}"
+    peak_data = HISTORICAL_PEAKS.get(key)
+    
+    if peak_data:
+        if isinstance(peak_data, dict):
+            return peak_data.get("peak", peak_data.get("absolute_max", 5000))
+        else:
+            return peak_data
+    return 5000
+
+import numpy as np
+
+def calculate_commuter_congestion(passenger_count, station, direction):
+    """
+    Calculate 0-100% congestion score based on historical percentile.
+    This tells commuters: "This hour is busier than X% of typical hours"
+    
+    Args:
+        passenger_count: Hourly passenger count
+        station: Station name (e.g., "Taft")
+        direction: "Northbound" or "Southbound"
+    
+    Returns:
+        float: 0-100% congestion score
+    """
+    # Get historical data for this station/direction
+    from services.feature_engineering import get_station_dataframe
+    hourly = get_station_dataframe(station, direction)
+    
+    if hourly is None or len(hourly) == 0:
+        # Fallback: use a simple scaling
+        return min((passenger_count / 1000) * 100, 100)
+    
+    # Get historical passenger counts
+    historical_counts = hourly['TotalPassenger'].values
+    
+    # Use 95th percentile as "100%" (very busy)
+    # This means only 5% of hours are considered "full"
+    p95 = np.percentile(historical_counts, 95)
+    
+    # Scale to 0-100%
+    congestion = min((passenger_count / p95) * 100, 100)
+    
+    # Ensure minimum value is 0
+    congestion = max(congestion, 0)
+    
+    return congestion
+
 # ============= EVALUATION METRICS ENDPOINT =============
 @model_perf_bp.route('/model/evaluate', methods=['POST'])
 def evaluate_model():
@@ -182,11 +329,8 @@ def evaluate_model():
                 try:
                     df = pd.read_csv(os.path.join('test_results', filename))
                     
-                    # Filter by station
                     if station != 'all' and 'station' in df.columns:
                         df = df[df['station'] == station]
-                    
-                    # Filter by direction
                     if direction != 'both' and 'direction' in df.columns:
                         df = df[df['direction'].str.lower() == direction.lower()]
                     
@@ -205,12 +349,10 @@ def evaluate_model():
         
         combined = pd.concat(all_results, ignore_index=True)
         
-        # Convert numeric columns
         for col in ['predicted', 'actual', 'absolute_error']:
             if col in combined.columns:
                 combined[col] = pd.to_numeric(combined[col], errors='coerce')
         
-        # Drop NaN rows
         combined = combined.dropna(subset=['predicted', 'actual'])
         
         if len(combined) < 10:
@@ -220,27 +362,21 @@ def evaluate_model():
                 "total_samples": len(combined)
             }), 400
         
-        # Get predictions and actuals
         predictions = combined['predicted'].values
         actuals = combined['actual'].values
         
-        # Convert to categories
         pred_categories = [get_congestion_category(p) for p in predictions]
         actual_categories = [get_congestion_category(a) for a in actuals]
         
-        # Calculate confusion matrix
         cm = confusion_matrix(actual_categories, pred_categories, labels=CATEGORY_ORDER)
         
-        # Calculate classification metrics
         accuracy = accuracy_score(actual_categories, pred_categories)
         precision = precision_score(actual_categories, pred_categories, labels=CATEGORY_ORDER, average='weighted', zero_division=0)
         recall = recall_score(actual_categories, pred_categories, labels=CATEGORY_ORDER, average='weighted', zero_division=0)
         f1 = f1_score(actual_categories, pred_categories, labels=CATEGORY_ORDER, average='weighted', zero_division=0)
         
-        # Per-class metrics
         class_report = classification_report(actual_categories, pred_categories, labels=CATEGORY_ORDER, output_dict=True, zero_division=0)
         
-        # Regression metrics
         mae = mean_absolute_error(actuals, predictions)
         rmse = np.sqrt(mean_squared_error(actuals, predictions))
         r2 = r2_score(actuals, predictions)
@@ -248,7 +384,6 @@ def evaluate_model():
         epsilon = 1e-8
         mape = np.mean(np.abs((actuals - predictions) / (actuals + epsilon))) * 100
         
-        # Per-class metrics for frontend
         per_class_metrics = {}
         for category in CATEGORY_ORDER:
             if category in class_report:
@@ -259,7 +394,6 @@ def evaluate_model():
                     'support': class_report[category]['support']
                 }
         
-        # Category distribution
         category_distribution = {}
         for category in CATEGORY_ORDER:
             category_distribution[category] = {
@@ -267,7 +401,6 @@ def evaluate_model():
                 'predicted': pred_categories.count(category)
             }
         
-        # Prepare response
         evaluation_data = {
             'station': station,
             'direction': direction,
@@ -291,11 +424,9 @@ def evaluate_model():
             'category_distribution': category_distribution
         }
         
-        # Save evaluation results
         os.makedirs('evaluation_results', exist_ok=True)
         filename = f"evaluation_results/eval_{station}_{direction}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         with open(filename, 'w') as f:
-            import json
             json.dump(evaluation_data, f, indent=2)
         
         return jsonify({
@@ -328,9 +459,7 @@ def get_evaluation_history():
             if f.endswith('.json'):
                 try:
                     with open(os.path.join('evaluation_results', f), 'r') as file:
-                        import json
                         data = json.load(file)
-                        # Filter by station/direction if specified
                         if station != 'all' and data.get('station') != station:
                             continue
                         if direction != 'both' and data.get('direction') != direction:
@@ -360,18 +489,135 @@ def health_check():
             "scalers_loaded": len(directional_scalers),
             "data_file_exists": data_exists,
             "test_results_directory": test_results_exist,
+            "historical_peaks_loaded": len(HISTORICAL_PEAKS),
+            "correction_factors_loaded": len(CORRECTION_FACTORS),
             "ready_for_testing": len(directional_models) > 0 and data_exists
         }
     })
 
 # ============= DEBUG ENDPOINTS =============
+
+@model_perf_bp.route('/debug/analyze-scalers', methods=['GET'])
+def debug_analyze_scalers():
+    """Analyze feature and target scalers to understand what the model learned"""
+    try:
+        station = request.args.get('station', 'Taft')
+        direction = request.args.get('direction', 'Southbound')
+        model_key = f"{station}_{direction}"
+        
+        result = {
+            "model_key": model_key,
+            "station": station,
+            "direction": direction,
+            "analysis": {}
+        }
+        
+        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        if feature_scaler is not None:
+            congestion_idx = -1
+            result["analysis"]["feature_scaler"] = {
+                "congestion_feature_index": congestion_idx,
+                "congestion_data_min": float(feature_scaler.data_min_[congestion_idx]),
+                "congestion_data_max": float(feature_scaler.data_max_[congestion_idx]),
+                "interpretation": f"During training, congestion was scaled from {feature_scaler.data_min_[congestion_idx]*100:.0f}% to {feature_scaler.data_max_[congestion_idx]*100:.0f}%"
+            }
+        else:
+            result["analysis"]["feature_scaler"] = {"error": "Feature scaler not found"}
+        
+        target_scaler = directional_scalers.get(f'{model_key}_target')
+        if target_scaler is not None:
+            result["analysis"]["target_scaler"] = {
+                "target_feature": "TotalPassenger (raw passenger counts)",
+                "data_min": float(target_scaler.data_min_[0]),
+                "data_max": float(target_scaler.data_max_[0]),
+                "interpretation": f"The model predicts passenger counts from {target_scaler.data_min_[0]:.0f} to {target_scaler.data_max_[0]:.0f}"
+            }
+        else:
+            result["analysis"]["target_scaler"] = {"error": "Target scaler not found"}
+        
+        # Get platform capacity
+        capacity = get_capacity(station)
+        result["analysis"]["platform_capacity"] = {
+            "value": capacity,
+            "source": "DOTr official data",
+            "note": f"Congestion = (passenger_count / {capacity:.0f}) * 100"
+        }
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+
+@model_perf_bp.route('/debug/trace-prediction/<station>/<direction>', methods=['GET'])
+def debug_trace_prediction(station, direction):
+    """Trace the complete prediction flow from model to congestion"""
+    try:
+        from routes.api_predict import get_directional_prediction as api_prediction
+        
+        station = station.replace('%20', ' ')
+        direction = direction.capitalize()
+        target_time = datetime.now().replace(minute=0, second=0, microsecond=0)
+        model_key = f"{station}_{direction}"
+        
+        target_scaler = directional_scalers.get(f'{model_key}_target')
+        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        
+        pred_congestion = api_prediction(station, direction, target_time)
+        
+        # Get capacity
+        capacity = get_capacity(station)
+        
+        response = {
+            "station": station,
+            "direction": direction,
+            "target_time": target_time.isoformat(),
+            "model_key": model_key,
+            "platform_capacity": capacity,
+            "prediction_flow": {}
+        }
+        
+        if target_scaler is not None:
+            response["target_scaler_info"] = {
+                "data_min": float(target_scaler.data_min_[0]),
+                "data_max": float(target_scaler.data_max_[0]),
+            }
+        
+        if feature_scaler is not None:
+            congestion_idx = -1
+            response["feature_scaler_info"] = {
+                "congestion_data_min": float(feature_scaler.data_min_[congestion_idx]),
+                "congestion_data_max": float(feature_scaler.data_max_[congestion_idx]),
+            }
+        
+        if pred_congestion is not None:
+            # Calculate passenger count from congestion
+            pred_passengers = (pred_congestion / 100) * capacity
+            
+            response["prediction_flow"] = {
+                "step_1_model_output": f"{pred_congestion:.1f}%",
+                "step_2_passenger_count": f"{pred_passengers:.0f} passengers",
+                "step_3_congestion_formula": f"({pred_passengers:.0f} / {capacity:.0f}) * 100 = {pred_congestion:.1f}%",
+                "conclusion": "Model → inverse_transform → passenger count → congestion % (using platform capacity)"
+            }
+        else:
+            response["prediction_flow"] = {"error": "Prediction returned None"}
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+
 @model_perf_bp.route('/debug/check-models', methods=['GET'])
 def debug_check_models():
     """Debug endpoint to check what models are accessible"""
     return jsonify({
         "models_loaded_in_services": len(directional_models),
         "model_keys": list(directional_models.keys()),
-        "scalers_loaded": len(directional_scalers)
+        "scalers_loaded": len(directional_scalers),
+        "historical_peaks_loaded": len(HISTORICAL_PEAKS),
+        "correction_factors_loaded": len(CORRECTION_FACTORS)
     })
 
 @model_perf_bp.route('/debug/models', methods=['GET'])
@@ -388,18 +634,18 @@ def debug_single_prediction(station, direction):
     target_time = datetime.now()
     
     try:
-        result = get_directional_prediction(
-            station, direction, target_time,
-            directional_models, directional_scalers,
-            get_feature_sequence_for_station
-        )
+        from routes.api_predict import get_directional_prediction as api_prediction
+        
+        result = api_prediction(station, direction, target_time)
+        capacity = get_capacity(station)
         
         return jsonify({
             "success": True,
             "station": station,
             "direction": direction,
             "target_time": target_time.isoformat(),
-            "prediction": result
+            "prediction": result,
+            "platform_capacity": capacity
         })
     except Exception as e:
         import traceback
@@ -442,14 +688,12 @@ def get_performance_metrics():
         if all_results:
             combined = pd.concat(all_results, ignore_index=True)
             
-            # Get latest evaluation for summary
             latest_eval = None
             if os.path.exists('evaluation_results'):
                 eval_files = [f for f in os.listdir('evaluation_results') if f.endswith('.json')]
                 if eval_files:
                     try:
                         with open(os.path.join('evaluation_results', eval_files[-1]), 'r') as f:
-                            import json
                             latest_eval = json.load(f)
                     except:
                         pass
@@ -601,18 +845,6 @@ def get_station_details():
         if df.empty:
             return jsonify({"success": True, "data": []}), 200
         
-        # Check if columns are shifted
-        if 'target_time' in df.columns:
-            sample = df['target_time'].iloc[0] if len(df) > 0 else None
-            if sample and isinstance(sample, str) and sample in ['Northbound', 'Southbound']:
-                proper_columns = ['station', 'direction', 'target_time', 'predicted', 'actual', 
-                                  'total_passengers', 'station_max', 'absolute_error', 
-                                  'percentage_error', 'verdict', 'timestamp']
-                raw_df = pd.read_csv(filename, header=None)
-                if len(raw_df.columns) >= len(proper_columns):
-                    raw_df.columns = proper_columns[:len(raw_df.columns)]
-                    df = raw_df
-        
         numeric_cols = ['predicted', 'actual', 'absolute_error', 'percentage_error']
         for col in numeric_cols:
             if col in df.columns:
@@ -678,13 +910,9 @@ def predict_single():
         
         print(f"🔮 Manual prediction request: {station} {direction} at {target_time}")
         
-        use_test_max = request.args.get('use_test_max', 'false').lower() == 'true'
+        from routes.api_predict import get_directional_prediction as api_prediction
         
-        pred_congestion = get_directional_prediction(
-            station, direction, target_time,
-            directional_models, directional_scalers,
-            get_feature_sequence_for_station
-        )
+        pred_congestion = api_prediction(station, direction, target_time)
         
         if pred_congestion is None:
             return jsonify({
@@ -692,7 +920,7 @@ def predict_single():
                 "error": f"Prediction failed. Model may not exist for {station} {direction}"
             }), 400
         
-        # Try to get actual congestion from historical data
+        # Try to get actual congestion from historical data using PLATFORM CAPACITY
         actual_congestion = None
         data_file = find_data_file()
         if data_file:
@@ -715,9 +943,9 @@ def predict_single():
                 matching = station_df[station_df['hour_timestamp'] == target_time.floor('h')]
                 if not matching.empty:
                     total_pass = matching['TotalPassenger'].sum()
-                    model_key = f"{station}_{direction}"
-                    station_max = PER_DIRECTION_MAX.get(model_key, 100)
-                    actual_congestion = min(100, total_pass / station_max * 100)
+                    capacity = get_capacity(station)
+                    actual_congestion = (total_pass / capacity * 100)
+                    actual_congestion = min(actual_congestion, 100)
                     actual_congestion = round(actual_congestion, 1)
                     
             except Exception as e:
@@ -729,13 +957,14 @@ def predict_single():
                 "predicted": round(pred_congestion, 1),
                 "station": station,
                 "direction": direction,
-                "target_time": target_datetime
+                "target_time": target_datetime,
+                "category": get_congestion_category(pred_congestion)
             }
         }
         if actual_congestion is not None:
             response["prediction"]["actual"] = actual_congestion
             response["prediction"]["error"] = round(abs(pred_congestion - actual_congestion), 1)
-            response["prediction"]["category"] = get_congestion_category(pred_congestion)
+            response["prediction"]["actual_category"] = get_congestion_category(actual_congestion)
         
         return jsonify(response)
         
@@ -744,13 +973,10 @@ def predict_single():
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ============= RUN AUTO TESTS =============
 @model_perf_bp.route('/model/run-auto-tests', methods=['POST'])
 def run_auto_tests():
-    """Run auto-tests on 2025 data using station capacity"""
+    """Run auto-tests using PERCENTILE-BASED congestion (commuter-friendly)"""
     try:
-        use_test_max = request.args.get('use_test_max', 'false').lower() == 'true'
-        
         if not directional_models:
             return jsonify({"success": False, "error": "No models loaded"}), 500
         
@@ -758,6 +984,7 @@ def run_auto_tests():
         if not data_file:
             return jsonify({"success": False, "error": "Data file not found"}), 404
         
+        # Load and prepare data
         df = pd.read_csv(data_file)
         df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'])
         df['hour'] = df['datetime'].dt.hour
@@ -790,39 +1017,42 @@ def run_auto_tests():
             9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
         }
         
-        # ========== STATION CAPACITIES (USE THIS FOR ALL) ==========
-        MRT3_CAPACITY = {
-            "North Ave": 1142, "Quezon Ave": 1195, "Kamuning": 1364, 
-            "Cubao": 1747, "Santolan": 1306, "Ortigas": 1331,
-            "Shaw Blvd": 1619, "Boni Ave": 1417, "Guadalupe": 1301,
-            "Buendia": 1645, "Ayala Ave": 1222, "Magallanes": 1202,
-            "Taft": 720
-        }
+        from routes.api_predict import get_directional_prediction as api_prediction
+        
+        print("\n" + "="*60)
+        print("🔍 AUTO-TEST: Using Percentile-Based Congestion (Commuter-Friendly)")
+        print("="*60)
+        print(f"Correction Factors Loaded: {len(CORRECTION_FACTORS)}")
+        print("="*60 + "\n")
         
         results = []
-        
-        # Import the prediction function
-        from routes.api_predict import get_directional_prediction as api_prediction
         
         for station_name in station_numbers_reverse.values():
             for direction in ['Northbound', 'Southbound']:
                 model_key = f"{station_name}_{direction}"
                 if model_key not in directional_models:
-                    print(f"⚠️ No model: {model_key}")
                     continue
                 
-                print(f"\n📊 Processing: {station_name} {direction}")
-                station_num = [k for k, v in station_numbers_reverse.items() if v == station_name][0]
+                # Get platform capacity (for reference only)
+                capacity = get_capacity(station_name)
                 
+                # Get historical data for percentile calculation
+                from services.feature_engineering import get_station_dataframe
+                historical_hourly = get_station_dataframe(station_name, direction)
+                if historical_hourly is None or len(historical_hourly) == 0:
+                    print(f"  ⚠️ No historical data for {station_name} {direction}, skipping")
+                    continue
+                
+                historical_counts = historical_hourly['TotalPassenger'].values
+                p95 = np.percentile(historical_counts, 95)
+                
+                station_num = [k for k, v in station_numbers_reverse.items() if v == station_name][0]
                 station_df = get_station_data_for_direction(df, station_num, direction)
                 station_df = station_df[station_df['direction'] == direction]
-                
                 if len(station_df) < 100:
-                    print(f"  ⚠️ Only {len(station_df)} records (need 100+)")
                     continue
                 
                 station_df['hour_timestamp'] = station_df['datetime'].dt.floor('h')
-                
                 hourly = station_df.groupby('hour_timestamp').agg({
                     'TotalPassenger': 'sum',
                     'hour': 'first', 'weekday': 'first', 'month': 'first',
@@ -843,45 +1073,40 @@ def run_auto_tests():
                 }).reset_index()
                 
                 if len(hourly) < 25:
-                    print(f"  ⚠️ Only {len(hourly)} hours (need 25+)")
                     continue
                 
-                # ========== ALWAYS USE STATION CAPACITY, NOT PER_DIRECTION_MAX ==========
-                station_capacity = MRT3_CAPACITY.get(station_name, 1000)
-                print(f"  📊 Using station capacity: {station_capacity} passengers/hour")
-                
-                # Calculate actual congestion based on station capacity
-                hourly['congestion'] = (hourly['TotalPassenger'] / station_capacity * 100).clip(0, 100)
+                # ========== USE PERCENTILE FOR CONGESTION ==========
+                hourly['actual_congestion'] = hourly['TotalPassenger'].apply(
+                    lambda x: calculate_commuter_congestion(x, station_name, direction)
+                )
                 hourly = hourly.sort_values('hour_timestamp')
                 
                 available_indices = list(range(24, len(hourly)))
                 if not available_indices:
                     continue
                 
-                # Use up to 30 samples per station-direction
-                max_samples = min(30, len(available_indices))
-                num_tests = max(10, max_samples)
+                num_tests = min(30, len(available_indices))
+                test_indices = sorted(random.sample(available_indices, num_tests))
                 
-                print(f"  📅 Testing {num_tests} dates (out of {len(available_indices)} available)")
-                
-                test_indices = sorted(random.sample(available_indices, min(num_tests, len(available_indices))))
+                print(f"\n📊 {station_name} {direction} (95th percentile: {p95:.0f} passengers)")
                 
                 for idx in test_indices:
                     target = hourly.iloc[idx]
                     target_time = target['hour_timestamp']
-                    
                     try:
-                        pred_result = api_prediction(
-                            station_name, direction, target_time
-                        )
+                        # Get prediction from model (returns congestion %)
+                        pred_congestion_pct = api_prediction(station_name, direction, target_time)
                         
-                        if pred_result is not None and pred_result >= 0:
-                            pred_congestion = pred_result
-                            actual_congestion = target['congestion']
+                        if pred_congestion_pct is not None and pred_congestion_pct >= 0:
+                            # Convert congestion % back to passenger count using the 95th percentile
+                            # This is the reverse of the percentile calculation
+                            pred_passengers = (pred_congestion_pct / 100) * p95
                             
-                            if actual_congestion > 100 or actual_congestion < 0:
-                                continue
+                            # Calculate commuter-friendly congestion using percentile score
+                            pred_congestion = calculate_commuter_congestion(pred_passengers, station_name, direction)
                             
+                            # Actual congestion from the data (already calculated)
+                            actual_congestion = target['actual_congestion']
                             abs_error = abs(pred_congestion - actual_congestion)
                             
                             if abs_error <= 5:
@@ -900,7 +1125,7 @@ def run_auto_tests():
                                 'predicted': round(pred_congestion, 1),
                                 'actual': round(actual_congestion, 1),
                                 'total_passengers': int(target['TotalPassenger']),
-                                'station_capacity': station_capacity,
+                                'platform_capacity': round(capacity, 0),
                                 'absolute_error': round(abs_error, 1),
                                 'percentage_error': round((abs_error / max(actual_congestion, 0.1) * 100), 1),
                                 'verdict': verdict,
@@ -908,17 +1133,17 @@ def run_auto_tests():
                                 'predicted_category': get_congestion_category(pred_congestion),
                                 'actual_category': get_congestion_category(actual_congestion)
                             })
-                            print(f"  ✅ {target_time.strftime('%Y-%m-%d %H:%M')}: Pred={round(pred_congestion,1)}%, Actual={round(actual_congestion,1)}%, Error={round(abs_error,1)}%")
-                        else:
-                            print(f"  ⚠️ Prediction returned None for {target_time}")
-                            
                     except Exception as e:
-                        print(f"  ❌ Error: {e}")
+                        print(f"  ⚠️ Error predicting {station_name} {direction} at {target_time}: {e}")
                         continue
         
+        # ============================================================
+        # Save and return results
+        # ============================================================
         if results:
             df_results = pd.DataFrame(results)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            os.makedirs('test_results', exist_ok=True)
             df_results.to_csv(f'test_results/full_2025_test_{timestamp}.csv', index=False)
             
             for (station, direction), group_df in df_results.groupby(['station', 'direction']):
@@ -940,9 +1165,19 @@ def run_auto_tests():
                 }
             }
             
+            print("\n" + "="*60)
+            print("📊 AUTO-TEST SUMMARY")
+            print("="*60)
+            print(f"Total tests: {summary['total_tests_run']}")
+            print(f"Stations tested: {summary['stations_tested']}")
+            print(f"Average absolute error: {summary['avg_absolute_error']}%")
+            print(f"Average percentage error: {summary['avg_percentage_error']}%")
+            print(f"Excellent: {summary['excellent_count']} | Good: {summary['good_count']} | Okay: {summary['okay_count']} | Needs Improvement: {summary['needs_improvement']}")
+            print("="*60 + "\n")
+            
             return jsonify({
                 "success": True,
-                "message": f"✅ Generated {len(results)} predictions for 2025 data",
+                "message": f"✅ Generated {len(results)} predictions using percentile-based congestion",
                 "summary": summary
             })
         else:
@@ -950,4 +1185,5 @@ def run_auto_tests():
         
     except Exception as e:
         import traceback
+        traceback.print_exc()
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
