@@ -82,22 +82,19 @@ def log_activity(user_id, user_type, user_email, action, details=None):
     from flask import current_app
     if hasattr(current_app, 'config') and 'LOG_ACTIVITY' in current_app.config:
         current_app.config['LOG_ACTIVITY'](user_id, user_type, user_email, action, details)
-
-@api_reports_bp.route('/reports')
+@api_reports_bp.route('api/reports', methods=['GET'])
 def get_reports():
     """Get reports - filtered for regular users (hide flagged reports)"""
     try:
-        user_id = session.get('user_id')
-        user_role = session.get('role', session.get('user_type', 'commuter'))
+      
         
-        print(f"🔍 DEBUG: User role = {user_role}")
-        
-        # Get ALL reports
-        all_reports = Report.query.order_by(Report.id.desc()).all()
+        # ========== FIX: Sort by timestamp DESC (newest first) ==========
+        all_reports = Report.query.order_by(Report.timestamp.desc()).all()
         print(f"🔍 DEBUG: Total reports in database: {len(all_reports)}")
         
+        # Debug: Show the most recent reports
         for r in all_reports[:5]:
-            print(f"🔍 DEBUG: Report {r.id} - timestamp={r.timestamp}, flagged={getattr(r, 'is_flagged', 'MISSING')}")
+            print(f"🔍 DEBUG: Report {r.id} - station={r.station}, timestamp={r.timestamp}, flagged={getattr(r, 'is_flagged', 'MISSING')}")
         
         reports = all_reports
         
@@ -140,6 +137,33 @@ def get_reports():
         import traceback
         traceback.print_exc()
         return jsonify([])
+    
+@api_reports_bp.route('/debug/taft-recent', methods=['GET'])
+def debug_taft_recent():
+    """Check for recent Taft reports (last 30 days)"""
+    try:
+        from datetime import timedelta
+        cutoff = Config.get_current_time() - timedelta(days=30)
+        
+        taft_reports = Report.query.filter(
+            Report.station == 'Taft',
+            Report.timestamp > cutoff
+        ).order_by(Report.timestamp.desc()).all()
+        
+        return jsonify({
+            'recent_taft_count': len(taft_reports),
+            'reports': [{
+                'id': r.id,
+                'timestamp': r.timestamp.isoformat() if r.timestamp else None,
+                'is_flagged': getattr(r, 'is_flagged', False),
+                'flag_count': getattr(r, 'flag_count', 0),
+                'archived': getattr(r, 'archived', False),
+                'congestion': r.reported_congestion,
+                'direction': r.direction
+            } for r in taft_reports]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
     
 @api_reports_bp.route('/debug/all-reports')
 def debug_all_reports():
@@ -199,6 +223,109 @@ def get_next_opening_time():
         # Next day opening
         next_day_open = now.replace(day=now.day + 1, hour=4, minute=30, second=0, microsecond=0)
         return next_day_open.strftime('%I:%M %p, %B %d')
+    
+    
+# Add to routes/api_reports_bp.py (at the end of the file)
+
+# ============================================
+# LSTM MODEL MANAGEMENT ENDPOINTS
+# ============================================
+
+@api_reports_bp.route('/lstm-status', methods=['GET'])
+def lstm_status():
+    """Check LSTM model status"""
+    from flask import current_app
+    
+    predictor = current_app.config.get('LSTM_PREDICTOR')
+    
+    if not predictor:
+        return jsonify({
+            'status': 'not_initialized',
+            'message': 'LSTM predictor not initialized'
+        })
+    
+    return jsonify({
+        'status': 'ready',
+        'models_loaded': len(predictor.models),
+        'station_directions': predictor.station_directions,
+        'model_path': predictor.model_path,
+        'feature_cols_count': len(predictor.feature_cols) if predictor.feature_cols else 0
+    })
+
+@api_reports_bp.route('/predict-station', methods=['POST'])
+def predict_station():
+    """Predict congestion for a station using LSTM"""
+    try:
+        data = request.get_json()
+        station = data.get('station')
+        direction = data.get('direction', 'Northbound')
+        
+        if not station:
+            return jsonify({'error': 'Station required'}), 400
+        
+        # Use the enhanced prediction function
+        prediction = get_station_prediction(station, direction)
+        
+        return jsonify({
+            'station': station,
+            'direction': direction,
+            'predicted_congestion': prediction,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api_reports_bp.route('/retrain-models', methods=['POST'])
+def retrain_models():
+    """Admin endpoint to manually trigger retraining"""
+    try:
+        user_id = session.get('user_id')
+        user_role = session.get('role', session.get('user_type', 'commuter'))
+        
+        if user_role not in ['admin', 'staff', 'admin_staff']:
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        from training.scheduled_trainer import retrain_models_with_reports
+        success = retrain_models_with_reports(db.session)
+        
+        log_activity(user_id, user_role, session.get('username', 'unknown'),
+                    'retrain_models', f'Manual retraining {"successful" if success else "failed"}')
+        
+        return jsonify({
+            'success': success,
+            'message': 'Retraining completed' if success else 'Retraining failed'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@api_reports_bp.route('/retrain-now', methods=['POST'])
+def retrain_now():
+    """Admin endpoint to manually trigger retraining"""
+    try:
+        user_id = session.get('user_id')
+        user_role = session.get('role', session.get('user_type', 'commuter'))
+        
+        # Check if user is admin
+        if user_role not in ['admin', 'staff', 'admin_staff']:
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        # Import and run retraining
+        from training.scheduled_trainer import retrain_models_with_reports
+        success = retrain_models_with_reports(db.session)
+        
+        # Log the activity
+        log_activity(user_id, user_role, session.get('username', 'unknown'),
+                    'manual_retrain', f'Manual retraining {"successful" if success else "failed"}')
+        
+        return jsonify({
+            'success': success,
+            'message': 'Retraining completed successfully' if success else 'Retraining failed or insufficient data'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
     
 @api_reports_bp.route('/debug/latest-report', methods=['GET'])
 def debug_latest_report():

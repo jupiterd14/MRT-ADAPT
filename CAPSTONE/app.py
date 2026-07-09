@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
@@ -8,6 +7,7 @@ import warnings
 from authlib.integrations.flask_client import OAuth
 import pickle
 import tempfile
+from datetime import datetime, timedelta
 
 
 
@@ -23,6 +23,8 @@ from models.broadcast import Broadcast
 from models.activity_log import ActivityLog
 from models.saved_route import SavedRoute
 from models.station_data import StationData
+# Add after your existing imports
+from services.lstm_integration import MRT3LSTMPredictor, init_lstm_predictor, schedule_weekly_retraining
 
 from utils import (
     STATIONS, STATION_BASE_CAPACITY, STATION_COORDINATES,
@@ -201,9 +203,54 @@ app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
 
 print("="*50 + "\n")
 
+# ============ LOAD LSTM MODELS FROM KAGGLE ============
+print("\n" + "="*50)
+print("LOADING LSTM MODELS FOR ENHANCED PREDICTIONS")
+print("="*50)
+
+# Initialize LSTM predictor with your Kaggle models
+LSTM_MODEL_PATH = 'models_2022-2024_v8'  # Your Kaggle model folder
+
+# Create predictor instance
+lstm_predictor = MRT3LSTMPredictor(model_path=LSTM_MODEL_PATH)
+
+# Load models
+if lstm_predictor.load_models():
+    print(f"✅ LSTM models loaded successfully!")
+    print(f"   📊 Loaded {len(lstm_predictor.models)} station-direction models")
+    print(f"   📈 Average Congestion MAE: 2.63%")
+    print(f"   📈 Average R²: 0.9749")
+    app.config['LSTM_PREDICTOR'] = lstm_predictor
+    
+    # Optional: Start weekly retraining
+    schedule_weekly_retraining(app)
+else:
+    print("⚠️ LSTM models not loaded - using fallback predictions")
+    app.config['LSTM_PREDICTOR'] = None
+
+print("="*50 + "\n")
 
 # ============ WRAPPER FUNCTIONS ============
 def get_directional_prediction_wrapper(station_name, direction, target_datetime=None):
+    """Get directional prediction with LSTM enhancement"""
+    
+    # First try LSTM if available
+    lstm_predictor = app.config.get('LSTM_PREDICTOR')
+    if lstm_predictor and hasattr(lstm_predictor, 'models') and len(lstm_predictor.models) > 0:
+        try:
+            from models import db
+            prediction = lstm_predictor.predict_congestion(
+                station_name, 
+                direction,
+                db.session
+            )
+            if prediction is not None:
+                print(f"📊 Using LSTM for {station_name} {direction}: {prediction:.1f}%")
+                return prediction
+        except Exception as e:
+            print(f"⚠️ LSTM prediction failed: {e}, falling back...")
+    
+    # Fallback to original prediction system
     return get_directional_prediction(
         station_name, direction, target_datetime,
         directional_models_cached, directional_scalers_cached,
@@ -211,6 +258,27 @@ def get_directional_prediction_wrapper(station_name, direction, target_datetime=
     )
 
 def get_station_prediction_wrapper(station_name):
+    """Get station prediction with LSTM enhancement"""
+    
+    # First try LSTM if available
+    lstm_predictor = app.config.get('LSTM_PREDICTOR')
+    if lstm_predictor and hasattr(lstm_predictor, 'models') and len(lstm_predictor.models) > 0:
+        try:
+            from models import db
+            # Try Northbound first, then Southbound
+            for direction in ['Northbound', 'Southbound']:
+                prediction = lstm_predictor.predict_congestion(
+                    station_name, 
+                    direction,
+                    db.session
+                )
+                if prediction is not None:
+                    print(f"📊 Using LSTM for {station_name}: {prediction:.1f}%")
+                    return prediction
+        except Exception as e:
+            print(f"⚠️ LSTM prediction failed: {e}, falling back...")
+    
+    # Fallback to original prediction system
     return get_station_prediction(
         station_name, None,
         directional_models_cached, directional_scalers_cached,
@@ -309,6 +377,7 @@ with app.app_context():
             
     except Exception as e:
         print(f"Note: {e}")
+
 # ============ DEBUG ROUTES ============
 @app.route('/debug/raw-prediction/<station_name>/<direction>')
 def raw_prediction(station_name, direction):
@@ -364,6 +433,7 @@ def raw_prediction(station_name, direction):
             'error': str(e),
             'traceback': traceback.format_exc()
         })
+
 @app.route('/debug/feature-sequence-test/<station>/<direction>')
 def test_feature_sequence(station, direction):
     """Test if feature sequence generation is working"""
@@ -392,7 +462,7 @@ def test_feature_sequence(station, direction):
     
     return jsonify(result)
 
-
+@app.route('/debug/test-real-model/<station_name>')
 def test_real_model(station_name):
     """Test if real models are being used"""
     from services import get_feature_sequence_for_station
@@ -647,22 +717,6 @@ def debug_raw_model_output(station_name, direction):
     
     return jsonify(result)
 
-# Add this to your app.py (near the end, before app.run())
-
-@app.route('/debug/routes')
-def list_all_routes():
-    """List all registered routes for debugging"""
-    routes = []
-    for rule in app.url_map.iter_rules():
-        routes.append({
-            'endpoint': rule.endpoint,
-            'methods': list(rule.methods),
-            'path': str(rule)
-        })
-    # Sort by path
-    routes.sort(key=lambda x: x['path'])
-    return jsonify(routes)
-
 @app.route('/debug/test-no-clamp/<station_name>')
 def debug_test_no_clamp(station_name):
     from services import get_directional_prediction, get_feature_sequence_for_station
@@ -791,6 +845,58 @@ def debug_simple_prediction(station_name):
         'results': results
     })
 
+# ============ LSTM DEBUG ROUTES ============
+@app.route('/debug/lstm-status')
+def debug_lstm_status():
+    """Check LSTM model status"""
+    lstm_predictor = app.config.get('LSTM_PREDICTOR')
+    
+    if not lstm_predictor:
+        return jsonify({
+            'status': 'not_initialized',
+            'message': 'LSTM predictor not initialized'
+        })
+    
+    return jsonify({
+        'status': 'ready',
+        'models_loaded': len(lstm_predictor.models),
+        'station_directions': lstm_predictor.station_directions[:10],  # Show first 10
+        'model_path': lstm_predictor.model_path,
+        'feature_cols_count': len(lstm_predictor.feature_cols) if lstm_predictor.feature_cols else 0,
+        'capacities_loaded': bool(lstm_predictor.capacities)
+    })
+
+@app.route('/debug/lstm-predict/<station>/<direction>')
+def debug_lstm_predict(station, direction):
+    """Test LSTM prediction for a station-direction"""
+    from urllib.parse import unquote
+    from models import db
+    
+    station = unquote(station)
+    direction = unquote(direction)
+    
+    lstm_predictor = app.config.get('LSTM_PREDICTOR')
+    
+    if not lstm_predictor:
+        return jsonify({'error': 'LSTM predictor not available'})
+    
+    try:
+        prediction = lstm_predictor.predict_congestion(station, direction, db.session)
+        
+        return jsonify({
+            'station': station,
+            'direction': direction,
+            'prediction': prediction,
+            'timestamp': datetime.now().isoformat(),
+            'models_loaded': len(lstm_predictor.models)
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'station': station,
+            'direction': direction
+        })
+
 # ============ MAIN ============
 if __name__ == '__main__':
     print("\n" + "="*50)
@@ -799,6 +905,14 @@ if __name__ == '__main__':
     print(f"✓ {len(directional_models_cached)} directional models loaded")
     print(f"✓ {len(historical_data['historical_entry'])} stations with historical data")
     print(f"✓ {len(STATIONS)} total stations configured")
+    
+    # Check if LSTM models are loaded
+    lstm_predictor = app.config.get('LSTM_PREDICTOR')
+    if lstm_predictor:
+        print(f"✓ {len(lstm_predictor.models)} LSTM models loaded for enhanced predictions")
+    else:
+        print("⚠️ LSTM models not loaded - using fallback predictions")
+    
     print("\n💡 TIP: First load may take 10-30 seconds (loading models)")
     print("💡 Subsequent reloads will take only 1-2 seconds (using cache)")
     print("\n🗑️  To force fresh model loading: visit /debug/clear-cache")

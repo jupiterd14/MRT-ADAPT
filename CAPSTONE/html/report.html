@@ -2611,7 +2611,7 @@ function filterAndDisplayReports() {
         const reportsList = document.getElementById('reportsList');
         reportsList.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading reports...</p></div>`;
         
-        fetch('/api/reports')
+        fetch('api/api/reports')
             .then(res => {
                 if (!res.ok) {
                     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -2635,14 +2635,17 @@ function filterAndDisplayReports() {
                     reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports yet</h3><p>Be the first to submit a report!</p></div>`;
                     return;
                 }
+              
                 
                 allReportsData = reports;
+                console.log("All reportsdata log: ", reports);
                 
                 activeFilters = {
                     dateRange: null,
                     congestionLevels: [],
                     stations: []
                 };
+                console.log("Active Filter here: ", activeFilters);
                 
                 document.querySelectorAll('.badge-filter').forEach(b => b.classList.remove('active-filter'));
                 document.querySelectorAll('#stationsGrid input').forEach(cb => cb.checked = true);
@@ -2652,6 +2655,7 @@ function filterAndDisplayReports() {
                 }
                 
                 displayReports(allReportsData);
+               
             })
             .catch(error => {
                 console.error("Error fetching reports:", error);

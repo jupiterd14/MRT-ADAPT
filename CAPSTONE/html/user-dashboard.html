@@ -1918,15 +1918,693 @@ canvas {
     }
 }
 
+
+/* ========== MOVING TRAIN LOADING ANIMATION - 3 CARS ========== */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 34, 77, 0.85);
+    backdrop-filter: blur(6px);
+    z-index: 99999;
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-container {
+    background: white;
+    padding: 40px 50px;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: fadeInScale 0.3s ease-out;
+    max-width: 460px;
+    width: 90%;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Train Track Container */
+.train-track-container {
+    width: 100%;
+    height: 100px;
+    position: relative;
+    overflow: hidden;
+     background: linear-gradient(
+        180deg,
+        #eef6ff 0%,
+        #d8e7f7 55%,
+        #c5d8ef 100%
+    );
+    border-radius: 12px;
+    padding: 12px 0 10px 0;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
+}
+
+/* Train Tracks */
+.train-tracks {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #7a8a9a;
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3);
+}
+
+.train-tracks::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #7a8a9a;
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3);
+}
+
+.train-tracks::after {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: repeating-linear-gradient(
+        90deg,
+        #8a7a6a 0px,
+        #8a7a6a 5px,
+        transparent 5px,
+        transparent 22px
+    );
+    opacity: 0.35;
+    border-radius: 1px;
+}
+
+/* Moving Train - 3 Cars */
+.moving-train {
+    position: absolute;
+    bottom: 2px;
+    left: 0;
+    animation: trainMoveContinuous 10s linear infinite;
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    z-index: 2;
+}
+
+/* ===== CAR 1 - Main Train Car ===== */
+.train-body {
+    background: linear-gradient(135deg, #00224D 0%, #1a4a7a 100%);
+    border-radius: 4px 10px 0 0;
+    height: 38px;
+    width: 65px;
+    position: relative;
+    border-bottom: 3px solid #FFD700;
+    box-shadow: 0 4px 12px rgba(0, 34, 77, 0.3);
+}
+
+/* Train Windows - 4 windows */
+.train-windows {
+    display: flex;
+    gap: 4px;
+    padding: 5px 6px;
+    justify-content: center;
+}
+
+.train-window {
+    width: 11px;
+    height: 15px;
+    background: #87CEEB;
+    border-radius: 2px;
+    border: 1px solid #4a90d9;
+    animation: windowGlow 1.5s ease-in-out infinite;
+}
+
+.train-window:nth-child(1) { animation-delay: 0s; }
+.train-window:nth-child(2) { animation-delay: 0.3s; }
+.train-window:nth-child(3) { animation-delay: 0.6s; }
+.train-window:nth-child(4) { animation-delay: 0.9s; }
+
+/* Train Headlight */
+.train-headlight {
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #FFD700;
+    border-radius: 50%;
+    box-shadow: 0 0 20px #FFD700, 0 0 40px #FFA500;
+    animation: headlightPulse 1s ease-in-out infinite;
+}
+
+/* Train Wheels */
+.train-wheels {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    padding-top: 2px;
+}
+
+.train-wheel {
+    width: 9px;
+    height: 9px;
+    background: #333;
+    border-radius: 50%;
+    border: 2px solid #555;
+    animation: wheelSpin 0.8s linear infinite;
+}
+
+.train-wheel::after {
+    content: '';
+    display: block;
+    width: 4px;
+    height: 4px;
+    background: #777;
+    border-radius: 50%;
+    margin: 0 auto;
+}
+
+/* ===== CONNECTION 1 ===== */
+.train-connection {
+    width: 6px;
+    height: 9px;
+    background: #1a3a5a;
+    border-radius: 2px;
+    margin-bottom: 4px;
+}
+
+/* ===== CAR 2 - Middle Car ===== */
+.train-car-2 {
+    background: linear-gradient(135deg, #1a3a5a 0%, #2a5a8a 100%);
+    border-radius: 4px 10px 0 0;
+    height: 32px;
+    width: 55px;
+    position: relative;
+    border-bottom: 2px solid #FFD700;
+}
+
+.train-car-2 .train-windows {
+    padding: 4px 5px;
+    gap: 4px;
+}
+
+.train-car-2 .train-window {
+    width: 9px;
+    height: 12px;
+}
+
+.train-car-2 .train-window:nth-child(1) { animation-delay: 0.15s; }
+.train-car-2 .train-window:nth-child(2) { animation-delay: 0.45s; }
+.train-car-2 .train-window:nth-child(3) { animation-delay: 0.75s; }
+.train-car-2 .train-window:nth-child(4) { animation-delay: 1.05s; }
+
+.train-car-2 .train-wheels {
+    gap: 12px;
+}
+
+.train-car-2 .train-wheel {
+    width: 8px;
+    height: 8px;
+}
+
+/* ===== CONNECTION 2 ===== */
+.train-connection-2 {
+    width: 6px;
+    height: 7px;
+    background: #1a3a5a;
+    border-radius: 2px;
+    margin-bottom: 3px;
+}
+
+/* ===== CAR 3 - Last Car (smallest) ===== */
+.train-car-3 {
+    background: linear-gradient(135deg, #0a2a4a 0%, #1a4a7a 100%);
+    border-radius: 4px 10px 0 0;
+    height: 26px;
+    width: 45px;
+    position: relative;
+    border-bottom: 2px solid #FFD700;
+}
+
+.train-car-3 .train-windows {
+    padding: 3px 4px;
+    gap: 3px;
+}
+
+.train-car-3 .train-window {
+    width: 8px;
+    height: 10px;
+}
+
+.train-car-3 .train-window:nth-child(1) { animation-delay: 0.2s; }
+.train-car-3 .train-window:nth-child(2) { animation-delay: 0.5s; }
+.train-car-3 .train-window:nth-child(3) { animation-delay: 0.8s; }
+
+.train-car-3 .train-wheels {
+    gap: 10px;
+}
+
+.train-car-3 .train-wheel {
+    width: 7px;
+    height: 7px;
+}
+
+/* Train rear light (red) */
+.train-rear-light {
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: #FF0000;
+    border-radius: 50%;
+    box-shadow: 0 0 15px #FF0000, 0 0 30px #CC0000;
+    animation: rearLightPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes rearLightPulse {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 15px #FF0000, 0 0 30px #CC0000;
+    }
+    50% {
+        opacity: 0.6;
+        box-shadow: 0 0 10px #FF0000, 0 0 20px #CC0000;
+    }
+}
+
+/* ========== CONTINUOUS TRAIN ANIMATION ========== */
+@keyframes trainMoveContinuous {
+    0% {
+        transform: translateX(-130px);
+    }
+    100% {
+        transform: translateX(calc(100% + 60px));
+    }
+}
+
+@keyframes wheelSpin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes windowGlow {
+    0%, 100% {
+        background: #87CEEB;
+        opacity: 0.7;
+    }
+    50% {
+        background: #FFD700;
+        opacity: 1;
+        box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    }
+}
+
+@keyframes headlightPulse {
+    0%, 100% {
+        box-shadow: 0 0 20px #FFD700, 0 0 40px #FFA500;
+        opacity: 1;
+    }
+    50% {
+        box-shadow: 0 0 30px #FFD700, 0 0 60px #FFA500;
+        opacity: 0.8;
+    }
+}
+
+/* Loading Text */
+.loading-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-dark);
+    letter-spacing: 0.5px;
+}
+
+.loading-subtext {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-top: -8px;
+}
+
+.loading-dots::after {
+    content: '';
+    animation: loadingDots 1.5s steps(4, end) infinite;
+}
+
+@keyframes loadingDots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+    100% { content: ''; }
+}
+
+/* ========== MOBILE RESPONSIVE ========== */
+
+/* Tablets */
+@media screen and (max-width: 768px) {
+    .loading-container {
+        padding: 30px 25px;
+        max-width: 340px;
+    }
+    
+    .train-track-container {
+        height: 75px;
+        padding: 10px 0 8px 0;
+    }
+    
+    .train-tracks {
+        bottom: 10px;
+        height: 2px;
+    }
+    
+    .train-tracks::before {
+        top: -8px;
+        height: 2px;
+    }
+    
+    .train-tracks::after {
+        top: -10px;
+        height: 16px;
+        background: repeating-linear-gradient(
+            90deg,
+            #8a7a6a 0px,
+            #8a7a6a 4px,
+            transparent 4px,
+            transparent 18px
+        );
+    }
+    
+    .train-body {
+        height: 32px;
+        width: 52px;
+    }
+    
+    .train-car-2 {
+        height: 26px;
+        width: 44px;
+    }
+    
+    .train-car-3 {
+        height: 22px;
+        width: 36px;
+    }
+    
+    .train-window {
+        width: 9px;
+        height: 12px;
+    }
+    
+    .train-car-2 .train-window {
+        width: 7px;
+        height: 10px;
+    }
+    
+    .train-car-3 .train-window {
+        width: 6px;
+        height: 8px;
+    }
+    
+    .train-wheels {
+        gap: 10px;
+    }
+    
+    .train-wheel {
+        width: 7px;
+        height: 7px;
+    }
+    
+    .train-car-2 .train-wheel {
+        width: 6px;
+        height: 6px;
+    }
+    
+    .train-car-3 .train-wheel {
+        width: 5px;
+        height: 5px;
+    }
+    
+    .loading-text {
+        font-size: 14px;
+    }
+    
+    .loading-subtext {
+        font-size: 12px;
+    }
+    
+    @keyframes trainMoveContinuous {
+        0% {
+            transform: translateX(-100px);
+        }
+        100% {
+            transform: translateX(calc(100% + 50px));
+        }
+    }
+}
+
+/* Mobile Phones */
+@media screen and (max-width: 480px) {
+    .loading-container {
+        padding: 20px 16px;
+        max-width: 290px;
+    }
+    
+    .train-track-container {
+        height: 60px;
+        border-radius: 8px;
+        padding: 8px 0 6px 0;
+    }
+    
+    .train-tracks {
+        bottom: 8px;
+        height: 2px;
+    }
+    
+    .train-tracks::before {
+        top: -6px;
+        height: 2px;
+    }
+    
+    .train-tracks::after {
+        top: -8px;
+        height: 14px;
+        background: repeating-linear-gradient(
+            90deg,
+            #8a7a6a 0px,
+            #8a7a6a 3px,
+            transparent 3px,
+            transparent 14px
+        );
+    }
+    
+    .train-body {
+        height: 24px;
+        width: 40px;
+        border-bottom: 2px solid #FFD700;
+    }
+    
+    .train-car-2 {
+        height: 20px;
+        width: 34px;
+        border-bottom: 2px solid #FFD700;
+    }
+    
+    .train-car-3 {
+        height: 17px;
+        width: 28px;
+        border-bottom: 1.5px solid #FFD700;
+    }
+    
+    .train-windows {
+        gap: 2px;
+        padding: 3px 4px;
+    }
+    
+    .train-window {
+        width: 7px;
+        height: 9px;
+    }
+    
+    .train-car-2 .train-windows {
+        padding: 2px 3px;
+    }
+    
+    .train-car-2 .train-window {
+        width: 6px;
+        height: 8px;
+    }
+    
+    .train-car-3 .train-windows {
+        padding: 2px 3px;
+    }
+    
+    .train-car-3 .train-window {
+        width: 5px;
+        height: 6px;
+    }
+    
+    .train-wheels {
+        gap: 8px;
+        padding-top: 1px;
+    }
+    
+    .train-wheel {
+        width: 6px;
+        height: 6px;
+        border-width: 1.5px;
+    }
+    
+    .train-wheel::after {
+        width: 2px;
+        height: 2px;
+    }
+    
+    .train-car-2 .train-wheel {
+        width: 5px;
+        height: 5px;
+    }
+    
+    .train-car-3 .train-wheel {
+        width: 4px;
+        height: 4px;
+    }
+    
+    .train-headlight {
+        right: -3px;
+        width: 6px;
+        height: 6px;
+        box-shadow: 0 0 15px #FFD700, 0 0 30px #FFA500;
+    }
+    
+    .train-rear-light {
+        left: -3px;
+        width: 5px;
+        height: 5px;
+    }
+    
+    .train-connection {
+        width: 4px;
+        height: 6px;
+        margin-bottom: 2px;
+    }
+    
+    .train-connection-2 {
+        width: 4px;
+        height: 5px;
+        margin-bottom: 2px;
+    }
+    
+    .loading-text {
+        font-size: 13px;
+    }
+    
+    .loading-subtext {
+        font-size: 11px;
+    }
+    
+    @keyframes trainMoveContinuous {
+        0% {
+            transform: translateX(-75px);
+        }
+        100% {
+            transform: translateX(calc(100% + 35px));
+        }
+    }
+}
 </style>
 </head>
 <body>
 
-    <!-- Loading Overlay -->
+<!-- Loading Overlay with Moving Train - 3 Cars -->
 <div id="loadingOverlay" class="loading-overlay">
-    <div class="loading-spinner">
-        <i class="fas fa-circle-notch"></i>
-        <span>Loading station data...</span>
+    <div class="loading-container">
+        <!-- Train Track -->
+        <div class="train-track-container">
+            <div class="train-tracks"></div>
+            
+            <!-- Moving Train - 3 Cars -->
+            <div class="moving-train">
+                <!-- Train Car 1 (Main - Front) -->
+                <div class="train-body">
+                    <div class="train-windows">
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                    </div>
+                    <div class="train-headlight"></div>
+                    <div class="train-wheels">
+                        <div class="train-wheel"></div>
+                        <div class="train-wheel"></div>
+                    </div>
+                </div>
+                
+                <!-- Train Connection 1 -->
+                <div class="train-connection"></div>
+                
+                <!-- Train Car 2 (Middle) -->
+                <div class="train-car-2">
+                    <div class="train-windows">
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                    </div>
+                    <div class="train-wheels">
+                        <div class="train-wheel"></div>
+                        <div class="train-wheel"></div>
+                    </div>
+                </div>
+                
+                <!-- Train Connection 2 -->
+                <div class="train-connection-2"></div>
+                
+                <!-- Train Car 3 (Last - Rear) -->
+                <div class="train-car-3">
+                    <div class="train-windows">
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                    </div>
+                    <div class="train-rear-light"></div>
+                    <div class="train-wheels">
+                        <div class="train-wheel"></div>
+                        <div class="train-wheel"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+     
+        <div class="loading-subtext">Please wait while we fetch the latest updates</div>
     </div>
 </div>
 
