@@ -3439,7 +3439,7 @@ async function markAsFalsePositive() {
 function displayOperatorReports(reports) {
     const container = document.getElementById('operatorReportsList');
     
-    // ========== FIX: Filter out archived reports ==========
+    // Filter out archived reports
     const activeReports = reports.filter(r => r.archived !== true);
     
     if (!activeReports || activeReports.length === 0) {
@@ -3448,54 +3448,61 @@ function displayOperatorReports(reports) {
     }
     
     let html = '';
-    let hasReports = false;
+    
+    // ========== FIX: Sort by ID DESC (newest ID first) - MATCHES USER DASHBOARD ==========
+    activeReports.sort((a, b) => b.id - a.id);
     
     activeReports.forEach((report, idx) => {
         const isManaged = managedStations.includes(report.station);
         
         let levelText = '';
         let levelColor = '';
+        let bgColor = '';
         let borderColor = '';
         
         if (report.reported_congestion > 80) {
-            levelText = 'Severe Congestion';
+            levelText = 'Severe';
             levelColor = '#EF4444';
+            bgColor = '#FEE2E2';
             borderColor = '#EF4444';
         } else if (report.reported_congestion > 60) {
             levelText = 'Congested';
             levelColor = '#F97316';
+            bgColor = '#FED7AA';
             borderColor = '#F97316';
         } else if (report.reported_congestion > 30) {
             levelText = 'Moderate';
             levelColor = '#EAB308';
+            bgColor = '#FEF9C3';
             borderColor = '#EAB308';
         } else {
             levelText = 'Light';
             levelColor = '#22C55E';
+            bgColor = '#DCFCE7';
             borderColor = '#22C55E';
         }
         
+        // ========== FIX: Use full date format like user dashboard ==========
         const reportTime = new Date(report.timestamp);
-        const now = new Date();
-        const diffMins = Math.floor((now - reportTime) / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
+        const dateOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+        const formattedDate = reportTime.toLocaleDateString('en-US', dateOptions);
         
-        let timeAgo = '';
-        if (diffMins < 1) timeAgo = 'just now';
-        else if (diffMins < 60) timeAgo = `${diffMins} min ago`;
-        else if (diffHours < 24) timeAgo = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-        else timeAgo = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-        
-        let displayName = 'Commuter';
-        let avatarLetter = 'C';
+        let displayName = '';
+        let avatarLetter = '?';
         
         if (report.anonymous) {
             displayName = 'Anonymous';
             avatarLetter = 'A';
         } else if (report.username) {
             const username = report.username;
-            displayName = username.includes('@') ? username.split('@')[0] : username;
+            if (username && username.includes('@')) {
+                displayName = username.split('@')[0];
+            } else if (username) {
+                displayName = username;
+            } else {
+                displayName = 'Commuter';
+                avatarLetter = 'C';
+            }
             avatarLetter = displayName.charAt(0).toUpperCase();
         } else {
             displayName = 'Commuter';
@@ -3505,125 +3512,149 @@ function displayOperatorReports(reports) {
         const hasRemarks = report.remarks && report.remarks.trim() !== '';
         const flagCount = report.flag_count || 0;
         const isFlagged = flagCount > 0 || report.flagged === true;
-        const isArchived = report.archived === true;
         
-        // Review button ONLY for MANAGED + FLAGGED + NOT ARCHIVED
-        const reviewButton = (isManaged && isFlagged && !isArchived) ? `
-            <button onclick="reviewFlaggedReport(${JSON.stringify(report).replace(/"/g, '&quot;')})" 
-                style="background: #F59E0B; color: white; border: none; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">
-                <i class="fas fa-flag"></i> Review (${flagCount})
-            </button>
-        ` : '';
+        let hasPhotos = false;
+        let photoCount = 0;
+        let photoUrls = [];
         
-        const stationBadge = isManaged 
-            ? `<span style="background: #DCFCE7; color: #166534; padding: 2px 10px; border-radius: 12px; font-size: 10px; margin-left: 6px;">
-                <i class="fas fa-check-circle"></i> Your Station
-            </span>`
-            : `<span style="background: #F1F5F9; color: #64748B; padding: 2px 10px; border-radius: 12px; font-size: 10px; margin-left: 6px;">
-                <i class="fas fa-eye"></i> View Only
-            </span>`;
-        
-        // Only show archive badge if it's actually archived
-        const archiveBadge = isArchived ? 
-            `<span style="background: #F1F5F9; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 6px;">
-                <i class="fas fa-archive"></i> Archived
-            </span>` : '';
+        if (report.photo_paths && Array.isArray(report.photo_paths) && report.photo_paths.length > 0) {
+            photoUrls = report.photo_paths;
+            photoCount = photoUrls.length;
+            hasPhotos = true;
+        } else if (report.photo_path) {
+            try {
+                if (typeof report.photo_path === 'string' && report.photo_path.startsWith('[')) {
+                    photoUrls = JSON.parse(report.photo_path);
+                    photoCount = photoUrls.length;
+                    hasPhotos = photoCount > 0;
+                } else if (typeof report.photo_path === 'string' && report.photo_path.length > 0) {
+                    photoUrls = [report.photo_path];
+                    photoCount = 1;
+                    hasPhotos = true;
+                } else if (Array.isArray(report.photo_path)) {
+                    photoUrls = report.photo_path;
+                    photoCount = photoUrls.length;
+                    hasPhotos = true;
+                }
+            } catch(e) {
+                if (report.photo_path && report.photo_path.length > 0) {
+                    photoUrls = [report.photo_path];
+                    photoCount = 1;
+                    hasPhotos = true;
+                }
+            }
+        }
         
         const contentId = `content-${report.id}-${idx}`;
         const menuId = `menu-${report.id}-${idx}`;
         
-        // Hide menu for archived reports
-        const showMenu = isManaged && !isArchived;
+        // Build photo HTML
+        let photosHtml = '';
+        if (hasPhotos) {
+            photosHtml = `
+            <div style="margin-top: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <i class="fas fa-camera" style="color: #3B82F6;"></i>
+                    <span style="font-size: 12px; color: #64748B;">${photoCount} photo(s)</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px;">`;
+            
+            photoUrls.forEach(url => {
+                photosHtml += `
+                <div style="position: relative; aspect-ratio: 1; cursor: pointer;" onclick="window.open('${url}', '_blank')">
+                    <img src="${url}" 
+                         style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #E2E8F0;"
+                         onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;background:#F1F5F9;border-radius:8px\\'><i class=\\'fas fa-image\\' style=\\'color:#94A3B8;font-size:24px\\'></i></div>'">
+                </div>`;
+            });
+            
+            photosHtml += `
+                </div>
+            </div>`;
+        }
         
-        const flagButton = (isManaged && !isArchived) ? `
-            <div onclick="flagReport(${report.id}, '${escapeHtml(report.station)}')" style="padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-flag" style="color: #F59E0B; width: 18px;"></i>
-                <span style="font-size: 13px;">Flag this report</span>
-            </div>
-        ` : '';
+        // Flag badge with count
+        let flagBadge = '';
+        if (isFlagged) {
+            flagBadge = `<span style="background: #FEF3C7; color: #92400E; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 500;"><i class="fas fa-flag"></i> ${flagCount} flag${flagCount > 1 ? 's' : ''}</span>`;
+        }
         
-        const archiveButton = (isManaged && !isArchived) ? `
-            <div onclick="archiveReport(${report.id})" style="padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px; border-top: 1px solid #E2E8F0;">
-                <i class="fas fa-archive" style="color: #64748B; width: 18px;"></i>
-                <span style="font-size: 13px;">Archive</span>
-            </div>
-        ` : '';
+        // Operator actions (only for managed stations)
+        let operatorActions = '';
+        if (isManaged) {
+            const reviewButton = isFlagged ? `
+                <button onclick="reviewFlaggedReport(${JSON.stringify(report).replace(/"/g, '&quot;')})" 
+                    style="background: #F59E0B; color: white; border: none; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;">
+                    <i class="fas fa-flag"></i> Review (${flagCount})
+                </button>
+            ` : '';
+            
+            operatorActions = `
+                <div style="position: absolute; top: 18px; right: 18px; display: flex; align-items: center; gap: 4px;">
+                    ${reviewButton}
+                    <button onclick="toggleReportMenu('${menuId}', event)" style="background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%;">
+                        <i class="fas fa-ellipsis-v" style="color: #94A3B8; font-size: 18px;"></i>
+                    </button>
+                    <div id="${menuId}" class="report-menu" style="display: none; position: absolute; right: 0; top: 40px; background: white; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; min-width: 160px;">
+                        <div onclick="flagReport(${report.id}, '${escapeHtml(report.station)}')" style="padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-flag" style="color: #F59E0B; width: 18px;"></i>
+                            <span style="font-size: 13px;">Flag this report</span>
+                        </div>
+                        <div onclick="archiveReport(${report.id})" style="padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px; border-top: 1px solid #E2E8F0;">
+                            <i class="fas fa-archive" style="color: #64748B; width: 18px;"></i>
+                            <span style="font-size: 13px;">Archive</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
         
         html += `
-            <div class="report-item" style="border: 2px solid ${borderColor}; border-radius: 16px; padding: 18px; margin-bottom: 12px; background: ${isManaged ? 'white' : '#F8FAFC'}; position: relative; ${!isManaged ? 'opacity: 0.85;' : ''} ${isArchived ? 'opacity: 0.85;' : ''}">
-                ${showMenu ? `
-                <div style="position: absolute; top: 16px; right: 16px; display: flex; gap: 6px; align-items: center;">
-                    ${reviewButton}
-                    <button onclick="toggleReportMenu('${menuId}', event)" style="background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 50%;">
-                        <i class="fas fa-ellipsis-v" style="color: #94A3B8; font-size: 16px;"></i>
-                    </button>
-                    <div id="${menuId}" class="report-menu" style="display: none; position: absolute; right: 0; top: 35px; background: white; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; min-width: 160px;">
-                        ${flagButton}
-                        ${archiveButton}
-                    </div>
+    <div class="report-item" style="border: 2px solid ${borderColor}; border-radius: 16px; padding: 18px; margin-bottom: 12px; background: white; position: relative;">
+        ${operatorActions}
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; ${isManaged ? 'padding-right: 50px;' : ''}">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div style="width: 36px; height: 36px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-weight: bold;">
+                    ${escapeHtml(avatarLetter)}
                 </div>
-                ` : ''}
-
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; ${showMenu ? 'padding-right: 120px;' : ''}">
-                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                        <div style="width: 32px; height: 32px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-weight: bold; font-size: 13px;">
-                            ${escapeHtml(avatarLetter)}
-                        </div>
-                        <div style="font-weight: 600; font-size: 14px;">${escapeHtml(displayName)}</div>
-                        ${stationBadge}
-                        ${isFlagged ? `<span style="background: #FEF3C7; color: #92400E; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 500;"><i class="fas fa-flag"></i> ${flagCount} flag${flagCount > 1 ? 's' : ''}</span>` : ''}
-                        ${archiveBadge}
-                    </div>
-                    <div style="font-size: 11px; color: #64748B;"><i class="far fa-clock"></i> ${timeAgo}</div>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <span style="font-weight: 700; font-size: 17px;">${escapeHtml(report.station)}</span>
-                        <span style="font-size: 13px; font-weight: 600; color: ${levelColor};"> - ${levelText}</span>
-                        ${report.direction ? `
-                            <span style="display: inline-block; padding: 2px 8px; background: #EFF6FF; border-radius: 20px; font-size: 11px; font-weight: 500; color: #3B82F6;">
-                                <i class="fas ${report.direction === 'northbound' ? 'fa-arrow-up' : (report.direction === 'southbound' ? 'fa-arrow-down' : 'fa-exchange-alt')}" style="font-size: 10px; margin-right: 4px;"></i>
-                                ${report.direction === 'northbound' ? 'Northbound' : (report.direction === 'southbound' ? 'Southbound' : 'Both')}
-                            </span>
-                        ` : ''}
-                    </div>
-                    <button onclick="toggleReportContent('${contentId}', this)" style="background: none; border: none; color: #3B82F6; cursor: pointer; font-size: 12px;">
-                        <i class="fas fa-chevron-down"></i> View more
-                    </button>
-                </div>
-                
-                <div id="${contentId}" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #E2E8F0;">
-                    ${hasRemarks ? `<div style="background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 10px; font-size: 13px;"><i class="fas fa-quote-left" style="color: #3B82F6; margin-right: 8px;"></i>${escapeHtml(report.remarks)}</div>` : ''}
-                    ${report.photo_paths && report.photo_paths.length > 0 ? `
-                        <div style="margin-top: 8px;">
-                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-                                <i class="fas fa-camera" style="color: #3B82F6; font-size: 12px;"></i>
-                                <span style="font-size: 12px; font-weight: 500;">${report.photo_paths.length} photo(s) attached</span>
-                            </div>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px;">
-                                ${report.photo_paths.map(url => `
-                                    <div style="position: relative; aspect-ratio: 1; cursor: pointer; border-radius: 6px; overflow: hidden;" onclick="window.open('${url}', '_blank')">
-                                        <img src="${url}" style="width: 100%; height: 100%; object-fit: cover; border: 1px solid #E2E8F0;">
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    ` : ''}
-                    ${!hasRemarks && (!report.photo_paths || report.photo_paths.length === 0) ? `<div style="color: #94A3B8; text-align: center; padding: 8px; font-size: 12px;">No additional details</div>` : ''}
-                </div>
+                <div style="font-weight: 600; font-size: 14px;">${escapeHtml(displayName)}</div>
+                ${flagBadge}
             </div>
-        `;
-        hasReports = true;
+<div style="font-size: 10px; color: #64748B; white-space: nowrap;">
+    <i class="far fa-calendar"></i> ${formattedDate}
+</div>        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span style="font-weight: 700; font-size: 18px;">${escapeHtml(report.station)}</span>
+                
+                <span class="pill" style="display: inline-block; background: ${bgColor}; color: ${levelColor}; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid ${levelColor};">
+                    ${levelText}
+                </span>
+                
+                ${report.direction ? `
+                    <span style="display: inline-block; padding: 4px 12px; background: #EFF6FF; border-radius: 20px; font-size: 11px; font-weight: 500; color: #3B82F6;">
+                        <i class="fas ${report.direction === 'northbound' ? 'fa-arrow-up' : (report.direction === 'southbound' ? 'fa-arrow-down' : 'fa-exchange-alt')}" style="font-size: 10px; margin-right: 4px;"></i>
+                        ${report.direction === 'northbound' ? 'Northbound' : (report.direction === 'southbound' ? 'Southbound' : 'Both')}
+                    </span>
+                ` : ''}
+            </div>
+            <button onclick="toggleReportContent('${contentId}', this)" style="background: none; border: none; color: #3B82F6; cursor: pointer; font-size: 13px;">
+                <i class="fas fa-chevron-down"></i> View more
+            </button>
+        </div>
+        
+        <div id="${contentId}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
+            ${hasRemarks ? `<div class="remark-text" style="background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 12px;"><i class="fas fa-quote-left" style="color: #3B82F6; margin-right: 8px;"></i>${escapeHtml(report.remarks)}</div>` : ''}
+            ${photosHtml}
+            ${!hasRemarks && !hasPhotos ? `<div class="remark-none" style="color: #94A3B8; text-align: center; padding: 12px;">No additional details</div>` : ''}
+        </div>
+    </div>`;
     });
     
-    if (!hasReports) {
-        container.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports yet</h3><p>User reports will appear here</p></div>`;
-    } else {
-        container.innerHTML = html;
-    }
+    container.innerHTML = html;
 }
-
     // ========== REVIEW FLAGGED REPORT FUNCTION ==========
     window.reviewFlaggedReport = function(report) {
         currentFlaggedReportId = report.id;

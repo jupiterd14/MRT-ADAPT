@@ -106,8 +106,17 @@ def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name):
 
 @operator_bp.route('/api/reports', methods=['GET'])
 def get_reports():
-    """Get reports for operator dashboard - ONLY non-archived reports"""
+    """Get reports for operator dashboard - Shows ALL active reports (no station filtering)"""
     try:
+        # Get user info
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
         # Debug: Check total reports count
         total_reports = Report.query.count()
         archived_count = Report.query.filter(Report.archived == True).count()
@@ -115,12 +124,13 @@ def get_reports():
         
         print(f"📊 REPORT STATS: Total={total_reports}, Archived={archived_count}, Active={active_count}")
         
-        # Get all reports that are NOT archived
+        # ✅ GET ALL ACTIVE REPORTS - NO STATION FILTERING
+        # This shows ALL reports regardless of which station they're from
         reports = Report.query.filter(
             Report.archived == False
         ).order_by(Report.timestamp.desc()).all()
         
-        print(f"📊 Found {len(reports)} active reports")
+        print(f"📊 Found {len(reports)} active reports (showing all to operator)")
         
         result = []
         for report in reports:
@@ -129,7 +139,6 @@ def get_reports():
             if report.photo_path:
                 try:
                     if report.photo_path.startswith('['):
-                        import json
                         photo_paths = json.loads(report.photo_path)
                     else:
                         photo_paths = [report.photo_path]
@@ -141,6 +150,21 @@ def get_reports():
             if report.user:
                 username = report.user.username
             
+            # Get status text from congestion
+            congestion = report.reported_congestion
+            if congestion >= 80:
+                status_text = "Severe"
+                status_class = "status-severe"
+            elif congestion >= 60:
+                status_text = "Congested"
+                status_class = "status-congested"
+            elif congestion >= 30:
+                status_text = "Moderate"
+                status_class = "status-moderate"
+            else:
+                status_text = "Light"
+                status_class = "status-light"
+            
             result.append({
                 'id': report.id,
                 'station': report.station,
@@ -148,18 +172,24 @@ def get_reports():
                 'reported_congestion': report.reported_congestion,
                 'remarks': report.remarks,
                 'timestamp': report.timestamp.isoformat(),
-                'username': username,
+                'username': username or 'Anonymous',
                 'anonymous': report.anonymous,
-                'flagged': report.flagged,
+                'flagged': getattr(report, 'flagged', False),
                 'flag_count': getattr(report, 'flag_count', 0),
                 'archived': report.archived,
                 'photo_paths': photo_paths,
-                'photo_path': report.photo_path
+                'photo_path': report.photo_path,
+                'reviewed': getattr(report, 'reviewed', False),
+                'status_text': status_text,
+                'status_class': status_class
             })
+        
+        # Log the count for debugging
+        print(f"✅ Returning {len(result)} reports to operator dashboard")
         
         return jsonify(result)
     except Exception as e:
-        print(f"Error fetching reports: {e}")
+        print(f"❌ Error fetching reports: {e}")
         import traceback
         traceback.print_exc()
         return jsonify([]), 500
