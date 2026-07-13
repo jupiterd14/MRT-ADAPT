@@ -2,6 +2,7 @@ import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 from flask import Flask, session, flash, redirect, url_for, jsonify
+from extensions import cache
 from dotenv import load_dotenv
 import warnings
 from authlib.integrations.flask_client import OAuth
@@ -140,6 +141,7 @@ def load_historical_with_cache(stations, base_capacity):
 # ============ APP INITIALIZATION ============
 app = Flask(__name__, template_folder='html', static_folder='static')
 app.config.from_object(Config)
+cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 @app.route('/api/test')
 def api_test():

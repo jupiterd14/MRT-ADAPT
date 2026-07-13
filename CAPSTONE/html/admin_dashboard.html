@@ -1218,7 +1218,7 @@
 <div id="loadingOverlay" class="loading-overlay">
     <div class="loading-spinner">
         <i class="fas fa-circle-notch"></i>
-        <span>Loading station data...</span>
+        <span>Loading (2-10 mins)</span>
     </div>
 </div>
 
@@ -1353,11 +1353,12 @@
                     <strong style="color: var(--text-dark);">Advanced Tools</strong>
                 </div>
                 <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
-                    <strong>Upload CSV:</strong> Test with your own data file.<br>
+                    <strong>Upload CSV:</strong> Test with 2025.csv<br>
                     <strong>Manual Test:</strong> Test a single specific prediction.<br>
                     <strong>Chart:</strong> Visual comparison of predictions vs actuals.
                 </p>
             </div>
+
         </div>
 
         <!-- Quick Tips -->
@@ -1614,13 +1615,12 @@
 
         <!-- Upload CSV Test -->
         <div class="card">
-            <div class="card-title"><i class="fas fa-upload"></i> Upload Test Data (Batch)</div>
+            <div class="card-title"><i class="fas fa-upload"></i> Upload Test Data (csv)</div>
             <div style="border: 2px dashed var(--border); border-radius: 16px; padding: 30px; text-align: center; background: #F8FAFC; cursor: pointer;" id="uploadDropZone">
                 <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: var(--accent-blue); margin-bottom: 12px;"></i>
                 <input type="file" id="testDataFile" accept=".csv" style="display: none;">
                 <p style="font-size: 14px; font-weight: 500; color: var(--accent-blue); margin-top: 8px;">Click to select CSV file</p>
                 <p style="font-size: 12px; color: var(--text-light); margin-top: 4px;">Supported format: .csv</p>
-                <a href="#" id="downloadSampleLink" style="color: var(--accent-blue);">Download sample CSV template</a>
             </div>
             <div id="uploadProgress" style="display: none; margin-top: 16px;">
                 <div style="background: #E2E8F0; border-radius: 8px; height: 8px; overflow: hidden;"><div id="progressBar" style="width: 0%; height: 100%; background: var(--accent-blue);"></div></div>
@@ -2187,55 +2187,82 @@ async function runManualTest() {
 async function uploadTestData() {
     const fileInput = document.getElementById('testDataFile');
     const file = fileInput.files[0];
-    if (!file) { showToast('⚠️', 'Please select a CSV file first'); return; }
+    if (!file) { 
+        showToast('⚠️', 'Please select a CSV file first'); 
+        return; 
+    }
+    
+    // ============================================================
+    // SHOW LOADING OVERLAY (same as Run Tests)
+    // ============================================================
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = loadingOverlay.querySelector('span');
+    const originalText = loadingText.innerText;
+    loadingText.innerText = '📤 Uploading and processing CSV file...';
+    loadingOverlay.classList.add('active');
+    
     const formData = new FormData();
     formData.append('file', file);
+    
     const uploadProgress = document.getElementById('uploadProgress');
     const progressBar = document.getElementById('progressBar');
     const uploadStatus = document.getElementById('uploadStatus');
+    
     uploadProgress.style.display = 'block';
-    progressBar.style.width = '50%';
-    uploadStatus.innerHTML = 'Uploading file...';
+    progressBar.style.width = '30%';
+    uploadStatus.innerHTML = '📤 Uploading file...';
+    
     try {
-        const response = await fetch('/api/model/upload/batch', { method: 'POST', body: formData });
+        const response = await fetch('/api/model/upload/batch', { 
+            method: 'POST', 
+            body: formData 
+        });
+        
+        progressBar.style.width = '70%';
+        uploadStatus.innerHTML = '⚙️ Processing predictions...';
+        
         const result = await response.json();
+        
         if (result.success) {
             progressBar.style.width = '100%';
             uploadStatus.innerHTML = `✅ ${result.message}`;
-            showToast('✅', result.message);
-            setTimeout(() => { loadModelPerformanceMetrics(); loadPredictionChart(); }, 1000);
-            setTimeout(() => { uploadProgress.style.display = 'none'; progressBar.style.width = '0%'; fileInput.value = ''; }, 3000);
+            
+            // Show summary in toast
+            const summary = result.summary;
+            showToast('✅', `Upload complete! ${summary.total_processed} predictions, Avg Error: ${summary.avg_absolute_error}%`);
+            
+            // Refresh all data
+            await loadModelPerformanceMetrics();
+            await loadPredictionChart();
+            await loadTestResults();
+            
+            // Update the station selector if needed
+            const stationSel = document.getElementById('stationSelector');
+            if (stationSel && stationSel.value !== 'all') {
+                await loadTestResults();
+            }
+            
+            setTimeout(() => { 
+                uploadProgress.style.display = 'none'; 
+                progressBar.style.width = '0%'; 
+                fileInput.value = ''; 
+            }, 3000);
         } else {
             uploadStatus.innerHTML = `❌ Error: ${result.error}`;
-            showToast('❌', result.error);
+            showToast('❌', `Upload failed: ${result.error}`);
         }
     } catch (error) {
+        console.error('Upload error:', error);
         uploadStatus.innerHTML = `❌ Upload failed: ${error.message}`;
-        showToast('❌', 'Upload failed');
+        showToast('❌', 'Upload failed: ' + error.message);
+    } finally {
+        // ============================================================
+        // HIDE LOADING OVERLAY
+        // ============================================================
+        loadingOverlay.classList.remove('active');
+        loadingText.innerText = originalText;
     }
 }
-
-function downloadSampleCSV() {
-    const sampleData = [
-        ['station', 'direction', 'target_time', 'predicted', 'actual'],
-        ['North Ave', 'Northbound', '2025-01-07 08:00:00', 45.2, 48.0],
-        ['North Ave', 'Southbound', '2025-01-07 08:00:00', 52.1, 50.5],
-        ['Cubao', 'Northbound', '2025-01-07 09:00:00', 68.5, 72.0],
-        ['Cubao', 'Southbound', '2025-01-07 09:00:00', 73.2, 70.0],
-        ['Taft', 'Northbound', '2025-01-07 17:00:00', 35.0, 38.2],
-        ['Taft', 'Southbound', '2025-01-07 17:00:00', 42.8, 40.0]
-    ];
-    const csvContent = sampleData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_test_data.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('📥', 'Sample CSV downloaded');
-}
-
 // ========== EVALUATION FUNCTIONS ==========
 async function runEvaluation() {
     const station = document.getElementById('stationSelector').value || 'all';
@@ -2912,9 +2939,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Download sample
-    const downloadSampleLink = document.getElementById('downloadSampleLink');
-    if (downloadSampleLink) downloadSampleLink.onclick = (e) => { e.preventDefault(); downloadSampleCSV(); };
-
+   // Download sample - use direct link
+const downloadSampleLink = document.getElementById('downloadSampleLink');
+if (downloadSampleLink) {
+    // Remove the preventDefault so the link works normally
+    downloadSampleLink.onclick = null;
+}
     // Auto‑tests button
     const autoTestsBtn = document.getElementById('testUploadedCsvBtnMP');
     if (autoTestsBtn) {
