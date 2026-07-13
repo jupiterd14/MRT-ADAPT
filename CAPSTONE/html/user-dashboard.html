@@ -3830,7 +3830,7 @@ function allowLocation() {
     
     // Show loading state
     updateLocationButton('⏳');
-    showLocationToast('📍 Detecting your location...');
+    showLocationToast(' Detecting your location...');
     
     navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -3849,8 +3849,8 @@ function allowLocation() {
                 : `${distance.toFixed(1)} km`;
             
             // Update UI
-            updateLocationButton('📍');
-            showLocationToast(`📍 Nearest station: ${station} (${distanceText})`);
+            updateLocationButton('');
+            showLocationToast(` Nearest station: ${station} (${distanceText})`);
             
             // Change to nearest station
             changeStation(station);
@@ -3937,7 +3937,7 @@ function updateLocationButton(status) {
     
     if (icon) {
         // Keep the same icon but change color/style
-        if (status === '✅' || status === '📍') {
+        if (status === '✅' || status === '') {
             icon.style.color = '#22C55E';
         } else if (status === '⏳') {
             icon.style.color = '#F59E0B';
@@ -3947,7 +3947,7 @@ function updateLocationButton(status) {
     }
     
     if (badge) {
-        if (status === '📍' || status === '✅') {
+        if (status === '' || status === '✅') {
             badge.textContent = '✓';
             badge.style.display = 'flex';
             badge.style.background = '#22C55E';
@@ -4000,7 +4000,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const savedStation = localStorage.getItem('nearestStation');
         if (savedStation && hasLocation) {
             currentStation = savedStation;
-            console.log('📍 Using saved station:', currentStation);
+            console.log(' Using saved station:', currentStation);
         } else {
             // Default to favorite_station from server
             const defaultStation = '{{ favorite_station if favorite_station else "North Ave" }}';

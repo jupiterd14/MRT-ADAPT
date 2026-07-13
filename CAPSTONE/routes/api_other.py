@@ -235,10 +235,7 @@ def travel_prediction():
 @api_other_bp.route('/live-map/directions/v2')
 def live_map_directions_v2():
     """New version using directional models - WITH PROPER SCALING"""
-    print("\n" + "="*60)
-    print("📍 LIVE MAP V2 API CALLED")
-    print("="*60)
-    
+
     try:
         from flask import current_app
         from services import get_feature_sequence_for_station
@@ -284,7 +281,6 @@ def live_map_directions_v2():
         
    
         
-        print(f"📍 Processing {len(stations_list)} stations... (is_closed: {is_closed}, TESTING_MODE: {TESTING_MODE})")
         
         for i, station in enumerate(stations_list):
             north_pred = 0
@@ -388,8 +384,7 @@ def live_map_directions_v2():
                     except Exception as e:
                         print(f"  ⚠️ Error predicting {station} Southbound: {e}")
             
-            if i < 3:
-                print(f"  📍 {station}: North={north_pred:.1f}%, South={south_pred:.1f}%")
+       
             
             def get_status(cong):
                 if cong > 80:
@@ -431,7 +426,6 @@ def live_map_directions_v2():
                 "testing_mode": TESTING_MODE and is_closed and not is_south_overridden
             }
         
-        print(f"✅ Returning data for {len(northbound)} stations")
         
         return jsonify({
             "northbound": northbound,
@@ -976,7 +970,6 @@ def alerts_count():
             import numpy as np
             
             now = Config.get_current_time()
-            print(f"🔍 Checking congestion for {len(stations_list)} stations at {now.strftime('%H:%M')}")
             
             for station in stations_list:
                 north_cong = 0
@@ -1026,22 +1019,17 @@ def alerts_count():
                 if avg_cong > 80:  # SEVERE
                     severe_count += 1
                     severity = 'severe'
-                    print(f"  🔴 SEVERE: {station} - {avg_cong:.1f}%")
                 elif avg_cong > 60:  # CONGESTED
                     congested_count += 1
                     severity = 'congested'
-                    print(f"  🟠 CONGESTED: {station} - {avg_cong:.1f}%")
                 elif avg_cong > 30:  # MODERATE
                     moderate_count += 1
                     severity = 'moderate'
-                    print(f"  🟡 MODERATE: {station} - {avg_cong:.1f}%")
                 elif avg_cong > 0:  # LIGHT (any congestion > 0)
                     light_count += 1
                     severity = 'light'
-                    print(f"  🟢 LIGHT: {station} - {avg_cong:.1f}%")
                 else:  # NO CONGESTION (0%)
                     severity = 'none'
-                    print(f"  ⚪ NONE: {station} - {avg_cong:.1f}%")
                 
                 station_statuses[station] = {
                     'congestion': round(avg_cong, 1),
@@ -1052,7 +1040,6 @@ def alerts_count():
             
             # ========== COUNT ALL STATIONS WITH ANY CONGESTION > 0 ==========
             alert_count = severe_count + congested_count + moderate_count + light_count
-            print(f"✅ Station breakdown - Severe: {severe_count}, Congested: {congested_count}, Moderate: {moderate_count}, Light: {light_count}")
             print(f"🔔 Alert count (ALL congestion): {alert_count}")
             
         except Exception as e:

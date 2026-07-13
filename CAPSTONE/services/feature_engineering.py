@@ -236,7 +236,6 @@ def get_feature_scaler(station_name, direction):
             with open(scaler_path, 'rb') as f:
                 scaler = pickle.load(f)
             _FEATURE_SCALER_CACHE[cache_key] = scaler
-            print(f"   ✅ Loaded feature scaler for {cache_key}")
             return scaler
         except Exception as e:
             print(f"   ⚠️ Error loading feature scaler: {e}")
@@ -316,11 +315,7 @@ def get_station_dataframe(station_name, direction):
         'is_maintenance_record': 'first', 'is_extended_hours': 'first'
     }).reset_index()
     
-    # DEBUG: After groupby
-    print(f"\n🔍 [DEBUG 0] AFTER groupby:")
-    print(f"   Type: {type(hourly)}")
-    print(f"   Shape: {hourly.shape if hasattr(hourly, 'shape') else 'N/A'}")
-    print(f"   Columns: {hourly.columns.tolist() if hasattr(hourly, 'columns') else 'N/A'}")
+  
     
     # Create complete hour range
     if len(hourly) > 0:
@@ -350,12 +345,6 @@ def get_station_dataframe(station_name, direction):
         hourly['weekday'] = hourly.index.weekday
         hourly['month'] = hourly.index.month
         hourly['minute'] = hourly.index.minute
-
-        print(f"\n🔍 [DEBUG 2] AFTER assigning hour/weekday/month/minute:")
-        print(f"   Type: {type(hourly)}")
-        print(f"   Shape: {hourly.shape}")
-        print(f"   First 8 hour values: {hourly['hour'].head(8).tolist()}")
-        print(f"   Last 8 hour values: {hourly['hour'].tail(8).tolist()}")
 
         # Re-add cyclical and operational features
         hourly = add_cyclical_time_features(hourly)
@@ -402,12 +391,6 @@ def get_station_dataframe(station_name, direction):
         # Store the percentage for display and categorization
         hourly['congestion_percentage'] = percentage
         hourly['raw_passengers'] = hourly['TotalPassenger']
-
-        # DEBUG: Check after setting (this shows the scaled values!)
-        print(f"\n🔍 DEBUG: After setting congestion (SCALED):")
-        print(f"   TotalPassenger (first 10): {hourly['TotalPassenger'].head(10).tolist()}")
-        print(f"   congestion (first 10): {hourly['congestion'].head(10).tolist()}")
-        print(f"   congestion_percentage (first 10): {hourly['congestion_percentage'].head(10).tolist()}")
         
         # 3. Add congestion categories for confusion matrix
         hourly['congestion_category'] = 0  # Default to Light
@@ -431,15 +414,9 @@ def get_station_dataframe(station_name, direction):
     
     # Store in memory cache
     _STATION_DATA_CACHE[cache_key] = hourly
+
     
-    print(f"✅ Created hourly data for {station_name} {direction}")
-    print(f"   Raw passenger counts - min: {hourly['TotalPassenger'].min():.0f}, max: {hourly['TotalPassenger'].max():.0f}, mean: {hourly['TotalPassenger'].mean():.0f}")
-    
-    # Print category distribution
-    if 'congestion_category_name' in hourly.columns:
-        print(f"\n   Congestion Categories Distribution:")
-        print(hourly['congestion_category_name'].value_counts().sort_index())
-    
+ 
     return hourly
 
 
@@ -516,11 +493,11 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
                 features = np.vstack([features, features[-1:]])
     
     # ========== DEBUG: Check features before scaling ==========
-    print("\n" + "="*60)
-    print("🔍 DEBUG: Before scaling - congestion values from features array:")
-    print("="*60)
-    print(f"Congestion values: {features[:, -1][:10]}")
-    print("="*60 + "\n")
+    #print("\n" + "="*60)
+    #print("🔍 DEBUG: Before scaling - congestion values from features array:")
+    #print("="*60)
+    #print(f"Congestion values: {features[:, -1][:10]}")
+    #print("="*60 + "\n")
     
     # ========== APPLY FEATURE SCALER TO ALL 29 FEATURES ==========
     feature_scaler = get_feature_scaler(station_name, direction)
@@ -644,23 +621,23 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
     
     if feature_scaler is not None:
         try:
-            print("\n========== BEFORE SCALING ==========")
-            print("First row:", features[0])
-            print("Congestion range:",
-                features[:, -1].min(),
-                features[:, -1].max())
+            #print("\n========== BEFORE SCALING ==========")
+            #print("First row:", features[0])
+            #print("Congestion range:",
+                #features[:, -1].min(),
+                #features[:, -1].max())
 
             # Scale all 29 features
             features = feature_scaler.transform(features)
 
-            print("\n========== AFTER SCALING ==========")
-            print("First row:", features[0])
-            print("Congestion range:",
-                features[:, -1].min(),
-                features[:, -1].max())
+            #print("\n========== AFTER SCALING ==========")
+            #print("First row:", features[0])
+            #print("Congestion range:",
+                #features[:, -1].min(),
+                #features[:, -1].max())
 
-            print(f"✅ Scaled all {features.shape[1]} features")
-            print(f"✅ Final shape: {features.shape}")
+            #print(f"✅ Scaled all {features.shape[1]} features")
+            #print(f"✅ Final shape: {features.shape}")
 
         except Exception as e:
             print(f"⚠️ Feature scaling failed: {e}")
