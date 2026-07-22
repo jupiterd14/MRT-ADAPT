@@ -82,6 +82,7 @@ def log_activity(user_id, user_type, user_email, action, details=None):
     from flask import current_app
     if hasattr(current_app, 'config') and 'LOG_ACTIVITY' in current_app.config:
         current_app.config['LOG_ACTIVITY'](user_id, user_type, user_email, action, details)
+        
 @api_reports_bp.route('api/reports', methods=['GET'])
 def get_reports():
     """Get reports - filtered for regular users (hide flagged reports)"""
