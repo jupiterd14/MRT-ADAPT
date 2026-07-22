@@ -243,160 +243,52 @@ def get_active_broadcasts():
     
 @operator_bp.route('/api/operator/station-status')
 def operator_station_status():
-    """Get station status for operator dashboard - SHOWS ALL STATIONS with overrides"""
+    """Get station status for operator dashboard - uses the same logic as live map v2."""
     try:
+        # Forward the request to the live map v2 endpoint (internal call)
         from flask import current_app
-        from datetime import datetime
-        from services.model_loader import directional_models, directional_scalers
-        from services import get_feature_sequence_for_station
-        import time
-        
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({'error': 'Unauthorized'}), 401
-        
-        # ========== GET ACTIVE OVERRIDES FROM FILE FIRST ==========
-        active_overrides = get_active_overrides()
-        
-        print(f"🔍 Active overrides: {len(active_overrides)}")
-        for key, val in active_overrides.items():
-            print(f"   {key}: {val.get('congestion', '?')}%")
-        
-        # Also update app config for consistency
-        if 'overrides' not in current_app.config:
-            current_app.config['overrides'] = {}
-        current_app.config['overrides'] = active_overrides
-        
-        stations_to_show = STATIONS
-        
-        # Get models from config
-        directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
-        directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
-        
-        now = datetime.now()
-        hour = now.hour
-        minute = now.minute
-        current_time = hour + minute / 60
-        
-        OPERATING_START = 4.5
-        OPERATING_END = 22.5
-        
-        def get_congestion(station_name, direction):
-            """Get congestion with OVERRIDE support - returns (congestion, is_overridden)"""
-            override_key = f"{station_name}_{direction.lower()}"
+        with current_app.test_client() as client:
+            # Add a timestamp to avoid caching
+            response = client.get('/api/live-map/directions/v2?_=' + str(int(time.time())))
+            data = response.get_json()
             
-            # CHECK OVERRIDE FIRST - THIS IS THE KEY FIX
-            if override_key in active_overrides:
-                override_value = active_overrides[override_key].get('congestion', 50)
-                print(f"🔧 OVERRIDE: {station_name} {direction} = {override_value}%")
-                return override_value, True
+            if not data or 'northbound' not in data:
+                return jsonify({'stations': []}), 500
             
-            # If MRT is closed and no override, return 0
-            if current_time < OPERATING_START or current_time >= OPERATING_END:
-                return 0, False
+            # Transform the v2 response into the format expected by the operator dashboard
+            stations_list = current_app.config.get('STATIONS', STATIONS)
+            result = []
+            for station in stations_list:
+                north = data['northbound'].get(station, {})
+                south = data['southbound'].get(station, {})
+                
+                result.append({
+                    'name': station,
+                    'northbound': {
+                        'congestion': north.get('congestion', 0),
+                        'status_text': north.get('status', 'LIGHT'),
+                        'status_class': 'status-' + north.get('status', 'light').lower(),
+                        'wait_time': north.get('wait_time', 'N/A'),
+                        'ridership': north.get('ridership', 0),
+                        'overridden': north.get('overridden', False)
+                    },
+                    'southbound': {
+                        'congestion': south.get('congestion', 0),
+                        'status_text': south.get('status', 'LIGHT'),
+                        'status_class': 'status-' + south.get('status', 'light').lower(),
+                        'wait_time': south.get('wait_time', 'N/A'),
+                        'ridership': south.get('ridership', 0),
+                        'overridden': south.get('overridden', False)
+                    }
+                })
             
-            # Otherwise use model prediction
-            model_key = f"{station_name}_{direction}"
+            return jsonify({'stations': result})
             
-            if model_key not in directional_models:
-                # Time-based fallback
-                if 7 <= hour <= 9:
-                    return 65 + (hour - 7) * 5, False
-                elif 17 <= hour <= 19:
-                    return 60 + (hour - 17) * 5, False
-                elif 10 <= hour <= 16:
-                    return 40, False
-                return 25, False
-            
-            try:
-                sequence = get_feature_sequence_for_station(station_name, direction, now)
-                if sequence is not None and len(sequence) == 24:
-                    feature_scaler = directional_scalers.get(f'{model_key}_feature')
-                    target_scaler = directional_scalers.get(f'{model_key}_target')
-                    
-                    if feature_scaler and target_scaler:
-                        input_sequence = sequence.reshape(1, 24, -1)
-                        pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
-                        congestion, _ = _get_congestion_from_prediction(
-                            pred_scaled, target_scaler, station_name
-                        )
-                        return congestion, False
-            except Exception as e:
-                print(f"⚠️ Error for {model_key}: {e}")
-            
-            # Fallback
-            if 7 <= hour <= 9:
-                return 65 + (hour - 7) * 5, False
-            elif 17 <= hour <= 19:
-                return 60 + (hour - 17) * 5, False
-            elif 10 <= hour <= 16:
-                return 40, False
-            return 25, False
-        
-        def get_status_info(congestion):
-            if congestion > 80:
-                return "SEVERE", "status-severe", "15-20 min"
-            elif congestion > 60:
-                return "CONGESTED", "status-congested", "10-15 min"
-            elif congestion > 30:
-                return "MODERATE", "status-moderate", "5-10 min"
-            else:
-                return "LIGHT", "status-light", "2-5 min"
-        
-        result = []
-        for station in stations_to_show:
-            north_congestion, north_overridden = get_congestion(station, 'Northbound')
-            south_congestion, south_overridden = get_congestion(station, 'Southbound')
-            
-            print("Operator status north: ", north_congestion)
-            print("Operator status south: ", south_congestion)
-            
-            
-            # If overridden, show the override value even if MRT is closed
-            # But if not overridden and MRT is closed, show CLOSED
-            if not north_overridden and (current_time < OPERATING_START or current_time >= OPERATING_END):
-                north_text = "CLOSED"
-                north_class = "status-light"
-                north_wait = "Closed"
-            else:
-                north_text, north_class, north_wait = get_status_info(north_congestion)
-            
-            if not south_overridden and (current_time < OPERATING_START or current_time >= OPERATING_END):
-                south_text = "CLOSED"
-                south_class = "status-light"
-                south_wait = "Closed"
-            else:
-                south_text, south_class, south_wait = get_status_info(south_congestion)
-            
-            platform_capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
-            
-            result.append({
-                'name': station,
-                'northbound': {
-                    'congestion': round(north_congestion, 1),
-                    'status_text': north_text,
-                    'status_class': north_class,
-                    'wait_time': north_wait,
-                    'ridership': int((north_congestion / 100) * platform_capacity) if north_congestion > 0 else 0,
-                    'overridden': north_overridden
-                },
-                'southbound': {
-                    'congestion': round(south_congestion, 1),
-                    'status_text': south_text,
-                    'status_class': south_class,
-                    'wait_time': south_wait,
-                    'ridership': int((south_congestion / 100) * platform_capacity) if south_congestion > 0 else 0,
-                    'overridden': south_overridden
-                }
-            })
-        
-        return jsonify({'stations': result})
-        
     except Exception as e:
         print(f"Error in operator_station_status: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'stations': []})
+        return jsonify({'stations': []}), 500
     
 @operator_bp.route('/api/operator/debug-override')
 def debug_override():

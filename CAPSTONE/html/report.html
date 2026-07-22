@@ -166,6 +166,8 @@ nav {
             text-transform: uppercase; 
             margin-bottom: 5px; 
             letter-spacing: 0.5px;
+              margin-bottom: 5px !important;
+              margin-top: 2px;
         }
 
         .header-top {
@@ -240,20 +242,20 @@ nav {
             color: white;
         }
 
-        .icon-btn {
-            background: #F1F5F9;
-            padding: 8px;
-            border-radius: 8px;
-            cursor: pointer;
-            position: relative;
-            color: var(--text-dark);
-            transition: 0.3s;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+       .icon-btn {
+    background: #F1F5F9;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    color: var(--text-dark);
+    transition: 0.3s;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
         .icon-btn:hover {
             background: #E2E8F0;
@@ -281,7 +283,7 @@ nav {
             gap: 10px;
             margin-bottom: 12px;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 14px;
             color: var(--text-dark);
         }
 
@@ -356,7 +358,7 @@ nav {
 
 
 .report-card i { 
-    font-size: 30px !important;
+    font-size: 30px;
     margin-bottom: 20px;
 }
         
@@ -911,6 +913,26 @@ nav {
 @media screen and (max-width: 768px) {
     
  
+ 
+    .direction-option {
+    flex-direction: column !important;   /* stack the text vertically */
+    gap: 2px !important;                /* reduce gap between lines */
+    padding: 5px 6px !important;
+    font-size: 11px !important;
+}
+
+.direction-option i {
+    font-size: 5px !important;
+    margin-bottom: 2px;                 /* separate icon from text */
+}
+
+.direction-option small {
+    font-size: 9px !important;
+    display: block !important;          /* force it to its own line */
+    margin-top: 0 !important;
+    color: var(--text-light) !important;
+    white-space: nowrap;                /* prevent wrapping inside */
+}
       .pill {
         padding: 2px 8px !important;
         font-size: 10px !important;
@@ -1118,12 +1140,13 @@ nav {
     }
     
     .report-card {
-        padding: 20px 12px;
+        padding: 20px 12px !important;
         min-height: 130px;
     }
     
     .report-card i {
-        font-size: 28px;
+        font-size: 28px !important;
+        margin-bottom: 2px !important;
     }
     
     .report-card h3 {
@@ -1191,7 +1214,8 @@ nav {
     
     /* Adjust greeting */
     .greeting {
-        font-size: 9px;
+        font-size: 9px !important;
+
     }
     
     /* Adjust action buttons */
@@ -1200,10 +1224,7 @@ nav {
         font-size: 12px;
     }
     
-    .icon-btn {
-        width: 32px;
-        height: 32px;
-    }
+ 
     
     /* Adjust filter dropdown for mobile */
       .dropdown-card {
@@ -1283,9 +1304,7 @@ nav {
         font-size: 11px !important;
     }
     
-    .greeting {
-        font-size: 10px !important;
-    }
+  
     
     /* Smaller station selector */
     .station-selector {
@@ -1455,6 +1474,11 @@ nav {
 /* Extra small devices */
 @media screen and (max-width: 480px) {
     /* Header alignment fix - title on left, icons on right */
+
+    .report-card i {
+    font-size: 16px !important;  /* was 20px */
+}
+
     .header-top {
         display: flex;
         flex-direction: row !important;
@@ -1658,7 +1682,7 @@ nav {
 
                 <div class="section-header" style="margin-bottom: 12px;">
                     <i class="fas fa-users"></i>
-                    <h3>Crowd Density</h3>
+                    <h3>Congestion Type</h3>
                 </div>
 
                 <div class="report-grid">
@@ -2729,24 +2753,15 @@ if (diffMins < 1) {
         let avatarLetter = '?';
         
         if (report.anonymous) {
-            displayName = 'Anonymous';
-            avatarLetter = 'A';
-        } else if (report.username) {
-            const username = report.username;
-            if (username && username.includes('@')) {
-                displayName = username.split('@')[0];
-            } else if (username) {
-                displayName = username;
-            } else {
+            displayName = 'Commuter';
+            avatarLetter = 'C';
+        } 
+             else {
                 displayName = 'Commuter';
                 avatarLetter = 'C';
             }
             avatarLetter = displayName.charAt(0).toUpperCase();
-        } else {
-            displayName = 'Commuter';
-            avatarLetter = 'C';
-        }
-        
+         
         const hasRemarks = report.remarks && report.remarks.trim() !== '';
         
         let hasPhotos = false;

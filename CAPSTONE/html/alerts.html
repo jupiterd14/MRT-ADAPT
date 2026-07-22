@@ -127,6 +127,7 @@ nav {
     font-weight: bold; 
     text-transform: uppercase; 
     margin-bottom: 5px; 
+      letter-spacing: 0.5px;
 }
 .header-top { 
     display: flex; 
@@ -208,18 +209,19 @@ nav {
     gap: 10px; 
     align-items: center; 
 }
-.icon-btn { 
-    background: #F1F5F9; 
-    padding: 8px; 
-    border-radius: 8px; 
-    cursor: pointer; 
-    color: var(--text-dark); 
-    transition: 0.3s; 
-    width: 36px; 
-    height: 36px; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
+.icon-btn {
+    background: #F1F5F9;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    color: var(--text-dark);
+    transition: 0.3s;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .icon-btn:hover { 
     background: #E2E8F0; 
@@ -558,6 +560,13 @@ nav {
 }
 
 @media screen and (max-width: 768px) {
+
+     .greeting {
+        font-size: 9px !important;
+        margin-top: 2px;
+
+     }
+
     .sidebar {
         display: none !important;
     }
@@ -663,7 +672,7 @@ nav {
     
     .greeting {
         font-size: 9px !important;
-        margin-bottom: 3px !important;
+        margin-bottom: 5px !important;
     }
     
     .alert-text .station-name {
@@ -790,6 +799,14 @@ nav {
     let currentFilter = 'all';
     let _lastAlertLoadTime = 0;
     let _cachedUnreadCount = 0;
+
+    (function setGreeting() {
+        const hour = new Date().getHours();
+        let greeting = 'GOOD MORNING';
+        if (hour >= 12 && hour < 18) greeting = 'GOOD AFTERNOON';
+        else if (hour >= 18) greeting = 'GOOD EVENING';
+        document.querySelector('.greeting').textContent = greeting + ', Commuter';
+    })();
 
     const STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
         "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 

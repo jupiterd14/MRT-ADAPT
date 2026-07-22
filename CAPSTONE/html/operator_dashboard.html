@@ -1,4 +1,6 @@
-        <!DOCTYPE html>
+
+<!-- LATEST -->
+<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
@@ -18,7 +20,7 @@
                     --border: #E2E8F0;
                     --success-green: #22C55E;
                     --danger-red: #EF4444;
-                    --purple: #8B5CF6;
+                    --purple: #3B82F6;
                     --purple-light: #EDE9FE;
                     --light-green: #22c55e;
                     --mod-yellow: #eab308;
@@ -317,7 +319,7 @@
                     transition: all 0.2s;
                 }
 
-                .btn-primary { background: var(--purple); color: white;padding: 12px; border-radius: 10px; }
+                .btn-primary { background: var(--purple); color: white;padding: 12px; border-radius: 10px; border: 1px solid var(--purple);}
                 .btn-primary:hover { background: #7C3AED; transform: translateY(-1px); }
                 .btn-ghost { background: transparent; color: var(--text-light); border-radius:10px; padding: 12px; border: 1px solid var(--border); }
                 .btn-ghost:hover { background: var(--border); transform: translate(1px, 2px); }
@@ -416,15 +418,17 @@
                 canvas { max-height: 250px; width: 100%; }
 
                 .broadcast-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
-                .form-card { background: white; border-radius: 16px; padding: 10px; border: 1px solid var(--border); }
+                .form-card { background: white; border-radius: 16px; padding: 12px; border: 1px solid var(--border); }
+                .form-card h3 {font-size: 16px;}
                 .input-group { margin-bottom: 20px; }
                 label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--text-dark); }
                 input, select, textarea { width: 100%; padding: 12px 15px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 13px; outline: none; }
 
-                .disruption-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+                .disruption-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
                 .dist-opt {
                     border: 1px solid var(--border);
                     padding: 16px 12px;
+                    font-size: 14px;
                     border-radius: 16px;
                     text-align: center;
                     cursor: pointer;
@@ -434,8 +438,14 @@
                     align-items: center;
                     gap: 8px;
                 }
+                .dist-opt:hover {
+                  border-color: var(--purple); background: var(--purple-light); 
+                   transform: translate(1px, 2px); 
+                  
+                }
                 .dist-opt.selected { border-color: var(--purple); background: var(--purple-light); }
                 .dist-opt i { font-size: 32px; color: var(--purple); }
+               
 
                 .stations-grid {
                     display: grid;
@@ -1187,9 +1197,9 @@
         /* Direction Selector for Broadcast */
         .direction-filter {
             display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
-            padding: 6px 2px;
+            gap: 6px;
+            margin-bottom: 12px;
+            padding: 2px 2px;
             background: #F8FAFC;
             border-radius: 10px;
         }
@@ -1201,13 +1211,13 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            padding: 10px;
+            padding: 8px;
             border: 2px solid var(--border);
             border-radius: 12px;
             cursor: pointer;
             transition: all 0.2s;
             background: white;
-            font-weight: 500;
+            font-size: 12px;
         }
 
         .direction-option-broadcast:hover {
@@ -1514,6 +1524,628 @@
     background: rgba(255, 255, 255, 0.05);
 }
 
+
+/* ========== MOVING TRAIN LOADING ANIMATION - 3 CARS ========== */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 34, 77, 0.85);
+    backdrop-filter: blur(6px);
+    z-index: 99999;
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-container {
+    background: white;
+    padding: 40px 50px;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: fadeInScale 0.3s ease-out;
+    max-width: 460px;
+    width: 90%;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Train Track Container */
+.train-track-container {
+    width: 100%;
+    height: 100px;
+    position: relative;
+    overflow: hidden;
+     background: linear-gradient(
+        180deg,
+        #eef6ff 0%,
+        #d8e7f7 55%,
+        #c5d8ef 100%
+    );
+    border-radius: 12px;
+    padding: 12px 0 10px 0;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
+}
+
+/* Train Tracks */
+.train-tracks {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #7a8a9a;
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3);
+}
+
+.train-tracks::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #7a8a9a;
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3);
+}
+
+.train-tracks::after {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: repeating-linear-gradient(
+        90deg,
+        #8a7a6a 0px,
+        #8a7a6a 5px,
+        transparent 5px,
+        transparent 22px
+    );
+    opacity: 0.35;
+    border-radius: 1px;
+}
+
+/* Moving Train - 3 Cars */
+.moving-train {
+    position: absolute;
+    bottom: 2px;
+    left: 0;
+    animation: trainMoveContinuous 10s linear infinite;
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    z-index: 2;
+}
+
+/* ===== CAR 1 - Main Train Car ===== */
+.train-body {
+    background: linear-gradient(135deg, #00224D 0%, #1a4a7a 100%);
+    border-radius: 4px 10px 0 0;
+    height: 38px;
+    width: 65px;
+    position: relative;
+    border-bottom: 3px solid #FFD700;
+    box-shadow: 0 4px 12px rgba(0, 34, 77, 0.3);
+}
+
+/* Train Windows - 4 windows */
+.train-windows {
+    display: flex;
+    gap: 4px;
+    padding: 5px 6px;
+    justify-content: center;
+}
+
+.train-window {
+    width: 11px;
+    height: 15px;
+    background: #87CEEB;
+    border-radius: 2px;
+    border: 1px solid #4a90d9;
+    animation: windowGlow 1.5s ease-in-out infinite;
+}
+
+.train-window:nth-child(1) { animation-delay: 0s; }
+.train-window:nth-child(2) { animation-delay: 0.3s; }
+.train-window:nth-child(3) { animation-delay: 0.6s; }
+.train-window:nth-child(4) { animation-delay: 0.9s; }
+
+/* Train Headlight */
+.train-headlight {
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #FFD700;
+    border-radius: 50%;
+    box-shadow: 0 0 20px #FFD700, 0 0 40px #FFA500;
+    animation: headlightPulse 1s ease-in-out infinite;
+}
+
+/* Train Wheels */
+.train-wheels {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    padding-top: 2px;
+}
+
+.train-wheel {
+    width: 9px;
+    height: 9px;
+    background: #333;
+    border-radius: 50%;
+    border: 2px solid #555;
+    animation: wheelSpin 0.8s linear infinite;
+}
+
+.train-wheel::after {
+    content: '';
+    display: block;
+    width: 4px;
+    height: 4px;
+    background: #777;
+    border-radius: 50%;
+    margin: 0 auto;
+}
+
+/* ===== CONNECTION 1 ===== */
+.train-connection {
+    width: 6px;
+    height: 9px;
+    background: #1a3a5a;
+    border-radius: 2px;
+    margin-bottom: 4px;
+}
+
+/* ===== CAR 2 - Middle Car ===== */
+.train-car-2 {
+    background: linear-gradient(135deg, #1a3a5a 0%, #2a5a8a 100%);
+    border-radius: 4px 10px 0 0;
+    height: 32px;
+    width: 55px;
+    position: relative;
+    border-bottom: 2px solid #FFD700;
+}
+
+.train-car-2 .train-windows {
+    padding: 4px 5px;
+    gap: 4px;
+}
+
+.train-car-2 .train-window {
+    width: 9px;
+    height: 12px;
+}
+
+.train-car-2 .train-window:nth-child(1) { animation-delay: 0.15s; }
+.train-car-2 .train-window:nth-child(2) { animation-delay: 0.45s; }
+.train-car-2 .train-window:nth-child(3) { animation-delay: 0.75s; }
+.train-car-2 .train-window:nth-child(4) { animation-delay: 1.05s; }
+
+.train-car-2 .train-wheels {
+    gap: 12px;
+}
+
+.train-car-2 .train-wheel {
+    width: 8px;
+    height: 8px;
+}
+
+/* ===== CONNECTION 2 ===== */
+.train-connection-2 {
+    width: 6px;
+    height: 7px;
+    background: #1a3a5a;
+    border-radius: 2px;
+    margin-bottom: 3px;
+}
+
+/* ===== CAR 3 - Last Car (smallest) ===== */
+.train-car-3 {
+    background: linear-gradient(135deg, #0a2a4a 0%, #1a4a7a 100%);
+    border-radius: 4px 10px 0 0;
+    height: 26px;
+    width: 45px;
+    position: relative;
+    border-bottom: 2px solid #FFD700;
+}
+
+.train-car-3 .train-windows {
+    padding: 3px 4px;
+    gap: 3px;
+}
+
+.train-car-3 .train-window {
+    width: 8px;
+    height: 10px;
+}
+
+.train-car-3 .train-window:nth-child(1) { animation-delay: 0.2s; }
+.train-car-3 .train-window:nth-child(2) { animation-delay: 0.5s; }
+.train-car-3 .train-window:nth-child(3) { animation-delay: 0.8s; }
+
+.train-car-3 .train-wheels {
+    gap: 10px;
+}
+
+.train-car-3 .train-wheel {
+    width: 7px;
+    height: 7px;
+}
+
+/* Train rear light (red) */
+.train-rear-light {
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: #FF0000;
+    border-radius: 50%;
+    box-shadow: 0 0 15px #FF0000, 0 0 30px #CC0000;
+    animation: rearLightPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes rearLightPulse {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 15px #FF0000, 0 0 30px #CC0000;
+    }
+    50% {
+        opacity: 0.6;
+        box-shadow: 0 0 10px #FF0000, 0 0 20px #CC0000;
+    }
+}
+
+/* ========== CONTINUOUS TRAIN ANIMATION ========== */
+@keyframes trainMoveContinuous {
+    0% {
+        transform: translateX(-130px);
+    }
+    100% {
+        transform: translateX(calc(100% + 60px));
+    }
+}
+
+@keyframes wheelSpin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes windowGlow {
+    0%, 100% {
+        background: #87CEEB;
+        opacity: 0.7;
+    }
+    50% {
+        background: #FFD700;
+        opacity: 1;
+        box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    }
+}
+
+@keyframes headlightPulse {
+    0%, 100% {
+        box-shadow: 0 0 20px #FFD700, 0 0 40px #FFA500;
+        opacity: 1;
+    }
+    50% {
+        box-shadow: 0 0 30px #FFD700, 0 0 60px #FFA500;
+        opacity: 0.8;
+    }
+}
+
+/* Loading Text */
+.loading-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-dark);
+    letter-spacing: 0.5px;
+}
+
+.loading-subtext {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-top: -8px;
+}
+
+.loading-dots::after {
+    content: '';
+    animation: loadingDots 1.5s steps(4, end) infinite;
+}
+
+@keyframes loadingDots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+    100% { content: ''; }
+}
+
+/* ========== MOBILE RESPONSIVE ========== */
+
+/* Tablets */
+@media screen and (max-width: 768px) {
+    .loading-container {
+        padding: 30px 25px;
+        max-width: 340px;
+    }
+    
+    .train-track-container {
+        height: 75px;
+        padding: 10px 0 8px 0;
+    }
+    
+    .train-tracks {
+        bottom: 10px;
+        height: 2px;
+    }
+    
+    .train-tracks::before {
+        top: -8px;
+        height: 2px;
+    }
+    
+    .train-tracks::after {
+        top: -10px;
+        height: 16px;
+        background: repeating-linear-gradient(
+            90deg,
+            #8a7a6a 0px,
+            #8a7a6a 4px,
+            transparent 4px,
+            transparent 18px
+        );
+    }
+    
+    .train-body {
+        height: 32px;
+        width: 52px;
+    }
+    
+    .train-car-2 {
+        height: 26px;
+        width: 44px;
+    }
+    
+    .train-car-3 {
+        height: 22px;
+        width: 36px;
+    }
+    
+    .train-window {
+        width: 9px;
+        height: 12px;
+    }
+    
+    .train-car-2 .train-window {
+        width: 7px;
+        height: 10px;
+    }
+    
+    .train-car-3 .train-window {
+        width: 6px;
+        height: 8px;
+    }
+    
+    .train-wheels {
+        gap: 10px;
+    }
+    
+    .train-wheel {
+        width: 7px;
+        height: 7px;
+    }
+    
+    .train-car-2 .train-wheel {
+        width: 6px;
+        height: 6px;
+    }
+    
+    .train-car-3 .train-wheel {
+        width: 5px;
+        height: 5px;
+    }
+    
+    .loading-text {
+        font-size: 14px;
+    }
+    
+    .loading-subtext {
+        font-size: 12px;
+    }
+    
+    @keyframes trainMoveContinuous {
+        0% {
+            transform: translateX(-100px);
+        }
+        100% {
+            transform: translateX(calc(100% + 50px));
+        }
+    }
+}
+
+/* Mobile Phones */
+@media screen and (max-width: 480px) {
+    .loading-container {
+        padding: 20px 16px;
+        max-width: 290px;
+    }
+    
+    .train-track-container {
+        height: 60px;
+        border-radius: 8px;
+        padding: 8px 0 6px 0;
+    }
+    
+    .train-tracks {
+        bottom: 8px;
+        height: 2px;
+    }
+    
+    .train-tracks::before {
+        top: -6px;
+        height: 2px;
+    }
+    
+    .train-tracks::after {
+        top: -8px;
+        height: 14px;
+        background: repeating-linear-gradient(
+            90deg,
+            #8a7a6a 0px,
+            #8a7a6a 3px,
+            transparent 3px,
+            transparent 14px
+        );
+    }
+    
+    .train-body {
+        height: 24px;
+        width: 40px;
+        border-bottom: 2px solid #FFD700;
+    }
+    
+    .train-car-2 {
+        height: 20px;
+        width: 34px;
+        border-bottom: 2px solid #FFD700;
+    }
+    
+    .train-car-3 {
+        height: 17px;
+        width: 28px;
+        border-bottom: 1.5px solid #FFD700;
+    }
+    
+    .train-windows {
+        gap: 2px;
+        padding: 3px 4px;
+    }
+    
+    .train-window {
+        width: 7px;
+        height: 9px;
+    }
+    
+    .train-car-2 .train-windows {
+        padding: 2px 3px;
+    }
+    
+    .train-car-2 .train-window {
+        width: 6px;
+        height: 8px;
+    }
+    
+    .train-car-3 .train-windows {
+        padding: 2px 3px;
+    }
+    
+    .train-car-3 .train-window {
+        width: 5px;
+        height: 6px;
+    }
+    
+    .train-wheels {
+        gap: 8px;
+        padding-top: 1px;
+    }
+    
+    .train-wheel {
+        width: 6px;
+        height: 6px;
+        border-width: 1.5px;
+    }
+    
+    .train-wheel::after {
+        width: 2px;
+        height: 2px;
+    }
+    
+    .train-car-2 .train-wheel {
+        width: 5px;
+        height: 5px;
+    }
+    
+    .train-car-3 .train-wheel {
+        width: 4px;
+        height: 4px;
+    }
+    
+    .train-headlight {
+        right: -3px;
+        width: 6px;
+        height: 6px;
+        box-shadow: 0 0 15px #FFD700, 0 0 30px #FFA500;
+    }
+    
+    .train-rear-light {
+        left: -3px;
+        width: 5px;
+        height: 5px;
+    }
+    
+    .train-connection {
+        width: 4px;
+        height: 6px;
+        margin-bottom: 2px;
+    }
+    
+    .train-connection-2 {
+        width: 4px;
+        height: 5px;
+        margin-bottom: 2px;
+    }
+    
+    .loading-text {
+        font-size: 13px;
+    }
+    
+    .loading-subtext {
+        font-size: 11px;
+    }
+    
+    @keyframes trainMoveContinuous {
+        0% {
+            transform: translateX(-75px);
+        }
+        100% {
+            transform: translateX(calc(100% + 35px));
+        }
+    }
+}
+
             </style>
         </head>
         <body>
@@ -1671,6 +2303,68 @@
 
         
 
+
+            <!-- ===== LOADING OVERLAY WITH MOVING TRAIN ===== -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-container">
+        <!-- Train Track -->
+        <div class="train-track-container">
+            <div class="train-tracks"></div>
+            <!-- Moving Train - 3 Cars -->
+            <div class="moving-train">
+                <!-- Train Car 1 (Main - Front) -->
+                <div class="train-body">
+                    <div class="train-windows">
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                    </div>
+                    <div class="train-headlight"></div>
+                    <div class="train-wheels">
+                        <div class="train-wheel"></div>
+                        <div class="train-wheel"></div>
+                    </div>
+                </div>
+                
+                <!-- Train Connection 1 -->
+                <div class="train-connection"></div>
+                
+                <!-- Train Car 2 (Middle) -->
+                <div class="train-car-2">
+                    <div class="train-windows">
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                    </div>
+                    <div class="train-wheels">
+                        <div class="train-wheel"></div>
+                        <div class="train-wheel"></div>
+                    </div>
+                </div>
+                
+                <!-- Train Connection 2 -->
+                <div class="train-connection-2"></div>
+                
+                <!-- Train Car 3 (Last - Rear) -->
+                <div class="train-car-3">
+                    <div class="train-windows">
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                    </div>
+                    <div class="train-rear-light"></div>
+                    <div class="train-wheels">
+                        <div class="train-wheel"></div>
+                        <div class="train-wheel"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="loading-subtext">Please wait while we fetch the latest updates</div>
+    </div>
+</div>
             <div class="sidebar">
                 <div class="logo-section">
                     <div class="logo-icon"><i class="fas fa-user-tie"></i></div>
@@ -1760,7 +2454,9 @@
 
                 <div>
                     <div class="form-card">
-                        <h3 style="margin-bottom:16px;">Disruption Type</h3>
+                      <h3 style="margin-bottom:16px;">
+    <i class="fas fa-bullhorn" style="padding-right: 5px;"></i> Disruption Type
+</h3>
                         <div class="disruption-grid" id="disruptionGrid"></div>
         <div id="customDisruptionContainer" style="display: none; margin-top: 12px;">
             <input type="text" id="customDisruptionInput" class="custom-disruption-input" placeholder="Enter disruption type...">
@@ -1794,12 +2490,12 @@
                 </div>
                 <div>
                     <div class="form-card">
-                        <h3><i class="fa-regular fa-envelope"></i> Message</h3>
+                        <h3><i class="fa-regular fa-envelope"  style="padding-right: 5px;"></i> Message</h3>
                         <div class="input-group"><label>Alert Title</label><input type="text" id="alertTitle" oninput="updatePreview()" placeholder="e.g., Train Malfunction"></div>
                         <div class="input-group"><label>Message</label><textarea id="alertMessage" oninput="updatePreview()" rows="4" placeholder="Describe situation..."></textarea></div>
                         <div class="input-group"><label>Severity</label><select id="severityLevel"><option value="advisory">Advisory</option><option value="warning">Warning</option><option value="critical">Critical</option></select></div>
                         <div class="input-group">
-            <label><i class="fas fa-hourglass-half"></i> Alert Duration</label>
+            <label> Alert Duration</label>
             <select id="alertDuration">
                 <option value="30">30 minutes</option>
                 <option value="60" selected>1 hour</option>
@@ -2186,6 +2882,16 @@
         return 'Light';
     }
 
+
+    function showLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.add('active');
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('active');
+}
     // ========== BROADCAST CORE FUNCTIONS ==========
     async function loadAllBroadcasts() {
         try {
@@ -2924,6 +3630,7 @@ async function confirmArchiveBroadcast() {
     // ========== DASHBOARD DATA FETCH ==========
     async function loadCongestionData() {
         console.log("Loading congestion data for operator dashboard...");
+         showLoadingOverlay();
         try {
             const response = await fetch(`/api/operator/station-status?_=${Date.now()}`);
             if (!response.ok) {
@@ -3060,7 +3767,10 @@ async function confirmArchiveBroadcast() {
 
         } catch (error) {
             console.error('Error loading congestion data:', error);
-        }
+        } finally {
+        hideLoadingOverlay(); 
+    }
+        
     }
  async function fetchOperatorReports() {
     console.log("Fetching operator reports...");
@@ -3083,9 +3793,16 @@ async function confirmArchiveBroadcast() {
         // Update summary counts (only flagged from managed stations)
         const managedFlagged = reports.filter(r => managedStations.includes(r.station) && ((r.flag_count || 0) > 0 || r.flagged === true));
         const flaggedEl = document.getElementById('flaggedReportsCount');
-        if (flaggedEl) flaggedEl.innerText = managedFlagged.length;
+         const flaggedReports = allReportsData.filter(r => (r.flag_count || 0) > 0 || r.flagged === true);
+          
+          
+
+        if (flaggedEl) flaggedEl.innerText = flaggedReports.length;
+        
+
         
         const totalEl = document.getElementById('totalReportsCount');
+        
         if (totalEl) totalEl.innerText = reports.length;
         
     } catch (error) {
@@ -3095,6 +3812,11 @@ async function confirmArchiveBroadcast() {
 }
 
 
+function resetReportsView() {
+    // Show all reports (the full dataset)
+    displayOperatorReports(allReportsData);
+    showToast('', 'Showing all reports');
+}
 
 // ========== SETUP FLAGGED CARD ==========
 function setupFlaggedCard() {
@@ -3230,10 +3952,8 @@ function setupFlaggedCard() {
     // ========== REVIEW REPORT FUNCTIONS ==========
 let currentFlaggedReportId = null;
 let currentFlaggedReportData = null;
-
 function reviewFlaggedReport(report) {
     currentFlaggedReportId = report.id;
-    currentFlaggedReportData = report;
     
     const modal = document.getElementById('reviewModal');
     const reportDetails = document.getElementById('reviewReportDetails');
@@ -3241,12 +3961,30 @@ function reviewFlaggedReport(report) {
     
     if (reviewReason) reviewReason.value = '';
     
+    // Determine level text and color
+    let levelText, levelColor, bgColor;
+    if (report.reported_congestion > 80) {
+        levelText = 'Severe';
+        levelColor = '#EF4444';
+        bgColor = '#FEE2E2';
+    } else if (report.reported_congestion > 60) {
+        levelText = 'Congested';
+        levelColor = '#F97316';
+        bgColor = '#FED7AA';
+    } else if (report.reported_congestion > 30) {
+        levelText = 'Moderate';
+        levelColor = '#EAB308';
+        bgColor = '#FEF9C3';
+    } else {
+        levelText = 'Light';
+        levelColor = '#22C55E';
+        bgColor = '#DCFCE7';
+    }
+    
+    const formattedDate = new Date(report.timestamp).toLocaleString();
+    const flagCount = report.flag_count || 1;
+    
     if (reportDetails) {
-        const formattedDate = new Date(report.timestamp).toLocaleString();
-        const flagCount = report.flag_count || 1;
-        const levelText = getCongestionLevelText(report.reported_congestion);
-        const levelColor = getCongestionLevelColor(report.reported_congestion);
-        
         reportDetails.innerHTML = `
             <div style="background: #FEF3C7; padding: 16px; border-radius: 12px; margin-bottom: 16px; border-left: 4px solid #F59E0B;">
                 <p style="margin-bottom: 4px; font-weight: 600; color: #92400E;">
@@ -3272,11 +4010,11 @@ function reviewFlaggedReport(report) {
                 </div>
             </div>
             
+            <!-- Congestion: show only the pill, NO percentage -->
             <div style="background: #F8FAFC; padding: 12px; border-radius: 10px; margin-bottom: 12px;">
-                <div style="font-size: 11px; color: var(--text-light); text-transform: uppercase;">Reported Congestion</div>
+                <div style="font-size: 11px; color: var(--text-light); text-transform: uppercase; margin-bottom: 6px;">Reported Congestion</div>
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-weight: 700; font-size: 24px; color: ${levelColor};">${report.reported_congestion}%</span>
-                    <span style="background: ${levelColor}20; color: ${levelColor}; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">
+                    <span style="background: ${bgColor}; color: ${levelColor}; padding: 6px 16px; border-radius: 20px; font-size: 16px; font-weight: 600; border: 1px solid ${levelColor};">
                         ${levelText}
                     </span>
                 </div>
@@ -3317,9 +4055,24 @@ function reviewFlaggedReport(report) {
         `;
     }
     
+    // Set the modal actions to "Keep report" and "Archive report"
+    const modalActions = document.querySelector('#reviewModal .modal-actions');
+    if (modalActions) {
+        modalActions.innerHTML = `
+            <button class="btn-cancel" onclick="closeReviewModal()">Cancel</button>
+            <div style="display: flex; gap: 12px;">
+                <button class="btn-ghost" onclick="keepAndRemoveFlag()" style="background: #DCFCE7; color: #166534; border-color: #86EFAC;">
+                    <i class="fas fa-check"></i> Keep report
+                </button>
+                <button class="btn-apply" onclick="archiveReport(${report.id})" style="background: #F59E0B; color: white;">
+                    <i class="fas fa-archive"></i> Archive Report
+                </button>
+            </div>
+        `;
+    }
+    
     modal.style.display = 'flex';
 }
-
 function closeReviewModal() {
     const modal = document.getElementById('reviewModal');
     if (modal) modal.style.display = 'none';
@@ -3439,71 +4192,35 @@ async function markAsFalsePositive() {
 function displayOperatorReports(reports) {
     const container = document.getElementById('operatorReportsList');
     
-    // Filter out archived reports
     const activeReports = reports.filter(r => r.archived !== true);
-    
     if (!activeReports || activeReports.length === 0) {
         container.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports yet</h3><p>User reports will appear here</p></div>`;
         return;
     }
     
     let html = '';
-    
-    // ========== FIX: Sort by ID DESC (newest ID first) - MATCHES USER DASHBOARD ==========
     activeReports.sort((a, b) => b.id - a.id);
     
     activeReports.forEach((report, idx) => {
         const isManaged = managedStations.includes(report.station);
-        
-        let levelText = '';
-        let levelColor = '';
-        let bgColor = '';
-        let borderColor = '';
-        
+        let levelText, levelColor, bgColor, borderColor;
         if (report.reported_congestion > 80) {
-            levelText = 'Severe';
-            levelColor = '#EF4444';
-            bgColor = '#FEE2E2';
-            borderColor = '#EF4444';
+            levelText = 'Severe'; levelColor = '#EF4444'; bgColor = '#FEE2E2'; borderColor = '#EF4444';
         } else if (report.reported_congestion > 60) {
-            levelText = 'Congested';
-            levelColor = '#F97316';
-            bgColor = '#FED7AA';
-            borderColor = '#F97316';
+            levelText = 'Congested'; levelColor = '#F97316'; bgColor = '#FED7AA'; borderColor = '#F97316';
         } else if (report.reported_congestion > 30) {
-            levelText = 'Moderate';
-            levelColor = '#EAB308';
-            bgColor = '#FEF9C3';
-            borderColor = '#EAB308';
+            levelText = 'Moderate'; levelColor = '#EAB308'; bgColor = '#FEF9C3'; borderColor = '#EAB308';
         } else {
-            levelText = 'Light';
-            levelColor = '#22C55E';
-            bgColor = '#DCFCE7';
-            borderColor = '#22C55E';
+            levelText = 'Light'; levelColor = '#22C55E'; bgColor = '#DCFCE7'; borderColor = '#22C55E';
         }
         
-        // ========== FIX: Use full date format like user dashboard ==========
         const reportTime = new Date(report.timestamp);
-        const dateOptions = { year: 'numeric', month: 'short', day: 'numeric' };
-        const formattedDate = reportTime.toLocaleDateString('en-US', dateOptions);
+        const formattedDate = reportTime.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
         
-        let displayName = '';
-        let avatarLetter = '?';
-        
+        let displayName = '', avatarLetter = '?';
         if (report.anonymous) {
-            displayName = 'Anonymous';
-            avatarLetter = 'A';
-        } else if (report.username) {
-            const username = report.username;
-            if (username && username.includes('@')) {
-                displayName = username.split('@')[0];
-            } else if (username) {
-                displayName = username;
-            } else {
-                displayName = 'Commuter';
-                avatarLetter = 'C';
-            }
-            avatarLetter = displayName.charAt(0).toUpperCase();
+            displayName = 'Commuter';
+            avatarLetter = 'C';
         } else {
             displayName = 'Commuter';
             avatarLetter = 'C';
@@ -3513,10 +4230,7 @@ function displayOperatorReports(reports) {
         const flagCount = report.flag_count || 0;
         const isFlagged = flagCount > 0 || report.flagged === true;
         
-        let hasPhotos = false;
-        let photoCount = 0;
-        let photoUrls = [];
-        
+        let hasPhotos = false, photoCount = 0, photoUrls = [];
         if (report.photo_paths && Array.isArray(report.photo_paths) && report.photo_paths.length > 0) {
             photoUrls = report.photo_paths;
             photoCount = photoUrls.length;
@@ -3548,7 +4262,6 @@ function displayOperatorReports(reports) {
         const contentId = `content-${report.id}-${idx}`;
         const menuId = `menu-${report.id}-${idx}`;
         
-        // Build photo HTML
         let photosHtml = '';
         if (hasPhotos) {
             photosHtml = `
@@ -3558,7 +4271,6 @@ function displayOperatorReports(reports) {
                     <span style="font-size: 12px; color: #64748B;">${photoCount} photo(s)</span>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px;">`;
-            
             photoUrls.forEach(url => {
                 photosHtml += `
                 <div style="position: relative; aspect-ratio: 1; cursor: pointer;" onclick="window.open('${url}', '_blank')">
@@ -3567,31 +4279,30 @@ function displayOperatorReports(reports) {
                          onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;background:#F1F5F9;border-radius:8px\\'><i class=\\'fas fa-image\\' style=\\'color:#94A3B8;font-size:24px\\'></i></div>'">
                 </div>`;
             });
-            
-            photosHtml += `
-                </div>
-            </div>`;
+            photosHtml += `</div></div>`;
         }
         
-        // Flag badge with count
         let flagBadge = '';
         if (isFlagged) {
             flagBadge = `<span style="background: #FEF3C7; color: #92400E; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 500;"><i class="fas fa-flag"></i> ${flagCount} flag${flagCount > 1 ? 's' : ''}</span>`;
         }
         
-        // Operator actions (only for managed stations)
-        let operatorActions = '';
-        if (isManaged) {
-            const reviewButton = isFlagged ? `
+        // --- REVIEW BUTTON (now placed on the left) ---
+        let reviewButtonHtml = '';
+        if (isManaged && isFlagged) {
+            reviewButtonHtml = `
                 <button onclick="reviewFlaggedReport(${JSON.stringify(report).replace(/"/g, '&quot;')})" 
-                    style="background: #F59E0B; color: white; border: none; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;">
+                    style="background: #F59E0B; color: white; border: none; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
                     <i class="fas fa-flag"></i> Review (${flagCount})
                 </button>
-            ` : '';
-            
-            operatorActions = `
-                <div style="position: absolute; top: 18px; right: 18px; display: flex; align-items: center; gap: 4px;">
-                    ${reviewButton}
+            `;
+        }
+        
+        // --- ELLIPSIS MENU (kept exactly as original, on the right) ---
+        let ellipsisMenu = '';
+        if (isManaged) {
+            ellipsisMenu = `
+                <div style="position: absolute; top: 18px; right: 10px; display: flex; align-items: center; gap: 4px; z-index: 5;">
                     <button onclick="toggleReportMenu('${menuId}', event)" style="background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%;">
                         <i class="fas fa-ellipsis-v" style="color: #94A3B8; font-size: 18px;"></i>
                     </button>
@@ -3609,48 +4320,49 @@ function displayOperatorReports(reports) {
             `;
         }
         
+        // --- BUILD THE CARD ---
         html += `
-    <div class="report-item" style="border: 2px solid ${borderColor}; border-radius: 16px; padding: 18px; margin-bottom: 12px; background: white; position: relative;">
-        ${operatorActions}
-        
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; ${isManaged ? 'padding-right: 50px;' : ''}">
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                <div style="width: 36px; height: 36px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-weight: bold;">
-                    ${escapeHtml(avatarLetter)}
+            <div class="report-item" style="border: 2px solid ${borderColor}; border-radius: 16px; padding: 18px 50px 18px 18px; margin-bottom: 12px; background: white; position: relative;">
+                ${ellipsisMenu}
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <div style="width: 36px; height: 36px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-weight: bold;">
+                            ${escapeHtml(avatarLetter)}
+                        </div>
+                        <div style="font-weight: 600; font-size: 14px;">${escapeHtml(displayName)}</div>
+                        ${flagBadge}
+                        ${reviewButtonHtml}   <!-- 👈 Review button now on the left -->
+                    </div>
+                    <div style="font-size: 10px; color: #64748B; white-space: nowrap;">
+                        <i class="far fa-calendar"></i> ${formattedDate}
+                    </div>
                 </div>
-                <div style="font-weight: 600; font-size: 14px;">${escapeHtml(displayName)}</div>
-                ${flagBadge}
-            </div>
-<div style="font-size: 10px; color: #64748B; white-space: nowrap;">
-    <i class="far fa-calendar"></i> ${formattedDate}
-</div>        </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                <span style="font-weight: 700; font-size: 18px;">${escapeHtml(report.station)}</span>
                 
-                <span class="pill" style="display: inline-block; background: ${bgColor}; color: ${levelColor}; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid ${levelColor};">
-                    ${levelText}
-                </span>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <span style="font-weight: 700; font-size: 18px;">${escapeHtml(report.station)}</span>
+                        <span class="pill" style="display: inline-block; background: ${bgColor}; color: ${levelColor}; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid ${levelColor};">
+                            ${levelText}
+                        </span>
+                        ${report.direction ? `
+                            <span style="display: inline-block; padding: 4px 12px; background: #EFF6FF; border-radius: 20px; font-size: 11px; font-weight: 500; color: #3B82F6;">
+                                <i class="fas ${report.direction === 'northbound' ? 'fa-arrow-up' : (report.direction === 'southbound' ? 'fa-arrow-down' : 'fa-exchange-alt')}" style="font-size: 10px; margin-right: 4px;"></i>
+                                ${report.direction === 'northbound' ? 'Northbound' : (report.direction === 'southbound' ? 'Southbound' : 'Both')}
+                            </span>
+                        ` : ''}
+                    </div>
+                    <button onclick="toggleReportContent('${contentId}', this)" style="background: none; border: none; color: #3B82F6; cursor: pointer; font-size: 13px;">
+                        <i class="fas fa-chevron-down"></i> View more
+                    </button>
+                </div>
                 
-                ${report.direction ? `
-                    <span style="display: inline-block; padding: 4px 12px; background: #EFF6FF; border-radius: 20px; font-size: 11px; font-weight: 500; color: #3B82F6;">
-                        <i class="fas ${report.direction === 'northbound' ? 'fa-arrow-up' : (report.direction === 'southbound' ? 'fa-arrow-down' : 'fa-exchange-alt')}" style="font-size: 10px; margin-right: 4px;"></i>
-                        ${report.direction === 'northbound' ? 'Northbound' : (report.direction === 'southbound' ? 'Southbound' : 'Both')}
-                    </span>
-                ` : ''}
+                <div id="${contentId}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
+                    ${hasRemarks ? `<div class="remark-text" style="background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 12px;"><i class="fas fa-quote-left" style="color: #3B82F6; margin-right: 8px;"></i>${escapeHtml(report.remarks)}</div>` : ''}
+                    ${photosHtml}
+                    ${!hasRemarks && !hasPhotos ? `<div class="remark-none" style="color: #94A3B8; text-align: center; padding: 12px;">No additional details</div>` : ''}
+                </div>
             </div>
-            <button onclick="toggleReportContent('${contentId}', this)" style="background: none; border: none; color: #3B82F6; cursor: pointer; font-size: 13px;">
-                <i class="fas fa-chevron-down"></i> View more
-            </button>
-        </div>
-        
-        <div id="${contentId}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
-            ${hasRemarks ? `<div class="remark-text" style="background: #F8FAFC; padding: 12px; border-radius: 12px; margin-bottom: 12px;"><i class="fas fa-quote-left" style="color: #3B82F6; margin-right: 8px;"></i>${escapeHtml(report.remarks)}</div>` : ''}
-            ${photosHtml}
-            ${!hasRemarks && !hasPhotos ? `<div class="remark-none" style="color: #94A3B8; text-align: center; padding: 12px;">No additional details</div>` : ''}
-        </div>
-    </div>`;
+        `;
     });
     
     container.innerHTML = html;
@@ -4214,7 +4926,92 @@ function displayOperatorReports(reports) {
             ctx.textAlign = 'center';
             ctx.fillText(`Error: ${error.message}`, canvas.width/2, canvas.height/2);
         }
+    }async function updateForecastUI() {
+    const station = currentForecastStation;
+    const canvas = document.getElementById('forecastChart');
+    if (!canvas) return;
+
+    try {
+        const response = await fetch(`/api/directional-forecast/${encodeURIComponent(station)}?_=${Date.now()}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        if (!data.forecasts || !Array.isArray(data.forecasts)) {
+            console.error('No forecasts array found:', data);
+            return;
+        }
+
+        // ─── FILTER OUT CURRENT HOUR & "NOW" ENTRIES ──────────────
+        const now = new Date();
+        const currentHour = now.getHours();
+
+        const filteredForecasts = data.forecasts.filter(f => {
+            const timeStr = f.time || '';
+            
+            // 🔥 Skip if time contains "NOW" (case-insensitive)
+            if (timeStr.toLowerCase().includes('now')) {
+                return false;
+            }
+
+            // Try 24-hour "HH:MM"
+            let match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+            if (match) {
+                const hour = parseInt(match[1]);
+                return hour !== currentHour; // skip current hour
+            }
+
+            // Try 12-hour "H:MM AM/PM"
+            match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (match) {
+                let hour = parseInt(match[1]);
+                if (match[3].toUpperCase() === 'PM' && hour !== 12) hour += 12;
+                if (match[3].toUpperCase() === 'AM' && hour === 12) hour = 0;
+                return hour !== currentHour;
+            }
+
+            // If we can't parse the time, keep it (fallback)
+            return true;
+        });
+
+        // Fallback: if filtering removed everything, use the last 6 forecasts
+        const finalForecasts = filteredForecasts.length > 0
+            ? filteredForecasts
+            : data.forecasts.slice(1); // skip the first (usually current hour)
+
+        // ─── Build labels and data ──────────────────────────────────
+        const labels = finalForecasts.map(f => f.time);
+        const rawMetrics = currentForecastDirection === 'north'
+            ? finalForecasts.map(f => f.northbound)
+            : finalForecasts.map(f => f.southbound);
+        const cleanData = rawMetrics.map(v => v !== null && v !== undefined ? v : 0);
+
+        let currentCongestion = 0;
+        if (data.current) {
+            currentCongestion = currentForecastDirection === 'north'
+                ? data.current.northbound
+                : data.current.southbound;
+        }
+
+        const fullData = [currentCongestion || 0, ...cleanData];
+        const fullLabels = ['NOW', ...labels];
+
+        // Keep only 7 points (NOW + 6 future hours)
+        if (fullData.length > 7) {
+            fullData.splice(7);
+            fullLabels.splice(7);
+        }
+
+        updateForecastChart(fullLabels, fullData, currentForecastDirection);
+    } catch (error) {
+        console.error('❌ Error loading forecast:', error);
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = '14px Inter';
+        ctx.fillStyle = '#EF4444';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Error: ${error.message}`, canvas.width/2, canvas.height/2);
     }
+}
 
     function setForecastDirection(direction) {
         currentForecastDirection = direction;
@@ -4510,6 +5307,14 @@ function displayOperatorReports(reports) {
         initBroadcast();
         initForecastSelect();
         
+        // Find the Total Reports card (the one containing the blue icon)
+const totalReportsCard = document.querySelector('#totalReportsCount')?.closest('.stat-card');
+if (totalReportsCard) {
+    totalReportsCard.style.cursor = 'pointer';
+    totalReportsCard.title = 'Click to show all reports';
+    totalReportsCard.onclick = resetReportsView;
+}
+
         const confirmSendBtn = document.getElementById('confirmSendBtn');
         if (confirmSendBtn) confirmSendBtn.onclick = confirmSendBroadcast;
 

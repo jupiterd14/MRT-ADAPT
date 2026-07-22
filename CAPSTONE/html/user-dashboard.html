@@ -291,13 +291,13 @@ nav {
     overflow-y: auto;
 }
 
-.greeting { 
-    font-size: 11px; 
-    color: var(--text-light); 
-    font-weight: bold; 
-    text-transform: uppercase; 
-    letter-spacing: 0.5px;
-}
+    .greeting { 
+        font-size: 11px; 
+        color: var(--text-light); 
+        font-weight: bold; 
+        text-transform: uppercase; 
+        letter-spacing: 0.5px;
+    }
 
 .header-top {
     display: flex;
@@ -560,24 +560,6 @@ nav {
     flex: 1;
 }
 
-/* DROPDOWN FIXES - FORCE ALWAYS VISIBLE */
-.station-select,
-#forecastStationSelect {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: relative !important;
-    z-index: 9999 !important;
-    background-color: white !important;
-    pointer-events: auto !important;
-    border: 1px solid var(--border) !important;
-    padding: 5px 10px !important;
-    border-radius: 5px !important;
-    font-size: 12px !important;
-    color: var(--text-light) !important;
-    margin-left: 10px !important;
-    cursor: pointer !important;
-}
 
 /* FORECAST HEADER FIXES */
 .forecast-header {
@@ -889,6 +871,14 @@ canvas {
 /* Update the media query for mobile - keep cards side by side */
 @media screen and (max-width: 768px) {
 
+     .icon-btn {
+        width: 30px !important;
+        height: 30px !important;
+    }
+    
+    .icon-btn i {
+        font-size: 12px !important;
+    }
     .header-top h1 {
     font-size: 17px !important;
     }
@@ -959,11 +949,16 @@ canvas {
     
     /* Make cards slightly smaller on mobile */
     .train-direction-card {
-        padding: 8px 4px;
+        padding: 5px 4px;
         min-width: 0;
         width: 100%;
         overflow: hidden;
         border-radius: 10px;
+    }
+
+    .toggle-btn {
+        padding: 8px 6px !important;
+        font-size: 12px !important;
     }
     
     .arrival-timer {
@@ -1020,7 +1015,7 @@ canvas {
     
     /* Ensure dropdown is accessible */
     #forecastStationSelect {
-        margin-left: 0 !important;
+        margin-left : 0 !important;
         width: 100%;
         max-width: 200px;
     }
@@ -1864,7 +1859,7 @@ canvas {
     }
     
     .tips-text {
-        font-size: 12px;
+        font-size: 10px !important;
         line-height: 1.4;
     }
     
