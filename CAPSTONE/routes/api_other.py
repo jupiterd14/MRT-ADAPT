@@ -34,6 +34,11 @@ MRT3_PLATFORM_CAPACITY = {
 }
 
 
+P95_CACHE = {}
+for station in STATIONS:
+    for direction in ['Northbound', 'Southbound']:
+        P95_CACHE[f"{station}_{direction}"] = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+        
 STATION_BASE_CAPACITY = {
     "North Ave": 12000, "Quezon Ave": 9000, "Kamuning": 7500, "Cubao": 15000,
     "Santolan": 8000, "Ortigas": 9500, "Shaw Blvd": 11000, "Boni Ave": 8500,
