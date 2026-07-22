@@ -16,6 +16,7 @@ import traceback
 import math
 from config import Config
 TESTING_MODE = False
+from routes.api_predict import get_directional_prediction
 
 api_other_bp = Blueprint('api_other', __name__)
 
@@ -31,6 +32,7 @@ MRT3_PLATFORM_CAPACITY = {
     "Guadalupe": 1301, "Buendia": 1645, "Ayala Ave": 1222, "Magallanes": 1202,
     "Taft": 720
 }
+
 
 STATION_BASE_CAPACITY = {
     "North Ave": 12000, "Quezon Ave": 9000, "Kamuning": 7500, "Cubao": 15000,
@@ -234,13 +236,8 @@ def travel_prediction():
 
 @api_other_bp.route('/live-map/directions/v2')
 def live_map_directions_v2():
-    """New version using directional models - WITH PROPER SCALING"""
-
+    """Consistent with prediction API – uses percentile‑based congestion."""
     try:
-        from flask import current_app
-        from services import get_feature_sequence_for_station
-        import time
-        
         # ========== GET DATE/TIME PARAMETERS ==========
         date_param = request.args.get('date')
         time_param = request.args.get('time')
@@ -258,134 +255,45 @@ def live_map_directions_v2():
             now = Config.get_current_time()
             print(f"🕐 Using current time: {now.strftime('%Y-%m-%d %H:%M')}")
         
-        # GET MODELS FROM APP CONFIG
-        directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
-        directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
-        
-        # ========== GET ACTIVE OVERRIDES FROM FILE ==========
+        # ========== GET ACTIVE OVERRIDES ==========
         active_overrides = get_active_overrides()
-        
-        print(f"🔍 Active overrides found: {len(active_overrides)}")
-        for key, val in active_overrides.items():
-            print(f"   {key}: {val.get('congestion', '?')}%")
-        
+        print(f"🔍 Active overrides: {len(active_overrides)}")
+
         stations_list = current_app.config.get('STATIONS', STATIONS)
         northbound = {}
         southbound = {}
-        
-        # Check operating hours
-        current_time = now.hour + now.minute / 60
-        OPERATING_START = 4.5
-        OPERATING_END = 22.5
-        is_closed = current_time < OPERATING_START or current_time >= OPERATING_END
-        
-   
-        
-        
-        for i, station in enumerate(stations_list):
-            north_pred = 0
-            south_pred = 0
-            north_passengers = 0
-            south_passengers = 0
-            
-            # ========== CHECK OVERRIDES FIRST ==========
+
+        for station in stations_list:
+            # ========== CHECK OVERRIDES ==========
             north_override_key = f"{station}_northbound"
             south_override_key = f"{station}_southbound"
-            
             is_north_overridden = north_override_key in active_overrides
             is_south_overridden = south_override_key in active_overrides
-            
-            if i < 3:
-                print(f"   Checking {station}: North override: {is_north_overridden}, South override: {is_south_overridden}")
-            
-            # Northbound
+
+            # ----- Northbound -----
             if is_north_overridden:
-                override = active_overrides[north_override_key]
-                north_pred = override.get('congestion', 50)
-                capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
-                north_passengers = int((north_pred / 100) * capacity)
-                print(f"  🔧 OVERRIDE: {station} Northbound = {north_pred}%")
-            elif is_closed and not TESTING_MODE:
-                north_pred = 0
-                north_passengers = 0
-            elif is_closed and TESTING_MODE:
-                hour = now.hour
-                if 7 <= hour <= 9 or 17 <= hour <= 19:
-                    north_pred = 65 + (hour - 7) * 5 if hour <= 9 else 60 + (hour - 17) * 5
-                elif 10 <= hour <= 16:
-                    north_pred = 40
-                elif 5 <= hour <= 6 or 20 <= hour <= 21:
-                    north_pred = 25
-                else:
-                    north_pred = 10
-                north_passengers = int((north_pred / 100) * MRT3_PLATFORM_CAPACITY.get(station, 1000))
-                print(f"  📊 TEST MODE: {station} Northbound = {north_pred}% (simulated)")
+                north_pred = active_overrides[north_override_key].get('congestion', 50)
+                # For ridership, we still need a passenger count – we use p95 * congestion%
+                p95_north = P95_CACHE.get(f"{station}_Northbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))
+                north_passengers = int((north_pred / 100) * p95_north)
             else:
-                # ========== FIX: Normal model prediction for northbound ==========
-                model_key_north = f"{station}_Northbound"
-                if model_key_north in directional_models:
-                    try:
-                        # Get features (ALREADY SCALED by feature_engineering)
-                        sequence = get_feature_sequence_for_station(station, 'Northbound', now)
-                        if sequence is not None and len(sequence) == 24:
-                            target_scaler = directional_scalers.get(f'{model_key_north}_target')
-                            
-                            if target_scaler:
-                                # ========== CRITICAL FIX: DO NOT apply feature scaler again! ==========
-                                # sequence is already scaled (feature scaler applied in get_feature_sequence_for_station)
-                                # Just reshape for LSTM
-                                input_sequence = sequence.reshape(1, 24, -1)
-                                pred_scaled = directional_models[model_key_north].predict(input_sequence, verbose=0)
-                                north_pred, north_passengers = _get_congestion_from_prediction(
-                                    pred_scaled, target_scaler, station
-                                )
-                    except Exception as e:
-                        print(f"  ⚠️ Error predicting {station} Northbound: {e}")
-            
-            # Southbound
+                # Use the same prediction function as the API
+                north_pred = get_directional_prediction(station, 'Northbound', now)
+                # Get p95 for passenger count
+                p95_north = P95_CACHE.get(f"{station}_Northbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))
+                north_passengers = int((north_pred / 100) * p95_north)
+
+            # ----- Southbound -----
             if is_south_overridden:
-                override = active_overrides[south_override_key]
-                south_pred = override.get('congestion', 50)
-                capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
-                south_passengers = int((south_pred / 100) * capacity)
-                print(f"  🔧 OVERRIDE: {station} Southbound = {south_pred}%")
-            elif is_closed and not TESTING_MODE:
-                south_pred = 0
-                south_passengers = 0
-            elif is_closed and TESTING_MODE:
-                hour = now.hour
-                if 7 <= hour <= 9 or 17 <= hour <= 19:
-                    south_pred = 65 + (hour - 7) * 5 if hour <= 9 else 60 + (hour - 17) * 5
-                elif 10 <= hour <= 16:
-                    south_pred = 40
-                elif 5 <= hour <= 6 or 20 <= hour <= 21:
-                    south_pred = 25
-                else:
-                    south_pred = 10
-                south_passengers = int((south_pred / 100) * MRT3_PLATFORM_CAPACITY.get(station, 1000))
-             
+                south_pred = active_overrides[south_override_key].get('congestion', 50)
+                p95_south = P95_CACHE.get(f"{station}_Southbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))
+                south_passengers = int((south_pred / 100) * p95_south)
             else:
-                # ========== FIX: Normal model prediction for southbound ==========
-                model_key_south = f"{station}_Southbound"
-                if model_key_south in directional_models:
-                    try:
-                        # Get features (ALREADY SCALED by feature_engineering)
-                        sequence = get_feature_sequence_for_station(station, 'Southbound', now)
-                        if sequence is not None and len(sequence) == 24:
-                            target_scaler = directional_scalers.get(f'{model_key_south}_target')
-                            
-                            if target_scaler:
-                                # ========== CRITICAL FIX: DO NOT apply feature scaler again! ==========
-                                input_sequence = sequence.reshape(1, 24, -1)
-                                pred_scaled = directional_models[model_key_south].predict(input_sequence, verbose=0)
-                                south_pred, south_passengers = _get_congestion_from_prediction(
-                                    pred_scaled, target_scaler, station
-                                )
-                    except Exception as e:
-                        print(f"  ⚠️ Error predicting {station} Southbound: {e}")
-            
-       
-            
+                south_pred = get_directional_prediction(station, 'Southbound', now)
+                p95_south = P95_CACHE.get(f"{station}_Southbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))
+                south_passengers = int((south_pred / 100) * p95_south)
+
+            # ----- Status & wait time (same as before) -----
             def get_status(cong):
                 if cong > 80:
                     return "SEVERE", "15-20 min"
@@ -395,49 +303,39 @@ def live_map_directions_v2():
                     return "MODERATE", "5-10 min"
                 else:
                     return "LIGHT", "2-5 min"
-            
-            if is_closed and not is_north_overridden and not TESTING_MODE:
-                north_status = "CLOSED"
-                north_wait = "Closed"
-            else:
-                north_status, north_wait = get_status(north_pred)
-            
-            if is_closed and not is_south_overridden and not TESTING_MODE:
-                south_status = "CLOSED"
-                south_wait = "Closed"
-            else:
-                south_status, south_wait = get_status(south_pred)
-            
+
+            north_status, north_wait = get_status(north_pred)
+            south_status, south_wait = get_status(south_pred)
+
             northbound[station] = {
                 "congestion": round(north_pred, 1),
                 "wait_time": north_wait,
                 "status": north_status,
-                "ridership": int(north_passengers),
-                "overridden": is_north_overridden,  
-                "testing_mode": TESTING_MODE and is_closed and not is_north_overridden
+                "ridership": north_passengers,
+                "overridden": is_north_overridden
             }
-            
             southbound[station] = {
                 "congestion": round(south_pred, 1),
                 "wait_time": south_wait,
                 "status": south_status,
-                "ridership": int(south_passengers),
-                "overridden": is_south_overridden,
-                "testing_mode": TESTING_MODE and is_closed and not is_south_overridden
+                "ridership": south_passengers,
+                "overridden": is_south_overridden
             }
-        
-        
+
+        # Check if MRT is closed for display
+        current_time = now.hour + now.minute / 60
+        is_closed = current_time < 4.5 or current_time >= 22.5
+
         return jsonify({
             "northbound": northbound,
             "southbound": southbound,
             "timestamp": now.isoformat(),
-            "model_version": "directional_2023-2024_capacity_based",
+            "model_version": "percentile_based (p95)",
             "active_overrides": len(active_overrides),
             "requested_time": f"{date_param} {time_param}" if date_param and time_param else None,
-            "is_operating": not is_closed,
-            "testing_mode": TESTING_MODE
+            "is_operating": not is_closed
         })
-        
+
     except Exception as e:
         print(f"❌ Error in live_map_directions_v2: {e}")
         import traceback

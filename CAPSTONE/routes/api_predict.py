@@ -16,7 +16,8 @@ from services.feature_engineering import get_feature_sequence_for_station
 from config import Config
 import numpy as np
 import math
-from routes.api_other import MRT3_PLATFORM_CAPACITY
+from constants import MRT3_PLATFORM_CAPACITY
+
 
 api_predict_bp = Blueprint('api_predict', __name__)
 
