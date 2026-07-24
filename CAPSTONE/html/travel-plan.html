@@ -2098,7 +2098,7 @@ nav {
     <label class="detail-item-i"><i class="far fa-calendar"></i> Travel Date</label>
     <input type="date" class="datetime-input" id="travelDate" value="">
     <small class="info" style="display: block; margin-top: 5px; font-size: 10px; color: var(--text-light);">
-        <i class="fas fa-info-circle"></i> Plan trips up to 7 days only in advance
+        <i class="fas fa-info-circle"></i> Actual conditions may differ to the real life events
     </small>
 </div>
                 
@@ -2251,22 +2251,28 @@ try {
     stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
 }
 
-  document.addEventListener('DOMContentLoaded', function() {
+ document.addEventListener('DOMContentLoaded', function() {
     cleanOldReadAlerts();
     updateDateTime();
     checkAlertCount();
     setInterval(updateDateTime, 1000);
     setInterval(checkAlertCount, 60000);
     
-    // ========== FOR TESTING WITH 2025 DATA - ONLY 2025 ==========
-    // Set default date to January 15, 2025
-    const defaultDate = '2025-01-15';
-    document.getElementById('travelDate').value = defaultDate;
+    // ========== AUTO-SET DATE TO CURRENT DATE (WITH 2025 YEAR) ==========
+    const now = new Date();
+    
+    // Get current month and day
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    
+    // Use 2025 as the year (for testing), but keep month and day from current date
+    const currentDate = `2025-${month}-${day}`;
+    
+    document.getElementById('travelDate').value = currentDate;
     document.getElementById('travelDate').min = '2025-01-01';
     document.getElementById('travelDate').max = '2025-12-31';
     
     // Set default time to current time + 1 hour
-    const now = new Date();
     now.setHours(now.getHours() + 1);
     now.setMinutes(0);
     const hours = String(now.getHours()).padStart(2, '0');
@@ -2285,17 +2291,22 @@ try {
         });
 }
 
-  function cancelRoute() {
-    // Reset to default values - ALWAYS 2025
-    document.getElementById('travelDate').value = '2025-01-15';
+ function cancelRoute() {
+    // Reset to current date (with 2025 year)
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const currentDate = `2025-${month}-${day}`;
+    
+    document.getElementById('travelDate').value = currentDate;
     document.getElementById('travelDate').min = '2025-01-01';
     document.getElementById('travelDate').max = '2025-12-31';
     
-    const now = new Date();
-    now.setHours(now.getHours() + 1);
-    now.setMinutes(0);
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const nowTime = new Date();
+    nowTime.setHours(nowTime.getHours() + 1);
+    nowTime.setMinutes(0);
+    const hours = String(nowTime.getHours()).padStart(2, '0');
+    const minutes = String(nowTime.getMinutes()).padStart(2, '0');
     document.getElementById('departureTime').value = `${hours}:${minutes}`;
     
     // Reset station selections
@@ -2317,7 +2328,7 @@ try {
     `;
     container.classList.remove('has-content');
     
-    showToast('Form reset to defaults');
+    showToast('Form reset to current date');
 }
     function showTravelGuide() {
     const modal = document.getElementById('travelGuideModal');
@@ -2614,7 +2625,7 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     };
     
     const getShortTip = (congestion) => {
-        if (congestion > 80) return 'Consider postponing trip.';
+        if (congestion > 80) return 'Consider an alterative route';
         if (congestion > 60) return 'Arrive 10-15 min early.';
         if (congestion > 40) return 'Arrive at normal time.';
         return 'No delays expected.';
@@ -2748,7 +2759,7 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     } else {
         rushLabel = 'REGULAR SERVICE HOURS';
         rushNote = `${from} has ${fromStatus.text.toLowerCase()} congestion`;
-        rushAdvice = 'Normal schedule · No significant delays expected';
+        rushAdvice = 'Stay prepared and arrive early to avoid crowds';
         rushColor = '#3B82F6';
     }
     

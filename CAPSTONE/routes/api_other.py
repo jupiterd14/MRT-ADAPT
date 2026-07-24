@@ -67,30 +67,29 @@ def load_overrides():
     return {}
 
 def get_active_overrides():
-    """Get active overrides from file with expiry check"""
-    overrides = load_overrides()
-    current_time = time.time()
-    active = {}
-    expired_keys = []
+    """Get active overrides - check app config first (instant), fallback to file."""
+    # 1. Check in-memory config first (immediate updates from operator)
+    from flask import current_app
+    overrides = current_app.config.get('overrides', {})
+    if overrides:
+        print(f"📄 api_other.py LOADED from config: {overrides}")
+        return overrides
     
-    for key, override in overrides.items():
-        expiry = override.get('expiry')
-        if expiry is None or expiry > current_time:
-            active[key] = override
-        else:
-            expired_keys.append(key)
-    
-    # Remove expired keys
-    if expired_keys:
-        for key in expired_keys:
-            del overrides[key]
+    # 2. Fallback to file (on startup or if config is empty)
+    overrides_file = 'overrides.json'
+    if os.path.exists(overrides_file):
         try:
-            with open(OVERRIDES_FILE, 'w') as f:
-                json.dump(overrides, f, indent=2)
-        except:
-            pass
-    
-    return active
+            with open(overrides_file, 'r') as f:
+                overrides = json.load(f)
+            print(f"📄 api_other.py LOADED from file: {overrides}")
+            # Also cache to config for future requests
+            if overrides:
+                current_app.config['overrides'] = overrides
+            return overrides
+        except Exception as e:
+            print(f"Error loading overrides: {e}")
+            return {}
+    return {}
 
 def get_station_predictions_from_config(station_name):
     """Get prediction from app config"""
@@ -262,7 +261,7 @@ def live_map_directions_v2():
         
         # ========== GET ACTIVE OVERRIDES ==========
         active_overrides = get_active_overrides()
-        print(f"🔍 Active overrides: {len(active_overrides)}")
+        print(f"🔍 Active overrides: {list(active_overrides.keys())}")
 
         stations_list = current_app.config.get('STATIONS', STATIONS)
         northbound = {}
@@ -272,15 +271,19 @@ def live_map_directions_v2():
             # ========== CHECK OVERRIDES ==========
             north_override_key = f"{station}_northbound"
             south_override_key = f"{station}_southbound"
+            
             is_north_overridden = north_override_key in active_overrides
             is_south_overridden = south_override_key in active_overrides
 
             # ----- Northbound -----
             if is_north_overridden:
-                north_pred = active_overrides[north_override_key].get('congestion', 50)
-                # For ridership, we still need a passenger count – we use p95 * congestion%
+                # Get the override data
+                override = active_overrides[north_override_key]
+                north_pred = override.get('congestion', 50)
+                # Calculate ridership based on congestion percentage
                 p95_north = P95_CACHE.get(f"{station}_Northbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))
                 north_passengers = int((north_pred / 100) * p95_north)
+                print(f"🔧 OVERRIDE ACTIVE: {station} Northbound = {north_pred}%")
             else:
                 # Use the same prediction function as the API
                 north_pred = get_directional_prediction(station, 'Northbound', now)
@@ -290,9 +293,12 @@ def live_map_directions_v2():
 
             # ----- Southbound -----
             if is_south_overridden:
-                south_pred = active_overrides[south_override_key].get('congestion', 50)
+                # Get the override data
+                override = active_overrides[south_override_key]
+                south_pred = override.get('congestion', 50)
                 p95_south = P95_CACHE.get(f"{station}_Southbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))
                 south_passengers = int((south_pred / 100) * p95_south)
+                print(f"🔧 OVERRIDE ACTIVE: {station} Southbound = {south_pred}%")
             else:
                 south_pred = get_directional_prediction(station, 'Southbound', now)
                 p95_south = P95_CACHE.get(f"{station}_Southbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))

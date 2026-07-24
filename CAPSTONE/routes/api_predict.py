@@ -102,6 +102,106 @@ TRAINS_PER_HOUR = {
     19: 20, 20: 16, 21: 12, 22: 8, 23: 0
 }
 
+# ========== CORRECTION FACTOR GENERATION (ADD THIS AFTER load_correction_factors) ==========
+
+def get_raw_prediction(station_name, direction, target_datetime):
+    """
+    Returns the raw passenger count from the model (WITHOUT correction factor).
+    Used internally to compute correction factors.
+    """
+    directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
+    directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
+    model_key = f"{station_name}_{direction}"
+    if model_key not in directional_models:
+        return None
+
+    try:
+        features = get_feature_sequence_for_station(station_name, direction, target_datetime)
+        if features is None:
+            return None
+
+        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        target_scaler = directional_scalers.get(f'{model_key}_target')
+        if feature_scaler is None or target_scaler is None:
+            return None
+
+        # Feature scaler already applied in get_feature_sequence_for_station? 
+        # Actually the features returned are already scaled, so we must not scale again.
+        # But in get_directional_prediction, they don't re-scale; they just reshape.
+        # So we use features as-is.
+        input_sequence = features.reshape(1, 24, -1)
+        raw_scaled = directional_models[model_key].predict(input_sequence, verbose=0)[0][0]
+        passenger_count = float(target_scaler.inverse_transform([[raw_scaled]])[0][0])
+        return passenger_count
+    except Exception as e:
+        print(f"⚠️ get_raw_prediction error: {e}")
+        return None
+
+
+def compute_and_save_correction_factors(test_days=30, end_date=None):
+    """
+    Computes correction factors for all station-directions by comparing
+    model predictions to actual historical passenger counts.
+    Saves to correction_factors.pkl.
+    """
+    from services.feature_engineering import get_station_dataframe
+    import numpy as np
+    import pickle
+    from datetime import timedelta
+
+    factors = {}
+    if end_date is None:
+        end_date = Config.get_current_time()
+    start_date = end_date - timedelta(days=test_days)
+
+    # Use the same STATIONS list defined at the top
+    for station in STATIONS:
+        for direction in ['Northbound', 'Southbound']:
+            model_key = f"{station}_{direction}"
+            # Only compute if model exists
+            if model_key not in current_app.config.get('DIRECTIONAL_MODELS', {}):
+                continue
+
+            # Get actual historical hourly data for this station-direction
+            df = get_station_dataframe(station, direction)
+            if df is None or len(df) == 0:
+                continue
+
+            # Filter to test period
+            mask = (df.index >= start_date) & (df.index < end_date)
+            test_df = df[mask]
+            if len(test_df) == 0:
+                continue
+
+            ratios = []
+            for timestamp, row in test_df.iterrows():
+                actual = row['TotalPassenger']
+                if actual <= 0:
+                    continue
+
+                pred = get_raw_prediction(station, direction, timestamp)
+                if pred is None or pred <= 0:
+                    continue
+
+                ratio = actual / pred
+                # Avoid extreme outliers
+                if 0.1 < ratio < 10:
+                    ratios.append(ratio)
+
+            if ratios:
+                factor = np.median(ratios)
+                # Clamp to [0.5, 1.5] to avoid over‑/under‑scaling
+                factor = min(1.5, factor)
+                factors[model_key] = factor
+                print(f"✅ {station} {direction}: factor = {factor:.3f} (based on {len(ratios)} samples)")
+
+    # Save
+    with open(CORRECTION_FILE, 'wb') as f:
+        pickle.dump(factors, f)
+    print(f"✅ Saved {len(factors)} correction factors to {CORRECTION_FILE}")
+    return factors
+
 def load_historical_peaks():
     """Load historical peaks for REFERENCE ONLY - NOT used for congestion calculation"""
     global HISTORICAL_PEAKS
@@ -149,42 +249,83 @@ def load_historical_peaks():
     return HISTORICAL_PEAKS
 
 HISTORICAL_PEAKS = load_historical_peaks()
-
 def get_active_overrides():
-    """Get active overrides from file with expiry check"""
+    """Get active overrides - check app config first (instant), fallback to file."""
+    # 1. Check in-memory config first (immediate updates from operator)
+    overrides = current_app.config.get('overrides', {})
+    if overrides:
+        print(f"📄 api_predict.py LOADED from config: {overrides}")
+        return overrides
+    
+    # 2. Fallback to file (on startup or if config is empty)
     overrides_file = 'overrides.json'
     if os.path.exists(overrides_file):
         try:
             with open(overrides_file, 'r') as f:
                 overrides = json.load(f)
-            current_time = time.time()
-            active = {}
-            expired_keys = []
-            
-            for key, override in overrides.items():
-                expiry = override.get('expiry')
-                if expiry is None or expiry > current_time:
-                    active[key] = override
-                else:
-                    expired_keys.append(key)
-            
-            # Remove expired keys
-            if expired_keys:
-                for key in expired_keys:
-                    del overrides[key]
-                try:
-                    with open(overrides_file, 'w') as f:
-                        json.dump(overrides, f, indent=2)
-                except:
-                    pass
-            
-            return active
+            print(f"📄 api_predict.py LOADED from file: {overrides}")
+            # Also cache to config for future requests
+            if overrides:
+                current_app.config['overrides'] = overrides
+            return overrides
         except Exception as e:
             print(f"Error loading overrides: {e}")
             return {}
     return {}
+ 
+@api_predict_bp.route('/debug/cache-keys/<station_name>')
+def debug_cache_keys(station_name):
+    """Debug what cache keys exist for a station."""
+    cache_instance = current_app.extensions.get('cache')
+    
+    if not cache_instance:
+        return jsonify({'error': 'Cache not found'}), 500
+    
+    keys = []
+    for hour in range(24):
+        key = f"forecast_{station_name}_{hour}"
+        value = cache_instance.get(key)
+        if value is not None:
+            keys.append({
+                'key': key,
+                'exists': True,
+                'has_value': value is not None
+            })
+    
+    return jsonify({
+        'station': station_name,
+        'cache_keys_found': keys,
+        'total_found': len(keys)
+    })
+ 
 
-
+@api_predict_bp.route('/debug/override-status')
+def debug_override_status():
+    """Debug what overrides are active and where they're coming from."""
+    from config import Config
+    
+    # Get from config
+    config_overrides = current_app.config.get('overrides', {})
+    
+    # Get from file
+    file_overrides = {}
+    if os.path.exists('overrides.json'):
+        try:
+            with open('overrides.json', 'r') as f:
+                file_overrides = json.load(f)
+        except:
+            pass
+    
+    # Get active (uses the function)
+    active = get_active_overrides()
+    
+    return jsonify({
+        'config_overrides': config_overrides,
+        'file_overrides': file_overrides,
+        'active_overrides': active,
+        'config_has_overrides': 'overrides' in current_app.config,
+        'current_time': Config.get_current_time().isoformat()
+    })
 #added changes here
 def get_directional_prediction(station_name, direction, target_datetime=None):
     """
@@ -239,10 +380,10 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
         # ========== GET RAW PASSENGER COUNT ==========
         passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
         
-        # Apply correction factor (if any)
+       # Apply correction factor (if any)
         factor = CORRECTION_FACTORS.get(model_key, 1.0)
         passenger_count = passenger_count * factor
-        
+                
         # ========== CONGESTION CALCULATION - USING HISTORICAL PERCENTILE ==========
         p95 = P95_CACHE.get(model_key)
         if p95 is None:
@@ -333,7 +474,7 @@ def debug_simulate_all_stations_day():
 
 @api_predict_bp.route('/debug/pipeline-details/<station_name>')
 def debug_pipeline_details(station_name):
-    """Debug the entire prediction pipeline step by step with actual values"""
+    """Debug the entire prediction pipeline step by step with actual values - USING P95 PERCENTILE"""
     from services.feature_engineering import get_feature_sequence_for_station, get_station_dataframe
     
     station = station_name.replace('%20', ' ')
@@ -357,7 +498,15 @@ def debug_pipeline_details(station_name):
         results["details"][direction] = {}
         target_scaler = directional_scalers.get(f'{model_key}_target')
         feature_scaler = directional_scalers.get(f'{model_key}_feature')
-        capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+        
+        # Get p95 from cache (this is what main function uses)
+        p95 = P95_CACHE.get(model_key)
+        if p95 is None:
+            hourly = get_station_dataframe(station, direction)
+            if hourly is not None and len(hourly) > 0:
+                p95 = np.percentile(hourly['TotalPassenger'].values, 95)
+            else:
+                p95 = MRT3_PLATFORM_CAPACITY.get(station, 1000)  # Fallback only
         
         # Get actual historical data for this station
         hourly = get_station_dataframe(station, direction)
@@ -377,7 +526,6 @@ def debug_pipeline_details(station_name):
                 # STEP 3: Check what the target scaler would do
                 target_scaler_info = {}
                 if target_scaler:
-                    # Show what raw passenger counts map to
                     test_raw_values = [0, 100, 200, 500, 1000, 1500, 2000]
                     test_scaled = []
                     for val in test_raw_values:
@@ -399,7 +547,6 @@ def debug_pipeline_details(station_name):
                 # STEP 4: Get the actual historical passenger counts for this time
                 historical_passengers = None
                 if hourly is not None:
-                    # Get historical data for this hour
                     historical = hourly[hourly.index.hour == hour]
                     if len(historical) > 0:
                         historical_passengers = {
@@ -415,23 +562,21 @@ def debug_pipeline_details(station_name):
                 target_scaler_obj = directional_scalers.get(f'{model_key}_target')
                 
                 if feature_scaler_obj and target_scaler_obj:
-                    # Scale features
                     scaled_features = feature_scaler_obj.transform(features)
                     input_sequence = scaled_features.reshape(1, 24, -1)
                     
-                    # Get model prediction
                     pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
                     raw_output = float(pred_scaled[0][0])
                     
-                    # Inverse transform to passenger count
                     passenger_count = float(target_scaler_obj.inverse_transform([[raw_output]])[0][0])
                     
-                    # Cap at capacity
-                    capped_passengers = min(passenger_count, capacity)
-                    congestion = (capped_passengers / capacity * 100)
+                    # Apply correction factor (matches main function)
+                    factor = CORRECTION_FACTORS.get(model_key, 1.0)
+                    passenger_count = passenger_count * factor
                     
-                    # Also calculate what the model output means in terms of capacity %
-                    model_output_as_percent = (raw_output * capacity * 1.2) / capacity * 100
+                    # ========== USE P95 PERCENTILE (MATCHES MAIN FUNCTION) ==========
+                    congestion = (passenger_count / p95) * 100
+                    congestion = max(0, min(congestion, 100))
                     
                     results["details"][direction][f"{hour}:00"] = {
                         "raw_congestion_in_features": {
@@ -442,13 +587,12 @@ def debug_pipeline_details(station_name):
                         },
                         "target_scaler": target_scaler_info,
                         "historical_passengers": historical_passengers,
+                        "p95_percentile": round(float(p95), 2),
+                        "correction_factor": round(float(factor), 3),
                         "model_output": {
                             "raw_scaled": round(raw_output, 4),
                             "inverse_transformed_passengers": round(passenger_count, 0),
-                            "capped_passengers": round(capped_passengers, 0),
-                            "capacity": capacity,
-                            "congestion_percentage": round(congestion, 1),
-                            "model_output_as_percent": round(model_output_as_percent, 1)
+                            "congestion_percentage": round(congestion, 1)
                         }
                     }
                 
@@ -457,10 +601,9 @@ def debug_pipeline_details(station_name):
     
     return jsonify(results)
 
-
 @api_predict_bp.route('/debug/check-raw-output/<station_name>')
 def debug_check_raw_output(station_name):
-    """Check raw model output and what it means"""
+    """Check raw model output and what it means - USING P95 PERCENTILE"""
     from services.feature_engineering import get_feature_sequence_for_station
     
     station = station_name.replace('%20', ' ')
@@ -477,9 +620,20 @@ def debug_check_raw_output(station_name):
             
         target_scaler = directional_scalers.get(f'{model_key}_target')
         feature_scaler = directional_scalers.get(f'{model_key}_feature')
-        capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
         
-        # Test at current time
+        # Get p95 from cache
+        p95 = P95_CACHE.get(model_key)
+        if p95 is None:
+            from services.feature_engineering import get_station_dataframe
+            hourly = get_station_dataframe(station, direction)
+            if hourly is not None and len(hourly) > 0:
+                p95 = np.percentile(hourly['TotalPassenger'].values, 95)
+            else:
+                p95 = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+        
+        # Get correction factor
+        factor = CORRECTION_FACTORS.get(model_key, 1.0)
+        
         test_time = now
         
         try:
@@ -491,22 +645,21 @@ def debug_check_raw_output(station_name):
                 pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
                 raw_output = float(pred_scaled[0][0])
                 
-                # What does this mean in passenger counts?
                 passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
+                passenger_count = passenger_count * factor  # Apply correction
                 
-                # What does this mean as % of capacity?
-                max_passengers = capacity * 1.2
-                percent_of_max = (raw_output * 100)
-                percent_of_capacity = (passenger_count / capacity * 100)
+                # ========== USE P95 PERCENTILE ==========
+                congestion = (passenger_count / p95) * 100
+                congestion = max(0, min(congestion, 100))
                 
                 results.append({
                     "direction": direction,
                     "raw_model_output": round(raw_output, 4),
                     "target_scaler_max": float(target_scaler.data_max_[0]) if target_scaler else None,
+                    "p95_percentile": round(float(p95), 2),
+                    "correction_factor": round(float(factor), 3),
                     "passenger_count": round(passenger_count, 0),
-                    "capacity": capacity,
-                    "congestion_percentage": round(percent_of_capacity, 1),
-                    "model_output_as_percent": round(percent_of_max, 1)
+                    "congestion_percentage": round(congestion, 1)
                 })
         except Exception as e:
             results.append({
@@ -518,8 +671,7 @@ def debug_check_raw_output(station_name):
         "station": station,
         "time": now.isoformat(),
         "results": results
-    })
-    
+    })  
     
 @api_predict_bp.route('/debug/test-time/<station_name>/<int:hour>')
 def debug_test_time(station_name, hour):
@@ -562,6 +714,7 @@ def simulate_day(station_name):
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
     
     # Use a specific date (June 26, 2025)
     test_date = datetime(2025, 6, 26)
@@ -677,44 +830,53 @@ def _get_directional_prediction_with_details(station_name, direction, target_dat
         if features is None:
             return result
         
-        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        # ========== FIX: DO NOT re-scale features ==========
+        # features are already scaled by get_feature_sequence_for_station
+        # Just reshape for the model
         target_scaler = directional_scalers.get(f'{model_key}_target')
         
-        if feature_scaler is None or target_scaler is None:
+        if target_scaler is None:
             return result
         
-        scaled_features = feature_scaler.transform(features)
-        if scaled_features.ndim == 2:
-            scaled_features = scaled_features.reshape(1, 24, -1)
+        # Reshape for LSTM (features are already scaled)
+        if features.ndim == 2:
+            input_sequence = features.reshape(1, 24, -1)
         
-        prediction_scaled = directional_models[model_key].predict(scaled_features, verbose=0)
+        prediction_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
         raw_output = float(prediction_scaled[0][0])
         
-        # Get passenger count
+        # Get passenger count from raw output
         passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
         
-        # Apply correction factor
+        # Apply correction factor (matches main function)
         factor = CORRECTION_FACTORS.get(model_key, 1.0)
+        print(f"🔍 DEBUG MAIN: {station_name} {direction}")
+        print(f"   Raw passengers: {passenger_count:.0f}")
+        print(f"   Correction factor: {factor:.3f}")
         passenger_count = passenger_count * factor
+        print(f"   Corrected passengers: {passenger_count:.0f}")
         
-        # ========== CONGESTION CALCULATION - USING HISTORICAL PERCENTILE ==========
-                # ========== CONGESTION CALCULATION - USING CACHED 95th PERCENTILE ==========
+        # ========== CONGESTION CALCULATION - USING CACHED 95th PERCENTILE ==========
         p95 = P95_CACHE.get(model_key)
+        print(f"   p95: {p95:.0f}")
         if p95 is None:
             hourly = get_station_dataframe(station_name, direction)
             if hourly is not None and len(hourly) > 0:
                 p95 = np.percentile(hourly['TotalPassenger'].values, 95)
             else:
                 p95 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        
         congestion = (passenger_count / p95) * 100
         congestion = max(0, min(congestion, 100))
         
         result["congestion"] = congestion
-        result["passengers"] = passenger_count
+        result["passengers"] = passenger_count  # This is the corrected passenger count
         result["raw_output"] = raw_output
         
     except Exception as e:
         print(f"Error in _get_directional_prediction_with_details: {e}")
+        import traceback
+        traceback.print_exc()
     
     return result
 
@@ -824,10 +986,9 @@ def debug_target_scaler_test(station_name):
             results[direction] = {"error": "Target scaler not found"}
     
     return jsonify(results)
-
 @api_predict_bp.route('/debug/passenger-prediction/<station_name>')
 def debug_passenger_prediction(station_name):
-    """Debug raw passenger predictions vs capacity-based congestion - FIXED"""
+    """Debug raw passenger predictions vs p95-based congestion - USING P95 PERCENTILE"""
     from services.feature_engineering import get_feature_sequence_for_station
     
     station = station_name.replace('%20', ' ')
@@ -835,8 +996,6 @@ def debug_passenger_prediction(station_name):
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
     
     results = {}
-    
-    # Test different times
     test_times = [8, 12, 18, 21]
     
     for hour in test_times:
@@ -859,17 +1018,29 @@ def debug_passenger_prediction(station_name):
                 raw_output = directional_models[model_key].predict(input_sequence, verbose=0)
                 raw_value = float(raw_output[0][0])
                 
-                # ========== USE PLATFORM CAPACITY FOR CONGESTION ==========
-                capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
                 passenger_count = float(target_scaler.inverse_transform([[raw_value]])[0][0])
                 
-                # Calculate congestion based on capacity (0-100%)
-                congestion = (passenger_count / capacity * 100)
-                congestion = min(congestion, 100)  # Cap at 100%
+                # Apply correction factor
+                factor = CORRECTION_FACTORS.get(model_key, 1.0)
+                passenger_count = passenger_count * factor
+                
+                # ========== USE P95 PERCENTILE ==========
+                p95 = P95_CACHE.get(model_key)
+                if p95 is None:
+                    from services.feature_engineering import get_station_dataframe
+                    hourly = get_station_dataframe(station, direction)
+                    if hourly is not None and len(hourly) > 0:
+                        p95 = np.percentile(hourly['TotalPassenger'].values, 95)
+                    else:
+                        p95 = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+                
+                congestion = (passenger_count / p95) * 100
+                congestion = max(0, min(congestion, 100))
                 
                 results[f"{hour}:00_{direction}"] = {
                     "raw_scaled_output": round(raw_value, 4),
-                    "station_capacity": capacity,
+                    "p95_percentile": round(float(p95), 2),
+                    "correction_factor": round(float(factor), 3),
                     "predicted_passengers": round(passenger_count, 0),
                     "congestion_percentage": round(congestion, 1),
                     "lookback_data_points": len(features),
@@ -880,14 +1051,8 @@ def debug_passenger_prediction(station_name):
                 results[f"{hour}:00_{direction}"] = {"error": str(e)}
     
     return jsonify(results)
-
 @api_predict_bp.route('/directional-forecast/<station_name>')
-@cache.cached(
-    timeout=300,  # 5 minutes – enough to avoid recomputation during a single dashboard visit
-    key_prefix=lambda: f"forecast_{request.view_args['station_name']}_{datetime.now().hour}"
-)
 def directional_forecast(station_name):
-    """Generates a 6-hour forecast array - Override only applies to current hour"""
     name = station_name.replace('%20', ' ')
     
     date_param = request.args.get('date')
@@ -905,40 +1070,90 @@ def directional_forecast(station_name):
         base_time = Config.get_current_time()
     
     active_overrides = get_active_overrides()
-    current_hour = base_time.hour  # The hour of the forecast base time
+    
+    # Debug: Print override status
+    print(f"\n🔍 DIRECTIONAL FORECAST for {name}")
+    print(f"   Active overrides: {list(active_overrides.keys())}")
+    north_key = f"{name}_northbound"
+    south_key = f"{name}_southbound"
+    print(f"   North override exists: {north_key in active_overrides}")
+    print(f"   South override exists: {south_key in active_overrides}")
     
     forecasts = []
     
     for i in range(6):
         target_time = base_time + timedelta(hours=i)
-        forecast_hour = target_time.hour        
-        # ========== KEY FIX: Only apply override if forecast hour matches current hour ==========
+        
         north_override_key = f"{name}_northbound"
         south_override_key = f"{name}_southbound"
         
-        # Only override if this forecast hour is the current hour (i == 0)
-        # OR if you want it to apply to the specific hour it was set for
         is_north_overridden = False
         is_south_overridden = False
+        north_cong = None
+        south_cong = None
         
-        # Check if override exists and this is the current hour
-        if i == 0:  # Only the first forecast (NOW) gets the override
-            if north_override_key in active_overrides:
-                is_north_overridden = True
-                north_cong = active_overrides[north_override_key].get('congestion', 50)
-                print(f"🔧 OVERRIDE APPLIED: {name} Northbound NOW = {north_cong}%")
-            else:
-                north_cong = get_directional_prediction(name, 'Northbound', target_time)
+        # ========== CHECK NORTHBOUND OVERRIDE ==========
+        if north_override_key in active_overrides:
+            override = active_overrides[north_override_key]
+            override_time_str = override.get('timestamp')
+            duration_minutes = override.get('duration_minutes', 60)
             
-            if south_override_key in active_overrides:
-                is_south_overridden = True
-                south_cong = active_overrides[south_override_key].get('congestion', 50)
-                print(f"🔧 OVERRIDE APPLIED: {name} Southbound NOW = {south_cong}%")
-            else:
-                south_cong = get_directional_prediction(name, 'Southbound', target_time)
-        else:
-            # Future hours use model predictions only (no overrides)
+            if override_time_str:
+                try:
+                    override_start = datetime.fromisoformat(override_time_str)
+                    # Round to hour for comparison
+                    override_start_hour = override_start.replace(minute=0, second=0, microsecond=0)
+                    
+                    if duration_minutes == 0:
+                        # Manual override - active from start hour indefinitely
+                        if target_time >= override_start_hour:
+                            north_cong = override.get('congestion', 50)
+                            is_north_overridden = True
+                            print(f"🔧 MANUAL OVERRIDE ACTIVE: {name} Northbound from {override_start_hour}")
+                    else:
+                        # Timed override - active for duration minutes
+                        override_end = override_start + timedelta(minutes=duration_minutes)
+                        # Round target_time to the hour for comparison if duration is in hours
+                        # But for minutes, keep as-is
+                        if override_start <= target_time <= override_end:
+                            north_cong = override.get('congestion', 50)
+                            is_north_overridden = True
+                            print(f"🔧 OVERRIDE ACTIVE: {name} Northbound until {override_end}")
+                except Exception as e:
+                    print(f"⚠️ Error parsing override: {e}")
+        
+        # ========== CHECK SOUTHBOUND OVERRIDE ==========
+        if south_override_key in active_overrides:
+            override = active_overrides[south_override_key]
+            override_time_str = override.get('timestamp')
+            duration_minutes = override.get('duration_minutes', 60)
+            
+            if override_time_str:
+                try:
+                    override_start = datetime.fromisoformat(override_time_str)
+                    # Round to hour for comparison
+                    override_start_hour = override_start.replace(minute=0, second=0, microsecond=0)
+                    
+                    if duration_minutes == 0:
+                        # Manual override - active from start hour indefinitely
+                        if target_time >= override_start_hour:
+                            south_cong = override.get('congestion', 50)
+                            is_south_overridden = True
+                            print(f"🔧 MANUAL OVERRIDE ACTIVE: {name} Southbound from {override_start_hour}")
+                    else:
+                        # Timed override - active for duration minutes
+                        override_end = override_start + timedelta(minutes=duration_minutes)
+                        if override_start <= target_time <= override_end:
+                            south_cong = override.get('congestion', 50)
+                            is_south_overridden = True
+                            print(f"🔧 OVERRIDE ACTIVE: {name} Southbound until {override_end}")
+                except Exception as e:
+                    print(f"⚠️ Error parsing override: {e}")
+        
+        # Use model predictions if no active override for this hour
+        if north_cong is None:
             north_cong = get_directional_prediction(name, 'Northbound', target_time)
+        if south_cong is None:
             south_cong = get_directional_prediction(name, 'Southbound', target_time)
         
         ampm = target_time.strftime('%I:%M %p')
@@ -1044,20 +1259,31 @@ def debug_model_output(station_name):
                 raw_output = directional_models[model_key].predict(input_sequence, verbose=0)
                 raw_value = float(raw_output[0][0])
                 
-                # ========== USE PLATFORM CAPACITY FOR CONGESTION ==========
-                capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
-                passenger_count = float(target_scaler.inverse_transform([[raw_value]])[0][0])
+                factor = CORRECTION_FACTORS.get(model_key, 1.0)
+                passenger_count = passenger_count * factor
                 
-                # Calculate congestion based on capacity (0-100%)
-                congestion = (passenger_count / capacity * 100)
-                congestion = min(congestion, 100)  # Cap at 100%
+                p95 = P95_CACHE.get(model_key)
+                if p95 is None:
+                    from services.feature_engineering import get_station_dataframe
+                    hourly = get_station_dataframe(station, direction)
+                    if hourly is not None and len(hourly) > 0:
+                        p95 = np.percentile(hourly['TotalPassenger'].values, 95)
+                    else:
+                        p95 = MRT3_PLATFORM_CAPACITY.get(station, 100)
+                        
+                congestion = (passenger_count / p95) *100
+                congestion = max(0, min(congestion, 100))
+                
+             
                 
                 results[f"{hour}:00_{direction}"] = {
                     "raw_model_output": round(raw_value, 4),
-                    "station_capacity": capacity,
+                    "p95_percentile": round(float(p95), 2),
+                    "correction_factor": round(float(factor), 3),
                     "predicted_passengers": round(passenger_count, 0),
                     "predicted_congestion": round(congestion, 1)
                 }
+                
                 
             except Exception as e:
                 results[f"{hour}:00_{direction}"] = {"error": str(e)}
@@ -1642,3 +1868,24 @@ def predict_route():
         "stations_between": station_diff,
         "recommendation": recommendation
     })
+
+@api_predict_bp.route('/admin/generate-factors', methods=['POST'])
+def generate_factors():
+    """Admin endpoint to recompute correction factors from historical data."""
+    try:
+        test_days = request.json.get('test_days', 30) if request.is_json else 30
+        factors = compute_and_save_correction_factors(test_days=test_days)
+        # Reload factors so they take effect immediately
+        load_correction_factors()
+        return jsonify({
+            "success": True,
+            "message": f"Generated {len(factors)} correction factors",
+            "factors": factors
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500

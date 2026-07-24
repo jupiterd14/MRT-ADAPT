@@ -3,6 +3,8 @@ from models import User, Report, Broadcast, db
 from datetime import datetime, timedelta
 import json, time, math, os
 from .auth import login_required, log_activity
+from flask_caching import Cache
+from extensions import cache
 
 operator_bp = Blueprint('operator', __name__)
 
@@ -37,37 +39,25 @@ def load_overrides():
             print(f"Error loading overrides: {e}")
             return {}
     return {}
-
 def save_overrides(overrides):
     """Save overrides to file"""
+    print(f"📝 SAVING OVERRIDES: {overrides}")
+    print(f"📝 Stack trace:")  # This will show who's calling it
+    import traceback
+    traceback.print_stack()
     try:
         with open(OVERRIDES_FILE, 'w') as f:
             json.dump(overrides, f, indent=2)
         print(f"✅ Saved {len(overrides)} overrides to file")
     except Exception as e:
         print(f"Error saving overrides: {e}")
-
+        
 def get_active_overrides():
-    """Get active overrides from file with expiry check"""
+    """Get active overrides from file - TEMPORARY: skip expiry check"""
     overrides = load_overrides()
-    current_time = time.time()
-    active = {}
-    expired_keys = []
-    
-    for key, override in overrides.items():
-        expiry = override.get('expiry')
-        if expiry is None or expiry > current_time:
-            active[key] = override
-        else:
-            expired_keys.append(key)
-    
-    # Remove expired keys
-    if expired_keys:
-        for key in expired_keys:
-            del overrides[key]
-        save_overrides(overrides)
-    
-    return active
+    print(f"📄 operator.py LOADED: {overrides}")
+    return overrides
+
 
 def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name):
     """
@@ -563,7 +553,6 @@ def deactivate_broadcast(broadcast_id):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
 @operator_bp.route('/api/operator/override-congestion', methods=['POST'])
 def override_congestion():
     try:
@@ -591,31 +580,88 @@ def override_congestion():
         # Load existing overrides from file
         overrides = load_overrides()
         
+        # ========== FIX: Use the config current time instead of system time ==========
+        from config import Config
+        current_time = Config.get_current_time()
+        current_timestamp = current_time.timestamp()
+        
         expiry = None
+        duration_minutes = 0
         if duration != 'manual':
-            expiry = time.time() + (int(duration) * 60)
-            print(f"   Expiry: {expiry} ({duration} minutes)")
+            duration_minutes = int(duration)
+            expiry = current_timestamp + (duration_minutes * 60)
+            print(f"   Current time (config): {current_time}")
+            print(f"   Expiry: {expiry} ({duration_minutes} minutes from now)")
         else:
-            print(f"   Expiry: Manual (no expiration)")
+        # For manual overrides, round to the start of the hour
+            current_time = current_time.replace(minute=0, second=0, microsecond=0)
+            current_timestamp = current_time.timestamp()
+            print(f"   Manual override - rounded to hour: {current_time}")
+        
+        # Get operator name
+        operator_name = session.get('username', 'operator')
         
         overrides[override_key] = {
             'station': station, 
             'direction': direction, 
             'level': level,
             'congestion': congestion_value, 
-            'operator': operator_email,
+            'operator': operator_name,
             'reason': reason, 
-            'expiry': expiry, 
-            'timestamp': datetime.now().isoformat()
+            'expiry': expiry,
+            'timestamp': current_time.isoformat(),
+            'duration_minutes': duration_minutes,
+            'created_at': current_time.isoformat()
         }
         
         # Save to file
         save_overrides(overrides)
         
-        # Also update app config for immediate use
+        # ========== UPDATE APP CONFIG ==========
+        # Use the imported current_app from top of file
         if 'overrides' not in current_app.config:
             current_app.config['overrides'] = {}
         current_app.config['overrides'][override_key] = overrides[override_key]
+        print(f"✅ Updated app config with override: {override_key}")
+        
+        # ========== CLEAR THE CACHE FOR THIS STATION ==========
+        try:
+            # Get the actual cache instance from the app extensions
+            cache_instance = current_app.extensions.get('cache')
+            
+            if cache_instance:
+                print(f"🗑️ Clearing cache for {station}...")
+                
+                # Delete ALL possible cache keys for this station
+                for hour in range(24):
+                    # Try with standard key
+                    cache_instance.delete(f"forecast_{station}_{hour}")
+                    
+                    # Try with view prefix that Flask-Caching might add
+                    cache_instance.delete(f"view//forecast_{station}_{hour}")
+                    
+                    # Try with prefix that Flask-Caching might use
+                    cache_instance.delete(f"view/forecast_{station}_{hour}")
+                
+                # Also clear the "all stations" cache
+                for hour in range(24):
+                    cache_instance.delete(f"all_stations_{hour}")
+                    cache_instance.delete(f"view//all_stations_{hour}")
+                    cache_instance.delete(f"view/all_stations_{hour}")
+                
+                # Clear the specific forecast for current hour
+                cache_instance.delete(f"forecast_{station}_{current_time.hour}")
+                cache_instance.delete(f"view//forecast_{station}_{current_time.hour}")
+                cache_instance.delete(f"view/forecast_{station}_{current_time.hour}")
+                
+                print(f"✅ Cleared all forecast caches for {station}")
+            else:
+                print("⚠️ Cache instance not found in app extensions")
+                
+        except Exception as cache_error:
+            print(f"⚠️ Could not clear cache: {cache_error}")
+            import traceback
+            traceback.print_exc()
         
         print(f"✅ Override saved to file: {override_key} = {congestion_value}%")
         
@@ -813,7 +859,6 @@ def get_broadcast(broadcast_id):
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
     
-    
 @operator_bp.route('/api/operator/clear-override', methods=['POST'])
 def clear_override():
     try:
@@ -841,6 +886,28 @@ def clear_override():
         # Remove from app config
         if 'overrides' in current_app.config and target_key in current_app.config['overrides']:
             del current_app.config['overrides'][target_key]
+            print(f"✅ Removed override from app config: {target_key}")
+        
+        # ========== CLEAR THE CACHE FOR THIS STATION ==========
+        try:
+            # Get the actual cache instance from the app extensions
+            cache_instance = current_app.extensions.get('cache')
+            
+            if cache_instance:
+                print(f"🗑️ Clearing cache for {station} after clearing override...")
+                
+                # Delete ALL possible cache keys for this station
+                for hour in range(24):
+                    cache_instance.delete(f"forecast_{station}_{hour}")
+                    cache_instance.delete(f"view//forecast_{station}_{hour}")
+                    cache_instance.delete(f"view/forecast_{station}_{hour}")
+                
+                print(f"✅ Cleared forecast caches for {station}")
+            else:
+                print("⚠️ Cache instance not found")
+                
+        except Exception as cache_error:
+            print(f"⚠️ Could not clear cache: {cache_error}")
         
         print(f"✅ Override cleared: {target_key}")
         
@@ -857,46 +924,7 @@ def clear_override():
     except Exception as e:
         print(f"Error clearing override: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    
-
-@operator_bp.route('/api/operator/get-overrides', methods=['GET'])
-def get_overrides():
-    """Get active overrides from file"""
-    active_overrides = get_active_overrides()
-    
-    print(f"📋 Active overrides: {list(active_overrides.keys())}")
-    return jsonify({'overrides': active_overrides})
-
-@operator_bp.route('/api/operator/flagged-reports')
-def get_flagged_reports():
-    user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    managed_stations = get_operator_stations(user_id)
-    
-    flagged_reports = Report.query.filter(
-        Report.flagged == True,
-        Report.station.in_(managed_stations),
-        Report.reviewed == False
-    ).order_by(Report.timestamp.desc()).all()
-    
-    result = []
-    for report in flagged_reports:
-        reporter_name = 'Anonymous'
-        if not report.anonymous and report.user:
-            reporter_name = report.user.username.split('@')[0] if '@' in report.user.username else report.user.username
-        
-        result.append({
-            'id': report.id, 'station': report.station,
-            'reported_congestion': report.reported_congestion,
-            'remarks': report.remarks, 'timestamp': report.timestamp.isoformat(),
-            'reporter': reporter_name, 'anonymous': report.anonymous,
-            'flag_count': getattr(report, 'flag_count', 1), 'photo_path': report.photo_path
-        })
-    
-    return jsonify(result)
-
+   
 @operator_bp.route('/api/operator/review-flagged/<int:report_id>', methods=['POST'])
 def review_flagged_report(report_id):
     data = request.json

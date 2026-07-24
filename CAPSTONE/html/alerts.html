@@ -899,18 +899,7 @@ nav {
         const now = new Date();
         const hour = now.getHours();
         
-        if (hour >= 0 && hour < 5) {
-            return {
-                id: 'advisory-early-morning-permanent',
-                type: 'advisory',
-                icon: 'info-circle',
-                icon_color: 'blue',
-                title: 'EARLY MORNING ADVISORY',
-                message: 'Trains are running on schedule. First trips start at 4:30 AM. Limited frequency (8-10 min intervals).',
-                time: 'Just now',
-                unread: true
-            };
-        } else if (hour >= 5 && hour < 7) {
+       if (hour >= 5 && hour < 7) {
             return {
                 id: 'advisory-pre-rush-permanent',
                 type: 'advisory',
@@ -983,24 +972,13 @@ nav {
                 icon: 'calendar-alt',
                 icon_color: 'purple',
                 title: 'WEEKEND SCHEDULE',
-                message: 'Weekend schedule active. Trains every 6-8 minutes. Reduced frequency but comfortable travel conditions.',
+                message: 'Weekend schedule active. Plan and travel as early as possible.',
                 time: 'Just now',
                 unread: true
             });
         }
         
-        if (hour >= 23 || hour <= 3) {
-            alerts.push({
-                id: 'service-maintenance-night-permanent',
-                type: 'broadcast',
-                icon: 'tools',
-                icon_color: 'purple',
-                title: 'SCHEDULED MAINTENANCE',
-                message: `Track maintenance ongoing. Service continues with minimal disruption.`,
-                time: 'Just now',
-                unread: true
-            });
-        }
+    
         return alerts;
     }
 async function getCongestionAlerts() {
