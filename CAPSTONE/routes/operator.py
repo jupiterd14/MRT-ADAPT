@@ -231,6 +231,72 @@ def get_active_broadcasts():
         print(f"Error getting active broadcasts: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
     
+    
+@operator_bp.route('/api/broadcasts/public', methods=['GET'])
+def get_public_broadcasts():
+    """Get active broadcasts for public alerts page"""
+    try:
+        now = datetime.now()
+        
+        # Auto-expire old broadcasts
+        expired_by_date = Broadcast.query.filter(
+            Broadcast.is_active == True,
+            Broadcast.expires_at != None,
+            Broadcast.expires_at <= now
+        ).all()
+        
+        for broadcast in expired_by_date:
+            broadcast.is_active = False
+        
+        if expired_by_date:
+            db.session.commit()
+        
+        # Only return active broadcasts, ordered by newest first
+        active_broadcasts = Broadcast.query.filter(
+            Broadcast.is_active == True
+        ).order_by(Broadcast.created_at.desc()).all()
+        
+        result = []
+        for broadcast in active_broadcasts:
+            stations = json.loads(broadcast.stations) if broadcast.stations else []
+            
+            # ========== FORMAT TIME ==========
+            created_at = broadcast.created_at
+            now = datetime.now()
+            diff = now - created_at
+            diff_seconds = diff.total_seconds()
+            
+            if diff_seconds < 60:
+                time_display = 'Just now'
+            elif diff_seconds < 3600:
+                minutes = int(diff_seconds // 60)
+                time_display = f'{minutes} min ago'
+            elif diff_seconds < 86400:
+                hours = int(diff_seconds // 3600)
+                time_display = f'{hours}h ago'
+            else:
+                days = int(diff_seconds // 86400)
+                time_display = f'{days}d ago'
+            
+            result.append({
+                'id': broadcast.id,
+                'title': broadcast.title,
+                'message': broadcast.message,
+                'type': broadcast.disruption_type,
+                'severity': broadcast.severity,
+                'direction': getattr(broadcast, 'direction', 'both'),
+                'stations': stations,
+                'created_at': broadcast.created_at.isoformat(),
+                'expires_at': broadcast.expires_at.isoformat() if broadcast.expires_at else None,
+                'is_active': broadcast.is_active,
+                'time': time_display  # ← Human-readable time
+            })
+        
+        return jsonify({'success': True, 'broadcasts': result})
+    except Exception as e:
+        print(f"Error getting public broadcasts: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @operator_bp.route('/api/operator/station-status')
 def operator_station_status():
     """Get station status for operator dashboard - uses the same logic as live map v2."""
@@ -247,10 +313,11 @@ def operator_station_status():
             
             # Transform the v2 response into the format expected by the operator dashboard
             stations_list = current_app.config.get('STATIONS', STATIONS)
-            result = []
+            result = [] 
             for station in stations_list:
                 north = data['northbound'].get(station, {})
                 south = data['southbound'].get(station, {})
+                
                 
                 result.append({
                     'name': station,

@@ -721,7 +721,27 @@ nav {
     .bottom-nav-item i {
         font-size: 16px;
     }
+
+       .header-subtitle {
+        font-size: 11px;
+        margin-top: -8px;
+        margin-bottom: 8px;
+    }
 }
+
+
+.header-subtitle {
+    display: block;
+    font-size: 13px;
+    color: var(--text-light);
+    margin-bottom: 12px;
+    margin-top: -19px; /* Very close */
+    padding-left: 2px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    line-height: 1.2;
+}
+
 </style>
 </head>
 <body>
@@ -772,9 +792,18 @@ nav {
             <h1>Alerts <span class="new-badge" id="newAlertBadge">0 New</span></h1>
             <div class="header-icons">
                 <span class="icon-btn" id="refreshBtn" onclick="refreshAlerts()" style="display:none;"><i class="fas fa-sync-alt"></i></span>
+
+                
                 <button class="mark-read-btn" id="markAllBtn" onclick="markAllAsRead()"><i class="far fa-envelope-open"></i> Mark all as read</button>
             </div>
+             
+              
+        
         </div>
+
+      
+
+       
 
         <!-- Filter Bar -->
         <div class="filter-bar">
@@ -992,6 +1021,9 @@ async function getCongestionAlerts() {
         const OPERATING_END = 22.5;
         const isClosed = timeDecimal < OPERATING_START || timeDecimal >= OPERATING_END;
         
+        // ========== GET TIMESTAMP FOR THIS FETCH ==========
+        const fetchTimestamp = now.getTime();
+        
         if (isClosed) {
             alerts.push({
                 id: 'service-closed-permanent',
@@ -1001,6 +1033,7 @@ async function getCongestionAlerts() {
                 title: 'MRT-3 SERVICE ENDED',
                 message: 'MRT-3 operations have ended for the day. Service resumes at 4:30 AM.',
                 time: 'Just now',
+                timestamp: fetchTimestamp,  // ← ADD THIS
                 unread: true
             });
             return alerts;
@@ -1030,7 +1063,6 @@ async function getCongestionAlerts() {
                 } else if (congestion > 0) {
                     northbound.light.push(station);
                 }
-                // congestion === 0 means no congestion, skip it
             }
         }
         
@@ -1048,7 +1080,6 @@ async function getCongestionAlerts() {
                 } else if (congestion > 0) {
                     southbound.light.push(station);
                 }
-                // congestion === 0 means no congestion, skip it
             }
         }
         
@@ -1088,7 +1119,22 @@ async function getCongestionAlerts() {
             return result;
         }
         
+        // Helper to format time
+        function formatTime(timestamp) {
+            const now = Date.now();
+            const diffMs = now - timestamp;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffMs < 60000) return 'Just now';
+            if (diffMins < 60) return `${diffMins} min ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            return `${diffDays}d ago`;
+        }
+        
         // ========== CREATE ONE ALERT PER SEVERITY PER DIRECTION ==========
+        const timeDisplay = formatTime(fetchTimestamp);
         
         // NORTHBOUND - Severe
         if (northbound.severe.length > 0) {
@@ -1100,7 +1146,8 @@ async function getCongestionAlerts() {
                 icon_color: 'red',
                 title: `NORTHBOUND: ${northbound.severe.length} SEVERE`,
                 message: `${stationList} — Expect delays of 15-20 minutes.`,
-                time: 'Just now',
+                time: timeDisplay,  // ← Use dynamic time
+                timestamp: fetchTimestamp,  // ← Store timestamp
                 unread: true,
                 priority: 1
             });
@@ -1116,7 +1163,8 @@ async function getCongestionAlerts() {
                 icon_color: 'red',
                 title: `NORTHBOUND: ${northbound.congested.length} CONGESTED`,
                 message: `${stationList} — Expect delays of 10-15 minutes.`,
-                time: 'Just now',
+                time: timeDisplay,  // ← Use dynamic time
+                timestamp: fetchTimestamp,
                 unread: true,
                 priority: 1
             });
@@ -1132,13 +1180,14 @@ async function getCongestionAlerts() {
                 icon_color: 'orange',
                 title: `NORTHBOUND: ${northbound.moderate.length} MODERATE`,
                 message: `${stationList} — Expect delays of 5-10 minutes.`,
-                time: 'Just now',
+                time: timeDisplay,  // ← Use dynamic time
+                timestamp: fetchTimestamp,
                 unread: true,
                 priority: 2
             });
         }
         
-        // NORTHBOUND - Light (ALL light stations in ONE alert)
+        // NORTHBOUND - Light
         if (northbound.light.length > 0) {
             const stationList = formatStationList(northbound.light, 'light');
             alerts.push({
@@ -1148,7 +1197,8 @@ async function getCongestionAlerts() {
                 icon_color: 'green',
                 title: `NORTHBOUND: ${northbound.light.length} LIGHT`,
                 message: `${stationList} — Normal travel conditions.`,
-                time: 'Just now',
+                time: timeDisplay,  // ← Use dynamic time
+                timestamp: fetchTimestamp,
                 unread: true,
                 priority: 3
             });
@@ -1164,7 +1214,8 @@ async function getCongestionAlerts() {
                 icon_color: 'red',
                 title: `SOUTHBOUND: ${southbound.severe.length} SEVERE`,
                 message: `${stationList} — Expect delays of 15-20 minutes.`,
-                time: 'Just now',
+                time: timeDisplay,  // ← Use dynamic time
+                timestamp: fetchTimestamp,
                 unread: true,
                 priority: 1
             });
@@ -1180,7 +1231,8 @@ async function getCongestionAlerts() {
                 icon_color: 'red',
                 title: `SOUTHBOUND: ${southbound.congested.length} CONGESTED`,
                 message: `${stationList} — Expect delays of 10-15 minutes.`,
-                time: 'Just now',
+                time: timeDisplay,  // ← Use dynamic time
+                timestamp: fetchTimestamp,
                 unread: true,
                 priority: 1
             });
@@ -1196,13 +1248,14 @@ async function getCongestionAlerts() {
                 icon_color: 'orange',
                 title: `SOUTHBOUND: ${southbound.moderate.length} MODERATE`,
                 message: `${stationList} — Expect delays of 5-10 minutes.`,
-                time: 'Just now',
+                time: timeDisplay,  // ← Use dynamic time
+                timestamp: fetchTimestamp,
                 unread: true,
                 priority: 2
             });
         }
         
-        // SOUTHBOUND - Light (ALL light stations in ONE alert)
+        // SOUTHBOUND - Light
         if (southbound.light.length > 0) {
             const stationList = formatStationList(southbound.light, 'light');
             alerts.push({
@@ -1212,7 +1265,8 @@ async function getCongestionAlerts() {
                 icon_color: 'green',
                 title: `SOUTHBOUND: ${southbound.light.length} LIGHT`,
                 message: `${stationList} — Normal travel conditions.`,
-                time: 'Just now',
+                time: timeDisplay,  // ← Use dynamic time
+                timestamp: fetchTimestamp,
                 unread: true,
                 priority: 3
             });
@@ -1232,7 +1286,8 @@ async function getCongestionAlerts() {
                 icon_color: 'green',
                 title: '✅ ALL CLEAR',
                 message: 'All directions are operating normally. Enjoy your commute!',
-                time: 'Just now',
+                time: timeDisplay,  // ← Use dynamic time
+                timestamp: fetchTimestamp,
                 unread: true,
                 priority: 4
             });
@@ -1251,6 +1306,7 @@ async function getCongestionAlerts() {
             title: '⚠️ CONGESTION DATA UNAVAILABLE',
             message: 'Unable to fetch current congestion data. Please check the live map for updates.',
             time: 'Just now',
+            timestamp: Date.now(),
             unread: true,
             priority: 4
         });
@@ -1475,15 +1531,24 @@ async function getCongestionAlerts() {
                 }
             }
             
-            uniqueAlerts.sort((a, b) => {
-                if (a.priority === 1 && b.priority !== 1) return -1;
-                if (b.priority === 1 && a.priority !== 1) return 1;
-                
-                const severityOrder = { red: 0, orange: 1, purple: 2, blue: 3, green: 4 };
-                const aSeverity = severityOrder[a.icon_color] ?? 4;
-                const bSeverity = severityOrder[b.icon_color] ?? 4;
-                return aSeverity - bSeverity;
-            });
+           uniqueAlerts.sort((a, b) => {
+    // ========== BROADCASTS ALWAYS FIRST ==========
+    if (a.type === 'broadcast' && b.type !== 'broadcast') return -1;
+    if (b.type === 'broadcast' && a.type !== 'broadcast') return 1;
+    
+    // Then by priority (1 = highest)
+    if (a.priority && b.priority) {
+        if (a.priority !== b.priority) {
+            return a.priority - b.priority;
+        }
+    }
+    
+    // Then by severity color
+    const severityOrder = { red: 0, orange: 1, purple: 2, blue: 3, green: 4 };
+    const aSeverity = severityOrder[a.icon_color] ?? 4;
+    const bSeverity = severityOrder[b.icon_color] ?? 4;
+    return aSeverity - bSeverity;
+});
             
             currentAlerts = uniqueAlerts.slice(0, 30);
             displayFilteredAlerts();

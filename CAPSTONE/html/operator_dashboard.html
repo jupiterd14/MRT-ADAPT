@@ -2146,6 +2146,12 @@
     }
 }
 
+.badge.closed { 
+    background: #E2E8F0; 
+    color: #475569; 
+}
+
+
             </style>
         </head>
         <body>
@@ -2270,7 +2276,7 @@
                         <i class="fas fa-info-circle" style="color: #D97706; margin-top: 2px;"></i>
                         <div style="font-size: 12px; color: #92400E;">
                             <strong>What happens next?</strong><br>
-                            The system will use real-time predictions and historical data to determine congestion levels for this station.
+                            The system will use forecasted predictions and historical data to determine congestion levels for this station.
                         </div>
                     </div>
                 </div>
@@ -2525,7 +2531,7 @@
                         <h3><i class="fa-regular fa-envelope"  style="padding-right: 5px;"></i> Message</h3>
                         <div class="input-group"><label>Alert Title</label><input type="text" id="alertTitle" oninput="updatePreview()" placeholder="e.g., Train Malfunction"></div>
                         <div class="input-group"><label>Message</label><textarea id="alertMessage" oninput="updatePreview()" rows="4" placeholder="Describe situation..."></textarea></div>
-                        <div class="input-group"><label>Severity</label><select id="severityLevel"><option value="advisory">Advisory</option><option value="warning">Warning</option><option value="critical">Critical</option></select></div>
+                        <div class="input-group"><label>Type</label><select id="severityLevel"><option value="advisory">Advisory</option><option value="warning">Warning</option><option value="critical">Critical</option></select></div>
                         <div class="input-group">
             <label> Alert Duration</label>
             <select id="alertDuration">
@@ -3659,6 +3665,7 @@ async function confirmArchiveBroadcast() {
         });
     }
 
+    
     async function loadCongestionData() {
     console.log("Loading congestion data for operator dashboard...");
     showLoadingOverlay();
@@ -3680,18 +3687,42 @@ async function confirmArchiveBroadcast() {
         const southRows = [];
         const northRows = [];
 
+        
+        
         // ========== NORTHBOUND: Keep original order (North Ave → Taft) ==========
         for (const station of stations) {
             const name = station.name;
             const northCong = station.northbound.congestion || 0;
             const isNorthOverridden = station.northbound.overridden || false;
             
+
+              const nowTime = new Date();
+            const hour = nowTime.getHours();
+            const minute = nowTime.getMinutes();
+            const currentTime = hour + minute/60;
+            const OPERATING_START = 4.5;
+            const OPERATING_END = 22.5;
+            const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
+
+
             let nClass = 'light', nText = 'LIGHT';
+
+        
+            
+            
+             if (isClosed) {
+                 nClass = 'closed';
+                  nText = 'CLOSED';
+            }
+            else {
             if (northCong > 80) { nClass = 'severe'; nText = 'SEVERE'; severeCount++; }
+          
             else if (northCong > 60) { nClass = 'congested'; nText = 'CONGESTED'; congestedCount++; }
             else if (northCong > 30) { nClass = 'moderate'; nText = 'MODERATE'; moderateCount++; }
             else { lightCount++; }
             
+            }
+           
             const canManageNorth = managedStations.includes(name);
             
             let btnHtmlNorth;
@@ -3700,7 +3731,11 @@ async function confirmArchiveBroadcast() {
                     btnHtmlNorth = `<button class="btn-override" onclick="removeOverride('${name}', 'northbound')" style="background:#EF4444; color:white;">
                         <i class="fas fa-trash"></i> Remove Override
                     </button>`;
-                } else {
+                } else if(isClosed) {
+                btnHtmlNorth = `<button class="btn-override" disabled style="opacity:0.5;"><i class="fas fa-lock"></i> CLOSED</button>`;
+                }
+                
+                else {
                     btnHtmlNorth = `<button class="btn-override" onclick="openOverrideModal('${name}', 'northbound')">
                         <i class="fas fa-edit"></i> Override
                     </button>`;
@@ -3713,6 +3748,8 @@ async function confirmArchiveBroadcast() {
                 `<span style="color:#EF4444; font-size:10px; background:#FEE2E2; padding:2px 8px; border-radius:12px; margin-left:6px;">
                     <i class="fas fa-pen"></i> Overridden
                 </span>` : '';
+
+                
 
             northRows.push(`
                 <tr ${isNorthOverridden ? 'style="background:#FEF2F2;"' : ''}>
@@ -3730,10 +3767,27 @@ async function confirmArchiveBroadcast() {
             const isSouthOverridden = station.southbound.overridden || false;
             
             let sClass = 'light', sText = 'LIGHT';
-            if (southCong > 80) { sClass = 'severe'; sText = 'SEVERE'; severeCount++; }
-            else if (southCong > 60) { sClass = 'congested'; sText = 'CONGESTED'; congestedCount++; }
-            else if (southCong > 30) { sClass = 'moderate'; sText = 'MODERATE'; moderateCount++; }
-            else { lightCount++; }
+
+              const nowTime = new Date();
+            const hour = nowTime.getHours();
+            const minute = nowTime.getMinutes();
+            const currentTime = hour + minute/60;
+            const OPERATING_START = 4.5;
+            const OPERATING_END = 22.5;
+            const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
+
+
+            if (isClosed) {
+                 sClass = 'closed';
+                  sText = 'CLOSED';
+            }
+            else {
+                    if (southCong > 80) { sClass = 'severe'; sText = 'SEVERE'; severeCount++; }
+                    else if (southCong > 60) { sClass = 'congested'; sText = 'CONGESTED'; congestedCount++; }
+                    else if (southCong > 30) { sClass = 'moderate'; sText = 'MODERATE'; moderateCount++; }
+                    else { lightCount++; }
+            }
+        
             
             const canManageSouth = managedStations.includes(name);
             
@@ -3743,7 +3797,12 @@ async function confirmArchiveBroadcast() {
                     btnHtmlSouth = `<button class="btn-override" onclick="removeOverride('${name}', 'southbound')" style="background:#EF4444; color:white;">
                         <i class="fas fa-trash"></i> Remove Override
                     </button>`;
-                } else {
+                } 
+                else if(isClosed) {
+                btnHtmlSouth = `<button class="btn-override" disabled style="opacity:0.5;">CLOSED</button>`;
+                }
+                
+                else {
                     btnHtmlSouth = `<button class="btn-override" onclick="openOverrideModal('${name}', 'southbound')">
                         <i class="fas fa-edit"></i> Override
                     </button>`;
@@ -5398,9 +5457,13 @@ if (confirmArchiveBtn) confirmArchiveBtn.onclick = confirmArchiveBroadcast;
             if (el) el.innerHTML = `<i class="fas fa-map-marker-alt"></i> ${managedStations.length} Station(s) Assigned`;
         });
         
-        setInterval(() => {
-            loadCongestionData();
-        }, 60000);
+       setInterval(() => {
+    console.log('🔄 Auto-refresh triggered (10 min interval)');
+    loadCongestionData();
+    loadIncidentLogs();
+    fetchOperatorReports();
+    updateForecastUI();
+}, 600000);
 
         console.log("Initialization complete!");
     });

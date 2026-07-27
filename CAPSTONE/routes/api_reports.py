@@ -58,86 +58,59 @@ def check_duplicate_report(station, congestion_value, user_id, minutes=10):
         Report.reported_congestion.between(min_congestion, max_congestion)
     ).first()
     return duplicate is not None
-
-def get_station_prediction(station_name, direction=None, models_cached=None, scalers_cached=None, feature_sequence_func=None):
-    """Get prediction - safely routes between initialization states"""
+def get_station_prediction(station_name, direction='Northbound', **kwargs):
+    """
+    Get congestion prediction using LSTM model
+    
+    Args:
+        station_name: Name of the station
+        direction: 'Northbound' or 'Southbound'
+    
+    Returns:
+        int: Predicted congestion percentage (0-100)
+    """
     from flask import current_app
     
-    # 1. If the wrapper already gave us the models, skip the config forwarder!
-    if models_cached is not None and feature_sequence_func is not None:
-        # (Put your actual LSTM processing logic here if it's written in this file)
-        capacity = STATION_BASE_CAPACITY.get(station_name, 10000)
-        return capacity * 0.5
-
-    # 2. If we don't have the models yet, call the wrapper in app.py with ONLY 1 argument
+    # 1. Try LSTM predictor
+    predictor = current_app.config.get('LSTM_PREDICTOR')
+    
+    if predictor is not None:
+        try:
+            with current_app.app_context():
+                from models import db
+                result = predictor.predict_congestion(station_name, direction, db.session)
+                if result is not None:
+                    return float(result)
+        except Exception as e:
+            print(f"⚠️ LSTM prediction error: {e}")
+    
+    # 2. Try config forwarder
     if hasattr(current_app, 'config') and 'GET_STATION_PREDICTION' in current_app.config:
-        return current_app.config['GET_STATION_PREDICTION'](station_name)
-        
-    # 3. Safe fallback
+        return current_app.config['GET_STATION_PREDICTION'](station_name, direction)
+    
+    # 3. Last resort: time-based estimate
+    now = datetime.now()
+    hour = now.hour
+    
+    # Station-specific base
     capacity = STATION_BASE_CAPACITY.get(station_name, 10000)
-    return capacity * 0.5
-
-def log_activity(user_id, user_type, user_email, action, details=None):
-    """Log activity - will be set in app.py"""
-    from flask import current_app
-    if hasattr(current_app, 'config') and 'LOG_ACTIVITY' in current_app.config:
-        current_app.config['LOG_ACTIVITY'](user_id, user_type, user_email, action, details)
-        
-@api_reports_bp.route('api/reports', methods=['GET'])
-def get_reports():
-    """Get reports - filtered for regular users (hide flagged reports)"""
-    try:
-      
-        
-        # ========== FIX: Sort by timestamp DESC (newest first) ==========
-        all_reports = Report.query.order_by(Report.timestamp.desc()).all()
-        print(f"🔍 DEBUG: Total reports in database: {len(all_reports)}")
-        
-        # Debug: Show the most recent reports
-        for r in all_reports[:5]:
-            print(f"🔍 DEBUG: Report {r.id} - station={r.station}, timestamp={r.timestamp}, flagged={getattr(r, 'is_flagged', 'MISSING')}")
-        
-        reports = all_reports
-        
-        result = []
-        for report in reports:
-            # Parse photo paths
-            photo_paths = []
-            if report.photo_path:
-                try:
-                    photo_paths = json.loads(report.photo_path)
-                except:
-                    photo_paths = [report.photo_path] if report.photo_path else []
-            
-            # Ensure timestamp is properly formatted
-            timestamp_str = None
-            if report.timestamp:
-                timestamp_str = report.timestamp.isoformat()
-            
-            result.append({
-                'id': report.id,
-                'station': report.station,
-                'direction': report.direction,
-                'reported_congestion': report.reported_congestion,
-                'predicted_congestion': report.predicted_congestion,
-                'remarks': report.remarks,
-                'anonymous': report.anonymous,
-                'username': report.user.username if report.user and not report.anonymous else None,
-                'timestamp': timestamp_str,
-                'photo_path': report.photo_path,
-                'photo_paths': photo_paths,
-                'flag_count': getattr(report, 'flag_count', 0),
-                'flagged': getattr(report, 'is_flagged', False),
-                'is_hidden': getattr(report, 'is_flagged', False)
-            })
-        
-        print(f"🔍 DEBUG: Returning {len(result)} reports to frontend")
-        return jsonify(result)
-    except Exception as e:
-        print(f"Error in get_reports: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify([])
+    base = 30 if capacity > 10000 else 40
+    
+    # Time-based adjustments
+    if 7 <= hour <= 9:
+        if direction == 'Southbound':
+            return min(95, base + 40)  # Morning rush southbound
+        else:
+            return min(70, base + 20)
+    elif 17 <= hour <= 19:
+        if direction == 'Northbound':
+            return min(95, base + 40)  # Evening rush northbound
+        else:
+            return min(70, base + 20)
+    elif 12 <= hour <= 14:
+        return base + 10
+    else:
+        return max(10, base - 10)
     
 @api_reports_bp.route('/debug/taft-recent', methods=['GET'])
 def debug_taft_recent():
@@ -512,6 +485,30 @@ def report_congestion():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": f"Server error: {str(e)}"}), 500
+    
+
+@api_reports_bp.route('/reports', methods=['GET'])
+def get_reports():
+    try:
+        reports = Report.query.order_by(Report.timestamp.desc()).all()
+            
+        result = []
+        
+        for report in reports:
+            result.append({
+                'id': report.id,
+                'station': report.station,
+                'status': getattr(report, 'status', 'NO_COLUMN'),
+                'timestamp': report.timestamp.isoformat() if report.timestamp else None
+            })
+            return jsonify({
+                'total_reports': len(result),
+                'reports': result,
+                    })
+    except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+
 @api_reports_bp.route('/reports/<int:report_id>/flag', methods=['POST'])
 def flag_report(report_id):
     try:

@@ -935,7 +935,7 @@ nav {
 }
       .pill {
         padding: 2px 8px !important;
-        font-size: 10px !important;
+        font-size: 9px !important;
         border-radius: 14px !important;
     }
      .remark-text {
@@ -1593,6 +1593,11 @@ nav {
         align-items: flex-start;
         gap: 8px;
     }
+
+    .direction-pill {
+        font-size: 8px !important;
+        padding: 3px 6px !important;
+    }
 }
     </style>
 </head>
@@ -1646,7 +1651,7 @@ nav {
 
        <div class="header-top">
     <div class="header-title">
-        <h1>Report Congestion</h1>
+        <h1>Reports</h1>
         <span class="header-subtitle">Help improve predictions by reporting what you actually see at the station.</span>
     </div>
     <div class="header-icons">
@@ -2635,7 +2640,7 @@ function filterAndDisplayReports() {
         const reportsList = document.getElementById('reportsList');
         reportsList.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading reports...</p></div>`;
         
-        fetch('api/api/reports')
+        fetch('/api/reports')
             .then(res => {
                 if (!res.ok) {
                     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -2860,7 +2865,7 @@ if (diffMins < 1) {
                 </span>
                 
                 ${report.direction ? `
-                    <span style="display: inline-block; padding: 4px 12px; background: #EFF6FF; border-radius: 20px; font-size: 11px; font-weight: 500; color: #3B82F6;">
+                    <span class="direction-pill" style="display: inline-block; padding: 4px 12px; background: #EFF6FF; border-radius: 20px; font-size: 11px; font-weight: 500; color: #3B82F6;">
                         <i class="fas ${report.direction === 'northbound' ? 'fa-arrow-up' : (report.direction === 'southbound' ? 'fa-arrow-down' : 'fa-exchange-alt')}" style="font-size: 10px; margin-right: 4px;"></i>
                         ${report.direction === 'northbound' ? 'Northbound' : (report.direction === 'southbound' ? 'Southbound' : 'Both')}
                     </span>
