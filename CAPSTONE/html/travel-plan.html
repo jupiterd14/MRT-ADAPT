@@ -1972,7 +1972,7 @@ nav {
             
             <div class="modal-tip">
                 <i class="fas fa-lightbulb"></i>
-                <span>Tip: Use the swap button to quickly exchange FROM and TO stations. Click CANCEL to reset all selections.</span>
+                <span>Tip: Use the swap button to quickly exchange FROM and TO stations. Click "X" to reset all selections.</span>
             </div>
         </div>
     </div>
@@ -2030,7 +2030,7 @@ nav {
         </div>
 
         <div class="header-top">
-            <h1>Travel Planner</h1>
+            <h1>Travel Status</h1>
             <div class="header-icons">
                 <div class="current-time" style="display: none;">
                     <i class="far fa-calendar-alt"></i>
@@ -2044,9 +2044,9 @@ nav {
             </div>
         </div>
 
-        <div class="header-subtitle">
-    Plan what station to go
-    </div>
+    <div class="header-subtitle">
+    View forecasted status and congestion for all stations
+</div>
 
 
         <div class="card planner-card">
@@ -2143,6 +2143,177 @@ nav {
 
     <script>
 let stations = [];
+
+
+// ========== TIME-BASED ADVISORY GENERATOR ==========
+function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTime) {
+    const advisories = [];
+    const hour12 = hour % 12 || 12;
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const timeStr = `${hour12}:00 ${ampm}`;
+    
+    // ===== MORNING RUSH (6:00 AM - 9:00 AM) =====
+    if (hour >= 6 && hour <= 9) {
+        // Early morning (6:00 AM)
+        if (hour === 6) {
+            advisories.push({
+                type: 'early-bird',
+                severity: 'info',
+                icon: 'fa-sun',
+                title: '🌅 EARLY BIRD ADVANTAGE',
+                message: `6:00 AM - Light crowds at ${fromStation}.`,
+                recommendation: `Leave before 6:30 AM to avoid the morning rush.`,
+                action: 'Arrive at station by 6:15 AM for smooth boarding.'
+            });
+        }
+        
+        // Peak morning (7:00 AM - 8:00 AM)
+        if (hour >= 7 && hour <= 8) {
+            advisories.push({
+                type: 'peak-congestion',
+                severity: 'critical',
+                icon: 'fa-exclamation-triangle',
+                title: '⚠️ HEAVIEST CONGESTION',
+                message: `Extreme crowding at ${fromStation} between 7:00-8:00 AM.`,
+                recommendation: `🚨 Leave BEFORE 6:30 AM or AFTER 9:00 AM to avoid crowds.`,
+                action: `If traveling now, expect ${travelTime}+ minutes extra wait time.`
+            });
+        }
+        
+        // Late morning (8:30 AM - 9:00 AM)
+        if (hour >= 8 && hour <= 9) {
+            advisories.push({
+                type: 'morning-rush',
+                severity: 'warning',
+                icon: 'fa-clock',
+                title: '🌤️ MORNING RUSH HOUR',
+                message: `Morning rush is in full effect at ${fromStation}.`,
+                recommendation: `If possible, wait until 9:30 AM for lighter crowds.`,
+                action: 'Allow extra 15-20 minutes for boarding delays.'
+            });
+        }
+    }
+    
+    // ===== MIDDAY (10:00 AM - 2:00 PM) =====
+    else if (hour >= 10 && hour <= 14) {
+        if (hour === 11 || hour === 12 || hour === 13) {
+            advisories.push({
+                type: 'midday',
+                severity: 'info',
+                icon: 'fa-sun',
+                title: '☀️ MIDDAY TRAVEL',
+                message: `12:00 PM - ${fromStation} has ${getCongestionText(congestion)} congestion.`,
+                recommendation: `Good time to travel. Leave at your normal time.`,
+                action: 'No special timing needed. Enjoy your trip!'
+            });
+        }
+    }
+    
+    // ===== AFTERNOON RUSH (3:00 PM - 8:00 PM) =====
+    else if (hour >= 15 && hour <= 20) {
+        // Early afternoon (3:00 PM)
+        if (hour === 15) {
+            advisories.push({
+                type: 'afternoon-start',
+                severity: 'info',
+                icon: 'fa-cloud-sun',
+                title: '🌤️ AFTERNOON SERVICE',
+                message: `3:00 PM - ${fromStation} has ${getCongestionText(congestion)} congestion.`,
+                recommendation: `Leave BEFORE 4:00 PM to avoid the rush.`,
+                action: 'Trains are still manageable at this time.'
+            });
+        }
+        
+        // Peak evening (5:00 PM - 7:00 PM)
+        if (hour >= 17 && hour <= 19) {
+            advisories.push({
+                type: 'evening-peak',
+                severity: 'critical',
+                icon: 'fa-exclamation-triangle',
+                title: '🚨 EVENING PEAK HOUR',
+                message: `Peak congestion at ${fromStation} (5:00-7:00 PM).`,
+                recommendation: `🚨 Leave BEFORE 4:30 PM or AFTER 7:30 PM to avoid crowds.`,
+                action: `Expect ${travelTime}+ minutes delays. Consider alternative routes.`
+            });
+        }
+        
+        // Late evening (7:30 PM - 8:00 PM)
+        if (hour >= 19 && hour <= 20) {
+            advisories.push({
+                type: 'evening-rush',
+                severity: 'warning',
+                icon: 'fa-moon',
+                title: '🌆 EVENING RUSH SUBSIDING',
+                message: `Evening rush is winding down at ${fromStation}.`,
+                recommendation: `Crowds are decreasing. Leave now or wait 20 mins for lighter crowds.`,
+                action: 'Arrive at station 10 minutes early for smoother boarding.'
+            });
+        }
+    }
+    
+    // ===== LATE NIGHT (9:00 PM - 11:30 PM) =====
+    else if (hour >= 21 && hour <= 23) {
+        if (hour === 21 || hour === 22) {
+            advisories.push({
+                type: 'late-night',
+                severity: 'warning',
+                icon: 'fa-clock',
+                title: '🌙 LATE NIGHT SERVICE',
+                message: `${timeStr} - Last trains at ${fromStation} soon.`,
+                recommendation: `🚨 Be at ${fromStation} by 10:15 PM for the last train.`,
+                action: 'If you miss the last train, consider Grab/Jeepney alternatives.'
+            });
+        }
+        
+        if (hour >= 22 && hour <= 23) {
+            advisories.push({
+                type: 'last-train',
+                severity: 'critical',
+                icon: 'fa-train',
+                title: '🚆 FINAL TRAIN ALERT',
+                message: `Last train departs ${fromStation} at 10:30 PM.`,
+                recommendation: `Hurry! Arrive by 10:15 PM to board the last train.`,
+                action: 'After 10:30 PM, use alternative transportation.'
+            });
+        }
+    }
+    
+    // ===== EARLY MORNING (4:30 AM - 5:30 AM) =====
+    else if (hour >= 4 && hour < 6) {
+        advisories.push({
+            type: 'first-train',
+            severity: 'info',
+            icon: 'fa-train',
+            title: '🚆 FIRST TRAIN SERVICE',
+            message: `4:30 AM - MRT operations starting at ${fromStation}.`,
+            recommendation: `Perfect for early commuters. Very light crowds.`,
+            action: 'Enjoy a peaceful commute with minimal congestion.'
+        });
+    }
+    
+    // ===== EXTRA: Specific recommendations based on congestion =====
+    if (congestion > 70) {
+        advisories.push({
+            type: 'congestion-alert',
+            severity: 'warning',
+            icon: 'fa-users',
+            title: '👥 HEAVY CROWDS DETECTED',
+            message: `${fromStation} has ${getCongestionText(congestion)} congestion (${congestion}%).`,
+            recommendation: `Leave 30-45 minutes earlier than planned.`,
+            action: 'Consider taking the first or last train car for less crowding.'
+        });
+    }
+    
+    return advisories;
+}
+
+// Helper function to get congestion text
+function getCongestionText(congestion) {
+    if (congestion > 80) return 'SEVERELY CONGESTED';
+    if (congestion > 60) return 'CONGESTED';
+    if (congestion > 30) return 'MODERATE';
+    return 'LIGHT';
+}
 
 
 // ========== DYNAMIC MESSAGE ARRAYS ==========
@@ -2762,6 +2933,7 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
         rushAdvice = 'Stay prepared and arrive early to avoid crowds';
         rushColor = '#3B82F6';
     }
+    
     
     // Format date for display
     const dateObj = new Date(date + 'T00:00:00');

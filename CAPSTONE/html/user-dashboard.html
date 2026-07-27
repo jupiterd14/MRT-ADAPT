@@ -480,13 +480,35 @@ nav {
 /* BEST TIME CARD */
 .best-time-card {
     background: white;
-    border: 1px solid var(--dark-bluew);
-    border-radius: 12px;
+    border: 2px solid var(--dark-bluew);
+    border-radius: 16px;
     padding: 15px 25px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+
+.best-time-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+}
+
+.plan-route-btn-wrapper {
+    display: inline-flex !important;
+    flex-shrink: 0 !important;
+}
+
+.plan-route-btn {
+    white-space: nowrap !important;
+    padding: 6px 14px;
+    font-size: 13px;
 }
 
 .best-time-info { 
@@ -510,7 +532,7 @@ nav {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;
     gap: 12px;
     width: 100%;
 }
@@ -616,17 +638,14 @@ nav {
     z-index: 99999 !important;
     background: white !important;
     border: 1px solid #ccc !important;
-    padding: 4px 8px !important;
-    border-radius: 6px !important;
-    font-size: 11px !important;
+    padding: 5px 10px !important;
+    border-radius: 5px !important;
+    margin-left: auto !important;  /* This pushes it to the right */
     cursor: pointer !important;
     pointer-events: auto !important;
-    width: auto !important;
-    min-width: 100px !important;
-    max-width: 130px !important;
-    font-weight: 500 !important;
+    min-width: 120px !important;
+    flex-shrink: 0 !important;
 }
-
 /* Adjust the forecast card header to make dropdown smaller */
 .forecast-header > div:first-child {
     font-size: 14px;
@@ -644,14 +663,7 @@ nav {
     margin: 0 !important;
 }
 
-.chart-container { 
-    height: 250px; 
-    width: 100%; 
-    position: relative; 
-    margin-top: 10px;
-    z-index: 1 !important;
-    clear: both !important;
-}
+
 
 canvas {
     position: relative !important;
@@ -695,21 +707,7 @@ canvas {
     100% { opacity: 1; transform: scale(1); }
 }
 
- #forecastStationSelect,
-        .station-select {
-            display: inline-block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            position: relative !important;
-            z-index: 99999 !important;
-            background: white !important;
-            border: 1px solid #ccc !important;
-            padding: 5px 10px !important;
-            border-radius: 5px !important;
-            margin-left: 10px !important;
-            cursor: pointer !important;
-            pointer-events: auto !important;
-        }
+
         
 .forecast-card,
 .forecast-header,
@@ -868,9 +866,18 @@ canvas {
     width: 100%;
 }
 
+
+
+
+
 /* Update the media query for mobile - keep cards side by side */
 @media screen and (max-width: 768px) {
 
+
+    
+        #forecastChart {
+            font-size: 12px;
+        }
      .icon-btn {
         width: 30px !important;
         height: 30px !important;
@@ -1015,23 +1022,51 @@ canvas {
     
     /* Ensure dropdown is accessible */
     #forecastStationSelect {
-        margin-left : 0 !important;
+        left : 0 !important;
         width: 100%;
         max-width: 200px;
     }
     
     /* Adjust best time card */
-    .best-time-card {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 15px;
+     .best-time-card {
+        flex-direction: row !important;  /* Force row layout instead of column */
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 12px 16px !important;
+        gap: 8px !important;
+        flex-wrap: nowrap !important;  /* Prevent wrapping */
     }
     
-    .best-time-info {
-        width: 100%;
+     .best-time-info {
+        flex: 1 !important;
+        min-width: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        width: auto !important;  /* Override the width: 100% */
     }
     
+    .best-time-text {
+        flex: 1 !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+    
+    .best-time-text strong {
+        font-size: 13px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        white-space: nowrap !important;
+    }
+     .btn-plan {
+        padding: 4px 12px !important;
+        font-size: 11px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;  /* Prevent button from shrinking */
+        margin-left: auto !important;  /* Push button to the right */
+    }
+
     .btn-plan {
         align-self: flex-start;
     }
@@ -1064,10 +1099,7 @@ canvas {
         font-size: 12px;
     }
     
-    /* Chart container */
-    .chart-container {
-      width: 300px;
-    }
+  
     
     /* Congestion section */
     .congestion {
@@ -1087,6 +1119,8 @@ canvas {
 
 /* Extra small devices (phones under 480px) */
 @media screen and (max-width: 480px) {
+
+    
     .bottom-nav-items {
         gap: 4px;
     }
@@ -1265,6 +1299,32 @@ canvas {
 
 /* Mobile adjustments */
 @media screen and (max-width: 768px) {
+
+    .locationModal {
+        width:90%;
+        max-width: 100px;
+        max-height: 85dvh; 
+    
+    }
+
+    .locationModal h2 {
+        font-size: 16px !important;
+    }
+
+    .locationModal p, span {
+        font-size: 10px !important;
+    }
+
+
+      .location-btn {
+        padding: 5px 10px !important;
+       
+        
+    }
+
+    .location-btn span {
+         font-size: 12px !important;
+    }
     .congestion-pill {
         padding: 3px 10px;
         font-size: 15px;
@@ -1281,8 +1341,6 @@ canvas {
 }
 
 /* ========== MOBILE-FRIENDLY CONGESTION PILLS - NO EMOJIS ========== */
-
-/* ========== ENLARGED STATUS PILLS - BETTER VISIBILITY ========== */
 
 .status-pill {
     display: inline-flex;
@@ -1701,12 +1759,7 @@ canvas {
     color: var(--text-dark);
 }
 
-/* Chart Container - Clean */
-.chart-container {
-    background: white;
-    border-radius: 16px;
-    padding: 10px;
-}
+
 
 /* Remove the shimmer animation and keep it clean */
 /* Remove the ::before pseudo-element from hero-card */
@@ -2282,10 +2335,64 @@ canvas {
     100% { content: ''; }
 }
 
+.chart-container {
+    height: 250px;
+    width: 100%;
+    max-width: 100%;
+    position: relative;
+    margin-top: 10px;
+    z-index: 1 !important;
+    clear: both !important;
+    overflow: hidden !important;
+}
+
+/* Force chart canvas to fit inside container */
+.chart-container canvas {
+    max-width: 100% !important;
+    height: auto !important;
+}
+
+@media screen and (min-width: 1024px) {
+   
+    
+    .chart-container {
+        height: 280px !important;
+        padding: 0 10px !important;
+    }
+
+     .main-content {
+        padding: 25px 50px !important;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .forecast-card {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    /* Make chart container wider */
+    .chart-container {
+        width: 100% !important;
+        min-height: 280px;
+    }
+}
+
+
+@media screen and (min-width: 1200px) {
+  
+    
+    .chart-container {
+        height: 300px !important;
+        padding: 0 20px !important;
+    }
+}
 /* ========== MOBILE RESPONSIVE ========== */
 
 /* Tablets */
 @media screen and (max-width: 768px) {
+  
+    
     .loading-container {
         padding: 30px 25px;
         max-width: 340px;
@@ -2534,6 +2641,20 @@ canvas {
         }
     }
 }
+
+/* Fix: Ensure Plan Route button is visible on desktop */
+.plan-route-btn-wrapper {
+    display: inline-flex !important;
+    flex-shrink: 0 !important;
+    margin-left: auto !important;
+}
+
+.plan-route-btn {
+    white-space: nowrap !important;
+}
+
+
+
 </style>
 </head>
 <body>
@@ -2715,7 +2836,7 @@ canvas {
 
 <!-- Location Request Modal -->
 <div id="locationModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; animation: fadeInModal 0.3s ease-out;">
-    <div style="background: white; border-radius: 24px; max-width: 420px; width: 90%; padding: 35px 30px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); text-align: center; position: relative; animation: slideUpModal 0.3s ease-out;">
+    <div class="locationModal" style="background: white; border-radius: 24px; max-width: 420px; width: 90%; padding: 35px 30px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); text-align: center; position: relative; animation: slideUpModal 0.3s ease-out;">
         
         <!-- Close button -->
         <button onclick="closeLocationModal()" style="position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 24px; color: #94A3B8; cursor: pointer; transition: 0.3s;">
@@ -2724,7 +2845,7 @@ canvas {
         
         <!-- Icon -->
         <div style="width: 80px; height: 80px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; border: 3px solid var(--accent-blue);">
-            <i class="fas fa-location-dot" style="font-size: 36px; color: var(--accent-blue);"></i>
+            <i class="fas fa-location-dot" style="font-size: 30px; color: var(--accent-blue);"></i>
         </div>
         
         <!-- Title -->
@@ -2733,34 +2854,34 @@ canvas {
         </h2>
         
         <!-- Description -->
-        <p style="color: var(--text-light); font-size: 15px; line-height: 1.6; margin-bottom: 25px;">
+        <p style="color: var(--text-light); font-size: 12px; line-height: 1.6; margin-bottom: 10px;">
             Allow MRT-ADAPT to access your location so we can show you the nearest station and personalized travel recommendations.
         </p>
         
         <!-- Benefits -->
-        <div style="background: #F8FAFC; border-radius: 12px; padding: 15px 20px; margin-bottom: 25px; text-align: left;">
+        <div style="background: #F8FAFC; border-radius: 12px; padding: 15px 20px; margin-bottom: 10px; text-align: left;">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                <i class="fas fa-check-circle" style="color: #22C55E; font-size: 16px;"></i>
+                <i class="fas fa-check-circle" style="color: #22C55E; font-size: 12px;"></i>
                 <span style="font-size: 13px; color: var(--text-dark);">Find nearest station automatically</span>
             </div>
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                <i class="fas fa-check-circle" style="color: #22C55E; font-size: 16px;"></i>
+                <i class="fas fa-check-circle" style="color: #22C55E; font-size: 12px;"></i>
                 <span style="font-size: 13px; color: var(--text-dark);">Get personalized congestion alerts</span>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
-                <i class="fas fa-check-circle" style="color: #22C55E; font-size: 16px;"></i>
+                <i class="fas fa-check-circle" style="color: #22C55E; font-size: 12px;"></i>
                 <span style="font-size: 13px; color: var(--text-dark);">Better travel recommendations</span>
             </div>
         </div>
         
         <!-- Buttons -->
-        <div style="display: flex; gap: 12px; flex-direction: column;">
+        <div class="location-btn" style="display: flex; gap: 12px; flex-direction: column;">
             <button onclick="allowLocation()" style="background: var(--accent-blue); color: white; border: none; padding: 14px 30px; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;">
                 <i class="fas fa-location-arrow"></i>
-                Allow Location Access
+                <span>Allow access</span>
             </button>
             <button onclick="skipLocationModal()" style="background: transparent; color: var(--text-light); border: 2px solid var(--border); padding: 12px 30px; border-radius: 12px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.3s ease; width: 100%;">
-                Skip for now
+                <span>Skip for now</span>
             </button>
         </div>
         
@@ -2815,19 +2936,26 @@ canvas {
             </div>
         </div>
 
-        <!-- Best Time Card -->
-        <div class="best-time-card">
-            <div class="best-time-info">
-                <div class="best-time-text">
-                   <strong id="bestStationName">    <i class="far fa-clock" style="padding-right:5px; padding-bottom: 20px;"></i>{{ favorite_station if favorite_station else 'North Ave' }}</strong> <br>
-                 <span id="bestTimeText" style="display: inline-block; white-space: nowrap;">
-    <span id="StationStatus">Please wait</span>
-</span>
-
+<div class="best-time-card">
+    <div class="best-time-info">
+        <div class="best-time-text">
+            <strong id="bestStationName">
+                <div class="best-time-header-row">
+                    <span><i class="far fa-clock" style="padding-right:5px;"></i>{{ favorite_station if favorite_station else 'North Ave' }}</span>
+                    <span class="plan-route-btn-wrapper">
+                        <button class="custom-btn plan-route-btn" onclick="window.location.href='/travel-plan'">
+                            <i class="fas fa-directions"></i> Plan Route
+                        </button>
+                    </span>
                 </div>
-            </div>
-            <button class="btn-plan" onclick="window.location.href='/travel-plan'">Plan Route</button>
+            </strong>
+            <br>
+            <span id="bestTimeText" style="display: block;">
+                <span id="StationStatus">Please wait</span>
+            </span>
         </div>
+    </div>
+</div>
 
      <div class="congestion">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
@@ -2852,25 +2980,22 @@ canvas {
         <!-- Forecast Card -->
       <!-- Forecast Card -->
 <!-- Forecast Card - Corrected Structure -->
-<!-- Forecast Card -->
 <div class="forecast-card">
     <div class="forecast-header" style="margin-bottom: 5px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px;">
-            <div style="flex: 1;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                    <div class="chartTitle" style="font-size: 14px; color: var(--text-dark); font-weight: bold;">
-                        {{ (favorite_station if favorite_station else 'NORTH AVE') }}: NEXT 6 HOURS
-                    </div>
-                    <select class="station-select" id="forecastStationSelect" onchange="changeStation(this.value)" style="margin: 0 !important;">
-                        {% for station in stations %}
-                        <option value="{{ station }}" {% if station == (favorite_station if favorite_station else 'North Ave') %}selected{% endif %}>{{ station }}</option>
-                        {% endfor %}
-                    </select>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; width: 100%;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div class="chartTitle" style="font-size: 14px; color: var(--text-dark); font-weight: bold;">
+                    {{ (favorite_station if favorite_station else 'NORTH AVE') }}: NEXT 6 HOURS
                 </div>
-                <h3 style="font-size: 10px; color: var(--text-light); margin-top: 8px; margin-bottom: 0; align-self: flex-end;">
+                <h3 style="font-size: 10px; color: var(--text-light); margin: 0;">
                     Predict crowd for {{ now.strftime('%B %d, %Y') }}
                 </h3>
             </div>
+            <select class="station-select" id="forecastStationSelect" onchange="changeStation(this.value)" style="margin: 0 !important; flex-shrink: 0;">
+                {% for station in stations %}
+                <option value="{{ station }}" {% if station == (favorite_station if favorite_station else 'North Ave') %}selected{% endif %}>{{ station }}</option>
+                {% endfor %}
+            </select>
         </div>
     </div>
    
@@ -2878,7 +3003,6 @@ canvas {
         <canvas id="forecastChart"></canvas>
     </div>
 </div>
-   
 
            
           
@@ -3286,12 +3410,17 @@ function createCongestionPill(percentage, size = 'xs') {
     return `<span class="congestion-pill congestion-${level} ${sizeClass}">${text}</span>`;
 }
 
+
+ const isMobile = window.innerWidth <= 768;
 // ========== UPDATE FORECAST CHART ==========
 function updateForecastChart(chartLabels, chartData, direction) {
     const ctx = document.getElementById('forecastChart');
     if (!ctx) return;
     
     if (chart) chart.destroy();
+    
+    const isMobile = window.innerWidth <= 768;
+    const isPhone = window.innerWidth <= 480;
     
     const lineColor = direction === 'north' ? '#3B82F6' : '#10B981';
     const bgColor = direction === 'north' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
@@ -3305,7 +3434,7 @@ function updateForecastChart(chartLabels, chartData, direction) {
                 data: chartData,
                 borderColor: lineColor,
                 backgroundColor: bgColor,
-                borderWidth: 3,
+                borderWidth: isMobile ? 2 : 3,
                 pointBackgroundColor: chartData.map(v => {
                     if (v > 80) return '#EF4444';
                     if (v > 60) return '#F97316';
@@ -3313,16 +3442,22 @@ function updateForecastChart(chartLabels, chartData, direction) {
                     return '#22C55E';
                 }),
                 pointBorderColor: 'white',
-                pointBorderWidth: 2,
-                pointRadius: 6,
+                pointBorderWidth: isMobile ? 1.5 : 2,
+                pointRadius: isMobile ? 6 : 7,
                 fill: true,
                 tension: 0.3
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
+            maintainAspectRatio: true,
+            aspectRatio: isPhone ? 1.5 : (isMobile ? 1.4 : 4),
             plugins: {
+                legend: {
+                    labels: {
+                        font: { size: isMobile ? 9 : 12 }
+                    }
+                },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
@@ -3337,11 +3472,30 @@ function updateForecastChart(chartLabels, chartData, direction) {
                 y: { 
                     beginAtZero: true, 
                     max: 100, 
-                    title: { display: true, text: 'Congestion (%)', font: { size: 11, weight: 'bold' } },
-                    ticks: { callback: (v) => v + '%' }
+                    title: { 
+                        display: !isPhone,  // Hide y-axis title on phones
+                        text: 'Congestion (%)', 
+                        font: { size: isMobile ? 9 : 11, weight: 'bold' } 
+                    },
+                    ticks: { 
+                        callback: (v) => v + '%',
+                        font: { size: isMobile ? 8 : 11 },
+                        maxTicksLimit: isMobile ? 6 : 9
+                    }
                 },
                 x: {
-                    title: { display: true, text: 'Time', font: { size: 11, weight: 'bold' } }
+                    title: { 
+                        display: !isPhone,  // Hide x-axis title on phones
+                        text: 'Time', 
+                        font: { size: isMobile ? 9 : 11, weight: 'bold' } 
+                    },
+                    ticks: {
+                        font: { size: isMobile ? 8 : 11 },
+                        maxRotation: isMobile ? 45 : 0,
+                        minRotation: isMobile ? 30 : 0,
+                        autoSkip: true,
+                        maxTicksLimit: isMobile ? 9 : 12
+                    }
                 }
             }
         }

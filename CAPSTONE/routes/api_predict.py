@@ -298,6 +298,83 @@ def debug_cache_keys(station_name):
         'total_found': len(keys)
     })
  
+ 
+@api_predict_bp.route('/debug/historical-patterns/<station_name>')
+def historical_patterns(station_name):
+    """Check actual historical patterns for comparison"""
+    from services.feature_engineering import get_station_dataframe
+    import numpy as np
+    
+    station = station_name.replace('%20', ' ')
+    results = {}
+    
+    # Get actual predictions for this station
+    north_preds = {}
+    south_preds = {}
+    now = Config.get_current_time()
+    
+    for direction in ['Northbound', 'Southbound']:
+        df = get_station_dataframe(station, direction)
+        if df is not None:
+            # Get average by hour from 2022-2024
+            hourly_avg = df.groupby(df.index.hour)['TotalPassenger'].mean()
+            hourly_std = df.groupby(df.index.hour)['TotalPassenger'].std()
+            
+            # Convert to congestion using p95
+            p95 = P95_CACHE.get(f"{station}_{direction}")
+            if p95 is None:
+                p95 = np.percentile(df['TotalPassenger'].values, 95)
+            
+            results[direction] = {
+                "hourly_avg_congestion": {
+                    f"{hour}:00": round((hourly_avg[hour] / p95) * 100, 1)
+                    for hour in range(6, 22) if hour in hourly_avg.index
+                },
+                "expected_rush_hour": "7-9 AM" if direction == "Southbound" else "5-7 PM"
+            }
+            
+            # Get model predictions for comparison
+            for hour in range(6, 22):
+                test_time = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+                if direction == 'Northbound':
+                    north_preds[f"{hour}:00"] = get_directional_prediction(station, 'Northbound', test_time)
+                else:
+                    south_preds[f"{hour}:00"] = get_directional_prediction(station, 'Southbound', test_time)
+    
+    return jsonify({
+        "station": station,
+        "historical_patterns": results,
+        "your_predictions": {
+            "northbound": {h: round(v,1) for h,v in north_preds.items()},
+            "southbound": {h: round(v,1) for h,v in south_preds.items()}
+        }
+    })
+    
+@api_predict_bp.route('/debug/model-weights/<station_name>')
+def debug_model_weights(station_name):
+    """Check if model weights are balanced"""
+    station = station_name.replace('%20', ' ')
+    directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
+    
+    results = {}
+    for direction in ['Northbound', 'Southbound']:
+        model_key = f"{station}_{direction}"
+        if model_key in directional_models:
+            model = directional_models[model_key]
+            # Get weights of the last layer
+            weights = model.get_weights()
+            results[direction] = {
+                "layer_count": len(weights),
+                "last_layer_shape": weights[-1].shape if weights else None,
+                "weight_stats": {
+                    "mean": float(weights[-1].mean()) if weights else None,
+                    "std": float(weights[-1].std()) if weights else None,
+                    "min": float(weights[-1].min()) if weights else None,
+                    "max": float(weights[-1].max()) if weights else None
+                } if weights else None
+            }
+    
+    return jsonify(results)
 
 @api_predict_bp.route('/debug/override-status')
 def debug_override_status():
@@ -380,10 +457,11 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
         # ========== GET RAW PASSENGER COUNT ==========
         passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
         
-       # Apply correction factor (if any)
+        # Apply correction factor (if any)
         factor = CORRECTION_FACTORS.get(model_key, 1.0)
         passenger_count = passenger_count * factor
-                
+        passenger_count = max(0, passenger_count)  # Ensure non-negative
+        
         # ========== CONGESTION CALCULATION - USING HISTORICAL PERCENTILE ==========
         p95 = P95_CACHE.get(model_key)
         if p95 is None:
@@ -392,11 +470,14 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
             if hourly is not None and len(hourly) > 0:
                 p95 = np.percentile(hourly['TotalPassenger'].values, 95)
             else:
+                # Use a reasonable default based on capacity
                 p95 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-        congestion = (passenger_count / p95) * 100
-        congestion = max(0, min(congestion, 100))
         
-        # Determine congestion level
+        # Calculate congestion as percentage of p95
+        congestion = (passenger_count / p95) * 100
+        congestion = max(0, min(congestion, 100))  # Clamp to 0-100
+        
+        # Determine congestion level (for debugging)
         if congestion >= 80:
             level = "SEVERE - Extremely busy"
         elif congestion >= 60:
@@ -406,15 +487,15 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
         else:
             level = "LIGHT - Not busy at all"
         
-        # Debug output
-        #print(f"\n========== PREDICTION ==========")
-        #print(f"Station: {station_name} {direction} @ {target_datetime.strftime('%H:%M')}")
-        #print(f"Raw output: {raw_output:.4f}")
-        #print(f"Passengers: {passenger_count:.0f}")
-        #print(f"95th Percentile: {p95:.0f} (if available)")
-        #print(f"Congestion: {congestion:.1f}%")
-        #print(f"Status: {level}")
-        #print("================================\n")
+        # Debug output (commented out to avoid log spam)
+        # print(f"\n========== PREDICTION ==========")
+        # print(f"Station: {station_name} {direction} @ {target_datetime.strftime('%H:%M')}")
+        # print(f"Raw output: {raw_output:.4f}")
+        # print(f"Passengers: {passenger_count:.0f}")
+        # print(f"95th Percentile: {p95:.0f}")
+        # print(f"Congestion: {congestion:.1f}%")
+        # print(f"Status: {level}")
+        # print("================================\n")
         
         return congestion
         
@@ -830,11 +911,7 @@ def _get_directional_prediction_with_details(station_name, direction, target_dat
         if features is None:
             return result
         
-        # ========== FIX: DO NOT re-scale features ==========
-        # features are already scaled by get_feature_sequence_for_station
-        # Just reshape for the model
         target_scaler = directional_scalers.get(f'{model_key}_target')
-        
         if target_scaler is None:
             return result
         
@@ -850,15 +927,11 @@ def _get_directional_prediction_with_details(station_name, direction, target_dat
         
         # Apply correction factor (matches main function)
         factor = CORRECTION_FACTORS.get(model_key, 1.0)
-        print(f"🔍 DEBUG MAIN: {station_name} {direction}")
-        print(f"   Raw passengers: {passenger_count:.0f}")
-        print(f"   Correction factor: {factor:.3f}")
         passenger_count = passenger_count * factor
-        print(f"   Corrected passengers: {passenger_count:.0f}")
+        passenger_count = max(0, passenger_count)  # Ensure non-negative
         
         # ========== CONGESTION CALCULATION - USING CACHED 95th PERCENTILE ==========
         p95 = P95_CACHE.get(model_key)
-        print(f"   p95: {p95:.0f}")
         if p95 is None:
             hourly = get_station_dataframe(station_name, direction)
             if hourly is not None and len(hourly) > 0:
@@ -870,7 +943,7 @@ def _get_directional_prediction_with_details(station_name, direction, target_dat
         congestion = max(0, min(congestion, 100))
         
         result["congestion"] = congestion
-        result["passengers"] = passenger_count  # This is the corrected passenger count
+        result["passengers"] = passenger_count
         result["raw_output"] = raw_output
         
     except Exception as e:
@@ -1225,7 +1298,6 @@ def directional_forecast_all():
         }
     
     return jsonify(result)
-
 @api_predict_bp.route('/debug-model-output/<station_name>')
 def debug_model_output(station_name):
     """Check raw model output for different times - FIXED with capacity"""
@@ -1259,6 +1331,10 @@ def debug_model_output(station_name):
                 raw_output = directional_models[model_key].predict(input_sequence, verbose=0)
                 raw_value = float(raw_output[0][0])
                 
+                # FIX: Define passenger_count before using it
+                passenger_count = float(target_scaler.inverse_transform([[raw_value]])[0][0])
+                
+                # Apply correction factor
                 factor = CORRECTION_FACTORS.get(model_key, 1.0)
                 passenger_count = passenger_count * factor
                 
@@ -1271,10 +1347,8 @@ def debug_model_output(station_name):
                     else:
                         p95 = MRT3_PLATFORM_CAPACITY.get(station, 100)
                         
-                congestion = (passenger_count / p95) *100
+                congestion = (passenger_count / p95) * 100
                 congestion = max(0, min(congestion, 100))
-                
-             
                 
                 results[f"{hour}:00_{direction}"] = {
                     "raw_model_output": round(raw_value, 4),
@@ -1284,34 +1358,8 @@ def debug_model_output(station_name):
                     "predicted_congestion": round(congestion, 1)
                 }
                 
-                
             except Exception as e:
                 results[f"{hour}:00_{direction}"] = {"error": str(e)}
-    
-    return jsonify(results)
-
-@api_predict_bp.route('/debug/test-congestion/<station_name>')
-def test_congestion(station_name):
-    """Test the congestion calculation using platform capacity"""
-    station = station_name.replace('%20', ' ')
-    
-    results = {
-        "station": station,
-        "capacity": MRT3_PLATFORM_CAPACITY.get(station, 1000),
-        "predictions": {}
-    }
-    
-    # Test predictions at different hours
-    test_hours = [6, 8, 12, 18, 21]
-    now = Config.get_current_time()
-    
-    for hour in test_hours:
-        test_time = now.replace(hour=hour, minute=0, second=0)
-        results["predictions"][f"{hour}:00"] = {}
-        
-        for direction in ['Northbound', 'Southbound']:
-            congestion = get_directional_prediction(station, direction, test_time)
-            results["predictions"][f"{hour}:00"][direction] = round(congestion, 1)
     
     return jsonify(results)
 

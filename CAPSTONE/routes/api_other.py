@@ -336,7 +336,7 @@ def live_map_directions_v2():
         # Check if MRT is closed for display
         current_time = now.hour + now.minute / 60
         is_closed = current_time < 4.5 or current_time >= 22.5
-
+        
         return jsonify({
             "northbound": northbound,
             "southbound": southbound,
