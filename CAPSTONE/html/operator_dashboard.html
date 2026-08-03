@@ -3367,7 +3367,7 @@ function hideLoadingOverlay() {
             return;
         }
         displayOperatorReports(flaggedReports);
-        showToast('🚩', `Showing ${flaggedReports.length} flagged report(s)`);
+        showToast('', `Showing ${flaggedReports.length} flagged report(s)`);
         
         const filterHeader = document.querySelector('.filter-header span');
         if (filterHeader && flaggedReports.length > 0) {
@@ -3885,7 +3885,6 @@ async function confirmArchiveBroadcast() {
 function resetReportsView() {
     // Show all reports (the full dataset)
     displayOperatorReports(allReportsData);
-    showToast('', 'Showing all reports');
 }
 
 // ========== SETUP FLAGGED CARD ==========
@@ -4917,7 +4916,7 @@ function displayOperatorReports(reports) {
                                 if (value > 80) level = 'SEVERE';
                                 else if (value > 60) level = 'CONGESTED';
                                 else if (value > 30) level = 'MODERATE';
-                                return `${level}: ${Math.round(value)}%`;
+                                return `${level}`;
                             }
                         }
                     }

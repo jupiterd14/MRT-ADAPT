@@ -2462,6 +2462,7 @@ try {
         });
 }
 
+
  function cancelRoute() {
     // Reset to current date (with 2025 year)
     const now = new Date();
@@ -2733,10 +2734,84 @@ function planRoute() {
     });
 }
 
+
+// Add this function to adjust text sizes dynamically
+function adjustMobileTextSizes() {
+    const isMobile = window.innerWidth <= 768;
+    
+    // Get all advisory cards and their text elements
+    const advisoryCards = document.querySelectorAll('.advisory-card');
+    
+    advisoryCards.forEach(card => {
+        // Adjust header titles
+        const headers = card.querySelectorAll('.advisory-header h4, [style*="font-weight: 700"]');
+        headers.forEach(el => {
+            if (isMobile) {
+                el.style.fontSize = '12px';
+            } else {
+                el.style.fontSize = '';
+            }
+        });
+        
+        // Adjust content text
+        const contentText = card.querySelectorAll('.advisory-content, [style*="font-size: 14px"]');
+        contentText.forEach(el => {
+            if (isMobile) {
+                el.style.fontSize = '11px';
+            } else {
+                el.style.fontSize = '';
+            }
+        });
+        
+        // Adjust any "BOARDING" labels
+        const labels = card.querySelectorAll('[style*="text-transform: uppercase"]');
+        labels.forEach(el => {
+            if (isMobile) {
+                el.style.fontSize = '9px';
+            } else {
+                el.style.fontSize = '';
+            }
+        });
+        
+        // Adjust numbers (ETA, time)
+        const numbers = card.querySelectorAll('[style*="font-weight: 700; font-size: 16px"]');
+        numbers.forEach(el => {
+            if (isMobile) {
+                el.style.fontSize = '13px';
+            } else {
+                el.style.fontSize = '';
+            }
+        });
+    });
+}
+
+// Call on load and resize
+document.addEventListener('DOMContentLoaded', function() {
+    // ... existing code ...
+    adjustMobileTextSizes();
+});
+
+window.addEventListener('resize', function() {
+    // Debounce the resize event
+    clearTimeout(window._resizeTimer);
+    window._resizeTimer = setTimeout(adjustMobileTextSizes, 200);
+});
+
 function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData, date, time, hour) {
     const container = document.getElementById('advisoriesContainer');
     container.innerHTML = '';
     container.classList.add('has-content');
+     const isMobile = window.innerWidth <= 768;
+    const statusSize = isMobile ? '14px' : '18px';
+    const titleSize = isMobile ? '13px' : '15px';
+    const subtitleSize = isMobile ? '10px' : '11px';
+    const numberSize = isMobile ? '14px' : '16px';
+    const boxPadding = isMobile ? '6px' : '10px';
+    const boxFontSize = isMobile ? '9px' : '10px';
+    const boxNumberSize = isMobile ? '13px' : '16px';
+    const messageSize = isMobile ? '13px' : '15px';
+    const tipSize = isMobile ? '11px' : '13px';
+    const iconSize = isMobile ? '14px' : '18px';
     
     // Calculate base travel time
     const fromIdx = stations.indexOf(from);
@@ -2809,34 +2884,27 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     advisory1.style.border = '1px solid #E2E8F0';
     advisory1.style.padding = '18px 20px';
     advisory1.style.minHeight = '120px';
-    advisory1.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <div style="background: #EFF6FF; padding: 8px 12px; border-radius: 10px;">
-                    <i class="fas fa-subway" style="color: #3B82F6; font-size: 18px;"></i>
-                </div>
-                <div>
-                    <div style="font-weight: 700; font-size: 15px; color: #1E293B;">BOARDING: ${from}</div>
-                    <div style="font-size: 11px; color: #64748B;">${time} · ${directionText} · ${stationDiff} stops</div>
-                </div>
-            </div>
-            <div style="text-align: right;">
-                <div style="font-size: 18px; font-weight: 700; color: ${fromStatus.color};">${fromStatus.text}</div>
-                <div style="font-size: 11px; color: #64748B;">${waitTime}</div>
-            </div>
+   advisory1.innerHTML = `
+    <div style="display: flex; align-items: center; gap: ${isMobile ? '8px' : '12px'};">
+        <div style="background: #EFF6FF; padding: ${isMobile ? '6px 10px' : '8px 12px'}; border-radius: 10px;">
+            <i class="fas fa-subway" style="color: #3B82F6; font-size: ${isMobile ? '14px' : '18px'};"></i>
         </div>
-        <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid #F1F5F9; display: flex; gap: 10px;">
-            <div style="flex:1; text-align:center; background:#F8FAFC; border: 1px solid grey; border-radius:8px; padding:10px;">
-                <div style="font-size:10px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">BOARDING</div>
-                <div style="font-weight:700; font-size:16px; color:${fromStatus.color};">${fromStatus.text}</div>
-            </div>
-            <div style="flex:1; text-align:center; background:#F8FAFC; border: 1px solid grey; border-radius:8px; padding:10px;">
-                <div style="font-size:10px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">ESTIMATED TRAVEL TIME</div>
-                <div style="font-weight:700; font-size:16px; color:#1E293B;">${adjustedTravelTime}min(s)~</div>
-            </div>
-            
+        <div>
+            <div style="font-weight: 700; font-size: ${titleSize}; color: #1E293B;">BOARDING: ${from}</div>
+            <div style="font-size: ${subtitleSize}; color: #64748B;">${time} · ${directionText} · ${stationDiff} stops</div>
         </div>
-    `;
+    </div>
+    <div style="margin-top: ${isMobile ? '10px' : '14px'}; padding-top: ${isMobile ? '10px' : '14px'}; border-top: 1px solid #F1F5F9; display: flex; gap: ${isMobile ? '6px' : '10px'};">
+        <div style="flex:1; text-align:center; background:#F8FAFC; border: 1px solid grey; border-radius:8px; padding: ${boxPadding};">
+            <div style="font-size: ${boxFontSize}; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">BOARDING</div>
+            <div style="font-weight:700; font-size: ${boxNumberSize}; color:${fromStatus.color};">${fromStatus.text}</div>
+        </div>
+        <div style="flex:1; text-align:center; background:#F8FAFC; border: 1px solid grey; border-radius:8px; padding: ${boxPadding};">
+            <div style="font-size: ${boxFontSize}; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">ESTIMATED TRAVEL TIME</div>
+            <div style="font-weight:700; font-size: ${boxNumberSize}; color:#1E293B;">${adjustedTravelTime}min(s)~</div>
+        </div>
+    </div>
+`;
     
     // ========== ADVISORY 2 - STATUS & TIP (EXPANDED HEIGHT) ==========
     const advisory2 = document.createElement('div');
@@ -2877,18 +2945,18 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     const shortMsg = getShortMessage(fromCongestion, from);
     const shortTip = getShortTip(fromCongestion);
     
-    advisory2.innerHTML = `
-        <div style="display: flex; align-items: flex-start; gap: 12px; color: ${textColor};">
-            <i class="fas ${fromCongestion > 80 ? 'fa-exclamation-triangle' : fromCongestion > 60 ? 'fa-exclamation-circle' : 'fa-info-circle'}" 
-               style="font-size: 18px; margin-top: 2px;"></i>
-            <div style="flex:1;">
-                <div style="font-size: 15px; font-weight: 600; line-height: 1.4;">${shortMsg}</div>
-                <div style="margin-top: 6px; font-size: 13px; opacity: 0.85; display: flex; align-items: center; gap: 6px;">
-                    <i class="fas fa-lightbulb" style="font-size: 12px;"></i> ${shortTip}
-                </div>
+   advisory2.innerHTML = `
+    <div style="display: flex; align-items: flex-start; gap: ${isMobile ? '8px' : '12px'}; color: ${textColor};">
+        <i class="fas ${fromCongestion > 80 ? 'fa-exclamation-triangle' : fromCongestion > 60 ? 'fa-exclamation-circle' : 'fa-info-circle'}" 
+           style="font-size: ${iconSize}; margin-top: 2px;"></i>
+        <div style="flex:1;">
+            <div style="font-size: ${messageSize}; font-weight: 600; line-height: 1.4;">${shortMsg}</div>
+            <div style="margin-top: 6px; font-size: ${tipSize}; opacity: 0.85; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-lightbulb" style="font-size: ${isMobile ? '10px' : '12px'};"></i> ${shortTip}
             </div>
         </div>
-    `;
+    </div>
+`;
     
     // ========== ADVISORY 3 - RUSH HOUR (EXPANDED HEIGHT) ==========
     const advisory3 = document.createElement('div');
@@ -2944,24 +3012,23 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
         year: 'numeric'
     });
     
-    advisory3.innerHTML = `
-        <div style="display: flex; align-items: flex-start; gap: 12px;">
-            <div style="background: ${rushColor}15; padding: 8px 10px; border-radius: 8px; border-left: 4px solid ${rushColor};">
-                <i class="fas fa-clock" style="color: ${rushColor}; font-size: 16px;"></i>
-            </div>
-            <div style="flex: 1;">
-                <div style="font-weight: 700; font-size: 14px; color: ${rushColor};">${rushLabel}</div>
-                <div style="font-size: 13px; color: #1E293B; margin-top: 2px;">${rushNote}</div>
-                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">
-                    <i class="fas fa-lightbulb" style="color: ${rushColor};"></i> ${rushAdvice}
-                </div>
+   advisory3.innerHTML = `
+    <div style="display: flex; align-items: flex-start; gap: ${isMobile ? '8px' : '12px'};">
+        <div style="background: ${rushColor}15; padding: ${isMobile ? '6px 8px' : '8px 10px'}; border-radius: 8px; border-left: 4px solid ${rushColor};">
+            <i class="fas fa-clock" style="color: ${rushColor}; font-size: ${isMobile ? '12px' : '16px'};"></i>
+        </div>
+        <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: ${isMobile ? '12px' : '14px'}; color: ${rushColor};">${rushLabel}</div>
+            <div style="font-size: ${isMobile ? '11px' : '13px'}; color: #1E293B; margin-top: 2px;">${rushNote}</div>
+            <div style="font-size: ${isMobile ? '10px' : '12px'}; color: #64748B; margin-top: 4px;">
+                <i class="fas fa-lightbulb" style="color: ${rushColor};"></i> ${rushAdvice}
             </div>
         </div>
-        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #F1F5F9; display: flex; justify-content: space-between; font-size: 11px; color: #64748B;">
-            <span><i class="fas fa-route"></i> ${from} → ${to}</span>
-          
-        </div>
-    `;
+    </div>
+    <div style="margin-top: ${isMobile ? '8px' : '12px'}; padding-top: ${isMobile ? '8px' : '12px'}; border-top: 1px solid #F1F5F9; display: flex; justify-content: space-between; font-size: ${isMobile ? '10px' : '11px'}; color: #64748B;">
+        <span><i class="fas fa-route"></i> ${from} → ${to}</span>
+    </div>
+`;
     
     container.appendChild(advisory1);
     container.appendChild(advisory2);

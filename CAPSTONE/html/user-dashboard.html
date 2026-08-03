@@ -2654,6 +2654,51 @@ canvas {
 }
 
 
+/* Fix chart container height on mobile */
+.chart-container {
+    height: 250px;
+    width: 100%;
+    max-width: 100%;
+    position: relative;
+    margin-top: 10px;
+    z-index: 1 !important;
+    clear: both !important;
+    overflow: hidden !important;
+    min-height: 200px; /* Add this */
+}
+
+/* Force chart canvas to fit inside container */
+.chart-container canvas {
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 200px !important; /* Add this */
+}
+
+/* Mobile fixes for chart */
+@media screen and (max-width: 768px) {
+    .chart-container {
+        height: 200px !important; /* Fixed height on mobile */
+        min-height: 200px !important;
+        padding: 0 5px !important;
+    }
+    
+    .chart-container canvas {
+        min-height: 180px !important;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .chart-container {
+        height: 180px !important;
+        min-height: 180px !important;
+        padding: 0 5px !important;
+    }
+    
+    .chart-container canvas {
+        min-height: 160px !important;
+    }
+}
+
 
 </style>
 </head>
@@ -3450,8 +3495,8 @@ function updateForecastChart(chartLabels, chartData, direction) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
-            aspectRatio: isPhone ? 1.5 : (isMobile ? 1.4 : 4),
+            maintainAspectRatio: false, // ← CHANGE THIS TO FALSE
+            // Remove aspectRatio completely, let CSS control height
             plugins: {
                 legend: {
                     labels: {
@@ -3473,7 +3518,7 @@ function updateForecastChart(chartLabels, chartData, direction) {
                     beginAtZero: true, 
                     max: 100, 
                     title: { 
-                        display: !isPhone,  // Hide y-axis title on phones
+                        display: !isPhone,
                         text: 'Congestion (%)', 
                         font: { size: isMobile ? 9 : 11, weight: 'bold' } 
                     },
@@ -3485,7 +3530,7 @@ function updateForecastChart(chartLabels, chartData, direction) {
                 },
                 x: {
                     title: { 
-                        display: !isPhone,  // Hide x-axis title on phones
+                        display: !isPhone,
                         text: 'Time', 
                         font: { size: isMobile ? 9 : 11, weight: 'bold' } 
                     },
@@ -3501,6 +3546,18 @@ function updateForecastChart(chartLabels, chartData, direction) {
         }
     });
 }
+
+// Handle window resize for chart
+let resizeTimeout;
+
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        if (cachedData && cachedData.forecastData) {
+            updateForecastUI(cachedData.forecastData);
+        }
+    }, 250);
+});
 
 function updateForecastUI(data) {
     if (!data || !data.forecasts || !Array.isArray(data.forecasts)) {

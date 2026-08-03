@@ -2635,63 +2635,72 @@ function filterAndDisplayReports() {
         });
     }
 
-    // ========== FETCH REPORTS ==========
-    function fetchReports() {
-        const reportsList = document.getElementById('reportsList');
-        reportsList.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading reports...</p></div>`;
-        
-        fetch('/api/reports')
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-                }
-                return res.json();
-            })
-            .then(data => {
-                console.log("========== FETCHED REPORTS ==========");
-                
-                let reports = [];
-                if (Array.isArray(data)) {
-                    reports = data;
-                    console.log("Total reports fetched:", reports.length);
-                } else {
-                    console.error("Unexpected response format:", data);
-                    reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Invalid response format from server</h3></div>`;
-                    return;
-                }
-                
-                if (reports.length === 0) {
-                    reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports yet</h3><p>Be the first to submit a report!</p></div>`;
-                    return;
-                }
-              
-                
-                allReportsData = reports;
-                console.log("All reportsdata log: ", reports);
-                
-                activeFilters = {
-                    dateRange: null,
-                    congestionLevels: [],
-                    stations: []
-                };
-                console.log("Active Filter here: ", activeFilters);
-                
-                document.querySelectorAll('.badge-filter').forEach(b => b.classList.remove('active-filter'));
-                document.querySelectorAll('#stationsGrid input').forEach(cb => cb.checked = true);
-                document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-                if (document.querySelector('.chip')) {
-                    document.querySelector('.chip').classList.add('active');
-                }
-                
-                displayReports(allReportsData);
-               
-            })
-            .catch(error => {
-                console.error("Error fetching reports:", error);
-                reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Failed to load reports</h3><p>${error.message}</p></div>`;
-            });
-    }
-
+  function fetchReports() {
+    const reportsList = document.getElementById('reportsList');
+    reportsList.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Loading reports...</p></div>`;
+    
+    fetch('/api/public-reports')
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            return res.json();
+        })
+        .then(data => {
+            console.log("========== FETCHED REPORTS ==========");
+            console.log("Raw response:", data);
+            
+            // ========== FIX: Handle both response formats ==========
+            let reports = [];
+            
+            // Check if data is an array (old format)
+            if (Array.isArray(data)) {
+                reports = data;
+                console.log("Response is array format");
+            } 
+            // Check if data has reports property (new format)
+            else if (data && typeof data === 'object' && Array.isArray(data.reports)) {
+                reports = data.reports;
+                console.log("Response is object with reports array");
+                console.log(`Total reports: ${data.total_reports || reports.length}`);
+            }
+            // Handle unexpected format
+            else {
+                console.error("Unexpected response format:", data);
+                reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Invalid response format from server</h3></div>`;
+                return;
+            }
+            
+            if (reports.length === 0) {
+                reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-edit"></i><h3>No reports yet</h3><p>Be the first to submit a report!</p></div>`;
+                return;
+            }
+            
+            console.log(`✅ Found ${reports.length} reports`);
+            allReportsData = reports;
+            
+            // Apply any active filters
+            activeFilters = {
+                dateRange: null,
+                congestionLevels: [],
+                stations: []
+            };
+            
+            // Reset filters to default state
+            document.querySelectorAll('.badge-filter').forEach(b => b.classList.remove('active-filter'));
+            document.querySelectorAll('#stationsGrid input').forEach(cb => cb.checked = true);
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            if (document.querySelector('.chip')) {
+                document.querySelector('.chip').classList.add('active');
+            }
+            
+            displayReports(allReportsData);
+        })
+        .catch(error => {
+            console.error("Error fetching reports:", error);
+            reportsList.innerHTML = `<div class="no-reports"><i class="fas fa-exclamation-circle"></i><h3>Failed to load reports</h3><p>${error.message}</p></div>`;
+        });
+}
   function displayReports(reports) {
 
      reports.sort((a, b) => b.id - a.id);

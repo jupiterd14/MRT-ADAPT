@@ -129,7 +129,7 @@ def debug_taft_recent():
             'reports': [{
                 'id': r.id,
                 'timestamp': r.timestamp.isoformat() if r.timestamp else None,
-                'is_flagged': getattr(r, 'is_flagged', False),
+                'is_flagged': getattr(r, 'flagged', False),
                 'flag_count': getattr(r, 'flag_count', 0),
                 'archived': getattr(r, 'archived', False),
                 'congestion': r.reported_congestion,
@@ -150,7 +150,7 @@ def debug_all_reports():
             result.append({
                 'id': report.id,
                 'station': report.station,
-                'is_flagged': getattr(report, 'is_flagged', 'NO_COLUMN'),
+                'is_flagged': getattr(report, 'flagged', 'NO_COLUMN'),
                 'flag_count': getattr(report, 'flag_count', 0),
                 'status': getattr(report, 'status', 'NO_COLUMN'),
                 'timestamp': report.timestamp.isoformat() if report.timestamp else None
@@ -160,7 +160,7 @@ def debug_all_reports():
             'total_reports': len(result),
             'reports': result,
             'columns_check': {
-                'has_is_flagged': hasattr(Report, 'is_flagged'),
+                'has_is_flagged': hasattr(Report, 'flagged'),
                 'has_flag_count': hasattr(Report, 'flag_count'),
                 'has_status': hasattr(Report, 'status')
             }
@@ -321,7 +321,7 @@ def debug_latest_report():
             'anonymous': latest.anonymous,
             'timestamp': latest.timestamp.isoformat() if latest.timestamp else None,
             'user_id': latest.user_id,
-            'is_flagged': getattr(latest, 'is_flagged', False),
+            'is_flagged': getattr(latest, 'flagged', False),
             'flag_count': getattr(latest, 'flag_count', 0),
             'has_user': latest.user is not None
         })
@@ -486,27 +486,147 @@ def report_congestion():
         traceback.print_exc()
         return jsonify({"success": False, "error": f"Server error: {str(e)}"}), 500
     
-
-@api_reports_bp.route('/reports', methods=['GET'])
-def get_reports():
+# Add this debug route to check
+@api_reports_bp.route('/debug/check-image/<filename>')
+def debug_check_image(filename):
+    import os
+    from flask import current_app
+    
+    # Check multiple possible locations
+    possible_paths = [
+        os.path.join('static', 'uploads', 'reports', filename),
+        os.path.join('uploads', 'reports', filename),
+        os.path.join('static', 'uploads', filename),
+        os.path.join('uploads', filename),
+    ]
+    
+    results = {}
+    for path in possible_paths:
+        exists = os.path.exists(path)
+        results[path] = exists
+        if exists:
+            results['found_at'] = path
+            results['size'] = os.path.getsize(path)
+            break
+    
+    return jsonify({
+        'filename': filename,
+        'search_results': results,
+        'current_directory': os.getcwd(),
+        'static_exists': os.path.exists('static'),
+        'uploads_exists': os.path.exists(os.path.join('static', 'uploads', 'reports'))
+    })
+    
+@api_reports_bp.route('/uploads/reports/<filename>')
+def serve_upload(filename):
+    from flask import send_from_directory, abort, send_file
+    import os
+    from io import BytesIO
+    
+    upload_folder = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'reports')
+    
+    # Check if file exists
+    file_path = os.path.join(upload_folder, filename)
+    if os.path.exists(file_path):
+        return send_from_directory(upload_folder, filename)
+    
+    # If file doesn't exist, return a placeholder image
+    # This prevents 404 errors in the frontend
     try:
-        reports = Report.query.order_by(Report.timestamp.desc()).all()
-            
-        result = []
+        from PIL import Image, ImageDraw
+        img = Image.new('RGB', (300, 200), color=(240, 240, 240))
+        draw = ImageDraw.Draw(img)
+        draw.text((100, 80), "No Image", fill=(150, 150, 150))
+        draw.text((80, 110), "Report Photo", fill=(150, 150, 150))
+        img_io = BytesIO()
+        img.save(img_io, 'PNG')
+        img_io.seek(0)
+        return send_file(img_io, mimetype='image/png')
+    except:
+        # If PIL not installed, return a simple SVG
+        svg = '''<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="300" height="200" fill="#f0f0f0"/>
+            <text x="150" y="100" font-family="Arial" font-size="20" fill="#999" text-anchor="middle">No Image</text>
+            <text x="150" y="130" font-family="Arial" font-size="14" fill="#999" text-anchor="middle">Report Photo</text>
+        </svg>'''
+        return send_file(BytesIO(svg.encode()), mimetype='image/svg+xml')
+
+@api_reports_bp.route('/debug/route-check', methods=['GET'])
+def debug_route_check():
+    """Check what routes are registered for reports"""
+    from flask import current_app
+    
+    routes = []
+    for rule in current_app.url_map.iter_rules():
+        if 'reports' in str(rule):
+            routes.append({
+                'path': str(rule),
+                'endpoint': rule.endpoint,
+                'methods': list(rule.methods),
+                'blueprint': rule.endpoint.split('.')[0] if '.' in rule.endpoint else 'none'
+            })
+    
+    return jsonify({
+        'report_routes': routes,
+        'total_routes': len(routes)
+    })
+    
+    
+@api_reports_bp.route('/public-reports', methods=['GET'])
+def get_reports():
+    """Get all reports - Public endpoint"""
+    try:
+        print("=" * 50)
+        print("📊 GET /api/reports called")
         
+        reports = Report.query.order_by(Report.timestamp.desc()).all()
+        
+        result = []
         for report in reports:
+            # Parse photo paths if they exist
+            photo_paths = []
+            if report.photo_path:
+                try:
+                    if isinstance(report.photo_path, str) and report.photo_path.startswith('['):
+                        photo_paths = json.loads(report.photo_path)
+                    elif isinstance(report.photo_path, str) and report.photo_path:
+                        photo_paths = [report.photo_path]
+                    elif isinstance(report.photo_path, list):
+                        photo_paths = report.photo_path
+                except:
+                    photo_paths = []
+            
             result.append({
                 'id': report.id,
                 'station': report.station,
-                'status': getattr(report, 'status', 'NO_COLUMN'),
-                'timestamp': report.timestamp.isoformat() if report.timestamp else None
+                'direction': report.direction,
+                'reported_congestion': report.reported_congestion,
+                'predicted_congestion': report.predicted_congestion,
+                'remarks': report.remarks,
+                'photo_paths': photo_paths,
+                'photo_path': report.photo_path,  # Keep for backward compatibility
+                'anonymous': report.anonymous,
+                'timestamp': report.timestamp.isoformat() if report.timestamp else None,
+                'status': getattr(report, 'status', 'active'),
+                'flagged': getattr(report, 'flagged', False),
+                'flag_count': getattr(report, 'flag_count', 0),
+                'user_id': report.user_id
             })
-            return jsonify({
-                'total_reports': len(result),
-                'reports': result,
-                    })
+        
+        response = jsonify({
+            'total_reports': len(result),
+            'reports': result,
+        })
+        
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+        
     except Exception as e:
-            return jsonify({'error': str(e)}), 500
+        print(f"❌ Error in /reports: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    
 
 
 @api_reports_bp.route('/reports/<int:report_id>/flag', methods=['POST'])
@@ -523,7 +643,7 @@ def flag_report(report_id):
         report.flag_count = (report.flag_count or 0) + 1
         
         if report.flag_count >= 3:
-            report.is_flagged = True
+            report.flagged = True
             report.flagged_at = Config.get_current_time()
             report.status = 'pending'
         
@@ -552,7 +672,7 @@ def flag_report_user(report_id):
         
         # Auto-hide after 3 flags
         if report.flag_count >= 3:
-            report.is_flagged = True
+            report.flagged = True
             report.flagged_at = Config.get_current_time()  # Use Config for consistent year
             report.status = 'pending'  # Needs admin review
             print(f"🔴 Report {report_id} automatically hidden after {report.flag_count} flags")
