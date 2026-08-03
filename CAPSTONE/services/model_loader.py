@@ -49,7 +49,7 @@ def debug_prediction(station, direction, features):
     # 4. Get the actual model and scaler
     model = directional_models[model_key]
     feature_scaler = directional_scalers[feature_key]
-    target_scaler = directional_scalers.get(target_key)  # Might be None
+    target_scaler = directional_scalers.get(target_key)
     
     # 5. Check input features BEFORE scaling
     print(f"\n4. Input features shape: {features.shape}")
@@ -62,7 +62,7 @@ def debug_prediction(station, direction, features):
     print(f"   First row, first 5 values: {features_scaled[0, :5]}")
     print(f"   Min/Max scaled: {features_scaled.min():.3f} / {features_scaled.max():.3f}")
     
-    # 7. Check if scaling worked (should be roughly 0-1 range)
+    # 7. Check if scaling worked
     if features_scaled.max() > 5 or features_scaled.min() < -5:
         print(f"   ⚠️ WARNING: Scaling seems off! Range too large")
     
@@ -80,7 +80,7 @@ def debug_prediction(station, direction, features):
         print(f"   After inverse transform: {pred_congestion}")
     else:
         print(f"\n7. No target scaler! Converting directly...")
-        pred_congestion = pred_scaled[0][0] * 100  # Fixed: multiply by 100
+        pred_congestion = pred_scaled[0][0] * 100
         print(f"   Raw output * 100: {pred_congestion}")
     
     # 10. Clip to valid range
@@ -89,24 +89,6 @@ def debug_prediction(station, direction, features):
     print(f"\n8. FINAL PREDICTION: {pred_congestion:.1f}%")
     
     return pred_congestion
-
-def fix_target_scalers_to_percentage():
-    """
-    DEPRECATED: This was the wrong fix!
-    Fix target scalers to convert model output (0-1) to percentages (0-100)
-    This ensures predictions are in the 0-100% range
-    """
-    global directional_scalers
-    
-    fixed_count = 0
-    skipped_count = 0
-    
-    print("\n" + "="*50)
-    print("⚠️ DEPRECATED: fix_target_scalers_to_percentage() is the WRONG fix!")
-    print("   Use fix_target_scalers_to_passenger_counts() instead")
-    print("="*50)
-    
-    return 0
 
 def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_v8'):
     global directional_models, directional_scalers
@@ -155,20 +137,16 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
                 if os.path.exists(feature_scaler_path):
                     with open(feature_scaler_path, 'rb') as f:
                         directional_scalers[f'{model_key}_feature'] = pickle.load(f)
-                    print(f"    ✅ Loaded feature scaler")
                 else:
                     print(f"    ⚠️ Feature scaler not found: {feature_scaler_path}")
                 
-                # Load target scaler
+                # Load target scaler - KEEP ORIGINAL, DON'T MODIFY
                 if os.path.exists(target_scaler_path):
                     with open(target_scaler_path, 'rb') as f:
                         directional_scalers[f'{model_key}_target'] = pickle.load(f)
-                    print(f"    ✅ Loaded target scaler")
                 else:
                     print(f"    ⚠️ Target scaler not found: {target_scaler_path}")
                     print(f"    Will use fallback: multiply by 100")
-                
-                print(f"  ✅ Loaded {model_key}")
                 
             except Exception as e:
                 print(f"  ❌ Error loading {model_key}: {e}")
@@ -178,169 +156,17 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
     print(f"\n✅ Loaded {len(directional_models)} directional models")
     print(f"✅ Loaded {len(directional_scalers)} scalers")
     
-    # Show which target scalers were loaded
+    # Show target scaler info
     target_scalers = [k for k in directional_scalers.keys() if k.endswith('_target')]
     print(f"✅ Target scalers loaded: {len(target_scalers)}")
     if target_scalers:
         print(f"   Examples: {target_scalers[:3]}")
+        # Show the actual range of the first target scaler
+        first_scaler = directional_scalers[target_scalers[0]]
+        if hasattr(first_scaler, 'data_min_') and hasattr(first_scaler, 'data_max_'):
+            print(f"   First scaler range: {float(first_scaler.data_min_[0]):.1f} to {float(first_scaler.data_max_[0]):.1f}")
     
     return directional_models, directional_scalers
-
-def fix_target_scalers_to_passenger_counts(STATIONS):
-    """
-    Fix target scalers to output passenger counts (0-8000) instead of percentages (0-100)
-    This is the CORRECT fix for models trained on passenger counts
-    """
-    global directional_scalers
-    from sklearn.preprocessing import MinMaxScaler
-    import numpy as np
-    
-    print("\n" + "="*60)
-    print("🔧 FIXING TARGET SCALERS TO PASSENGER COUNTS")
-    print("="*60)
-    
-    fixed_count = 0
-    skipped_count = 0
-    
-    for station in STATIONS:
-        for direction in ['Northbound', 'Southbound']:
-            model_key = f"{station}_{direction}"
-            target_key = f"{model_key}_target"
-            
-            if target_key in directional_scalers:
-                # Get the current scaler
-                current_scaler = directional_scalers[target_key]
-                
-                # Check if it's already a passenger scaler (max > 100)
-                if hasattr(current_scaler, 'data_max_'):
-                    current_max = float(current_scaler.data_max_[0])
-                    
-                    # If max > 100, it's already a passenger scaler
-                    if current_max > 100:
-                        skipped_count += 1
-                        print(f"   ⏭️  {target_key} already passenger scaler (max={current_max:.0f})")
-                        continue
-                
-                # Get the station capacity from MRT3_PLATFORM_CAPACITY
-                try:
-                    # Try to import from config or routes
-                    from services.feature_engineering import MRT3_PLATFORM_CAPACITY
-                    capacity = MRT3_PLATFORM_CAPACITY.get(station, 1142)
-                except:
-                    # Fallback capacities
-                    capacities = {
-                        "North Ave": 1142, "Quezon Ave": 1195, "Kamuning": 1364,
-                        "Cubao": 1747, "Santolan": 1306, "Ortigas": 1331,
-                        "Shaw Blvd": 1619, "Boni Ave": 1417, "Guadalupe": 1301,
-                        "Buendia": 1645, "Ayala Ave": 1222, "Magallanes": 1202,
-                        "Taft": 720
-                    }
-                    capacity = capacities.get(station, 1142)
-                
-                # Calculate max passengers based on capacity
-                # Models were trained on 2022-2024 data with max ~5000-6000 passengers
-                # Use 6x capacity as safe upper bound, capped at 8000
-                max_passengers = min(int(capacity * 6), 8000)
-                
-                # Ensure minimum of 1000 passengers
-                max_passengers = max(max_passengers, 1000)
-                
-                # Create new scaler for passenger counts
-                new_scaler = MinMaxScaler()
-                # Fit to 0 to max_passengers
-                dummy_data = np.array([[0], [max_passengers]])
-                new_scaler.fit(dummy_data)
-                
-                # Store the min/max info
-                new_scaler.data_min_ = np.array([0.0])
-                new_scaler.data_max_ = np.array([float(max_passengers)])
-                new_scaler.scale_ = np.array([1.0 / max_passengers])
-                new_scaler.min_ = np.array([0.0])
-                
-                # Replace the scaler
-                directional_scalers[target_key] = new_scaler
-                fixed_count += 1
-                print(f"   ✅ Fixed {target_key}: 0 → {max_passengers} passengers")
-    
-    print(f"\n✅ Fixed {fixed_count} target scalers to passenger counts")
-    if skipped_count > 0:
-        print(f"   ⏭️  Skipped {skipped_count} scalers (already passenger scalers)")
-    
-    return fixed_count
-
-def fix_target_scalers_to_passenger_counts_auto(STATIONS):
-    """Auto-fix scalers using raw training data"""
-    global directional_scalers
-    from sklearn.preprocessing import MinMaxScaler
-    import numpy as np
-    
-    print("\n" + "="*60)
-    print("🔧 AUTO-FIXING TARGET SCALERS USING RAW DATA")
-    print("="*60)
-    
-    from services.feature_engineering import load_data_fast
-    df = load_data_fast()
-    
-    station_numbers = {
-        "North Ave": 1, "Quezon Ave": 2, "Kamuning": 3, "Cubao": 4,
-        "Santolan": 5, "Ortigas": 6, "Shaw Blvd": 7, "Boni Ave": 8,
-        "Guadalupe": 9, "Buendia": 10, "Ayala Ave": 11, "Magallanes": 12,
-        "Taft": 13
-    }
-    
-    fixed_count = 0
-    
-    for station in STATIONS:
-        for direction in ['Northbound', 'Southbound']:
-            model_key = f"{station}_{direction}"
-            target_key = f"{model_key}_target"
-            
-            if target_key not in directional_scalers:
-                continue
-            
-            station_num = station_numbers.get(station)
-            
-            if station == "North Ave":
-                if direction == 'Northbound':
-                    station_df = df[df['StationExit'] == station_num].copy()
-                else:
-                    station_df = df[df['StationEntry'] == station_num].copy()
-            elif station == "Taft":
-                if direction == 'Northbound':
-                    station_df = df[df['StationEntry'] == station_num].copy()
-                else:
-                    station_df = df[df['StationExit'] == station_num].copy()
-            else:
-                if direction == 'Northbound':
-                    station_df = df[df['StationExit'] == station_num].copy()
-                else:
-                    station_df = df[df['StationEntry'] == station_num].copy()
-            
-            station_df = station_df[station_df['Direction'] == direction]
-            
-            if len(station_df) > 0:
-                actual_max = float(station_df['TotalPassenger'].max())
-                
-                # IMPORTANT: Use min=0, not actual_min
-                actual_min = 0.0
-                
-                print(f"   {model_key}: max={actual_max:.0f}")
-                
-                new_scaler = MinMaxScaler()
-                dummy_data = np.array([[actual_min], [actual_max]])
-                new_scaler.fit(dummy_data)
-                
-                new_scaler.data_min_ = np.array([actual_min])
-                new_scaler.data_max_ = np.array([actual_max])
-                new_scaler.scale_ = np.array([1.0 / (actual_max - actual_min)]) if actual_max > actual_min else np.array([1.0])
-                new_scaler.min_ = np.array([actual_min])
-                
-                directional_scalers[target_key] = new_scaler
-                fixed_count += 1
-                print(f"   ✅ Fixed {model_key}: {actual_min:.0f} → {actual_max:.0f}")
-    
-    print(f"\n✅ Fixed {fixed_count} target scalers")
-    return fixed_count
 
 def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY, 
                                historical_cache='historical_data_cache_2023_2024.pkl'):
@@ -450,17 +276,15 @@ print(f"✅ Loaded {len(directional_scalers)} scalers")
 target_scalers = [k for k in directional_scalers.keys() if 'target' in k.lower()]
 print(f"✅ Found {len(target_scalers)} target scalers")
 if target_scalers:
+    first_scaler = directional_scalers[target_scalers[0]]
+    if hasattr(first_scaler, 'data_min_') and hasattr(first_scaler, 'data_max_'):
+        print(f"   First scaler range: {float(first_scaler.data_min_[0]):.1f} to {float(first_scaler.data_max_[0]):.1f}")
     print(f"   Example target scaler: {target_scalers[0]}")
 
-# ========== CRITICAL FIX: Fix target scalers to passenger counts ==========
-# The models were trained on passenger counts, NOT percentages!
-# The scalers were incorrectly set to 0-100 (percentage) but should be 0-8000 (passengers)
+# ========== NO AUTO-FIX - Keep original scalers as they are ==========
 print("\n" + "="*50)
-print("🔧 APPLYING CRITICAL FIX: Converting scalers to passenger counts...")
+print("✅ Using original target scalers from model files (passenger counts)")
 print("="*50)
-
-print("\nUsing auto-fix with historical data...")
-fix_target_scalers_to_passenger_counts_auto(STATIONS)
 
 # Print final scaler info
 print("\n" + "="*50)
@@ -469,7 +293,7 @@ print("="*50)
 for key in directional_scalers.keys():
     if '_target' in key:
         scaler = directional_scalers[key]
-        if hasattr(scaler, 'data_max_'):
+        if hasattr(scaler, 'data_min_') and hasattr(scaler, 'data_max_'):
             print(f"  {key}: min={float(scaler.data_min_[0]):.1f}, max={float(scaler.data_max_[0]):.1f}")
 
 print("=" * 50)
