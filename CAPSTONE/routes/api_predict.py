@@ -783,19 +783,17 @@ def debug_test_time(station_name, hour):
             results["predictions"][direction] = round(congestion, 1)
     
     return jsonify(results)
-
 @api_predict_bp.route('/debug/simulate-day/<station_name>')
 def simulate_day(station_name):
     """
     Simulate predictions for a full day (24 hours) for a specific station.
-    Includes raw passenger counts from inverse transform.
+    Includes raw passenger counts from inverse transform and individual statuses per direction.
     """
     from services.feature_engineering import get_feature_sequence_for_station
     
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
-    
     
     # Use a specific date (June 26, 2025)
     test_date = datetime(2025, 6, 26)
@@ -806,6 +804,17 @@ def simulate_day(station_name):
         "capacity": MRT3_PLATFORM_CAPACITY.get(station, 1000),
         "predictions": []
     }
+    
+    # Helper function to get status
+    def get_status(cong):
+        if cong > 80:
+            return "SEVERE"
+        elif cong > 60:
+            return "CONGESTED"
+        elif cong > 30:
+            return "MODERATE"
+        else:
+            return "LIGHT"
     
     # Test every hour from 4 AM to 11 PM (operating hours)
     for hour in range(4, 24):  # 4 AM to 11 PM
@@ -822,14 +831,17 @@ def simulate_day(station_name):
             "northbound": {
                 "congestion": None,
                 "passengers": None,
-                "raw_model_output": None
+                "raw_model_output": None,
+                "status": None
             },
             "southbound": {
                 "congestion": None,
                 "passengers": None,
-                "raw_model_output": None
+                "raw_model_output": None,
+                "status": None
             },
-            "avg": None
+            "avg": None,
+            "status": None
         }
         
         if is_operating:
@@ -837,35 +849,46 @@ def simulate_day(station_name):
             north_result = _get_directional_prediction_with_details(station, 'Northbound', test_time)
             south_result = _get_directional_prediction_with_details(station, 'Southbound', test_time)
             
-            hour_data["northbound"]["congestion"] = round(north_result["congestion"], 1)
-            hour_data["northbound"]["passengers"] = round(north_result["passengers"], 0)
-            hour_data["northbound"]["raw_model_output"] = round(north_result["raw_output"], 4)
+            north_cong = north_result["congestion"]
+            south_cong = south_result["congestion"]
             
-            hour_data["southbound"]["congestion"] = round(south_result["congestion"], 1)
-            hour_data["southbound"]["passengers"] = round(south_result["passengers"], 0)
-            hour_data["southbound"]["raw_model_output"] = round(south_result["raw_output"], 4)
+            # Set northbound data with status
+            hour_data["northbound"] = {
+                "congestion": round(north_cong, 1),
+                "passengers": round(north_result["passengers"], 0),
+                "raw_model_output": round(north_result["raw_output"], 4),
+                "status": get_status(north_cong)
+            }
             
-            hour_data["avg"] = round((north_result["congestion"] + south_result["congestion"]) / 2, 1)
+            # Set southbound data with status
+            hour_data["southbound"] = {
+                "congestion": round(south_cong, 1),
+                "passengers": round(south_result["passengers"], 0),
+                "raw_model_output": round(south_result["raw_output"], 4),
+                "status": get_status(south_cong)
+            }
+            
+            # Calculate average
+            avg_cong = (north_cong + south_cong) / 2
+            hour_data["avg"] = round(avg_cong, 1)
+            
+            # Set average status (for reference)
+            hour_data["status"] = get_status(avg_cong)
         else:
-            hour_data["northbound"]["congestion"] = 0
-            hour_data["northbound"]["passengers"] = 0
-            hour_data["northbound"]["raw_model_output"] = 0
-            hour_data["southbound"]["congestion"] = 0
-            hour_data["southbound"]["passengers"] = 0
-            hour_data["southbound"]["raw_model_output"] = 0
+            hour_data["northbound"] = {
+                "congestion": 0,
+                "passengers": 0,
+                "raw_model_output": 0,
+                "status": "CLOSED"
+            }
+            hour_data["southbound"] = {
+                "congestion": 0,
+                "passengers": 0,
+                "raw_model_output": 0,
+                "status": "CLOSED"
+            }
             hour_data["avg"] = 0
             hour_data["status"] = "CLOSED"
-        
-        # Add status
-        if hour_data["avg"] is not None and hour_data["avg"] > 0:
-            if hour_data["avg"] > 80:
-                hour_data["status"] = "SEVERE"
-            elif hour_data["avg"] > 60:
-                hour_data["status"] = "CONGESTED"
-            elif hour_data["avg"] > 30:
-                hour_data["status"] = "MODERATE"
-            else:
-                hour_data["status"] = "LIGHT"
         
         results["predictions"].append(hour_data)
     
@@ -873,19 +896,49 @@ def simulate_day(station_name):
     operating_hours = [h for h in results["predictions"] if h["is_operating"] and h["avg"] is not None and h["avg"] > 0]
     if operating_hours:
         avgs = [h["avg"] for h in operating_hours]
+        
+        # Find peak hour
+        peak_idx = avgs.index(max(avgs))
+        peak_hour_data = operating_hours[peak_idx]
+        
         results["summary"] = {
-            "peak_hour": operating_hours[avgs.index(max(avgs))]["time"],
+            "peak_hour": peak_hour_data["time"],
             "peak_congestion": max(avgs),
-            "peak_passengers": max([h["northbound"]["passengers"] or 0 for h in operating_hours] + [h["southbound"]["passengers"] or 0 for h in operating_hours]),
+            "peak_passengers": max([
+                h["northbound"]["passengers"] or 0 for h in operating_hours
+            ] + [
+                h["southbound"]["passengers"] or 0 for h in operating_hours
+            ]),
             "average_congestion": round(sum(avgs) / len(avgs), 1),
             "min_congestion": min(avgs),
             "rush_hours": {
-                "morning_peak": [h for h in operating_hours if 7 <= h["hour"] <= 9],
-                "evening_peak": [h for h in operating_hours if 17 <= h["hour"] <= 19]
+                "morning_peak": [
+                    {
+                        "hour": h["hour"],
+                        "time": h["time"],
+                        "avg": h["avg"],
+                        "northbound": h["northbound"],
+                        "southbound": h["southbound"],
+                        "status": h["status"]
+                    }
+                    for h in operating_hours if 7 <= h["hour"] <= 9
+                ],
+                "evening_peak": [
+                    {
+                        "hour": h["hour"],
+                        "time": h["time"],
+                        "avg": h["avg"],
+                        "northbound": h["northbound"],
+                        "southbound": h["southbound"],
+                        "status": h["status"]
+                    }
+                    for h in operating_hours if 17 <= h["hour"] <= 19
+                ]
             }
         }
     
     return jsonify(results)
+
 #added 2
 def _get_directional_prediction_with_details(station_name, direction, target_datetime):
     """Helper function that returns both congestion and passenger count using percentile approach"""

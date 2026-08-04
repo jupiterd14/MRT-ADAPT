@@ -543,7 +543,7 @@ nav {
     font-weight: 400;
     color: var(--accent-blue);
     display: inline;
-    margin: 0 2px;
+    margin: 0;
     font-size: 12px;
 }
 
@@ -740,6 +740,110 @@ nav {
     font-weight: 500;
     letter-spacing: 0.3px;
     line-height: 1.2;
+}
+/* ========== VIEW MORE - PLAIN TEXT STYLE ========== */
+.view-more-btn {
+    color: var(--accent-blue) !important;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    display: inline-block;
+    margin: 0 2px;
+    transition: color 0.2s;
+    text-decoration: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+.view-more-btn:hover {
+    color: #2563EB !important;
+    text-decoration: underline;
+}
+
+.view-more-btn:active {
+    color: #1D4ED8 !important;
+}
+
+.view-more-btn i {
+    font-size: 10px;
+    margin-left: 2px;
+}
+
+/* Mobile specific styles */
+@media screen and (max-width: 768px) {
+
+     .alert-text p {
+        margin-bottom: 8px !important;  /* ← Add space before time */
+    }
+    
+    .alert-time {
+        font-size: 9px !important;
+        margin-top: 2px !important;  /* ← Small top margin */
+        padding-top: 4px !important;  /* ← Add some padding */
+        border-top: 1px solid rgba(0,0,0,0.05);  /* ← Optional: subtle separator */
+        display: flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+    }
+    
+    /* If you want the icon and text to be properly spaced */
+    .alert-time i {
+        margin-right: 2px !important;
+    }
+
+    .view-more-btn {
+        font-size: 12px !important;
+        padding: 0 !important;
+         min-height: auto !important;  /* ← Remove min-height */
+        min-width: auto !important;  /* ← Remove min-width */
+        margin: 0 !important;
+    }
+    
+    .view-more-btn i {
+        font-size: 10px !important;
+    }
+    
+    .alert-text .station-name {
+       font-size: 12px !important;
+        padding: 0 !important;  /* ← Remove padding */
+        display: inline !important;  /* ← Change to inline */
+        margin: 0 !important;  /* ← Remove margin */
+    }
+    
+    .alert-text p {
+        display: inline !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 2px !important;
+        line-height: 1.6 !important;
+    }
+}
+
+@media screen and (max-width: 480px) {
+
+     .alert-text p {
+        margin-bottom: 6px !important;
+    }
+    
+    .alert-time {
+        font-size: 8px !important;
+        margin-top: 2px !important;
+        padding-top: 3px !important;
+    }
+    .view-more-btn {
+        font-size: 11px !important;
+        padding: 4px 4px !important;
+        min-height: 28px !important;
+    }
+    
+    .alert-text .station-name {
+        font-size: 11px !important;
+        padding: 1px 3px !important;
+    }
 }
 
 </style>
@@ -1010,6 +1114,35 @@ nav {
     
         return alerts;
     }
+
+// ========== SIMPLE VIEW MORE TOGGLE - PLAIN TEXT ==========
+function toggleStations(alertId) {
+    const shortList = document.getElementById(`short-${alertId}`);
+    const fullList = document.getElementById(`full-${alertId}`);
+    const btn = document.getElementById(`btn-${alertId}`);
+    
+    if (!shortList || !fullList || !btn) return;
+    
+    // Add haptic feedback if available (mobile)
+    if (navigator.vibrate) {
+        navigator.vibrate(10);
+    }
+    
+    if (shortList.style.display !== 'none') {
+        // Hide short list, show full list
+        shortList.style.display = 'none';
+        fullList.style.display = 'inline';
+        btn.innerHTML = 'Show less <i class="fas fa-chevron-up"></i>';
+        btn.dataset.expanded = 'true';
+    } else {
+        // Show short list, hide full list
+        shortList.style.display = 'inline';
+        fullList.style.display = 'none';
+        const extra = btn.dataset.extra || 'more';
+        btn.innerHTML = `+${extra}`;
+        btn.dataset.expanded = 'false';
+    }
+}
 async function getCongestionAlerts() {
     const alerts = [];
     try {
@@ -1087,38 +1220,62 @@ async function getCongestionAlerts() {
         console.log('📊 Southbound grouping:', southbound);
         
         // Helper to format station list
-        function formatStationList(stations, severity) {
-            if (stations.length === 0) return '';
-            
-            let displayStations = stations;
-            let extraCount = 0;
-            if (stations.length > 5) {
-                displayStations = stations.slice(0, 5);
-                extraCount = stations.length - 5;
-            }
-            
-            const className = severity === 'severe' || severity === 'congested' ? 'critical' : 
-                             severity === 'moderate' ? 'moderate' : 'light';
-            const stationSpans = displayStations.map(s => 
-                `<span class="station-name ${className}">${s}</span>`
-            );
-            
-            let result = '';
-            if (stationSpans.length === 1) {
-                result = stationSpans[0];
-            } else if (stationSpans.length === 2) {
-                result = stationSpans.join(' and ');
-            } else {
-                const last = stationSpans.pop();
-                result = stationSpans.join(', ') + ', and ' + last;
-            }
-            
-            if (extraCount > 0) {
-                result += ` and ${extraCount} more station${extraCount > 1 ? 's' : ''}`;
-            }
-            return result;
-        }
-        
+   function formatStationList(stations, severity) {
+    if (stations.length === 0) return '';
+    
+    const className = severity === 'severe' || severity === 'congested' ? 'critical' : 
+                     severity === 'moderate' ? 'moderate' : 'light';
+    
+    // If 5 or fewer stations, show all
+    if (stations.length <= 5) {
+        const stationSpans = stations.map(s => 
+            `<span class="station-name ${className}">${s}</span>`
+        );
+        if (stationSpans.length === 1) return stationSpans[0];
+        if (stationSpans.length === 2) return stationSpans.join(' and ');
+        const last = stationSpans.pop();
+        return stationSpans.join(', ') + ', and ' + last;
+    }
+    
+    // More than 5 stations - show first 5 with "+X more"
+    const first5 = stations.slice(0, 5);
+    const extraCount = stations.length - 5;
+    const alertId = `station-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    
+    const firstSpans = first5.map(s => 
+        `<span class="station-name ${className}">${s}</span>`
+    );
+    
+    const allSpans = stations.map(s => 
+        `<span class="station-name ${className}">${s}</span>`
+    );
+    
+    // Build the HTML with toggle - NO extra spaces
+    let html = `<span id="short-${alertId}">`;
+    if (firstSpans.length === 1) html += firstSpans[0];
+    else if (firstSpans.length === 2) html += firstSpans.join(' and ');
+    else {
+        const last = firstSpans.pop();
+        html += firstSpans.join(', ') + ', and ' + last;
+    }
+    
+    // Add the "+X more" link with NO extra spaces
+    html += `<span id="btn-${alertId}" class="view-more-btn" data-extra="${extraCount}" onclick="toggleStations('${alertId}')"> +${extraCount} more</span>`;
+    html += `</span>`;
+    
+    // Full list (hidden by default)
+    html += `<span id="full-${alertId}" style="display:none;">`;
+    if (allSpans.length === 1) html += allSpans[0];
+    else if (allSpans.length === 2) html += allSpans.join(' and ');
+    else {
+        const last = allSpans.pop();
+        html += allSpans.join(', ') + ', and ' + last;
+    }
+    html += `<span class="view-more-btn" onclick="toggleStations('${alertId}')"> Show less <i class="fas fa-chevron-up"></i></span>`;
+    html += `</span>`;
+    
+    return html;
+}
         // Helper to format time
         function formatTime(timestamp) {
             const now = Date.now();
