@@ -340,17 +340,16 @@ def report_congestion():
         print(f"📋 Content-Type: {request.content_type}")
         print(f"📋 Request data: {request.get_data(as_text=True)}")
         
-        # TEMPORARILY DISABLE OPERATING HOURS CHECK FOR TESTING
-        # if not is_operating_hours():
-        #     next_open = get_next_opening_time()
-        #     return jsonify({
-        #         "success": False, 
-        #         "error": f"MRT-3 is currently closed. Operating hours are 4:30 AM - 10:30 PM. Reports can only be submitted during operating hours. Next opening: {next_open}"
-        #     }), 403
+        if not is_operating_hours():
+            next_open = get_next_opening_time()
+            return jsonify({
+                "success": False, 
+                "error": f"MRT-3 is currently closed. Operating hours are 4:30 AM - 10:30 PM. Reports can only be submitted during operating hours. Next opening: {next_open}"
+                }), 403
         
-        # TEMPORARILY DISABLE RATE LIMITING FOR TESTING
-        # if is_rate_limited(user_id, ip_address, limit=3, window=3600):
-        #     return jsonify({"success": False, "error": "You've reached the limit of 3 reports per hour."}), 429
+       
+        if is_rate_limited(user_id, ip_address, limit=3, window=3600):
+            return jsonify({"success": False, "error": "You've reached the limit of 3 reports per hour."}), 429
         
         station = None
         direction = None
