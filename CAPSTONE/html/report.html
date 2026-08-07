@@ -1894,6 +1894,7 @@ nav {
 <script>
     let selectedLevel = null;
     let selectedFiles = [];
+    const MAX_PHOTOS = 5;
     let reportsVisible = false;
     let allReportsData = [];
     
@@ -1904,10 +1905,6 @@ nav {
     };
     // Spam protection variables
     let isSubmitting = false;
-    let lastSubmitTime = 0;
-    const SUBMIT_COOLDOWN = 30000; // 30 seconds cooldown
-    let submitCount = 0;
-    let submitResetTimer = null;
     let selectedDirection = null; // 'northbound', 'southbound', or 'both'
     let currentFlagReportId = null;
     let currentFlagStationName = null;
@@ -1941,6 +1938,20 @@ console.log('🗑️ Cleared alert count cache');
     selectedLevel = level;
 }
 
+
+// ========== CHECK REMAINING REPORTS ==========
+async function checkRemainingReports() {
+    try {
+        const response = await fetch('/api/remaining-reports', {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        return data.remaining || 0;
+    } catch (error) {
+        console.error('Error checking remaining reports:', error);
+        return -1; // -1 means unknown
+    }
+}
     // ========== OPERATING HOURS ==========
     function isOperatingHours() {
         const now = new Date();
@@ -2183,80 +2194,7 @@ console.log('🗑️ Cleared alert count cache');
         document.getElementById(`dir-${direction}`).classList.add('selected');
     }
 
-    // ========== RATE LIMITS ==========
-    function loadRateLimits() {
-        const savedCount = localStorage.getItem('submitCount');
-        const savedTime = localStorage.getItem('lastSubmitTime');
-        const savedResetTime = localStorage.getItem('submitResetTime');
-        
-        if (savedCount) submitCount = parseInt(savedCount);
-        if (savedTime) lastSubmitTime = parseInt(savedTime);
-        
-        const now = Date.now();
-        if (lastSubmitTime && (now - lastSubmitTime) > 3600000) {
-            submitCount = 0;
-            lastSubmitTime = 0;
-            localStorage.removeItem('submitCount');
-            localStorage.removeItem('lastSubmitTime');
-            localStorage.removeItem('submitResetTime');
-        }
-    }
-
-    function saveRateLimits() {
-        localStorage.setItem('submitCount', submitCount);
-        localStorage.setItem('lastSubmitTime', lastSubmitTime);
-        if (submitResetTimer) {
-            localStorage.setItem('submitResetTime', submitResetTimer);
-        }
-    }
-
-    function canSubmitReport() {
-        const now = Date.now();
-        
-        loadRateLimits();
-        
-        if (isSubmitting) {
-            showToast('Please wait, your report is being submitted...', 'warning');
-            return false;
-        }
-        
-        if (now - lastSubmitTime < SUBMIT_COOLDOWN) {
-            const remainingSeconds = Math.ceil((SUBMIT_COOLDOWN - (now - lastSubmitTime)) / 1000);
-            showToast(`Please wait ${remainingSeconds} seconds before submitting another report.`, 'warning');
-            return false;
-        }
-        
-        if (submitResetTimer === null) {
-            const savedResetTime = localStorage.getItem('submitResetTime');
-            if (savedResetTime) {
-                const timeLeft = parseInt(savedResetTime) - now;
-                if (timeLeft > 0) {
-                    submitResetTimer = setTimeout(() => {
-                        submitCount = 0;
-                        submitResetTimer = null;
-                        localStorage.removeItem('submitCount');
-                        localStorage.removeItem('submitResetTime');
-                    }, timeLeft);
-                }
-            } else {
-                submitResetTimer = setTimeout(() => {
-                    submitCount = 0;
-                    submitResetTimer = null;
-                    localStorage.removeItem('submitCount');
-                    localStorage.removeItem('submitResetTime');
-                }, 3600000);
-                localStorage.setItem('submitResetTime', now + 3600000);
-            }
-        }
-        
-        if (submitCount >= 3) {
-            showToast('You have reached the limit of 3 reports per hour. Please try again later.', 'error');
-            return false;
-        }
-        
-        return true;
-    }
-
+   
     // ========== FILTER FUNCTIONS ==========
     function toggleFilterDropdown() {
         const dropdown = document.getElementById('filterDropdown');
@@ -2426,57 +2364,88 @@ function filterAndDisplayReports() {
     
     displayReports(filteredReports);
 }
-    function updateImagePreview() {
-        const previewContainer = document.getElementById('previewContainer');
-        const previewGrid = document.getElementById('imagePreviewGrid');
-        const photoCountSpan = document.getElementById('photoCount');
-        
-        if (selectedFiles.length === 0) {
-            previewGrid.style.display = 'none';
-            return;
-        }
-        
-        previewGrid.style.display = 'block';
-        photoCountSpan.textContent = selectedFiles.length;
-        
-        previewContainer.innerHTML = '';
-        selectedFiles.forEach((file, index) => {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const previewDiv = document.createElement('div');
-                previewDiv.style.position = 'relative';
-                previewDiv.style.width = '100%';
-                previewDiv.style.aspectRatio = '1';
-                
-                previewDiv.innerHTML = `
-                    <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid var(--border);">
-                    <button onclick="removePhoto(${index})" style="position: absolute; top: -8px; right: -8px; background: var(--red); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 12px;">
-                        <i class="fas fa-times"></i>
-                    </button>
-                `;
-                previewContainer.appendChild(previewDiv);
-            };
-            reader.readAsDataURL(file);
-        });
+   // ========== IMAGE PREVIEW FUNCTIONS ==========
+function updateImagePreview() {
+    console.log('🔄 updateImagePreview called, files:', selectedFiles.length);
+    
+    const previewContainer = document.getElementById('previewContainer');
+    const previewGrid = document.getElementById('imagePreviewGrid');
+    const photoCountSpan = document.getElementById('photoCount');
+    
+    if (!previewContainer || !previewGrid) {
+        console.error('❌ Preview elements not found!');
+        return;
     }
+    
+    if (selectedFiles.length === 0) {
+        previewGrid.style.display = 'none';
+        return;
+    }
+    
+    previewGrid.style.display = 'block';
+    photoCountSpan.textContent = selectedFiles.length;
+    previewContainer.innerHTML = '';
+    
+    selectedFiles.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const previewDiv = document.createElement('div');
+            previewDiv.style.position = 'relative';
+            previewDiv.style.width = '100%';
+            previewDiv.style.aspectRatio = '1';
+            previewDiv.style.borderRadius = '8px';
+            previewDiv.style.overflow = 'hidden';
+            previewDiv.style.border = '1px solid #E2E8F0';
+            previewDiv.style.background = '#F8FAFC';
+            
+            previewDiv.innerHTML = `
+                <img src="${e.target.result}" 
+                     style="width: 100%; height: 100%; object-fit: cover;"
+                     alt="Uploaded photo ${index + 1}">
+                <button onclick="removePhoto(${index})" 
+                        style="position: absolute; top: 4px; right: 4px; 
+                               background: #EF4444; color: white; border: none; 
+                               border-radius: 50%; width: 24px; height: 24px; 
+                               cursor: pointer; font-size: 12px; display: flex; 
+                               align-items: center; justify-content: center;
+                               box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                               transition: transform 0.2s;"
+                        onmouseover="this.style.transform='scale(1.1)'"
+                        onmouseout="this.style.transform='scale(1)'">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            previewContainer.appendChild(previewDiv);
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
-    function removePhoto(index) {
+function removePhoto(index) {
+    console.log(`🗑️ Removing photo at index ${index}`);
+    if (index >= 0 && index < selectedFiles.length) {
         selectedFiles.splice(index, 1);
+        console.log(`📊 Remaining files: ${selectedFiles.length}`);
+        // Refresh the entire preview
         updateImagePreview();
         updatePhotoUploadText();
+        // Reset the file input
         document.getElementById('imageInput').value = '';
     }
+}
 
-    function updatePhotoUploadText() {
-        const uploadSpan = document.querySelector('.photo-upload span');
-        if (selectedFiles.length > 0) {
-            uploadSpan.textContent = `📸 ${selectedFiles.length} photo(s) selected`;
-            uploadSpan.style.color = 'var(--accent-blue)';
-        } else {
-            uploadSpan.textContent = 'Click to select multiple photos (Max 5)';
-            uploadSpan.style.color = 'var(--text-light)';
-        }
+function updatePhotoUploadText() {
+    const uploadSpan = document.querySelector('.photo-upload span');
+    if (!uploadSpan) return;
+    
+    if (selectedFiles.length > 0) {
+        uploadSpan.textContent = ` ${selectedFiles.length} photo(s) selected`;
+        uploadSpan.style.color = '#3B82F6';
+    } else {
+        uploadSpan.textContent = 'Click to select multiple photos (Max 5)';
+        uploadSpan.style.color = '#64748B';
     }
+}
 
     // ========== TOGGLE REPORTS VIEW ==========
     function toggleReports() {
@@ -2557,83 +2526,98 @@ function filterAndDisplayReports() {
         if (modal) modal.classList.remove('active');
     }
 
-    function confirmSubmit() {
-        if (!canSubmitReport()) {
+    function canSubmitReport() {
+    // Check if already submitting
+    if (isSubmitting) {
+        showToast('Please wait, your report is being submitted...', 'warning');
+        return false;
+    }
+    return true;
+}
+
+function confirmSubmit() {
+    if (!canSubmitReport()) {
+        return;
+    }
+    
+    closeConfirmModal();
+    
+    const station = document.getElementById('stationSelect').value;
+    const remarks = document.getElementById('remarks').value;
+    
+    if (!selectedDirection) {
+        showToast('Please select a direction (Northbound, Southbound, or Both)', 'error');
+        return;
+    }
+    
+    let congestionValue = 0;
+    switch(selectedLevel) {
+        case 'low': congestionValue = 20; break;
+        case 'moderate': congestionValue = 45; break;
+        case 'congested': congestionValue = 70; break;
+        case 'severe': congestionValue = 90; break;
+        default:
+            showToast('Please select a congestion level', 'error');
             return;
-        }
+    }
+    
+    isSubmitting = true;
+    const submitBtn = document.querySelector('.submit-btn');
+    const originalBtnText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+    submitBtn.disabled = true;
+    
+    showToast('Submitting report...', 'info');
+    
+    const formData = new FormData();
+    formData.append('station', station);
+    formData.append('direction', selectedDirection);
+    formData.append('congestion', congestionValue);
+    formData.append('remarks', remarks || '');
+    formData.append('anonymous', 'false');
+    
+    selectedFiles.forEach((file) => {
+        formData.append('images', file);
+    });
+    
+    fetch('/api/report-congestion', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        isSubmitting = false;
+        submitBtn.innerHTML = originalBtnText;
+        submitBtn.disabled = false;
         
-        closeConfirmModal();
-        
-        const station = document.getElementById('stationSelect').value;
-        const remarks = document.getElementById('remarks').value;
-        
-        if (!selectedDirection) {
-            showToast('Please select a direction (Northbound, Southbound, or Both)', 'error');
-            return;
-        }
-        
-        let congestionValue = 0;
-        switch(selectedLevel) {
-            case 'low': congestionValue = 20; break;
-            case 'moderate': congestionValue = 45; break;
-            case 'congested': congestionValue = 70; break;
-            case 'severe': congestionValue = 90; break;
-            default:
-                showToast('Please select a congestion level', 'error');
-                return;
-        }
-        
-        isSubmitting = true;
-        const submitBtn = document.querySelector('.submit-btn');
-        const originalBtnText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
-        submitBtn.disabled = true;
-        
-        showToast('Submitting report...', 'info');
-        
-        const formData = new FormData();
-        formData.append('station', station);
-        formData.append('direction', selectedDirection);
-        formData.append('congestion', congestionValue);
-        formData.append('remarks', remarks || '');
-        formData.append('anonymous', 'false');
-        
-        selectedFiles.forEach((file) => {
-            formData.append('images', file);
-        });
-        
-        fetch('/api/report-congestion', {
-            method: 'POST',
-            body: formData
-        })
-        .then(res => res.json())
-        .then(data => {
-            isSubmitting = false;
-            submitBtn.innerHTML = originalBtnText;
-            submitBtn.disabled = false;
-            
-            if (data.success) {
-                lastSubmitTime = Date.now();
-                submitCount++;
-                saveRateLimits();
-                const message = selectedFiles.length > 0 
-                    ? `Report with ${selectedFiles.length} photo(s) submitted!` 
-                    : 'Report submitted successfully!';
-                showToast(message, 'success');
-                resetForm();
-                if (reportsVisible) fetchReports();
+        if (data.success) {
+            // ✅ Removed lastSubmitTime and submitCount
+            updateSubmitButton();
+            const message = selectedFiles.length > 0 
+                ? `Report with ${selectedFiles.length} photo(s) submitted!` 
+                : 'Report submitted successfully!';
+            showToast(message, 'success');
+            resetForm();
+            if (reportsVisible) fetchReports();
+        } else {
+            // Check if error is due to rate limiting
+            if (data.error && data.error.includes('limit of 3 reports per day')) {
+                showToast('You have reached the limit of 3 reports per day. Please try again tomorrow.', 'error');
+                // Update the button to show limit reached
+                updateSubmitButton();
             } else {
                 showToast(data.error || 'Error submitting report', 'error');
             }
-        })
-        .catch(error => {
-            isSubmitting = false;
-            submitBtn.innerHTML = originalBtnText;
-            submitBtn.disabled = false;
-            console.error('Error:', error);
-            showToast(`Failed: ${error.message}`, 'error');
-        });
-    }
+        }
+    })
+    .catch(error => {
+        isSubmitting = false;
+        submitBtn.innerHTML = originalBtnText;
+        submitBtn.disabled = false;
+        console.error('Error:', error);
+        showToast(`Failed: ${error.message}`, 'error');
+    });
+}
 
   function fetchReports() {
     const reportsList = document.getElementById('reportsList');
@@ -3132,7 +3116,94 @@ document.addEventListener('DOMContentLoaded', function() {
             dropdown.classList.remove('show');
         }
     });
+
+     const imageInput = document.getElementById('imageInput');
+    if (imageInput) {
+        console.log('✅ Found imageInput, attaching event listener');
+        
+        // Remove any existing listeners by cloning
+        const newInput = imageInput.cloneNode(true);
+        imageInput.parentNode.replaceChild(newInput, imageInput);
+        
+        newInput.addEventListener('change', function(e) {
+            console.log('📁 File input change detected!');
+            console.log('📄 Files:', this.files);
+            
+            const files = this.files;
+            if (!files || files.length === 0) {
+                console.log('⚠️ No files selected');
+                return;
+            }
+            
+            const currentCount = selectedFiles.length;
+            const availableSlots = MAX_PHOTOS - currentCount;
+            
+            if (availableSlots <= 0) {
+                showToast(`Maximum ${MAX_PHOTOS} photos allowed`, 'warning');
+                this.value = '';
+                return;
+            }
+            
+            let addedCount = 0;
+            const filesToAdd = Math.min(files.length, availableSlots);
+            
+            for (let i = 0; i < filesToAdd; i++) {
+                const file = files[i];
+                console.log(`📄 Processing file ${i+1}:`, file.name);
+                
+                if (!file.type.startsWith('image/')) {
+                    showToast(`"${file.name}" is not an image`, 'warning');
+                    continue;
+                }
+                if (file.size > 5 * 1024 * 1024) {
+                    showToast(`"${file.name}" is too large (max 5MB)`, 'warning');
+                    continue;
+                }
+                
+                selectedFiles.push(file);
+                addedCount++;
+            }
+            
+            console.log(`✅ Added ${addedCount} photos, total: ${selectedFiles.length}`);
+            
+            if (addedCount > 0) {
+                updateImagePreview();
+                updatePhotoUploadText();
+                showToast(`Added ${addedCount} photo(s)`, 'success');
+            }
+            
+            // Reset input so same files can be selected again
+            this.value = '';
+        });
+    } else {
+        console.error('❌ imageInput not found!');
+    }
+
+// Call this on page load
+updateSubmitButton();
+// Also update when switching views or after submission
 });
+
+
+    // Check remaining reports and update button text
+async function updateSubmitButton() {
+    const remaining = await checkRemainingReports();
+    const submitBtn = document.querySelector('.submit-btn');
+    
+    if (remaining <= 0) {
+        submitBtn.innerHTML = '<i class="fas fa-ban"></i> Daily Limit Reached (3/3)';
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.6';
+        submitBtn.style.cursor = 'not-allowed';
+        showToast('You have reached the limit of 3 reports per day.', 'warning');
+    } else if (remaining > 0 && remaining <= 3) {
+        submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Submit Report`;
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+        submitBtn.style.cursor = 'pointer';
+    }
+}
+
 </script>
 </body>
 </html>

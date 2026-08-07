@@ -220,66 +220,66 @@
             flex: 1;
         }
 
-        .status-moderate {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
-        border-radius: 30px;
-        font-size: 12px;
-        font-weight: 600;
-        background: #FEF3C7;
-        color: #D97706;
-    }
+    /* Status classes - matching the "Most Reported Stations" style */
+.status-light {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #DCFCE7;
+    color: #166534;
+}
 
-    .status-light {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
-        border-radius: 30px;
-        font-size: 12px;
-        font-weight: 600;
-        background: #DCFCE7;
-        color: #166534;
-    }
-    
-    .status-closed {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
-        border-radius: 30px;
-        font-size: 12px;
-        font-weight: 600;
-        background: #e4e4e4;
-        color: #414141;
-    }
-    .status-severe {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
-        border-radius: 30px;
-        font-size: 12px;
-        font-weight: 600;
-        background: #FEE2E2;
-        color: #991B1B;
-    }
-    
-   
-    .status-congested {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
-        border-radius: 30px;
-        font-size: 12px;
-        font-weight: 600;
-        background: #FFEDD5;
-        color: #EA580C;
-    }
+.status-moderate {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #FEF3C7;
+    color: #D97706;
+}
 
+.status-congested {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #FFEDD5;
+    color: #EA580C;
+}
+
+.status-severe {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #FEE2E2;
+    color: #DC2626;
+}
+
+.status-closed {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #F1F5F9;
+    color: #64748B;
+}
         .nav-item { 
             padding: 12px 16px; 
             margin: 4px 0;
@@ -995,14 +995,15 @@
 }
 
 /* Status classes matching operator dashboard */
+/* Status classes - matching the "Most Reported Stations" style */
 .status-light {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    border-radius: 30px;
+    padding: 4px 12px;
+    border-radius: 20px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     background: #DCFCE7;
     color: #166534;
 }
@@ -1011,10 +1012,10 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    border-radius: 30px;
+    padding: 4px 12px;
+    border-radius: 20px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     background: #FEF3C7;
     color: #D97706;
 }
@@ -1023,10 +1024,10 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    border-radius: 30px;
+    padding: 4px 12px;
+    border-radius: 20px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     background: #FFEDD5;
     color: #EA580C;
 }
@@ -1035,14 +1036,25 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    border-radius: 30px;
+    padding: 4px 12px;
+    border-radius: 20px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     background: #FEE2E2;
     color: #DC2626;
 }
 
+.status-closed {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #F1F5F9;
+    color: #64748B;
+}
 .btn-danger:hover {
     background: #EF4444;
     color: white;
@@ -1208,6 +1220,10 @@
 .station-select:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+.modal-overlay.active {
+    display: flex;
 }
 
     </style>
@@ -1399,6 +1415,53 @@
     </div>
     <button class="logout-btn" onclick="window.location.href='/logout'"><i class="fas fa-sign-out-alt"></i> Logout</button>
 </div>
+
+<!-- OVERRIDE DETAILS MODAL -->
+<div id="overrideDetailsModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 480px;">
+        <div class="modal-header">
+            <i class="fas fa-pen" style="color: #8B5CF6;"></i>
+            <h2 style="color: #6D28D9;">Override Details</h2>
+            <button onclick="closeOverrideDetails()" style="margin-left: auto; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-light);">&times;</button>
+        </div>
+        <div id="overrideDetailsContent">
+            <div style="margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #EDE9FE; border-radius: 12px; border: 1px solid #8B5CF6;">
+                    <div style="width: 44px; height: 44px; background: #8B5CF6; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 16px;" id="overrideStationInitial">T</div>
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700; color: #1E293B;" id="overrideDetailsStation">Taft</div>
+                        <div style="font-size: 13px; color: #6D28D9; font-weight: 500;" id="overrideDetailsDirection">Northbound</div>
+                    </div>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                <div style="background: #F8FAFC; padding: 12px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 11px; color: var(--text-light);">Override Status</div>
+                    <div style="font-size: 16px; font-weight: 700; color: #8B5CF6;" id="overrideDetailsStatus">CONGESTED</div>
+                </div>
+                <div style="background: #F8FAFC; padding: 12px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 11px; color: var(--text-light);">Expires</div>
+                    <div style="font-size: 16px; font-weight: 700; color: var(--text-dark);" id="overrideDetailsExpiry">Manual</div>
+                </div>
+            </div>
+            <div style="background: #F8FAFC; border-radius: 12px; padding: 14px; margin-bottom: 12px;">
+                <div style="font-size: 12px; color: var(--text-light); margin-bottom: 4px;"><i class="fas fa-user"></i> Operator</div>
+                <div style="font-size: 15px; font-weight: 600; color: var(--text-dark);" id="overrideDetailsOperator">John Doe</div>
+            </div>
+            <div style="background: #F8FAFC; border-radius: 12px; padding: 14px;">
+                <div style="font-size: 12px; color: var(--text-light); margin-bottom: 4px;"><i class="fas fa-comment"></i> Reason</div>
+                <div style="font-size: 14px; color: var(--text-dark);" id="overrideDetailsReason">No reason provided</div>
+            </div>
+        </div>
+        <div class="modal-footer" style="justify-content: center; gap: 12px; margin-top: 20px;">
+            <button class="btn-cancel" onclick="closeOverrideDetails()">Close</button>
+            <button class="btn-apply" style="display:none;" onclick="clearOverrideFromModal()" style="background: #EF4444; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer;">
+                <i class="fas fa-times"></i> Clear Override
+            </button>
+        </div>
+    </div>
+</div>
+
 <div class="main-content">
     <div class="topbar">
         <div class="page-title" id="pageTitle">Analytics Dashboard</div>
@@ -1432,7 +1495,7 @@
                     </div>
                     <div class="table-scroll-container">
                         <table class="data-table">
-                            <thead><tr><th>STATION</th><th>STATUS</th></tr></thead>
+                            <thead><tr><th>STATION</th><th>STATUS</th><th>Override</th></tr></thead>
                             <tbody id="stationStatusBody"><tr><td colspan="2" style="text-align:center;">Loading...</td></tr></tbody>
                         </table>
                     </div>
@@ -1704,6 +1767,8 @@
 
 
 
+
+
     <!-- Manual Test -->
     <div class="card">
         <div class="card-title"><i class="fas fa-flask"></i> Manual Test (Single Prediction)</div>
@@ -1738,6 +1803,95 @@ let currentOperatorToDeactivate = null;
 let currentOperatorToReactivate = null;
 let currentFlaggedReportId = null;
 let predictionChart = null;
+
+
+// ========== OVERRIDE DETAILS FUNCTIONS ==========
+let currentOverrideDetails = null;
+
+function showOverrideDetails(station, direction) {
+    // Find the override info from cached data
+    const stations = cachedStationData?.stations || [];
+    const stationData = stations.find(s => s.name === station);
+    
+    if (!stationData) {
+        showToast('❌', 'Station data not found');
+        return;
+    }
+    
+    const directionData = direction === 'north' ? stationData.northbound : stationData.southbound;
+    const overrideInfo = directionData?.override_info || null;
+    
+    if (!overrideInfo) {
+        showToast('❌', 'No override found for this station');
+        return;
+    }
+    
+    // Store for use in clear function
+    currentOverrideDetails = { station, direction, overrideInfo };
+    
+    // Update modal content
+    const initial = station.charAt(0).toUpperCase();
+    document.getElementById('overrideStationInitial').textContent = initial;
+    document.getElementById('overrideDetailsStation').textContent = station;
+    document.getElementById('overrideDetailsDirection').textContent = 
+        direction === 'north' ? 'Northbound' : 'Southbound';
+    
+    const level = overrideInfo.congestion || overrideInfo.level || 25;
+    const statusText = getStatusText(level);
+    document.getElementById('overrideDetailsStatus').textContent = statusText.toUpperCase();
+    
+    // Color the status based on level
+    const statusEl = document.getElementById('overrideDetailsStatus');
+    if (level > 80) statusEl.style.color = '#DC2626';
+    else if (level > 60) statusEl.style.color = '#EA580C';
+    else if (level > 30) statusEl.style.color = '#D97706';
+    else statusEl.style.color = '#16A34A';
+    
+    const operatorName = overrideInfo.operator || 'Unknown';
+    document.getElementById('overrideDetailsOperator').textContent = operatorName;
+    
+    const expiry = overrideInfo.expiry ? new Date(overrideInfo.expiry * 1000).toLocaleString() : 'Manual (until cleared)';
+    document.getElementById('overrideDetailsExpiry').textContent = expiry;
+    
+    const reason = overrideInfo.reason || 'No reason provided';
+    document.getElementById('overrideDetailsReason').textContent = reason;
+    
+    // Show modal
+document.getElementById('overrideDetailsModal').style.display = 'flex';}
+
+function closeOverrideDetails() {
+document.getElementById('overrideDetailsModal').style.display = 'none';    currentOverrideDetails = null;
+}
+
+function clearOverrideFromModal() {
+    if (!currentOverrideDetails) return;
+    
+    const { station, direction, overrideInfo } = currentOverrideDetails;
+    
+    // Close the modal
+    closeOverrideDetails();
+    
+    // Call the clear function
+    clearOverrideFromAdmin(station, direction);
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('overrideDetailsModal');
+    if (event.target === modal) {
+       modal.style.display = 'none';
+    }
+});
+
+// Close with Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('overrideDetailsModal');
+        if (modal && modal.classList.contains('active')) {
+            closeOverrideDetails();
+        }
+    }
+});
 
 // ========== HELPER FUNCTIONS ==========
 function showToast(icon, msg) {
@@ -2477,74 +2631,139 @@ let cachedStationData = null, lastFetchTime = 0, CACHE_DURATION = 30000;
 // ========== STATION STATUS - USING SAME API AS LIVE MAP ==========
 async function loadStationStatus() {
     const tbody = document.getElementById('stationStatusBody');
-    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Loading...</td></tr>';
     try {
-       const OPERATING_START = 4.5;
+        const OPERATING_START = 4.5;
         const OPERATING_END = 22.5;
-
         const now = new Date();
-        // Hint: .getHours() returns whole integers (0-23). 
-        // Since your constants use decimals (.5), converting time to a float helps!
         const hour = now.getHours() + (now.getMinutes() / 60);
+        
         if (!cachedStationData || (now - lastFetchTime) > CACHE_DURATION) {
-            // ========== USE THE SAME API AS LIVE MAP ==========
+            // Fetch live map data
             const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
             const data = await response.json();
+            
+            // Also fetch active overrides
+            const overrideResponse = await fetch('/api/operator/debug-override?_=${Date.now()}');
+            const overrideData = await overrideResponse.json();
+            const activeOverrides = overrideData.active_overrides || {};
+            
+            console.log('📋 Active overrides from API:', activeOverrides);
             
             if (!data.northbound || !data.southbound) {
                 throw new Error('No station data received');
             }
             
-            // Convert live map data format to station list format
             const stations = Object.keys(data.northbound).map(station => {
-
-                
                 const northData = data.northbound[station] || { congestion: 0, status: 'LIGHT' };
                 const southData = data.southbound[station] || { congestion: 0, status: 'LIGHT' };
                 
+                // Check for overrides - the key format is `${station}_northbound` or `${station}_southbound`
+                const northOverrideKey = `${station}_northbound`;
+                const southOverrideKey = `${station}_southbound`;
+                const northOverride = activeOverrides[northOverrideKey] || null;
+                const southOverride = activeOverrides[southOverrideKey] || null;
+                
+                console.log(`📍 ${station} - North override:`, northOverride);
+                console.log(`📍 ${station} - South override:`, southOverride);
                 
                 return {
                     name: station,
                     northbound: {
-                        congestion: northData.congestion || 0,
-                        status_text: northData.status || 'LIGHT',
-                        status_class: getStatusClass(northData.congestion || 0),
+                        congestion: northOverride ? northOverride.congestion : (northData.congestion || 0),
+                        status_text: northOverride ? getStatusText(northOverride.congestion) : (northData.status || 'LIGHT'),
+                        status_class: northOverride ? getStatusClass(northOverride.congestion) : getStatusClass(northData.congestion || 0),
                         ridership: northData.ridership || 0,
-                        overridden: northData.overridden || false
+                        overridden: !!northOverride,
+                        override_info: northOverride || null
                     },
                     southbound: {
-                        congestion: southData.congestion || 0,
-                        status_text: southData.status || 'LIGHT',
-                        status_class: getStatusClass(southData.congestion || 0),
+                        congestion: southOverride ? southOverride.congestion : (southData.congestion || 0),
+                        status_text: southOverride ? getStatusText(southOverride.congestion) : (southData.status || 'LIGHT'),
+                        status_class: southOverride ? getStatusClass(southOverride.congestion) : getStatusClass(southData.congestion || 0),
                         ridership: southData.ridership || 0,
-                        overridden: southData.overridden || false
+                        overridden: !!southOverride,
+                        override_info: southOverride || null
                     }
                 };
             });
             
-            cachedStationData = { stations };
+            cachedStationData = { stations, overrides: activeOverrides };
             lastFetchTime = now;
         }
         
         const stations = cachedStationData.stations;
+        const overrides = cachedStationData.overrides || {};
         const stationOrder = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
         
         let stationList = stations.map(s => {
-            if (currentDirection === 'north') {
-                return { 
-                    name: s.name, 
-                    status_text: s.northbound?.status_text || 'LIGHT', 
-                    status_class: s.northbound?.status_class || 'status-light', 
-                    overridden: s.northbound?.overridden || false
-                };
-            } else {
-                return { 
-                    name: s.name, 
-                    status_text: s.southbound?.status_text || 'LIGHT', 
-                    status_class: s.southbound?.status_class || 'status-light', 
-                    overridden: s.southbound?.overridden || false
-                };
+            const directionData = currentDirection === 'north' ? s.northbound : s.southbound;
+            // Try multiple key formats
+const directionMap = {
+    'north': ['northbound', 'north'],
+    'south': ['southbound', 'south']
+};
+const directionVariants = directionMap[currentDirection] || [currentDirection];
+
+let hasOverride = false;
+let overrideInfo = null;
+let foundKey = null;
+
+for (const dirVariant of directionVariants) {
+    const possibleKeys = [
+        `${s.name}_${dirVariant}`,
+        `${s.name}_${dirVariant.toLowerCase()}`,
+        `${s.name.toLowerCase()}_${dirVariant}`,
+        `${s.name}_${dirVariant.charAt(0)}`, // e.g., Taft_n
+        `${s.name.replace(' ', '')}_${dirVariant}` // e.g., Taft_northbound
+    ];
+    
+    // Also try with "Ave" variations
+    if (s.name.includes(' Ave')) {
+        const shortName = s.name.replace(' Ave', '');
+        possibleKeys.push(`${shortName}_${dirVariant}`);
+        possibleKeys.push(`${shortName}_${dirVariant.toLowerCase()}`);
+    }
+    if (s.name.includes(' Blvd')) {
+        const shortName = s.name.replace(' Blvd', '');
+        possibleKeys.push(`${shortName}_${dirVariant}`);
+        possibleKeys.push(`${shortName}_${dirVariant.toLowerCase()}`);
+    }
+    
+    for (const key of possibleKeys) {
+        if (overrides[key]) {
+            hasOverride = true;
+            overrideInfo = overrides[key];
+            foundKey = key;
+            console.log(`✅ Found override for ${s.name}: key="${key}"`);
+            break;
+        }
+    }
+    if (hasOverride) break;
+}
+            
+            // If there's an override, use its congestion value
+            let congestion = directionData?.congestion || 0;
+            let statusText = directionData?.status_text || 'LIGHT';
+            let statusClass = directionData?.status_class || 'status-light';
+            
+            // If overridden, update the status based on override congestion
+            if (hasOverride && overrideInfo) {
+                const overrideCong = overrideInfo.congestion || overrideInfo.level || 25;
+                congestion = overrideCong;
+                statusText = getStatusText(overrideCong);
+                statusClass = getStatusClass(overrideCong);
             }
+            
+            return { 
+                name: s.name, 
+                status_text: statusText, 
+                status_class: statusClass, 
+                overridden: directionData?.overridden || false,
+                has_override: hasOverride,
+                override_info: overrideInfo,
+                congestion: congestion
+            };
         });
         
         if (currentDirection === 'south') {
@@ -2554,25 +2773,26 @@ async function loadStationStatus() {
         }
         
         if (stationList.length === 0) { 
-            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No station data available</td></tr>'; 
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No station data available</td></tr>'; 
             return; 
         }
         
-        // Map status to CSS classes
         tbody.innerHTML = stationList.map(s => {
             let statusClass = 'status-light';
             let displayText = s.status_text || 'LIGHT';
             
-            if (s.status_text === 'SEVERE' || s.status_text === 'SEVERELY CONGESTED' || s.status_text === 'Severely Congested') {
+            // Normalize status text for display
+            const statusUpper = s.status_text.toUpperCase();
+            if (statusUpper === 'SEVERE' || statusUpper === 'SEVERELY CONGESTED' || s.congestion > 80) {
                 statusClass = 'status-severe';
                 displayText = 'SEVERE';
-            } else if (s.status_text === 'CONGESTED' || s.status_text === 'Congested') {
+            } else if (statusUpper === 'CONGESTED' || s.congestion > 60) {
                 statusClass = 'status-congested';
                 displayText = 'CONGESTED';
-            } else if (s.status_text === 'MODERATE' || s.status_text === 'Moderate') {
+            } else if (statusUpper === 'MODERATE' || s.congestion > 30) {
                 statusClass = 'status-moderate';
                 displayText = 'MODERATE';
-            } else if (hour < OPERATING_START || hour > OPERATING_END) {
+            } else if (statusUpper === 'CLOSED') {
                 statusClass = 'status-closed';
                 displayText = 'CLOSED';
             } else {
@@ -2580,16 +2800,46 @@ async function loadStationStatus() {
                 displayText = 'LIGHT';
             }
             
-            // Add override indicator
-            const overrideBadge = s.overridden ? 
+            // Override display
+           // Override display - show status text instead of percentage
+// Override display - show status text only (no remove button)
+let overrideDisplay = '<span style="color:#94A3B8; font-size:12px;">—</span>';
+if (s.has_override && s.override_info) {
+    const info = s.override_info;
+    const level = info.congestion || info.level || 25;
+    const statusText = getStatusText(level);
+    
+    // Get color based on status
+    let statusColor = '#8B5CF6';
+    let bgColor = '#EDE9FE';
+    if (level > 80) { statusColor = '#DC2626'; bgColor = '#FEE2E2'; }
+    else if (level > 60) { statusColor = '#EA580C'; bgColor = '#FFEDD5'; }
+    else if (level > 30) { statusColor = '#D97706'; bgColor = '#FEF3C7'; }
+    else { statusColor = '#16A34A'; bgColor = '#DCFCE7'; }
+    
+   overrideDisplay = `
+    <span data-station="${s.name}" data-direction="${currentDirection}" 
+          style="background:${bgColor}; color:${statusColor}; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600; border:1px solid ${statusColor}; display:inline-flex; align-items:center; gap:4px; cursor:pointer; transition:all 0.2s;"
+          onmouseover="this.style.transform='scale(1.05)'"
+          onmouseout="this.style.transform='scale(1)'"
+          onclick="showOverrideDetails('${s.name}', '${currentDirection}')">
+        <i class="fas fa-pen" style="font-size:9px;"></i> ${statusText}
+    </span>
+`;
+}
+            
+            // Add override indicator next to station name
+            const overrideBadge = s.has_override ? 
                 '<span style="background:#8B5CF6; color:white; padding:2px 8px; border-radius:12px; font-size:9px; margin-left:4px;"><i class="fas fa-pen"></i></span>' : '';
             
             return `<tr>
-                <td style="font-weight:500;">${s.name}${overrideBadge}<span style="font-size:11px; color:#64748B; margin-left:8px;"></span></td>
+                <td style="font-weight:500;">${s.name}${overrideBadge}</td>
                 <td><span class="${statusClass}">${displayText}</span></td>
+                <td>${overrideDisplay}</td>
             </tr>`;
         }).join('');
         
+        // Update direction buttons
         const northBtn = document.getElementById('northBtn'), southBtn = document.getElementById('southBtn');
         if (northBtn && southBtn) {
             northBtn.classList.toggle('active', currentDirection === 'north');
@@ -2601,10 +2851,96 @@ async function loadStationStatus() {
         
     } catch (error) {
         console.error('Error loading station status:', error);
-        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:red;">Error loading data. Please refresh.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:red;">Error loading data. Please refresh.</td></tr>';
+    }
+    setupOverrideHandlers();
+}
+
+
+// ========== EVENT DELEGATION FOR OVERRIDE BADGES ==========
+// Add this after loadStationStatus() function
+
+// Setup event delegation for override badges
+function setupOverrideClickHandler() {
+    const tbody = document.getElementById('stationStatusBody');
+    if (!tbody) return;
+    
+    // Remove any existing listener to avoid duplicates
+    tbody.removeEventListener('click', handleOverrideClick);
+    tbody.addEventListener('click', handleOverrideClick);
+}
+
+function handleOverrideClick(event) {
+    // Check if the clicked element or its parent is an override badge
+    let target = event.target;
+    
+    // Find the closest element with the 'override-badge' class or the span with onclick
+    const badge = target.closest('[onclick*="showOverrideDetails"]');
+    
+    if (badge) {
+        // Extract the onclick attribute value
+        const onclickAttr = badge.getAttribute('onclick');
+        if (onclickAttr) {
+            // Execute the onclick function
+            try {
+                // The onclick attr looks like: showOverrideDetails('Taft', 'north')
+                // We can eval it or parse it
+                eval(onclickAttr);
+            } catch (e) {
+                console.error('Error executing onclick:', e);
+            }
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+    }
+    
+    // Also check if the span has the data attributes
+    const dataBadge = target.closest('[data-station][data-direction]');
+    if (dataBadge) {
+        const station = dataBadge.dataset.station;
+        const direction = dataBadge.dataset.direction;
+        if (station && direction) {
+            showOverrideDetails(station, direction);
+        }
+        event.preventDefault();
+        event.stopPropagation();
     }
 }
 
+// Call this after DOM is loaded and whenever station status is updated
+document.addEventListener('DOMContentLoaded', function() {
+    // ... existing code ...
+    
+    // Setup override click handler
+    setupOverrideClickHandler();
+});
+async function clearOverrideFromAdmin(station, direction) {
+    if (!confirm(`Clear override for ${station} (${direction})?`)) return;
+    
+    try {
+        const response = await fetch('/api/operator/clear-override', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ station, direction: direction === 'north' ? 'northbound' : 'southbound' })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('✅', `Override cleared for ${station}`);
+            // Refresh the station status
+            lastFetchTime = 0;
+            loadStationStatus();
+            loadDashboardStats();
+        } else {
+            showToast('❌', result.error || 'Failed to clear override');
+        }
+    } catch (error) {
+        console.error('Error clearing override:', error);
+        showToast('❌', 'Failed to clear override');
+    }
+}
 // ========== REFRESH INTERVAL ==========
 setInterval(() => {
     const dashboardPage = document.getElementById('page-dashboard');
@@ -2613,7 +2949,7 @@ setInterval(() => {
         loadStationStatus(); 
         loadDashboardStats();
     }
-}, 30000);
+}, 300000);
 
 let isUpdating = false;
 function setDirection(dir) {
@@ -2643,7 +2979,49 @@ async function loadMostReportedStations() {
         reports.forEach(r => { stationCounts[r.station] = (stationCounts[r.station] || 0) + 1; });
         const sorted = Object.entries(stationCounts).sort((a,b) => b[1] - a[1]).slice(0,4);
         const tbody = document.getElementById('mostReportedBody');
-        tbody.innerHTML = sorted.map(([station, count]) => `<tr><td style="font-weight:500;">${station}</td><td>${count}</td><td style="color:#f59e0b;">● Moderate</td></tr>`).join('');
+        tbody.innerHTML = sorted.map(([station, count]) => {
+            // Get the dominant level for this station
+            const stationReports = reports.filter(r => r.station === station);
+            const levels = stationReports.map(r => r.congestion_level || r.level || 'MODERATE');
+            // Find the most common level
+            const levelCounts = {};
+            levels.forEach(l => { levelCounts[l] = (levelCounts[l] || 0) + 1; });
+            let dominantLevel = 'MODERATE';
+            let maxCount = 0;
+            for (const [level, cnt] of Object.entries(levelCounts)) {
+                if (cnt > maxCount) {
+                    maxCount = cnt;
+                    dominantLevel = level;
+                }
+            }
+            
+            // Map to status class
+            let statusClass = 'status-moderate';
+            let displayText = 'MODERATE';
+            const levelUpper = dominantLevel.toUpperCase();
+            if (levelUpper === 'SEVERE' || levelUpper === 'SEVERELY CONGESTED') {
+                statusClass = 'status-severe';
+                displayText = 'SEVERE';
+            } else if (levelUpper === 'CONGESTED') {
+                statusClass = 'status-congested';
+                displayText = 'CONGESTED';
+            } else if (levelUpper === 'MODERATE') {
+                statusClass = 'status-moderate';
+                displayText = 'MODERATE';
+            } else if (levelUpper === 'LIGHT') {
+                statusClass = 'status-light';
+                displayText = 'LIGHT';
+            } else if (levelUpper === 'CLOSED') {
+                statusClass = 'status-closed';
+                displayText = 'CLOSED';
+            }
+            
+            return `<tr>
+                <td style="font-weight:500;">${station}</td>
+                <td>${count}</td>
+                <td><span class="${statusClass}">${displayText}</span></td>
+            </tr>`;
+        }).join('');
         if (sorted.length === 0) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No reports yet</td></tr>';
     } catch (error) { console.error('Error loading most reported stations:', error); }
 }
@@ -2757,11 +3135,27 @@ window.showAuditDetails = function(entry) {
     const content = document.getElementById('auditModalContent');
     const date = new Date(entry.timestamp);
     const formattedDate = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    
+    // Clean function to remove percentages from text
+    function removePercentage(text) {
+        if (!text) return text;
+        // Remove (75%) or similar patterns
+        return text.replace(/\s*\([^)]*%\)/g, '').trim();
+    }
+    
+    // Clean all fields that might contain the percentage
+    let actionDisplay = removePercentage(entry.action);
+    let targetDisplay = removePercentage(entry.target);
+    let detailsDisplay = entry.details ? removePercentage(entry.details) : '';
+    
+    // Special handling: if target still has "to congested" without percentage, we might want to keep it
+    // But the removePercentage already handles it
+    
     content.innerHTML = `<div class="detail-row"><div class="detail-label">User</div><div class="detail-value"><strong>${entry.userName}</strong><span class="detail-badge ${entry.userType}">${entry.userType}</span></div></div>
-        <div class="detail-row"><div class="detail-label">Action</div><div class="detail-value"><span class="action-badge ${getActionClass(entry.action)}">${entry.action}</span></div></div>
-        <div class="detail-row"><div class="detail-label">Target</div><div class="detail-value">${entry.target}</div></div>
+        <div class="detail-row"><div class="detail-label">Action</div><div class="detail-value"><span class="action-badge ${getActionClass(entry.action)}">${actionDisplay}</span></div></div>
+        <div class="detail-row"><div class="detail-label">Target</div><div class="detail-value">${targetDisplay}</div></div>
         <div class="detail-row"><div class="detail-label">Timestamp</div><div class="detail-value">${formattedDate}</div></div>
-        ${entry.details ? `<div class="detail-row"><div class="detail-label">Additional Details</div><div class="detail-value"><div style="background:#F8FAFC; padding:12px; border-radius:8px; font-size:13px;">${entry.details}</div></div></div>` : ''}
+        ${detailsDisplay ? `<div class="detail-row"><div class="detail-label">Additional Details</div><div class="detail-value"><div style="background:#F8FAFC; padding:12px; border-radius:8px; font-size:13px;">${detailsDisplay}</div></div></div>` : ''}
         <div class="detail-row"><div class="detail-label">IP Address</div><div class="detail-value">${entry.ip_address || 'Not recorded'}</div></div>`;
     modal.style.display = 'flex';
 };
@@ -2796,10 +3190,20 @@ window.reviewFlaggedReport = function(report) {
     const content = document.getElementById('auditModalContent');
     const footer = document.querySelector('#auditDetailsModal .modal-footer');
     const formattedDate = new Date(report.timestamp).toLocaleString();
+    
+    // Clean function
+    function removePercentage(text) {
+        if (!text) return text;
+        return text.replace(/\s*\([^)]*%\)/g, '').trim();
+    }
+    
+    let actionDisplay = removePercentage(report.action || '');
+    
     content.innerHTML = `<div class="detail-row"><div class="detail-label">Report ID</div><div class="detail-value"><strong>#${report.id}</strong></div></div>
         <div class="detail-row"><div class="detail-label">Submitted By</div><div class="detail-value">${report.userName}</div></div>
         <div class="detail-row"><div class="detail-label">Station</div><div class="detail-value"><strong>${report.station}</strong> - ${report.direction || 'both directions'}</div></div>
         <div class="detail-row"><div class="detail-label">Congestion</div><div class="detail-value">${report.congestion}%</div></div>
+        <div class="detail-row"><div class="detail-label">Action</div><div class="detail-value">${actionDisplay}</div></div>
         <div class="detail-row"><div class="detail-label">Remarks</div><div class="detail-value">${report.remarks || 'No remarks'}</div></div>
         <div class="detail-row"><div class="detail-label">Flag Count</div><div class="detail-value"><span class="flag-count"><i class="fas fa-flag"></i> ${report.flag_count} flags</span></div></div>
         <div class="detail-row"><div class="detail-label">Submitted</div><div class="detail-value">${formattedDate}</div></div>
@@ -2835,12 +3239,23 @@ function renderAuditLog() {
     });
     const tbody = document.getElementById('auditLogBody');
     if (filtered.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:60px;"><i class="fas fa-search"></i> No audit records found</td></tr>'; return; }
-    tbody.innerHTML = filtered.map(entry => `<tr style="cursor:pointer;" onclick='showAuditDetails(${JSON.stringify(entry).replace(/'/g, "&#39;")})'>
-        <td><div style="display:flex;align-items:center;"><div style="width:32px;height:32px;background:#3B82F6;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-right:12px;"><i class="fas fa-user text-white text-xs"></i></div><div><p class="font-bold text-gray-800">${entry.userName}</p><p class="text-xs text-gray-500">${entry.userType}</p></div></div></td>
-        <td><span class="action-badge ${getActionClass(entry.action)}">${entry.action}</span></td>
-        <td class="font-medium">${entry.target}</td>
-        <td class="text-right text-xs font-bold text-gray-500">${formatTimestamp(entry.timestamp)}</td>
-    </tr>`).join('');
+    tbody.innerHTML = filtered.map(entry => {
+        // Clean function
+        function removePercentage(text) {
+            if (!text) return text;
+            return text.replace(/\s*\([^)]*%\)/g, '').trim();
+        }
+        
+        let actionDisplay = removePercentage(entry.action);
+        let targetDisplay = removePercentage(entry.target);
+        
+        return `<tr style="cursor:pointer;" onclick='showAuditDetails(${JSON.stringify(entry).replace(/'/g, "&#39;")})'>
+            <td><div style="display:flex;align-items:center;"><div style="width:32px;height:32px;background:#3B82F6;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-right:12px;"><i class="fas fa-user text-white text-xs"></i></div><div><p class="font-bold text-gray-800">${entry.userName}</p><p class="text-xs text-gray-500">${entry.userType}</p></div></div></td>
+            <td><span class="action-badge ${getActionClass(entry.action)}">${actionDisplay}</span></td>
+            <td class="font-medium">${targetDisplay}</td>
+            <td class="text-right text-xs font-bold text-gray-500">${formatTimestamp(entry.timestamp)}</td>
+        </tr>`;
+    }).join('');
 }
 
 function filterAuditLog(type) { currentAuditFilter = type; document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active')); document.querySelector(`.filter-btn[data-filter="${type}"]`).classList.add('active'); renderAuditLog(); }
@@ -3092,6 +3507,9 @@ window.generateInvite = generateInvite;
 window.copyLink = copyLink;
 window.showPage = showPage;
 window.showStationDetails = showStationDetails;
+window.showOverrideDetails = showOverrideDetails;
+window.closeOverrideDetails = closeOverrideDetails;
+window.clearOverrideFromModal = clearOverrideFromModal;
 </script>
     </body>
     </html>

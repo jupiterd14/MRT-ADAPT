@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import json, os, re, time
 from collections import defaultdict
 from config import Config
+from utils import log_activity
 
 api_reports_bp = Blueprint('api_reports', __name__)
 
@@ -17,20 +18,57 @@ STATION_BASE_CAPACITY = {
     "Guadalupe": 10000, "Buendia": 9000, "Ayala Ave": 14000, "Magallanes": 9000, "Taft": 16000
 }
 
+# Replace the report_tracker with a day-based tracker
 report_tracker = defaultdict(list)
 
 def track_report_submission(user_id, ip_address, station):
-    key = f"{user_id if user_id else ip_address}_{station}"
-    timestamp = time.time()
-    report_tracker[key].append(timestamp)
-    current_time = time.time()
-    report_tracker[key] = [t for t in report_tracker[key] if current_time - t < 3600]
+    """Track report submission with date-based tracking"""
+    # Use consistent key - always use user_id if available, else ip_address
+    key = user_id if user_id else ip_address
+    date_str = Config.get_current_time().strftime('%Y-%m-%d')
+    report_tracker[key].append((time.time(), date_str))
 
-def is_rate_limited(user_id, ip_address, limit=3, window=3600):
+def is_rate_limited(user_id, ip_address, limit=3, window=86400):
+    """
+    Check if user has exceeded rate limit.
+    limit=3, window=86400 (24 hours) = 3 per day
+    """
     key = user_id if user_id else ip_address
     current_time = time.time()
-    recent_reports = [t for t in report_tracker.get(key, []) if current_time - t < window]
-    return len(recent_reports) >= limit
+    today = Config.get_current_time().strftime('%Y-%m-%d')
+    
+    # Get today's reports only within the window
+    today_reports = []
+    for t, date_str in report_tracker.get(key, []):
+        if date_str == today and current_time - t <= window:
+            today_reports.append(t)
+    
+    # Clean up old entries
+    report_tracker[key] = [(t, d) for t, d in report_tracker.get(key, []) 
+                          if d == today and current_time - t <= window]
+    
+    return len(today_reports) >= limit
+
+@api_reports_bp.route('/remaining-reports', methods=['GET'])
+def get_remaining_reports():
+    """Get remaining reports allowed for today"""
+    try:
+        user_id = session.get('user_id')
+        ip_address = request.remote_addr
+        key = user_id if user_id else ip_address
+        today = Config.get_current_time().strftime('%Y-%m-%d')
+        
+        # Count today's reports
+        today_reports = [t for t, d in report_tracker.get(key, []) if d == today]
+        remaining = max(0, 3 - len(today_reports))
+        
+        return jsonify({
+            'remaining': remaining,
+            'max_per_day': 3,
+            'reset_at': Config.get_current_time().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 def is_suspicious_remarks(remarks):
     if not remarks:
@@ -338,19 +376,37 @@ def report_congestion():
         ip_address = request.remote_addr
         print(f"👤 User: {user_id}, IP: {ip_address}")
         print(f"📋 Content-Type: {request.content_type}")
-        print(f"📋 Request data: {request.get_data(as_text=True)}")
-        
+        """"
+        # Operating hours check
         if not is_operating_hours():
             next_open = get_next_opening_time()
             return jsonify({
                 "success": False, 
                 "error": f"MRT-3 is currently closed. Operating hours are 4:30 AM - 10:30 PM. Reports can only be submitted during operating hours. Next opening: {next_open}"
                 }), 403
-        
-       
-        if is_rate_limited(user_id, ip_address, limit=3, window=3600):
-            return jsonify({"success": False, "error": "You've reached the limit of 3 reports per hour."}), 429
-        
+        """""
+        # Rate limiting
+        # Rate limiting - 3 reports per day
+        if is_rate_limited(user_id, ip_address, limit=3, window=86400):
+            # Calculate remaining reports for today
+            today_start = Config.get_current_time().replace(hour=0, minute=0, second=0, microsecond=0)
+            if user_id:
+                report_count = Report.query.filter(
+                    Report.user_id == user_id,
+                    Report.timestamp >= today_start
+                ).count()
+                remaining = max(0, 3 - report_count)
+            else:
+                # For anonymous, check the tracker
+                key = ip_address
+                today = Config.get_current_time().strftime('%Y-%m-%d')
+                today_reports = [t for t, d in report_tracker.get(key, []) if d == today]
+                remaining = max(0, 3 - len(today_reports))
+            
+            return jsonify({
+                "success": False, 
+                "error": f"You've reached the limit of 3 reports per day. You have {remaining} report(s) remaining today."
+            }), 429        
         station = None
         direction = None
         reported = None
@@ -358,16 +414,54 @@ def report_congestion():
         anonymous = False
         photo_paths = []
         
-        # Try to get data from different sources
+        # ========== HANDLE FILE UPLOADS ==========
         if request.content_type and 'multipart/form-data' in request.content_type:
-            print("📁 Processing multipart/form-data")
+            print("📁 Processing multipart/form-data with files")
             station = request.form.get('station')
             direction = request.form.get('direction')
             reported = request.form.get('congestion')
             remarks = request.form.get('remarks', '')
             anonymous = request.form.get('anonymous', 'false').lower() == 'true'
+            
+            # ========== PROCESS UPLOADED FILES ==========
+            files = request.files.getlist('images')
+            print(f"📁 Received {len(files)} file(s)")
+            
+            for file in files:
+                if file and file.filename:
+                    # Validate file type
+                    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+                    file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+                    
+                    if file_ext not in allowed_extensions:
+                        print(f"⚠️ Skipping invalid file type: {file_ext}")
+                        continue
+                    
+                    # Validate file size (max 5MB)
+                    file.seek(0, 2)  # Seek to end
+                    file_size = file.tell()
+                    file.seek(0)  # Seek back to beginning
+                    
+                    if file_size > 5 * 1024 * 1024:  # 5MB
+                        print(f"⚠️ Skipping file too large: {file_size} bytes")
+                        continue
+                    
+                    # Generate unique filename
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    safe_filename = f"report_{timestamp}_{file.filename}"
+                    
+                    # Save file
+                    # When saving the file, store the path correctly
+                    upload_folder = os.path.join('static', 'uploads', 'reports')
+                    os.makedirs(upload_folder, exist_ok=True)
+
+                    file_path = os.path.join(upload_folder, safe_filename)
+                    file.save(file_path)
+
+                    # Store the path for URL access - this should match your route URL
+                    photo_paths.append(f"/uploads/reports/{safe_filename}")
         else:
-            # Try JSON first
+            # Try JSON data
             try:
                 data = request.get_json()
                 if data:
@@ -379,7 +473,6 @@ def report_congestion():
                     anonymous = data.get('anonymous', False)
                 else:
                     print("❌ No JSON data found")
-                    # Try form data as fallback
                     data = request.form
                     if data:
                         print("📋 Processing form data")
@@ -392,7 +485,6 @@ def report_congestion():
                         return jsonify({"success": False, "error": "No data provided"}), 400
             except Exception as json_error:
                 print(f"❌ JSON parse error: {json_error}")
-                # Try form data as fallback
                 data = request.form
                 if data:
                     print("📋 Processing form data (fallback)")
@@ -404,7 +496,7 @@ def report_congestion():
                 else:
                     return jsonify({"success": False, "error": "No data provided"}), 400
         
-        print(f"📋 Parsed: station={station}, congestion={reported}, remarks={remarks}")
+        print(f"📋 Parsed: station={station}, congestion={reported}, remarks={remarks}, photos={len(photo_paths)}")
         
         # Validation
         if not station:
@@ -460,12 +552,16 @@ def report_congestion():
             print("💾 Saving to database...")
             db.session.add(report)
             db.session.commit()
+      
+            # Track the submission for rate limiting
+            track_report_submission(user_id, ip_address, station)
             print(f"✅ Report saved! ID: {report.id}")
-            
+                        
             return jsonify({
                 "success": True,
                 "message": "Report submitted successfully!",
                 "photos": len(photo_paths),
+                "photo_paths": photo_paths,
                 "direction": direction,
                 "report_id": report.id,
                 "timestamp": current_time.isoformat()
@@ -515,40 +611,8 @@ def debug_check_image(filename):
         'static_exists': os.path.exists('static'),
         'uploads_exists': os.path.exists(os.path.join('static', 'uploads', 'reports'))
     })
-    
-@api_reports_bp.route('/uploads/reports/<filename>')
-def serve_upload(filename):
-    from flask import send_from_directory, abort, send_file
-    import os
-    from io import BytesIO
-    
-    upload_folder = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'reports')
-    
-    # Check if file exists
-    file_path = os.path.join(upload_folder, filename)
-    if os.path.exists(file_path):
-        return send_from_directory(upload_folder, filename)
-    
-    # If file doesn't exist, return a placeholder image
-    # This prevents 404 errors in the frontend
-    try:
-        from PIL import Image, ImageDraw
-        img = Image.new('RGB', (300, 200), color=(240, 240, 240))
-        draw = ImageDraw.Draw(img)
-        draw.text((100, 80), "No Image", fill=(150, 150, 150))
-        draw.text((80, 110), "Report Photo", fill=(150, 150, 150))
-        img_io = BytesIO()
-        img.save(img_io, 'PNG')
-        img_io.seek(0)
-        return send_file(img_io, mimetype='image/png')
-    except:
-        # If PIL not installed, return a simple SVG
-        svg = '''<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
-            <rect width="300" height="200" fill="#f0f0f0"/>
-            <text x="150" y="100" font-family="Arial" font-size="20" fill="#999" text-anchor="middle">No Image</text>
-            <text x="150" y="130" font-family="Arial" font-size="14" fill="#999" text-anchor="middle">Report Photo</text>
-        </svg>'''
-        return send_file(BytesIO(svg.encode()), mimetype='image/svg+xml')
+# routes/api_reports_bp.py
+
 
 @api_reports_bp.route('/debug/route-check', methods=['GET'])
 def debug_route_check():

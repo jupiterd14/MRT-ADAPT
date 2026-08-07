@@ -3732,8 +3732,10 @@ function updateBestTimeUI(data) {
         northCong = data.forecastData.forecasts[0].northbound || 0;
         southCong = data.forecastData.forecasts[0].southbound || 0;
     }
+     
     
-    // FIX: Use system time for rush hour detection
+    // FIX: U
+    // se system time for rush hour detection
     const now = new Date();
     const currentHour = now.getHours();
     const isRushHour = (currentHour >= 7 && currentHour < 9) || (currentHour >= 17 && currentHour < 19);
@@ -3994,6 +3996,7 @@ async function updateAllUI() {
     const data = await fetchAllData();
     if (!data) return;
     
+    console.log('🔄 Updating forecast with data:', data.forecastData);
     updateForecastUI(data.forecastData);
     updateStationStatusUI(data);
     updateBestTimeUI(data);
