@@ -74,6 +74,312 @@ body {
 }
 
 
+/* ===== ADVISORY CARD CLASSES (for mobile responsiveness) ===== */
+.advisory-boarding-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.advisory-boarding-icon {
+    background: #EFF6FF;
+    padding: 8px 12px;
+    border-radius: 10px;
+}
+
+.advisory-boarding-icon i {
+    color: #3B82F6;
+    font-size: 18px;
+}
+
+.advisory-boarding-title {
+    font-weight: 700;
+    font-size: 15px;
+    color: #1E293B;
+}
+
+.advisory-boarding-subtitle {
+    font-size: 11px;
+    color: #64748B;
+}
+
+.advisory-boarding-stats {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #F1F5F9;
+    display: flex;
+    gap: 10px;
+}
+
+.advisory-stat-box {
+    flex: 1;
+    text-align: center;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.advisory-stat-label {
+    font-size: 10px;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.advisory-stat-value {
+    font-weight: 700;
+    font-size: 16px;
+    color: #1E293B;
+}
+
+/* Status card */
+.advisory-status-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.advisory-status-icon {
+    font-size: 18px;
+    margin-top: 2px;
+}
+
+.advisory-status-text {
+    flex: 1;
+}
+
+.advisory-status-message {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.advisory-status-tip {
+    margin-top: 6px;
+    font-size: 13px;
+    opacity: 0.85;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.advisory-status-tip i {
+    font-size: 12px;
+}
+
+/* Rush hour card */
+.advisory-rush-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.advisory-rush-icon {
+    background: rgba(59, 130, 246, 0.08);
+    padding: 8px 10px;
+    border-radius: 8px;
+    border-left: 4px solid #3B82F6;
+}
+
+.advisory-rush-icon i {
+    font-size: 16px;
+}
+
+.advisory-rush-text {
+    flex: 1;
+}
+
+.advisory-rush-label {
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.advisory-rush-note {
+    font-size: 13px;
+    color: #1E293B;
+    margin-top: 2px;
+}
+
+.advisory-rush-advice {
+    font-size: 12px;
+    color: #64748B;
+    margin-top: 4px;
+}
+
+.advisory-rush-advice i {
+    margin-right: 4px;
+}
+
+.advisory-rush-footer {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #F1F5F9;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #64748B;
+}
+
+/* ===== MOBILE RESPONSIVE OVERRIDES ===== */
+@media screen and (max-width: 768px) {
+    .advisory-boarding-header {
+        gap: 8px;
+    }
+    
+    .advisory-boarding-icon {
+        padding: 6px 10px;
+    }
+    
+    .advisory-boarding-icon i {
+        font-size: 14px;
+    }
+    
+    .advisory-boarding-title {
+        font-size: 12px;
+    }
+    
+    .advisory-boarding-subtitle {
+        font-size: 10px;
+    }
+    
+    .advisory-boarding-stats {
+        margin-top: 10px;
+        padding-top: 10px;
+        gap: 6px;
+    }
+    
+    .advisory-stat-box {
+        padding: 6px;
+    }
+    
+    .advisory-stat-label {
+        font-size: 8px;
+    }
+    
+    .advisory-stat-value {
+        font-size: 13px;
+    }
+    
+    .advisory-status-content {
+        gap: 8px;
+    }
+    
+    .advisory-status-icon {
+        font-size: 14px;
+    }
+    
+    .advisory-status-message {
+        font-size: 13px;
+    }
+    
+    .advisory-status-tip {
+        font-size: 11px;
+    }
+    
+    .advisory-status-tip i {
+        font-size: 10px;
+    }
+    
+    .advisory-rush-content {
+        gap: 8px;
+    }
+    
+    .advisory-rush-icon {
+        padding: 6px 8px;
+    }
+    
+    .advisory-rush-icon i {
+        font-size: 12px;
+    }
+    
+    .advisory-rush-label {
+        font-size: 12px;
+    }
+    
+    .advisory-rush-note {
+        font-size: 11px;
+    }
+    
+    .advisory-rush-advice {
+        font-size: 10px;
+    }
+    
+    .advisory-rush-footer {
+        font-size: 10px;
+        margin-top: 8px;
+        padding-top: 8px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .advisory-boarding-title {
+        font-size: 11px;
+    }
+    
+    .advisory-boarding-subtitle {
+        font-size: 9px;
+    }
+    
+    .advisory-stat-value {
+        font-size: 11px;
+    }
+    
+    .advisory-stat-label {
+        font-size: 7px;
+    }
+    
+    .advisory-status-message {
+        font-size: 11px;
+    }
+    
+    .advisory-status-tip {
+        font-size: 10px;
+    }
+    
+    .advisory-rush-label {
+        font-size: 11px;
+    }
+    
+    .advisory-rush-note {
+        font-size: 10px;
+    }
+    
+    .advisory-rush-advice {
+        font-size: 9px;
+    }
+}
+
+
+/* ===== FIX: Force white text on colored status cards ===== */
+.advisory-card.critical .advisory-status-message,
+.advisory-card.critical .advisory-status-tip,
+.advisory-card.critical .advisory-status-tip i,
+.advisory-card.critical .advisory-status-icon {
+    color: white !important;
+}
+
+.advisory-card.warning .advisory-status-message,
+.advisory-card.warning .advisory-status-tip,
+.advisory-card.warning .advisory-status-tip i,
+.advisory-card.warning .advisory-status-icon {
+    color: white !important;
+}
+
+.advisory-card.moderate .advisory-status-message,
+.advisory-card.moderate .advisory-status-tip,
+.advisory-card.moderate .advisory-status-tip i,
+.advisory-card.moderate .advisory-status-icon {
+    color: white !important;
+}
+
+.advisory-card.success .advisory-status-message,
+.advisory-card.success .advisory-status-tip,
+.advisory-card.success .advisory-status-tip i,
+.advisory-card.success .advisory-status-icon {
+    color: #166534 !important;
+}
+
 /* Desktop: 1024px - 1440px */
 @media (min-width: 1024px) and (max-width: 1440px) {
     .sidebar {
@@ -1055,6 +1361,54 @@ nav {
 
 /* ========== MOBILE ONLY (max-width: 768px) ========== */
 @media screen and (max-width: 768px) {
+.datetime-input {
+        width: 100% !important;
+        min-width: 0 !important;
+        height: 36px !important;  /* Reduced from 40px */
+        font-size: 11px !important;  /* Smaller font */
+        padding: 0 10px !important;
+        min-height: 36px !important;
+    }
+    
+    /* Date input specific */
+    .datetime-input[type="date"] {
+        min-height: 36px !important;
+        height: 36px !important;
+        background-size: 16px !important;
+        background-position: right 10px center !important;
+        padding-right: 30px !important;
+    }
+    
+    /* Time input specific */
+    .datetime-input[type="time"] {
+        min-height: 36px !important;
+        height: 36px !important;
+        background-size: 16px !important;
+        background-position: right 10px center !important;
+        padding-right: 30px !important;
+    }
+    
+    /* Make the detail items smaller */
+    .detail-item {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .detail-item label {
+        font-size: 9px !important;
+        margin-bottom: 3px !important;
+    }
+
+    .detail-item label i {
+        font-size: 10px;
+    }
+    
+    /* The info text below date */
+    .detail-item .info {
+        font-size: 8px !important;
+        margin-top: 3px !important;
+        line-height: 1.2 !important;
+    }
     /* Make advisory container smaller on mobile */
 .advisories-section {
     margin-top: 15px !important;
@@ -1421,10 +1775,51 @@ nav {
 
 
 
+/* Make select dropdown options smaller on mobile */
+@media screen and (max-width: 768px) {
+    .datetime-input option {
+        font-size: 11px !important;
+        padding: 4px 8px !important;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .datetime-input option {
+        font-size: 10px !important;
+        padding: 2px 6px !important;
+    }
+}
+
+
 /* Extra small devices */
 @media screen and (max-width: 480px) {
 
+     .datetime-input {
+        height: 32px !important;
+        font-size: 10px !important;
+        padding: 0 8px !important;
+        min-height: 32px !important;
+    }
     
+    .datetime-input[type="date"] {
+        min-height: 32px !important;
+        height: 32px !important;
+        background-size: 14px !important;
+        background-position: right 8px center !important;
+        padding-right: 24px !important;
+    }
+    
+    .datetime-input[type="time"] {
+        min-height: 32px !important;
+        height: 32px !important;
+        background-size: 14px !important;
+        background-position: right 8px center !important;
+        padding-right: 24px !important;
+    }
+    
+    .details-row {
+        gap: 6px !important;
+    }
 .help-btn { 
     background: var(--blue-bg);
     color: var(--accent-blue);
@@ -1921,8 +2316,144 @@ nav {
 
 }
 
+/* ===== CUSTOM DATE & TIME INPUTS (FIXED) ===== */
+.custom-date-input,
+.custom-time-input {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: white;
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 4px 16px;
+    transition: all 0.2s ease;
+    height: 52px; /* Match station dropdown height */
+    width: 100%;
+}
 
+.custom-date-input:hover,
+.custom-time-input:hover {
+    border-color: var(--accent-blue);
+}
 
+.custom-date-input:focus-within,
+.custom-time-input:focus-within {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.custom-select {
+    border: none;
+    background: transparent;
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 14px;
+    padding: 8px 4px;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    min-width: 32px;
+    text-align: center;
+    flex: 1;
+}
+
+.custom-select:hover {
+    color: var(--accent-blue);
+}
+
+.custom-select option {
+    font-weight: 500;
+    padding: 4px 8px;
+}
+
+.time-separator {
+    font-weight: 700;
+    color: var(--text-light);
+    font-size: 16px;
+    padding: 0 2px;
+}
+
+.time-period {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--accent-blue);
+    padding: 0 4px;
+    min-width: 30px;
+    text-align: center;
+}
+
+/* --- Desktop sizes --- */
+@media (min-width: 769px) {
+    .custom-date-input,
+    .custom-time-input {
+        height: 52px;
+        padding: 4px 16px;
+    }
+    
+    .custom-select {
+        font-size: 15px;
+        padding: 8px 6px;
+        min-width: 40px;
+    }
+}
+
+/* --- Mobile sizes (768px and below) --- */
+@media screen and (max-width: 768px) {
+    .custom-date-input,
+    .custom-time-input {
+        height: 40px;
+        padding: 2px 10px;
+        gap: 4px;
+        border-radius: 12px;
+    }
+    
+    .custom-select {
+        font-size: 12px;
+        padding: 4px 2px;
+        min-width: 24px;
+    }
+    
+    .time-separator {
+        font-size: 14px;
+    }
+    
+    .time-period {
+        font-size: 11px;
+        min-width: 24px;
+    }
+}
+
+/* --- Extra small devices (480px and below) --- */
+@media screen and (max-width: 480px) {
+    .custom-date-input,
+    .custom-time-input {
+        height: 36px;
+        padding: 2px 8px;
+        gap: 3px;
+        border-radius: 10px;
+    }
+    
+    .custom-select {
+        font-size: 10px;
+        padding: 3px 2px;
+        min-width: 20px;
+    }
+    
+    .time-separator {
+        font-size: 12px;
+    }
+    
+    .time-period {
+        font-size: 10px;
+        min-width: 20px;
+    }
+    
+    .details-row {
+        gap: 6px;
+    }
+}
 </style>
 </head>
 <body>
@@ -2049,101 +2580,119 @@ nav {
 </div>
 
 
-        <div class="card planner-card">
-            <div class="planner-header">
-                <div class="planner-title">
-                    <i class="fa-solid fa-location-dot" style="color: var(--accent-blue);"></i>
-                    Where do you plan to go?
-                </div>
-                <button class="help-btn" onclick="showTravelGuide()">
-                <i class="fas fa-question-circle"></i> <h3>How to use</h3>
-            </button>
-            </div>
-            
-            <div class="input-row">
-    <div class="select-group">
-        <div class="select-label">
-            <i class="fas fa-circle-dot"></i> FROM
+ <div class="card planner-card">
+    <div class="planner-header">
+        <div class="planner-title">
+            <i class="fa-solid fa-location-dot" style="color: var(--accent-blue);"></i>
+            Where do you plan to go?
         </div>
-        <select class="station-dropdown" id="fromStation">
-            {% for station in stations %}
-            <option value="{{ station }}" {% if station == 'North Ave' %}selected{% endif %}>{{ station }}</option>
-            {% endfor %}
-        </select>
-        
+        <button class="help-btn" onclick="showTravelGuide()">
+            <i class="fas fa-question-circle"></i> <h3>How to use</h3>
+        </button>
     </div>
-
-    <div class="swap-icon" onclick="swapStations()">
-        <i class="fas fa-arrows-left-right"></i>
-    </div>
-
-    <div class="select-group">
-        <div class="select-label">
-            <i class="fas fa-flag-checkered"></i> TO
-        </div>
-        <select class="station-dropdown" id="toStation">
-            {% for station in stations %}
-            <option value="{{ station }}" {% if station == 'Ayala Ave' %}selected{% endif %}>{{ station }}</option>
-            {% endfor %}
-        </select>
-       
-    </div>
-</div>
-
-
-               
-
-            <div class="details-row">
-               <div class="detail-item">
-    <label class="detail-item-i"><i class="far fa-calendar"></i> Travel Date</label>
-    <input type="date" class="datetime-input" id="travelDate" value="">
-    <small class="info" style="display: block; margin-top: 5px; font-size: 10px; color: var(--text-light);">
-        <i class="fas fa-info-circle"></i> Actual conditions may differ to the real life events
-    </small>
-</div>
-                
-                <div class="detail-item">
-                    <label class="detail-item-i"><i class="far fa-clock"></i> Departure Time</label>
-                    <input type="time" class="datetime-input" id="departureTime" value="">
-                </div>
-            </div>
-   <div class="button-group" style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px;">
-    <button class="btn-plan" onclick="planRoute()">
-        <i class="fas fa-check-circle"></i> PLAN
-    </button>
     
-    <button class="btn-cancel" onclick="cancelRoute()">
-        <i class="fas fa-times"></i>
-    </button>
-</div>
+    <div class="input-row">
+        <div class="select-group">
+            <div class="select-label">
+                <i class="fas fa-circle-dot"></i> FROM
+            </div>
+            <select class="station-dropdown" id="fromStation">
+                {% for station in stations %}
+                <option value="{{ station }}" {% if station == 'North Ave' %}selected{% endif %}>{{ station }}</option>
+                {% endfor %}
+            </select>
         </div>
 
-        
-        <div class="advisories-section">
-            <div class="section-header">
-                <i class="fas fa-exclamation-triangle"></i> Travel Advisories
+        <div class="swap-icon" onclick="swapStations()">
+            <i class="fas fa-arrows-left-right"></i>
+        </div>
+
+        <div class="select-group">
+            <div class="select-label">
+                <i class="fas fa-flag-checkered"></i> TO
             </div>
-            
-            <div id="advisoriesContainer">
-                <!-- Recommendation alert inside the container (hidden initially) -->
-                <div class="recommendation-alert" id="recommendation">
-                    <i class="fas fa-check-circle"></i>
-                    <span><b>Recommended:</b> Select stations to get travel recommendations.</span>
-                </div>
-                
-                <!-- Empty state (hidden initially) -->
-                <div class="empty-state" id="emptyState">
-                    <i class="fas fa-route" style="font-size: 48px; color: var(--text-light); opacity: 0.5; margin-bottom: 15px;"></i>
-                    <h3 style="color: var(--text-dark); margin-bottom: 5px;">Plan a route to see advisories</h3>
-                    <p style="color: var(--text-light); font-size: 13px;">Click "PLAN ROUTE" to get travel recommendations and alerts.</p>
-                </div>
+            <select class="station-dropdown" id="toStation">
+                {% for station in stations %}
+                <option value="{{ station }}" {% if station == 'Ayala Ave' %}selected{% endif %}>{{ station }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="details-row">
+        <div class="detail-item">
+            <label>
+                <i class="far fa-calendar"></i> Travel Date
+            </label>
+            <div class="custom-date-input">
+                <select class="custom-select" id="monthSelect">
+                    <!-- Months will be populated by JS -->
+                </select>
+                <select class="custom-select" id="daySelect">
+                    <!-- Days will be populated by JS -->
+                </select>
+                <select class="custom-select" id="yearSelect">
+                    <!-- Years will be populated by JS -->
+                </select>
+            </div>
+            <small class="info">
+                <i class="fas fa-info-circle"></i> Actual conditions may differ
+            </small>
+        </div>
+        
+        <div class="detail-item">
+            <label>
+                <i class="far fa-clock"></i> Departure Time
+            </label>
+            <div class="custom-time-input">
+                <select class="custom-select" id="hourSelect">
+                    <!-- Hours will be populated by JS -->
+                </select>
+                <span class="time-separator">:</span>
+                <select class="custom-select" id="minuteSelect">
+                    <!-- Minutes will be populated by JS -->
+                </select>
+                <span class="time-period" id="timePeriod">AM</span>
             </div>
         </div>
+    </div>
+
+    <!-- BUTTONS - Inside the card, below date/time -->
+    <div class="button-group" style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px;">
+        <button class="btn-plan" onclick="planRoute()">
+            <i class="fas fa-check-circle"></i> PLAN
+        </button>
+        <button class="btn-cancel" onclick="cancelRoute()">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+</div> <!-- END OF planner-card -->
+
+<!-- ===== ADVISORIES - OUTSIDE the blue card ===== -->
+<div class="advisories-section">
+    <div class="section-header">
+        <i class="fas fa-exclamation-triangle"></i> Travel Advisories
+    </div>
+    
+    <div id="advisoriesContainer">
+        <!-- Recommendation alert (hidden initially) -->
+        <div class="recommendation-alert" id="recommendation">
+            <i class="fas fa-check-circle"></i>
+            <span><b>Recommended:</b> Select stations to get travel recommendations.</span>
+        </div>
+        
+        <!-- Empty state (shown initially) -->
+        <div class="empty-state" id="emptyState">
+            <i class="fas fa-route" style="font-size: 48px; color: var(--text-light); opacity: 0.5; margin-bottom: 15px;"></i>
+            <h3 style="color: var(--text-dark); margin-bottom: 5px;">Plan a route to see advisories</h3>
+            <p style="color: var(--text-light); font-size: 13px;">Click "PLAN" to get travel recommendations and alerts.</p>
+        </div>
+    </div>
+</div>
     </div>
 
     <script>
 let stations = [];
-
 
 // ========== TIME-BASED ADVISORY GENERATOR ==========
 function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTime) {
@@ -2152,9 +2701,7 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const timeStr = `${hour12}:00 ${ampm}`;
     
-    // ===== MORNING RUSH (6:00 AM - 9:00 AM) =====
     if (hour >= 6 && hour <= 9) {
-        // Early morning (6:00 AM)
         if (hour === 6) {
             advisories.push({
                 type: 'early-bird',
@@ -2166,8 +2713,6 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
                 action: 'Arrive at station by 6:15 AM for smooth boarding.'
             });
         }
-        
-        // Peak morning (7:00 AM - 8:00 AM)
         if (hour >= 7 && hour <= 8) {
             advisories.push({
                 type: 'peak-congestion',
@@ -2179,8 +2724,6 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
                 action: `If traveling now, expect ${travelTime}+ minutes extra wait time.`
             });
         }
-        
-        // Late morning (8:30 AM - 9:00 AM)
         if (hour >= 8 && hour <= 9) {
             advisories.push({
                 type: 'morning-rush',
@@ -2192,10 +2735,7 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
                 action: 'Allow extra 15-20 minutes for boarding delays.'
             });
         }
-    }
-    
-    // ===== MIDDAY (10:00 AM - 2:00 PM) =====
-    else if (hour >= 10 && hour <= 14) {
+    } else if (hour >= 10 && hour <= 14) {
         if (hour === 11 || hour === 12 || hour === 13) {
             advisories.push({
                 type: 'midday',
@@ -2207,11 +2747,7 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
                 action: 'No special timing needed. Enjoy your trip!'
             });
         }
-    }
-    
-    // ===== AFTERNOON RUSH (3:00 PM - 8:00 PM) =====
-    else if (hour >= 15 && hour <= 20) {
-        // Early afternoon (3:00 PM)
+    } else if (hour >= 15 && hour <= 20) {
         if (hour === 15) {
             advisories.push({
                 type: 'afternoon-start',
@@ -2223,8 +2759,6 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
                 action: 'Trains are still manageable at this time.'
             });
         }
-        
-        // Peak evening (5:00 PM - 7:00 PM)
         if (hour >= 17 && hour <= 19) {
             advisories.push({
                 type: 'evening-peak',
@@ -2236,8 +2770,6 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
                 action: `Expect ${travelTime}+ minutes delays. Consider alternative routes.`
             });
         }
-        
-        // Late evening (7:30 PM - 8:00 PM)
         if (hour >= 19 && hour <= 20) {
             advisories.push({
                 type: 'evening-rush',
@@ -2249,10 +2781,7 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
                 action: 'Arrive at station 10 minutes early for smoother boarding.'
             });
         }
-    }
-    
-    // ===== LATE NIGHT (9:00 PM - 11:30 PM) =====
-    else if (hour >= 21 && hour <= 23) {
+    } else if (hour >= 21 && hour <= 23) {
         if (hour === 21 || hour === 22) {
             advisories.push({
                 type: 'late-night',
@@ -2264,7 +2793,6 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
                 action: 'If you miss the last train, consider Grab/Jeepney alternatives.'
             });
         }
-        
         if (hour >= 22 && hour <= 23) {
             advisories.push({
                 type: 'last-train',
@@ -2276,10 +2804,7 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
                 action: 'After 10:30 PM, use alternative transportation.'
             });
         }
-    }
-    
-    // ===== EARLY MORNING (4:30 AM - 5:30 AM) =====
-    else if (hour >= 4 && hour < 6) {
+    } else if (hour >= 4 && hour < 6) {
         advisories.push({
             type: 'first-train',
             severity: 'info',
@@ -2291,7 +2816,6 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
         });
     }
     
-    // ===== EXTRA: Specific recommendations based on congestion =====
     if (congestion > 70) {
         advisories.push({
             type: 'congestion-alert',
@@ -2314,7 +2838,6 @@ function getCongestionText(congestion) {
     if (congestion > 30) return 'MODERATE';
     return 'LIGHT';
 }
-
 
 // ========== DYNAMIC MESSAGE ARRAYS ==========
 const messageArrays = {
@@ -2385,17 +2908,13 @@ const messageArrays = {
     }
 };
 
-
-
 function cleanOldReadAlerts() {
     const saved = localStorage.getItem('readAlerts');
     if (saved) {
         const readAlerts = JSON.parse(saved);
-        // Check if any alert ID doesn't match the new permanent format
         const hasOldFormat = readAlerts.some(id => 
             id.includes('-') && !id.includes('permanent') && !id.includes('congestion-') && !id.includes('broadcast-')
         );
-        
         if (hasOldFormat) {
             console.log('Cleaning old readAlerts format...');
             localStorage.removeItem('readAlerts');
@@ -2415,6 +2934,7 @@ function getCongestionLevel(congestion) {
     if (congestion > 40) return 'moderate';
     return 'light';
 }
+
 try {
     stations = {{ stations|tojson }};
 } catch(e) {
@@ -2422,70 +2942,312 @@ try {
     stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
 }
 
- document.addEventListener('DOMContentLoaded', function() {
+// ========== MAIN DOM CONTENT LOADED ==========
+document.addEventListener('DOMContentLoaded', function() {
     cleanOldReadAlerts();
     updateDateTime();
     checkAlertCount();
     setInterval(updateDateTime, 1000);
     setInterval(checkAlertCount, 60000);
     
-    // ========== AUTO-SET DATE TO CURRENT DATE (WITH 2025 YEAR) ==========
-    const now = new Date();
+    // Populate custom date/time selects
+    populateDateTimeSelects();
     
-    // Get current month and day
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
+    // Update time period when hour changes
+    document.getElementById('hourSelect')?.addEventListener('change', updateTimePeriod);
     
-    // Use 2025 as the year (for testing), but keep month and day from current date
-    const currentDate = `2025-${month}-${day}`;
+    // Set up station event listeners
+    const fromSelect = document.getElementById('fromStation');
+    const toSelect = document.getElementById('toStation');
     
-    document.getElementById('travelDate').value = currentDate;
-    document.getElementById('travelDate').min = '2025-01-01';
-    document.getElementById('travelDate').max = '2025-12-31';
+    fromSelect?.addEventListener('change', updateStationCongestion);
+    toSelect?.addEventListener('change', updateStationCongestion);
     
-    // Set default time to current time + 1 hour
-    now.setHours(now.getHours() + 1);
-    now.setMinutes(0);
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    document.getElementById('departureTime').value = `${hours}:${minutes}`;
+    updateStationCongestion();
+    adjustMobileTextSizes();
 });
 
-    function getPredictionWithDateTime(station, date, time) {
-    if (!date || !time) {
-        return fetch(`/api/predict/${encodeURIComponent(station)}`).then(res => res.json());
-    }
-    return fetch(`/api/predict/${encodeURIComponent(station)}?date=${date}&time=${time}`)
-        .then(res => res.json())
-        .catch(() => {
-            return fetch(`/api/predict/${encodeURIComponent(station)}`).then(res => res.json());
-        });
+// ========== SHOW TRAVEL GUIDE ==========
+function showTravelGuide() {
+    const modal = document.getElementById('travelGuideModal');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
 }
 
+function closeTravelGuide() {
+    const modal = document.getElementById('travelGuideModal');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+}
 
- function cancelRoute() {
-    // Reset to current date (with 2025 year)
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('travelGuideModal');
+    if (event.target === modal) {
+        closeTravelGuide();
+    }
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeTravelGuide();
+    }
+});
+
+// ========== UPDATE DATE TIME ==========
+function updateDateTime() {
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const currentDate = `2025-${month}-${day}`;
+    const options = { 
+        weekday: 'long', 
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    };
+    const el = document.getElementById('currentDateTime');
+    if (el) el.textContent = now.toLocaleDateString('en-US', options);
+}
+
+// ========== SWAP STATIONS ==========
+function swapStations() {
+    const fromSelect = document.getElementById('fromStation');
+    const toSelect = document.getElementById('toStation');
     
-    document.getElementById('travelDate').value = currentDate;
-    document.getElementById('travelDate').min = '2025-01-01';
-    document.getElementById('travelDate').max = '2025-12-31';
+    const fromValue = fromSelect.value;
+    const toValue = toSelect.value;
     
-    const nowTime = new Date();
-    nowTime.setHours(nowTime.getHours() + 1);
-    nowTime.setMinutes(0);
-    const hours = String(nowTime.getHours()).padStart(2, '0');
-    const minutes = String(nowTime.getMinutes()).padStart(2, '0');
-    document.getElementById('departureTime').value = `${hours}:${minutes}`;
+    fromSelect.value = toValue;
+    toSelect.value = fromValue;
     
-    // Reset station selections
+    if (fromSelect.value === toSelect.value) {
+        showToast('Cannot have same stations', 'error');
+        fromSelect.value = fromValue;
+        toSelect.value = toValue;
+        return;
+    }
+    
+    showToast('Stations swapped');
+}
+
+// ========== UPDATE STATION CONGESTION ==========
+async function updateStationCongestion() {
+    const fromStation = document.getElementById('fromStation').value;
+    const toStation = document.getElementById('toStation').value;
+    const dateTime = getFormattedDateTime();
+    
+    console.log(`FROM: ${fromStation}, TO: ${toStation}, Date: ${dateTime.date}, Time: ${dateTime.time}`);
+    
+    try {
+        const response = await fetch(`/api/directional-forecast/${encodeURIComponent(fromStation)}?date=${dateTime.date}&time=${dateTime.time}`);
+        const data = await response.json();
+        console.log('FROM forecast:', data);
+    } catch(e) {
+        console.log('Error fetching from congestion:', e);
+    }
+    
+    try {
+        const response = await fetch(`/api/directional-forecast/${encodeURIComponent(toStation)}?date=${dateTime.date}&time=${dateTime.time}`);
+        const data = await response.json();
+        console.log('TO forecast:', data);
+    } catch(e) {
+        console.log('Error fetching to congestion:', e);
+    }
+}
+
+// ========== POPULATE CUSTOM DATE/TIME SELECTS ==========
+function populateDateTimeSelects() {
+    // Months
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                   'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthSelect = document.getElementById('monthSelect');
+    if (monthSelect) {
+        monthSelect.innerHTML = '';
+        months.forEach((month, index) => {
+            const option = document.createElement('option');
+            option.value = index + 1;
+            option.textContent = month;
+            monthSelect.appendChild(option);
+        });
+    }
+    
+    // Days
+    const daySelect = document.getElementById('daySelect');
+    if (daySelect) {
+        daySelect.innerHTML = '';
+        for (let i = 1; i <= 31; i++) {
+            const option = document.createElement('option');
+            option.value = String(i).padStart(2, '0');
+            option.textContent = i;
+            daySelect.appendChild(option);
+        }
+    }
+    
+    // Years
+    const yearSelect = document.getElementById('yearSelect');
+    if (yearSelect) {
+        yearSelect.innerHTML = '';
+        for (let i = 2025; i <= 2026; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = i;
+            yearSelect.appendChild(option);
+        }
+    }
+    
+    // Hours (4 AM to 11 PM)
+    const hourSelect = document.getElementById('hourSelect');
+    if (hourSelect) {
+        hourSelect.innerHTML = '';
+        for (let i = 4; i <= 23; i++) {
+            const option = document.createElement('option');
+            option.value = String(i).padStart(2, '0');
+            const displayHour = i > 12 ? i - 12 : i;
+            option.textContent = displayHour;
+            hourSelect.appendChild(option);
+        }
+    }
+    
+    // Minutes (in 5-minute increments)
+    const minuteSelect = document.getElementById('minuteSelect');
+    if (minuteSelect) {
+        minuteSelect.innerHTML = '';
+        for (let i = 0; i < 60; i += 5) {
+            const option = document.createElement('option');
+            option.value = String(i).padStart(2, '0');
+            option.textContent = String(i).padStart(2, '0');
+            minuteSelect.appendChild(option);
+        }
+    }
+    
+    // Set current date and time (add 1 hour)
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentDay = now.getDate();
+    let currentHour = now.getHours() + 1;
+    if (currentHour > 23) currentHour = 23;
+    const currentMinute = Math.floor(now.getMinutes() / 5) * 5;
+    
+    if (monthSelect) monthSelect.value = currentMonth;
+    if (daySelect) daySelect.value = String(currentDay).padStart(2, '0');
+    if (yearSelect) yearSelect.value = 2025;
+    if (hourSelect) hourSelect.value = String(Math.min(currentHour, 23)).padStart(2, '0');
+    if (minuteSelect) minuteSelect.value = String(Math.min(currentMinute, 55)).padStart(2, '0');
+    
+    updateTimePeriod();
+}
+
+// ========== UPDATE TIME PERIOD (AM/PM) ==========
+function updateTimePeriod() {
+    const hourSelect = document.getElementById('hourSelect');
+    const periodSpan = document.getElementById('timePeriod');
+    if (hourSelect && periodSpan) {
+        const hour = parseInt(hourSelect.value);
+        periodSpan.textContent = hour >= 12 ? 'PM' : 'AM';
+    }
+}
+
+// ========== GET FORMATTED DATE/TIME ==========
+function getFormattedDateTime() {
+    const month = document.getElementById('monthSelect')?.value || '1';
+    const day = document.getElementById('daySelect')?.value || '1';
+    const year = document.getElementById('yearSelect')?.value || '2025';
+    const hour = document.getElementById('hourSelect')?.value || '12';
+    const minute = document.getElementById('minuteSelect')?.value || '00';
+    
+    return {
+        date: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+        time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+        display: `${month}/${day}/${year} at ${hour}:${minute}`
+    };
+}
+
+// ========== VALIDATE DATE TIME ==========
+function validateDateTime() {
+    const dateTime = getFormattedDateTime();
+    const hour = parseInt(dateTime.time.split(':')[0]);
+    
+    if (hour < 4 || hour > 23) {
+        showToast('Trains operate from 4:30 AM to 10:30 PM only', 'error');
+        return false;
+    }
+    
+    return true;
+}
+
+// ========== PLAN ROUTE ==========
+function planRoute() {
+    if (!validateDateTime()) return;
+    
+    const from = document.getElementById('fromStation').value;
+    const to = document.getElementById('toStation').value;
+    
+    if (from === to) {
+        showToast('Please select different stations for FROM and TO', 'error');
+        return;
+    }
+    
+    const dateTime = getFormattedDateTime();
+    const date = dateTime.date;
+    const time = dateTime.time;
+    
+    console.log('Travel Date:', date);
+    console.log('Departure Time:', time);
+    
+    document.body.classList.add('loading');
+    
+    Promise.all([
+        fetch(`/api/directional-forecast/${encodeURIComponent(from)}?date=${date}&time=${time}`).then(res => res.json()),
+        fetch(`/api/directional-forecast/${encodeURIComponent(to)}?date=${date}&time=${time}`).then(res => res.json()),
+        fetch(`/api/schedule/headway`).then(res => res.json())
+    ]).then(([fromForecast, toForecast, headwayData]) => {
+        
+        const [hours, minutes] = time.split(':');
+        const departureHour = parseInt(hours);
+        
+        const fromHourlyForecast = fromForecast.forecasts?.find(f => f.hour === departureHour);
+        const toHourlyForecast = toForecast.forecasts?.find(f => f.hour === departureHour);
+        
+        let fromData = fromHourlyForecast || fromForecast.forecasts?.[0] || fromForecast.current || { northbound: 0, southbound: 0 };
+        let toData = toHourlyForecast || toForecast.forecasts?.[0] || toForecast.current || { northbound: 0, southbound: 0 };
+        
+        const ampm = departureHour >= 12 ? 'PM' : 'AM';
+        const hour12 = departureHour % 12 || 12;
+        const formattedTime = `${hour12}:${minutes} ${ampm}`;
+        
+        const dateObj = new Date(date);
+        const formattedDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+        
+        generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData, formattedDate, formattedTime, departureHour);
+        
+        document.body.classList.remove('loading');
+        showToast(`Route planned from ${from} to ${to} on ${formattedDate} at ${formattedTime}`);
+    }).catch(error => {
+        console.error('Error planning route:', error);
+        document.body.classList.remove('loading');
+        showToast('Error planning route', 'error');
+    });
+}
+
+// ========== CANCEL ROUTE ==========
+function cancelRoute() {
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentDay = now.getDate();
+    let currentHour = now.getHours() + 1;
+    if (currentHour > 23) currentHour = 23;
+    const currentMinute = Math.floor(now.getMinutes() / 5) * 5;
+    
+    document.getElementById('monthSelect').value = currentMonth;
+    document.getElementById('daySelect').value = String(currentDay).padStart(2, '0');
+    document.getElementById('yearSelect').value = 2025;
+    document.getElementById('hourSelect').value = String(Math.min(currentHour, 23)).padStart(2, '0');
+    document.getElementById('minuteSelect').value = String(Math.min(currentMinute, 55)).padStart(2, '0');
+    
     document.getElementById('fromStation').value = 'North Ave';
     document.getElementById('toStation').value = 'Ayala Ave';
     
-    // Clear advisories and show empty state
+    // Reset advisories
     const container = document.getElementById('advisoriesContainer');
     container.innerHTML = `
         <div class="recommendation-alert" id="recommendation">
@@ -2500,250 +3262,28 @@ try {
     `;
     container.classList.remove('has-content');
     
+    updateTimePeriod();
     showToast('Form reset to current date');
 }
-    function showTravelGuide() {
-    const modal = document.getElementById('travelGuideModal');
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
 
-function closeTravelGuide() {
-    const modal = document.getElementById('travelGuideModal');
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-// Close modal when clicking outside
-document.addEventListener('click', function(event) {
-    const modal = document.getElementById('travelGuideModal');
-    if (event.target === modal) {
-        closeTravelGuide();
-    }
-});
-
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        closeTravelGuide();
-    }
-});
-
-    function updateDateTime() {
-        const now = new Date();
-        const options = { 
-            weekday: 'long', 
-            month: 'long', 
-            day: 'numeric', 
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        };
-        document.getElementById('currentDateTime').textContent = now.toLocaleDateString('en-US', options);
-    }
-
-   function validateDateTime() {
-    const dateInput = document.getElementById('travelDate').value;
-    const timeInput = document.getElementById('departureTime').value;
-    const now = new Date();
-    
-    // ========== ONLY ALLOW 2025 DATES (ANY DATE IN 2025) ==========
-    const selectedYear = parseInt(dateInput.split('-')[0]);
-    if (selectedYear !== 2025) {
-        showToast('Only 2025 dates are allowed for testing', 'error');
-        document.getElementById('travelDate').value = '2025-01-15';
-        return false;
-    }
-    
-    // Check if date is within 2025
-    if (dateInput < '2025-01-01' || dateInput > '2025-12-31') {
-        showToast('Please select a date in 2025', 'error');
-        document.getElementById('travelDate').value = '2025-01-15';
-        return false;
-    }
-    
-    // ========== REMOVE THE PAST DATE CHECK FOR TESTING ==========
-    // Allow any date in 2025, even if it's "past" (for testing purposes)
-    // Just check if the time is valid
-    
-    const [hours, minutes] = timeInput.split(':').map(Number);
-    const totalMinutes = hours * 60 + minutes;
-    const openTime = 4 * 60 + 30;
-    const closeTime = 22 * 60 + 30;
-    
-    if (totalMinutes < openTime || totalMinutes > closeTime) {
-        showToast('Trains operate from 4:30 AM to 10:30 PM only', 'error');
-        return false;
-    }
-    
-    return true;
-}
-    function swapStations() {
-    const fromSelect = document.getElementById('fromStation');
-    const toSelect = document.getElementById('toStation');
-    
-    const fromValue = fromSelect.value;
-    const toValue = toSelect.value;
-    
-    fromSelect.value = toValue;
-    toSelect.value = fromValue;
-    
-    // Check if after swap, stations are the same
-    if (fromSelect.value === toSelect.value) {
-        showToast('Cannot have same stations', 'error');
-        // Swap back
-        fromSelect.value = fromValue;
-        toSelect.value = toValue;
-        return;
-    }
-    
-    showToast('Stations swapped');
-}
-
-// Load congestion for selected stations - Simplified (no indicators needed)
-async function updateStationCongestion() {
-    const fromStation = document.getElementById('fromStation').value;
-    const toStation = document.getElementById('toStation').value;
-    const date = document.getElementById('travelDate').value;
-    const time = document.getElementById('departureTime').value;
-    
-    // Just log the values - no UI elements to update
-    console.log(`FROM: ${fromStation}, TO: ${toStation}, Date: ${date}, Time: ${time}`);
-    
-    // Optionally, you could still fetch data for debugging
-    try {
-        const url = `/api/directional-forecast/${encodeURIComponent(fromStation)}?date=${date}&time=${time}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        console.log('FROM forecast:', data);
-    } catch(e) {
-        console.log('Error fetching from congestion:', e);
-    }
-    
-    try {
-        const url = `/api/directional-forecast/${encodeURIComponent(toStation)}?date=${date}&time=${time}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        console.log('TO forecast:', data);
-    } catch(e) {
-        console.log('Error fetching to congestion:', e);
-    }
-}
-document.addEventListener('DOMContentLoaded', function() {
-    
-    const fromSelect = document.getElementById('fromStation');
-    const toSelect = document.getElementById('toStation');
-    const dateInput = document.getElementById('travelDate');
-    const timeInput = document.getElementById('departureTime');
-    
-    fromSelect.addEventListener('change', updateStationCongestion);
-    toSelect.addEventListener('change', updateStationCongestion);
-    dateInput.addEventListener('change', updateStationCongestion);
-    timeInput.addEventListener('change', updateStationCongestion);
-    
-    // Initial load
-    updateStationCongestion();
-});
-function planRoute() {
-    if (!validateDateTime()) {
-        return;
-    }
-    
+// ========== REFRESH PLAN ==========
+function refreshPlan() {
     const from = document.getElementById('fromStation').value;
     const to = document.getElementById('toStation').value;
     
-    if (from === to) {
-        showToast('Please select different stations for FROM and TO', 'error');
-        return;
+    if (from && to && from !== to) {
+        planRoute();
+    } else {
+        showToast('Please select valid stations first', 'info');
     }
-    
-    const date = document.getElementById('travelDate').value;
-    const time = document.getElementById('departureTime').value;
-    
-    document.body.classList.add('loading');
-    
-    // FIX: Add date and time as query parameters to BOTH API calls
-    Promise.all([
-        fetch(`/api/directional-forecast/${encodeURIComponent(from)}?date=${date}&time=${time}`).then(res => res.json()),
-        fetch(`/api/directional-forecast/${encodeURIComponent(to)}?date=${date}&time=${time}`).then(res => res.json()),
-        fetch(`/api/schedule/headway`).then(res => res.json())
-    ]).then(([fromForecast, toForecast, headwayData]) => {
-        
-        console.log("FROM FORECAST:", fromForecast);
-        console.log("TO FORECAST:", toForecast);
-        
-        // Get the departure hour from selected time
-        const [hours, minutes] = time.split(':');
-        const departureHour = parseInt(hours);
-        
-        // ========== FIX: Find the forecast for the selected hour ==========
-        const fromHourlyForecast = fromForecast.forecasts?.find(f => f.hour === departureHour);
-        const toHourlyForecast = toForecast.forecasts?.find(f => f.hour === departureHour);
-        
-        // ========== FIX: Use current forecast if exact hour not found ==========
-        let fromData;
-        let toData;
-        
-        if (fromHourlyForecast) {
-            fromData = fromHourlyForecast;
-            console.log(`✅ Found FROM forecast for hour ${departureHour}`);
-        } else {
-            // Use the first forecast (closest to requested time) or current data
-            fromData = fromForecast.forecasts?.[0] || fromForecast.current || {
-                northbound: 0,
-                southbound: 0
-            };
-            console.log(`⚠️ Hour ${departureHour} not in FROM forecast, using closest available (hour ${fromData.hour})`);
-        }
-        
-        if (toHourlyForecast) {
-            toData = toHourlyForecast;
-            console.log(`✅ Found TO forecast for hour ${departureHour}`);
-        } else {
-            // Use the first forecast (closest to requested time) or current data
-            toData = toForecast.forecasts?.[0] || toForecast.current || {
-                northbound: 0,
-                southbound: 0
-            };
-            console.log(`⚠️ Hour ${departureHour} not in TO forecast, using closest available (hour ${toData.hour})`);
-        }
-        
-        console.log(`   FROM data at ${departureHour}:00:`, fromData);
-        console.log(`   TO data at ${departureHour}:00:`, toData);
-        
-        const ampm = departureHour >= 12 ? 'PM' : 'AM';
-        const hour12 = departureHour % 12 || 12;
-        const formattedTime = `${hour12}:${minutes} ${ampm}`;
-        
-        const dateObj = new Date(date);
-        const formattedDate = dateObj.toLocaleDateString('en-US', { 
-            weekday: 'long',
-            month: 'short', 
-            day: 'numeric' 
-        });
-        
-        // Generate advisories using the forecast data
-        generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData, formattedDate, formattedTime, departureHour);
-        
-        document.body.classList.remove('loading');
-        showToast(`Route planned from ${from} to ${to} on ${formattedDate} at ${formattedTime}`);
-    }).catch(error => {
-        console.error('Error planning route:', error);
-        document.body.classList.remove('loading');
-        showToast('Error planning route', 'error');
-    });
 }
 
-
-// Add this function to adjust text sizes dynamically
+// ========== ADJUST MOBILE TEXT SIZES ==========
 function adjustMobileTextSizes() {
     const isMobile = window.innerWidth <= 768;
-    
-    // Get all advisory cards and their text elements
     const advisoryCards = document.querySelectorAll('.advisory-card');
     
     advisoryCards.forEach(card => {
-        // Adjust header titles
         const headers = card.querySelectorAll('.advisory-header h4, [style*="font-weight: 700"]');
         headers.forEach(el => {
             if (isMobile) {
@@ -2753,7 +3293,6 @@ function adjustMobileTextSizes() {
             }
         });
         
-        // Adjust content text
         const contentText = card.querySelectorAll('.advisory-content, [style*="font-size: 14px"]');
         contentText.forEach(el => {
             if (isMobile) {
@@ -2763,7 +3302,6 @@ function adjustMobileTextSizes() {
             }
         });
         
-        // Adjust any "BOARDING" labels
         const labels = card.querySelectorAll('[style*="text-transform: uppercase"]');
         labels.forEach(el => {
             if (isMobile) {
@@ -2773,7 +3311,6 @@ function adjustMobileTextSizes() {
             }
         });
         
-        // Adjust numbers (ETA, time)
         const numbers = card.querySelectorAll('[style*="font-weight: 700; font-size: 16px"]');
         numbers.forEach(el => {
             if (isMobile) {
@@ -2785,55 +3322,29 @@ function adjustMobileTextSizes() {
     });
 }
 
-// Call on load and resize
-document.addEventListener('DOMContentLoaded', function() {
-    // ... existing code ...
-    adjustMobileTextSizes();
-});
-
 window.addEventListener('resize', function() {
-    // Debounce the resize event
     clearTimeout(window._resizeTimer);
     window._resizeTimer = setTimeout(adjustMobileTextSizes, 200);
 });
 
+// ========== GENERATE ADVISORIES WITH FORECAST (FIXED FOR MOBILE) ==========
 function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData, date, time, hour) {
     const container = document.getElementById('advisoriesContainer');
     container.innerHTML = '';
     container.classList.add('has-content');
-     const isMobile = window.innerWidth <= 768;
-    const statusSize = isMobile ? '14px' : '18px';
-    const titleSize = isMobile ? '13px' : '15px';
-    const subtitleSize = isMobile ? '10px' : '11px';
-    const numberSize = isMobile ? '14px' : '16px';
-    const boxPadding = isMobile ? '6px' : '10px';
-    const boxFontSize = isMobile ? '9px' : '10px';
-    const boxNumberSize = isMobile ? '13px' : '16px';
-    const messageSize = isMobile ? '13px' : '15px';
-    const tipSize = isMobile ? '11px' : '13px';
-    const iconSize = isMobile ? '14px' : '18px';
     
-    // Calculate base travel time
     const fromIdx = stations.indexOf(from);
     const toIdx = stations.indexOf(to);
     const stationDiff = Math.abs(fromIdx - toIdx);
     const baseTravelTime = stationDiff * 3 + 5;
     
-    // Determine direction
     const travelingSouth = fromIdx < toIdx;
     const directionText = travelingSouth ? 'SOUTHBOUND' : 'NORTHBOUND';
-    const directionIcon = travelingSouth ? 'fa-arrow-down' : 'fa-arrow-up';
     
-    // Get congestion for YOUR direction
     const fromCongestion = travelingSouth 
         ? (fromData?.southbound || 0)
         : (fromData?.northbound || 0);
     
-    const toCongestion = travelingSouth
-        ? (toData?.southbound || 0)
-        : (toData?.northbound || 0);
-    
-    // ETA adjustment
     let etaAdjustment = 0;
     if (fromCongestion > 80) etaAdjustment = 15;
     else if (fromCongestion > 70) etaAdjustment = 10;
@@ -2842,27 +3353,16 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     else if (fromCongestion > 20) etaAdjustment = 2;
     const adjustedTravelTime = baseTravelTime + etaAdjustment;
     
-    // Status helper
     const getStatus = (cong) => {
-        if (cong > 80) return { text: 'SEVERE', color: '#EF4444', bg: '#FEE2E2' };
-        if (cong > 60) return { text: 'CONGESTED', color: '#F97316', bg: '#FFEDD5' };
-        if (cong > 40) return { text: 'MODERATE', color: '#F59E0B', bg: '#FEF3C7' };
-        if (cong > 20) return { text: 'LIGHT', color: '#3B82F6', bg: '#EFF6FF' };
-        return { text: 'LIGHT', color: '#22C55E', bg: '#DCFCE7' };
+        if (cong > 80) return { text: 'SEVERE', color: '#EF4444' };
+        if (cong > 60) return { text: 'CONGESTED', color: '#F97316' };
+        if (cong > 40) return { text: 'MODERATE', color: '#F59E0B' };
+        if (cong > 20) return { text: 'LIGHT', color: '#3B82F6' };
+        return { text: 'LIGHT', color: '#22C55E' };
     };
     
     const fromStatus = getStatus(fromCongestion);
-    const toStatus = getStatus(toCongestion);
     
-    const getWaitTime = (cong) => {
-        if (cong > 80) return '';
-        if (cong > 60) return '';
-        if (cong > 30) return '';
-        return '';
-    };
-    const waitTime = getWaitTime(fromCongestion);
-    
-    // Short messages
     const getShortMessage = (congestion, station) => {
         if (congestion > 80) return `${station} severely congested. Long queues expected.`;
         if (congestion > 60) return `${station} congested. Delay boarding time.`;
@@ -2871,101 +3371,67 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     };
     
     const getShortTip = (congestion) => {
-        if (congestion > 80) return 'Consider an alterative route';
+        if (congestion > 80) return 'Consider an alternative route';
         if (congestion > 60) return 'Arrive 10-15 min early.';
         if (congestion > 40) return 'Arrive at normal time.';
         return 'No delays expected.';
     };
     
-    // ========== ADVISORY 1 - BOARDING STATION (EXPANDED HEIGHT) ==========
+    // ===== ADVISORY 1 - BOARDING STATION =====
     const advisory1 = document.createElement('div');
-    advisory1.className = 'advisory-card info';
-    advisory1.style.background = 'white';
-    advisory1.style.border = '1px solid #E2E8F0';
-    advisory1.style.padding = '18px 20px';
-    advisory1.style.minHeight = '120px';
-   advisory1.innerHTML = `
-    <div style="display: flex; align-items: center; gap: ${isMobile ? '8px' : '12px'};">
-        <div style="background: #EFF6FF; padding: ${isMobile ? '6px 10px' : '8px 12px'}; border-radius: 10px;">
-            <i class="fas fa-subway" style="color: #3B82F6; font-size: ${isMobile ? '14px' : '18px'};"></i>
+    advisory1.className = 'advisory-card info advisory-boarding';
+    advisory1.innerHTML = `
+        <div class="advisory-boarding-header">
+            <div class="advisory-boarding-icon">
+                <i class="fas fa-subway"></i>
+            </div>
+            <div>
+                <div class="advisory-boarding-title">BOARDING: ${from}</div>
+                <div class="advisory-boarding-subtitle">${time} · ${directionText} · ${stationDiff} stops</div>
+            </div>
         </div>
-        <div>
-            <div style="font-weight: 700; font-size: ${titleSize}; color: #1E293B;">BOARDING: ${from}</div>
-            <div style="font-size: ${subtitleSize}; color: #64748B;">${time} · ${directionText} · ${stationDiff} stops</div>
+        <div class="advisory-boarding-stats">
+            <div class="advisory-stat-box">
+                <div class="advisory-stat-label">BOARDING</div>
+                <div class="advisory-stat-value" style="color: ${fromStatus.color};">${fromStatus.text}</div>
+            </div>
+            <div class="advisory-stat-box">
+                <div class="advisory-stat-label">ESTIMATED TRAVEL TIME</div>
+                <div class="advisory-stat-value">${adjustedTravelTime}min(s)~</div>
+            </div>
         </div>
-    </div>
-    <div style="margin-top: ${isMobile ? '10px' : '14px'}; padding-top: ${isMobile ? '10px' : '14px'}; border-top: 1px solid #F1F5F9; display: flex; gap: ${isMobile ? '6px' : '10px'};">
-        <div style="flex:1; text-align:center; background:#F8FAFC; border: 1px solid grey; border-radius:8px; padding: ${boxPadding};">
-            <div style="font-size: ${boxFontSize}; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">BOARDING</div>
-            <div style="font-weight:700; font-size: ${boxNumberSize}; color:${fromStatus.color};">${fromStatus.text}</div>
-        </div>
-        <div style="flex:1; text-align:center; background:#F8FAFC; border: 1px solid grey; border-radius:8px; padding: ${boxPadding};">
-            <div style="font-size: ${boxFontSize}; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">ESTIMATED TRAVEL TIME</div>
-            <div style="font-weight:700; font-size: ${boxNumberSize}; color:#1E293B;">${adjustedTravelTime}min(s)~</div>
-        </div>
-    </div>
-`;
+    `;
     
-    // ========== ADVISORY 2 - STATUS & TIP (EXPANDED HEIGHT) ==========
+    // ===== ADVISORY 2 - STATUS & TIP =====
     const advisory2 = document.createElement('div');
     let cardClass = 'info';
-    let bgColor = '#EFF6FF';
-    let textColor = '#1E293B';
-    let borderColor = '#3B82F6';
+    if (fromCongestion > 80) cardClass = 'critical';
+    else if (fromCongestion > 60) cardClass = 'warning';
+    else if (fromCongestion > 40) cardClass = 'moderate';
+    else cardClass = 'success';
     
-    if (fromCongestion > 80) {
-        cardClass = 'critical';
-        bgColor = '#EF4444';
-        textColor = 'white';
-        borderColor = '#EF4444';
-    } else if (fromCongestion > 60) {
-        cardClass = 'warning';
-        bgColor = '#F97316';
-        textColor = 'white';
-        borderColor = '#F97316';
-    } else if (fromCongestion > 40) {
-        cardClass = 'moderate';
-        bgColor = '#F59E0B';
-        textColor = 'white';
-        borderColor = '#F59E0B';
-    } else {
-        cardClass = 'success';
-        bgColor = '#F0FDF4';
-        textColor = '#166534';
-        borderColor = '#22C55E';
-    }
-    
-    advisory2.className = `advisory-card ${cardClass}`;
-    advisory2.style.background = bgColor;
-    advisory2.style.border = cardClass === 'info' || cardClass === 'success' ? `2px solid ${borderColor}` : 'none';
-    advisory2.style.padding = '16px 20px';
-    advisory2.style.marginTop = '10px';
-    advisory2.style.minHeight = '80px';
+    advisory2.className = `advisory-card ${cardClass} advisory-status`;
     
     const shortMsg = getShortMessage(fromCongestion, from);
     const shortTip = getShortTip(fromCongestion);
+    const iconClass = fromCongestion > 80 ? 'fa-exclamation-triangle' : 
+                     fromCongestion > 60 ? 'fa-exclamation-circle' : 'fa-info-circle';
     
-   advisory2.innerHTML = `
-    <div style="display: flex; align-items: flex-start; gap: ${isMobile ? '8px' : '12px'}; color: ${textColor};">
-        <i class="fas ${fromCongestion > 80 ? 'fa-exclamation-triangle' : fromCongestion > 60 ? 'fa-exclamation-circle' : 'fa-info-circle'}" 
-           style="font-size: ${iconSize}; margin-top: 2px;"></i>
-        <div style="flex:1;">
-            <div style="font-size: ${messageSize}; font-weight: 600; line-height: 1.4;">${shortMsg}</div>
-            <div style="margin-top: 6px; font-size: ${tipSize}; opacity: 0.85; display: flex; align-items: center; gap: 6px;">
-                <i class="fas fa-lightbulb" style="font-size: ${isMobile ? '10px' : '12px'};"></i> ${shortTip}
+    advisory2.innerHTML = `
+        <div class="advisory-status-content">
+            <i class="fas ${iconClass} advisory-status-icon"></i>
+            <div class="advisory-status-text">
+                <div class="advisory-status-message">${shortMsg}</div>
+                <div class="advisory-status-tip">
+                    <i class="fas fa-lightbulb"></i> ${shortTip}
+                </div>
             </div>
         </div>
-    </div>
-`;
+    `;
     
-    // ========== ADVISORY 3 - RUSH HOUR (EXPANDED HEIGHT) ==========
+    // ===== ADVISORY 3 - RUSH HOUR =====
     const advisory3 = document.createElement('div');
-    advisory3.className = 'advisory-card info';
-    advisory3.style.background = 'white';
-    advisory3.style.border = '1px solid #E2E8F0';
-    advisory3.style.padding = '16px 20px';
-    advisory3.style.marginTop = '10px';
-    advisory3.style.minHeight = '80px';
+    advisory3.className = 'advisory-card info advisory-rush';
     
     const isMorningRush = hour >= 7 && hour <= 9;
     const isEveningRush = hour >= 17 && hour <= 20;
@@ -2987,7 +3453,7 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
         rushColor = '#F97316';
     } else if (hour >= 21) {
         rushLabel = 'LATE NIGHT SERVICE';
-        rushNote = `Last trains · ${from} ha ${fromStatus.text.toLowerCase()} congestion`;
+        rushNote = `Last trains · ${from} has ${fromStatus.text.toLowerCase()} congestion`;
         rushAdvice = 'Final train at 10:30 PM · Arrive early to board';
         rushColor = '#3B82F6';
     } else if (hour >= 5 && hour < 7) {
@@ -3002,54 +3468,29 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
         rushColor = '#3B82F6';
     }
     
-    
-    // Format date for display
-    const dateObj = new Date(date + 'T00:00:00');
-    const formattedDate = dateObj.toLocaleDateString('en-US', { 
-        weekday: 'short',
-        month: 'short', 
-        day: 'numeric',
-        year: 'numeric'
-    });
-    
-   advisory3.innerHTML = `
-    <div style="display: flex; align-items: flex-start; gap: ${isMobile ? '8px' : '12px'};">
-        <div style="background: ${rushColor}15; padding: ${isMobile ? '6px 8px' : '8px 10px'}; border-radius: 8px; border-left: 4px solid ${rushColor};">
-            <i class="fas fa-clock" style="color: ${rushColor}; font-size: ${isMobile ? '12px' : '16px'};"></i>
-        </div>
-        <div style="flex: 1;">
-            <div style="font-weight: 700; font-size: ${isMobile ? '12px' : '14px'}; color: ${rushColor};">${rushLabel}</div>
-            <div style="font-size: ${isMobile ? '11px' : '13px'}; color: #1E293B; margin-top: 2px;">${rushNote}</div>
-            <div style="font-size: ${isMobile ? '10px' : '12px'}; color: #64748B; margin-top: 4px;">
-                <i class="fas fa-lightbulb" style="color: ${rushColor};"></i> ${rushAdvice}
+    advisory3.innerHTML = `
+        <div class="advisory-rush-content">
+            <div class="advisory-rush-icon" style="border-left-color: ${rushColor};">
+                <i class="fas fa-clock" style="color: ${rushColor};"></i>
+            </div>
+            <div class="advisory-rush-text">
+                <div class="advisory-rush-label" style="color: ${rushColor};">${rushLabel}</div>
+                <div class="advisory-rush-note">${rushNote}</div>
+                <div class="advisory-rush-advice">
+                    <i class="fas fa-lightbulb" style="color: ${rushColor};"></i> ${rushAdvice}
+                </div>
             </div>
         </div>
-    </div>
-    <div style="margin-top: ${isMobile ? '8px' : '12px'}; padding-top: ${isMobile ? '8px' : '12px'}; border-top: 1px solid #F1F5F9; display: flex; justify-content: space-between; font-size: ${isMobile ? '10px' : '11px'}; color: #64748B;">
-        <span><i class="fas fa-route"></i> ${from} → ${to}</span>
-    </div>
-`;
+        <div class="advisory-rush-footer">
+            <span><i class="fas fa-route"></i> ${from} → ${to}</span>
+        </div>
+    `;
     
     container.appendChild(advisory1);
     container.appendChild(advisory2);
     container.appendChild(advisory3);
 }
-function refreshPlan() {
-    // Re-run the current plan with updated data
-    const from = document.getElementById('fromStation').value;
-    const to = document.getElementById('toStation').value;
-    const date = document.getElementById('travelDate').value;
-    const time = document.getElementById('departureTime').value;
-    
-    if (from && to && from !== to) {
-        // Re-fetch and update the advisories
-        planRoute();
-    } else {
-        showToast('Please select valid stations first', 'info');
-    }
-}
-
-// Sync mobile alert badge with desktop badge
+// ========== SYNC MOBILE ALERT BADGE ==========
 function syncMobileAlertBadge() {
     const desktopBadge = document.getElementById('alertBadge');
     const mobileBadge = document.getElementById('mobileAlertBadge');
@@ -3064,7 +3505,7 @@ function syncMobileAlertBadge() {
     }
 }
 
-// Helper function 
+// ========== HELPER FUNCTIONS ==========
 function getPreviousStation(station) {
     const stationsList = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
     const idx = stationsList.indexOf(station);
@@ -3072,35 +3513,20 @@ function getPreviousStation(station) {
     return stationsList[1];
 }
 
-function getCongestionText(congestion) {
-    if (congestion > 80) return 'SEVERELY CONGESTED';
-    if (congestion > 60) return 'CONGESTED';
-    if (congestion > 30) return 'MODERATE';
-    return 'LIGHT';
-}
-
-// Helper function to get previous station (you may need to add this)
-function getPreviousStation(station) {
-    const stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
-    const idx = stations.indexOf(station);
-    if (idx > 0) return stations[idx - 1];
-    return stations[1]; // fallback
-}
-// Replace the fetchAlertCount function with this optimized version:
+// ========== FETCH ALERT COUNT ==========
 let cachedAlertCount = null;
 let cachedAlertCountTime = 0;
 const ALERT_CACHE_DURATION = 30000;
+
 async function fetchAlertCount() {
     const now = Date.now();
     
-    // Use cached alert count if still valid
     if (cachedAlertCount !== null && (now - cachedAlertCountTime) < ALERT_CACHE_DURATION) {
         console.log('📦 Using cached alert count:', cachedAlertCount);
         return cachedAlertCount;
     }
     
     try {
-        // Get read status from localStorage
         let readAlerts = new Set();
         const saved = localStorage.getItem('readAlerts');
         if (saved) {
@@ -3111,14 +3537,12 @@ async function fetchAlertCount() {
         const nowDate = new Date();
         const hour = nowDate.getHours();
         
-        // ========== 1. Rush Hour Alert ==========
         if ((hour >= 7 && hour <= 9)) {
             allAlerts.push({ id: 'rush-morning-permanent' });
         } else if ((hour >= 17 && hour <= 19)) {
             allAlerts.push({ id: 'rush-evening-permanent' });
         }
         
-        // ========== 2. Advisory Alert ==========
         if (hour >= 0 && hour < 5) {
             allAlerts.push({ id: 'advisory-early-morning-permanent' });
         } else if (hour >= 5 && hour < 7) {
@@ -3131,14 +3555,12 @@ async function fetchAlertCount() {
             allAlerts.push({ id: 'advisory-service-ended-permanent' });
         }
         
-        // ========== 3. Congestion Advisory ==========
         if (hour >= 21 || hour < 5) {
             allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
         } else if (hour >= 14 && hour < 17) {
             allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
         }
         
-        // ========== 4. Service Notices ==========
         const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
         if (isWeekend) {
             allAlerts.push({ id: 'service-weekend-permanent' });
@@ -3147,19 +3569,16 @@ async function fetchAlertCount() {
             allAlerts.push({ id: 'service-maintenance-night-permanent' });
         }
         
-        // ========== 5. Congestion alerts from live map (GROUPED) ==========
         try {
             const response = await fetch('/api/live-map/directions/v2');
             const data = await response.json();
             
             if (data && data.northbound && data.southbound) {
-                // Group stations by severity
                 const grouped = {
                     northbound: { severe: [], congested: [], moderate: [], light: [] },
                     southbound: { severe: [], congested: [], moderate: [], light: [] }
                 };
                 
-                // Process northbound
                 for (const [station, stationData] of Object.entries(data.northbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.northbound.severe.push(station);
@@ -3168,7 +3587,6 @@ async function fetchAlertCount() {
                     else if (congestion > 0) grouped.northbound.light.push(station);
                 }
                 
-                // Process southbound
                 for (const [station, stationData] of Object.entries(data.southbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.southbound.severe.push(station);
@@ -3177,7 +3595,6 @@ async function fetchAlertCount() {
                     else if (congestion > 0) grouped.southbound.light.push(station);
                 }
                 
-                // ONLY COUNT GROUPS THAT HAVE STATIONS
                 if (grouped.northbound.severe.length > 0) allAlerts.push({ id: 'north-severe-permanent' });
                 if (grouped.northbound.congested.length > 0) allAlerts.push({ id: 'north-congested-permanent' });
                 if (grouped.northbound.moderate.length > 0) allAlerts.push({ id: 'north-moderate-permanent' });
@@ -3192,7 +3609,6 @@ async function fetchAlertCount() {
             console.log('Could not fetch congestion alerts:', e);
         }
         
-        // ========== 6. Broadcasts ==========
         try {
             const broadcastResponse = await fetch('/api/broadcasts/public');
             const broadcastData = await broadcastResponse.json();
@@ -3205,7 +3621,6 @@ async function fetchAlertCount() {
             console.log('Could not fetch broadcasts:', e);
         }
         
-        // ========== ONLY COUNT CONGESTION ALERTS ==========
         const congestionAlertIds = [
             'north-severe-permanent', 'north-congested-permanent', 
             'north-moderate-permanent', 'north-light-permanent',
@@ -3220,12 +3635,10 @@ async function fetchAlertCount() {
             }
         }
 
-        // Cache the result - ONLY congestion alerts
         cachedAlertCount = congestionCount;
         cachedAlertCountTime = now;
 
         console.log('📊 Travel Plan - Congestion alerts only:', congestionCount);
-        console.log('📊 Total alerts (all types):', allAlerts.length);
         return congestionCount;
         
     } catch (error) {
@@ -3234,16 +3647,14 @@ async function fetchAlertCount() {
     }
 }
 
+// ========== CHECK ALERT COUNT ==========
 async function checkAlertCount() {
     const alertCount = await fetchAlertCount();
     
     const badge = document.getElementById('alertBadge');
     const sidebarBadge = document.getElementById('sidebarAlertCount');
     
-    // Bell badge: Show 9+ for counts > 9
     const bellDisplayValue = alertCount > 9 ? '9+' : alertCount;
-    
-    // Sidebar badge: Show actual number (no truncation)
     const sidebarDisplayValue = alertCount;
     
     if (badge) {
@@ -3270,24 +3681,25 @@ async function checkAlertCount() {
     syncMobileAlertBadge();
 }
 
-    function showToast(message, type = 'success') {
-        const toast = document.createElement('div');
-        toast.className = 'success-message';
-        
-        if (type === 'error') {
-            toast.style.background = 'var(--red)';
-            toast.style.boxShadow = '0 8px 20px rgba(239, 68, 68, 0.3)';
-            toast.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
-        } else {
-            toast.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
-        }
-        
-        document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.remove();
-        }, 3000);
+// ========== SHOW TOAST ==========
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = 'success-message';
+    
+    if (type === 'error') {
+        toast.style.background = 'var(--red)';
+        toast.style.boxShadow = '0 8px 20px rgba(239, 68, 68, 0.3)';
+        toast.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+    } else {
+        toast.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
     }
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
     </script>
 </body>
 </html>

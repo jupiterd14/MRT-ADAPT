@@ -52,11 +52,6 @@ def save_overrides(overrides):
     except Exception as e:
         print(f"Error saving overrides: {e}")
         
-def get_active_overrides():
-    """Get active overrides from file - TEMPORARY: skip expiry check"""
-    overrides = load_overrides()
-    print(f"📄 operator.py LOADED: {overrides}")
-    return overrides
 
 
 def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name):
@@ -605,21 +600,26 @@ def send_broadcast():
         db.session.rollback()
         print(f"Error sending broadcast: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+    
+    
+def get_active_overrides():
+    """Get active overrides from file with expiry check"""
+    overrides = load_overrides()
+    now = datetime.now().timestamp()
+    
+    # Filter out expired overrides
+    active_overrides = {}
+    for key, override in overrides.items():
+        expiry = override.get('expiry')
+        if expiry is None or expiry > now:
+            active_overrides[key] = override
+        else:
+            print(f"⏰ Override expired: {key} (expired at {datetime.fromtimestamp(expiry)})")
+    
+    print(f"📄 operator.py LOADED: {active_overrides}")
+    return active_overrides
 
-@operator_bp.route('/api/operator/deactivate-broadcast/<int:broadcast_id>', methods=['POST'])
-def deactivate_broadcast(broadcast_id):
-    try:
-        broadcast = Broadcast.query.get(broadcast_id)
-        if broadcast:
-            broadcast.is_active = False
-            db.session.commit()
-        
-        log_activity(session.get('user_id'), 'operator', session.get('username'),
-                    'deactivate_broadcast', f'Deactivated broadcast ID: {broadcast_id}')
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+
 @operator_bp.route('/api/operator/override-congestion', methods=['POST'])
 def override_congestion():
     try:
@@ -647,9 +647,8 @@ def override_congestion():
         # Load existing overrides from file
         overrides = load_overrides()
         
-        # ========== FIX: Use the config current time instead of system time ==========
-        from config import Config
-        current_time = Config.get_current_time()
+        # ✅ FIX: Use ACTUAL system time, not Config time
+        current_time = datetime.now()
         current_timestamp = current_time.timestamp()
         
         expiry = None
@@ -657,10 +656,10 @@ def override_congestion():
         if duration != 'manual':
             duration_minutes = int(duration)
             expiry = current_timestamp + (duration_minutes * 60)
-            print(f"   Current time (config): {current_time}")
+            print(f"   Current time (system): {current_time}")
             print(f"   Expiry: {expiry} ({duration_minutes} minutes from now)")
         else:
-        # For manual overrides, round to the start of the hour
+            # For manual overrides, round to the start of the hour
             current_time = current_time.replace(minute=0, second=0, microsecond=0)
             current_timestamp = current_time.timestamp()
             print(f"   Manual override - rounded to hour: {current_time}")
@@ -685,13 +684,12 @@ def override_congestion():
         save_overrides(overrides)
         
         # ========== UPDATE APP CONFIG ==========
-        # Use the imported current_app from top of file
         if 'overrides' not in current_app.config:
             current_app.config['overrides'] = {}
         current_app.config['overrides'][override_key] = overrides[override_key]
         print(f"✅ Updated app config with override: {override_key}")
         
-        # ========== CLEAR THE CACHE FOR THIS STATION ==========
+     
         try:
             # Get the actual cache instance from the app extensions
             cache_instance = current_app.extensions.get('cache')

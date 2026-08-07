@@ -610,6 +610,54 @@ nav {
     overflow: visible;
 }
 
+/* Simple override indicator - just a purple ring and small icon */
+.override-ring {
+    border: 3px solid #8B5CF6 !important;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.4) !important;
+}
+
+/* Override section in modal */
+.override-section {
+    margin-top: 16px;
+    padding: 12px;
+    background: #EDE9FE;
+    border-radius: 12px;
+    border: 1px solid #8B5CF6;
+}
+
+.override-section .header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.override-section .header i {
+    color: #8B5CF6;
+}
+
+.override-section .header strong {
+    color: #6D28D9;
+}
+
+.override-section .details {
+    font-size: 13px;
+    color: #4C1D95;
+}
+
+/* Override status badge in modal */
+.status-badge.override {
+    border: 2px solid #8B5CF6;
+    background: #EDE9FE;
+}
+
+.status-badge.override span {
+    color: #6D28D9;
+}
+
+.status-badge.override .dot {
+    background: #8B5CF6;
+}
 
 .station-row {
     position: relative;
@@ -1970,7 +2018,6 @@ function goToReport() {
     const stationName = document.getElementById('modalStationName').textContent;
     window.location.href = '/report?station=' + encodeURIComponent(stationName);
 }
-
 async function fetchStationData() {
     const now = Date.now();
     
@@ -1989,155 +2036,119 @@ async function fetchStationData() {
     try {
         console.log('🚀 Fetching fresh map data from LIVE MAP API (with overrides)...');
         
-        const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
+        // Fetch both live map data AND overrides
+        const [response, overrideResponse] = await Promise.all([
+            fetch(`/api/live-map/directions/v2?_=${Date.now()}`),
+            fetch(`/api/operator/debug-override?_=${Date.now()}`)
+        ]);
         
-        if (response.ok) {
-            const data = await response.json();
+        const data = await response.json();
+        const overrideData = await overrideResponse.json();
+        const activeOverrides = overrideData.active_overrides || {};
+        
+        console.log('📋 Active overrides:', activeOverrides);
+        
+        // Check operating hours
+        const nowTime = new Date();
+        const hour = nowTime.getHours();
+        const minute = nowTime.getMinutes();
+        const currentTime = hour + minute/60;
+        const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
+        const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
+        
+        const processedData = { northbound: {}, southbound: {} };
+        
+        // ========== Process each station with override awareness ==========
+        for (const station of stations) {
+            const northData = data.northbound?.[station];
+            const southData = data.southbound?.[station];
             
-            // Check operating hours
-            const nowTime = new Date();
-            const hour = nowTime.getHours();
-            const minute = nowTime.getMinutes();
-            const currentTime = hour + minute/60;
-            const OPERATING_START = 4.5;
-            const OPERATING_END = 22.5;
-            const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
+            // Check for overrides for this station
+            const northOverrideKey = `${station}_northbound`;
+            const southOverrideKey = `${station}_southbound`;
+            const northOverride = activeOverrides[northOverrideKey] || null;
+            const southOverride = activeOverrides[southOverrideKey] || null;
             
-            const processedData = { northbound: {}, southbound: {} };
-            
-            // ========== FIX: Check for overrides even when closed ==========
-            for (const station of stations) {
-                const northData = data.northbound?.[station];
-                const southData = data.southbound?.[station];
-                
-                // Check if station has overrides
-                const isNorthOverridden = northData?.overridden || false;
-                const isSouthOverridden = southData?.overridden || false;
-                
-                // Northbound - use override if present, otherwise use closed status
-                if (isNorthOverridden) {
-                    // Use override value from API
-                    const northCong = northData?.congestion ?? 25;
-                    processedData.northbound[station] = {
-                        congestion: northCong,
-                        wait_time: northData?.wait_time || getWaitTime(northCong),
-                        status: northData?.status || getStatusText(northCong),
-                        overridden: true
-                    };
-                } else if (isClosed) {
-                    // MRT is closed and no override
-                    processedData.northbound[station] = { 
-                        congestion: 0, 
-                        wait_time: 'CLOSED', 
-                        status: 'CLOSED',
-                        overridden: false
-                    };
-                } else {
-                    // Normal operation
-                    const northCong = northData?.congestion ?? 25;
-                    processedData.northbound[station] = {
-                        congestion: northCong,
-                        wait_time: northData?.wait_time || getWaitTime(northCong),
-                        status: northData?.status || getStatusText(northCong),
-                        overridden: false
-                    };
-                }
-                
-                // Southbound - use override if present, otherwise use closed status
-                if (isSouthOverridden) {
-                    const southCong = southData?.congestion ?? 25;
-                    processedData.southbound[station] = {
-                        congestion: southCong,
-                        wait_time: southData?.wait_time || getWaitTime(southCong),
-                        status: southData?.status || getStatusText(southCong),
-                        overridden: true
-                    };
-                } else if (isClosed) {
-                    // MRT is closed and no override
-                    processedData.southbound[station] = { 
-                        congestion: 0, 
-                        wait_time: 'CLOSED', 
-                        status: 'CLOSED',
-                        overridden: false
-                    };
-                } else {
-                    // Normal operation
-                    const southCong = southData?.congestion ?? 25;
-                    processedData.southbound[station] = {
-                        congestion: southCong,
-                        wait_time: southData?.wait_time || getWaitTime(southCong),
-                        status: southData?.status || getStatusText(southCong),
-                        overridden: false
-                    };
-                }
+            // ===== NORTHBOUND =====
+            const isNorthOverridden = !!northOverride;
+            if (isNorthOverridden) {
+                // Use override value
+                const overrideCong = northOverride.congestion || northOverride.level || 25;
+                const overrideStatus = northOverride.level || getStatusText(overrideCong);
+                processedData.northbound[station] = {
+                    congestion: overrideCong,
+                    wait_time: northData?.wait_time || getWaitTime(overrideCong),
+                    status: overrideStatus,
+                    overridden: true,
+                    override_info: northOverride // Store full override info
+                };
+            } else if (isClosed) {
+                // MRT is closed and no override
+                processedData.northbound[station] = { 
+                    congestion: 0, 
+                    wait_time: 'CLOSED', 
+                    status: 'CLOSED',
+                    overridden: false,
+                    override_info: null
+                };
+            } else {
+                // Normal operation
+                const northCong = northData?.congestion ?? 25;
+                processedData.northbound[station] = {
+                    congestion: northCong,
+                    wait_time: northData?.wait_time || getWaitTime(northCong),
+                    status: northData?.status || getStatusText(northCong),
+                    overridden: false,
+                    override_info: null
+                };
             }
             
-            cachedData = processedData;
-            lastFetchTime = now;
-            isUpdating = false;
-            
-            console.log('✅ Map data loaded, overrides preserved');
-            
-            console.log("Forecast here: ", processedData);
-            return processedData;
-            
-        } else {
-            console.error('V2 API returned:', response.status);
-            console.log('⚠️ Falling back to directional-forecast API...');
-            
-            const forecastPromises = stations.map(async (station) => {
-                try {
-                    const forecastResponse = await fetch(`/api/directional-forecast/${encodeURIComponent(station)}?_=${Date.now()}`);
-                    if (forecastResponse.ok) {
-                        const forecastData = await forecastResponse.json();
-                        return { station, data: forecastData };
-
-                    }
-                } catch (e) {
-                    console.error(`Error fetching forecast for ${station}:`, e);
-                }
-                return null;
-            });
-            
-            const forecastResults = await Promise.all(forecastPromises);
-            const fallbackData = { northbound: {}, southbound: {} };
-            
-            for (const result of forecastResults) {
-                if (result && result.data && result.data.forecasts && result.data.forecasts.length > 0) {
-                    const station = result.station;
-                    const currentForecast = result.data.forecasts[0];
-                    const northCong = currentForecast.northbound || 25;
-                    const southCong = currentForecast.southbound || 25;
-                    
-                    fallbackData.northbound[station] = { 
-                        congestion: northCong, 
-                        wait_time: getWaitTime(northCong), 
-                        status: getStatusText(northCong),
-                        overridden: false
-                    };
-                    fallbackData.southbound[station] = { 
-                        congestion: southCong, 
-                        wait_time: getWaitTime(southCong), 
-                        status: getStatusText(southCong),
-                        overridden: false
-                    };
-                }
+            // ===== SOUTHBOUND =====
+            const isSouthOverridden = !!southOverride;
+            if (isSouthOverridden) {
+                const overrideCong = southOverride.congestion || southOverride.level || 25;
+                const overrideStatus = southOverride.level || getStatusText(overrideCong);
+                processedData.southbound[station] = {
+                    congestion: overrideCong,
+                    wait_time: southData?.wait_time || getWaitTime(overrideCong),
+                    status: overrideStatus,
+                    overridden: true,
+                    override_info: southOverride
+                };
+            } else if (isClosed) {
+                processedData.southbound[station] = { 
+                    congestion: 0, 
+                    wait_time: 'CLOSED', 
+                    status: 'CLOSED',
+                    overridden: false,
+                    override_info: null
+                };
+            } else {
+                const southCong = southData?.congestion ?? 25;
+                processedData.southbound[station] = {
+                    congestion: southCong,
+                    wait_time: southData?.wait_time || getWaitTime(southCong),
+                    status: southData?.status || getStatusText(southCong),
+                    overridden: false,
+                    override_info: null
+                };
             }
-            
-            cachedData = fallbackData;
-            lastFetchTime = now;
-            isUpdating = false;
-            return fallbackData;
         }
         
-    } catch (e) {
-        console.error("Fetch failed:", e);
+        cachedData = processedData;
+        lastFetchTime = now;
+        isUpdating = false;
+        
+        console.log('✅ Map data loaded with overrides');
+        return processedData;
+        
+    } catch (error) {
+        console.error('Fetch failed:', error);
+        isUpdating = false;
+        return cachedData || directionData;
     }
-    
-    isUpdating = false;
-    return cachedData || directionData;
 }
-
 // ========== OPTIMIZED: Batch DOM Updates With Nearest Location Glow ==========
 function renderStations() {
     const container = document.getElementById('stations-container');
@@ -2152,7 +2163,6 @@ function renderStations() {
         const stationInfo = data[station];
         const row = document.createElement('div');
         
-        // Check if this is the nearest station
         const isNearest = (station === nearestStationName);
         row.className = `station-row ${isNearest ? 'nearest-station' : ''}`;
         row.onclick = (function(s) { return function() { openModal(s); }; })(station);
@@ -2175,33 +2185,42 @@ function renderStations() {
         const isOverridden = stationInfo.overridden || false;
         const status = stationInfo.status || getStatusText(congestion);
         
-        // ========== FIX: Determine wait time based on status ==========
         let waitTime;
-        if (status === 'CLOSED') {
+        if (status === 'CLOSED' && !isOverridden) {
             waitTime = 'CLOSED';
         } else {
             waitTime = stationInfo.wait_time || getWaitTime(congestion);
         }
         
-        // If overridden, use the override status (never CLOSED)
         if (isOverridden && status === 'CLOSED') {
             waitTime = getWaitTime(congestion);
         }
         
         const colorClass = getStatusClass(congestion);
-        const overrideBadge = isOverridden ? `<span style="font-size: 9px; color: #8B5CF6; background: #EDE9FE; padding: 1px 6px; border-radius: 10px; margin-left: 4px; border: 1px solid #8B5CF6;"><i class="fas fa-pen"></i></span>` : '';
+        
+        // ========== SIMPLE "OVERRIDDEN" TEXT ==========
+        let overrideText = '';
+        if (isOverridden) {
+            overrideText = `<span style="font-size: 8px; color: #8B5CF6; background: #EDE9FE; padding: 1px 6px; border-radius: 8px; border: 1px solid #8B5CF6; margin-left: 4px; font-weight: 600; text-transform: uppercase;">
+                OVERRIDDEN
+            </span>`;
+        }
+        
         const nearestBadgeHTML = isNearest ? `<span class="nearest-badge"><i class="fas fa-street-view"></i> YOU ARE NEAR</span>` : '';
         
-        // If status is CLOSED and not overridden, use gray color
         const displayColorClass = (status === 'CLOSED' && !isOverridden) ? 'bg-light' : colorClass;
+        const markerStyle = (status === 'CLOSED' && !isOverridden) ? 'background: #94A3B8;' : '';
+        
+        // Purple ring for overridden stations
+        const overrideRing = isOverridden ? 'style="border: 3px solid #8B5CF6; box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);"' : '';
         
         row.innerHTML = `
             <div class="station-text-group">
-                <span class="st-name">${station}</span>
+                <span class="st-name">${station} ${overrideText}</span>
                 <span class="st-time" style="${status === 'CLOSED' && !isOverridden ? 'color: #94A3B8;' : ''}">${waitTime}</span>
                 ${nearestBadgeHTML}
             </div>
-            <div class="station-marker ${displayColorClass}" style="${status === 'CLOSED' && !isOverridden ? 'background: #94A3B8;' : ''}">
+            <div class="station-marker ${displayColorClass}" ${overrideRing} style="${markerStyle} ${isOverridden ? 'border: 3px solid #8B5CF6;' : ''}">
                 <i class="fas fa-train"></i>
             </div>
         `;
@@ -2211,7 +2230,6 @@ function renderStations() {
     container.innerHTML = '';
     container.appendChild(fragment);
 }
-
 async function updateAllStations() {
     const data = await fetchStationData();
     if (data) {
@@ -2436,23 +2454,59 @@ function openModal(stationName) {
     
     const congestion = stationData.congestion || 0;
     const status = getStatusText(congestion);
+    const isOverridden = stationData.overridden || false;
+    const overrideInfo = stationData.override_info || null;
     const message = getStatusMessage(stationName, congestion);
     
     document.getElementById('modalStationName').textContent = stationName;
     document.getElementById('modalStatusText').textContent = status;
     document.getElementById('modalBodyText').textContent = message;
     
+    // ========== SIMPLE OVERRIDE SECTION IN MODAL ==========
+    let overrideSection = '';
+    if (isOverridden && overrideInfo) {
+        const operatorName = overrideInfo.operator || 'Unknown';
+        const expiry = overrideInfo.expiry ? new Date(overrideInfo.expiry * 1000).toLocaleString() : 'Manual (until cleared)';
+        const level = overrideInfo.level || overrideInfo.congestion || 'N/A';
+        const reason = overrideInfo.reason || 'No reason provided';
+        
+        overrideSection = `
+            <div style="margin-top: 16px; padding: 12px; background: #EDE9FE; border-radius: 12px; border: 1px solid #8B5CF6;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <i class="fas fa-pen" style="color: #8B5CF6;"></i>
+                    <strong style="color: #6D28D9;">Operator Override Active</strong>
+                </div>
+                <div style="font-size: 13px; color: #4C1D95;">
+                    <div><strong>Operator:</strong> ${operatorName}</div>
+                    <div><strong>Congestion:</strong> ${level}</div>
+                    <div><strong>Expires:</strong> ${expiry}</div>
+                    ${reason ? `<div><strong>Reason:</strong> ${reason}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Update modal body to include override section
+    const modalBody = document.getElementById('modalBodyText');
+    modalBody.innerHTML = `
+        ${message}
+        ${overrideSection}
+    `;
+    
     const statusBadge = document.getElementById('modalStatusBadge');
     statusBadge.className = 'status-badge';
     
-    if (congestion > 80) statusBadge.classList.add('severe');
-    else if (congestion > 60) statusBadge.classList.add('congested');
-    else if (congestion > 30) statusBadge.classList.add('moderate');
-    else statusBadge.classList.add('light');
+    if (isOverridden) {
+        statusBadge.classList.add('override');
+    } else {
+        if (congestion > 80) statusBadge.classList.add('Severely congested');
+        else if (congestion > 60) statusBadge.classList.add('Congested');
+        else if (congestion > 30) statusBadge.classList.add('Moderate congestion');
+        else statusBadge.classList.add('Light congestion');
+    }
     
     document.getElementById('stationModal').classList.add('active');
 }
-
 function closeModal() {
     document.getElementById('stationModal').classList.remove('active');
 }

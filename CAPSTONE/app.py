@@ -160,6 +160,42 @@ google = oauth.register(
 
 app.config['GOOGLE_CLIENT'] = google
 
+@app.route('/uploads/reports/<filename>')
+def serve_upload(filename):
+    from flask import send_from_directory, abort, current_app
+    import os
+    
+    # Use app.root_path which is the directory where app.py is located
+    upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'reports')
+    
+    # Check if file exists
+    file_path = os.path.join(upload_folder, filename)
+    if not os.path.exists(file_path):
+        abort(404)
+    
+    return send_from_directory(upload_folder, filename)
+
+# Add this route as well
+@app.route('/uploads/reports/<path:filename>')
+def serve_upload_with_path(filename):
+    """Serve uploaded images with path support"""
+    from flask import send_from_directory, abort, current_app
+    import os
+    
+    upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'reports')
+    
+    # Security: Prevent directory traversal
+    safe_path = os.path.normpath(filename)
+    if safe_path.startswith('..'):
+        abort(403)
+    
+    file_path = os.path.join(upload_folder, safe_path)
+    if not os.path.exists(file_path):
+        print(f"❌ File not found: {file_path}")
+        abort(404)
+    
+    return send_from_directory(upload_folder, safe_path)
+
 app.register_blueprint(auth_bp, url_prefix='/')
 app.register_blueprint(user_bp, url_prefix='/')
 app.register_blueprint(admin_bp, url_prefix='/')
@@ -616,11 +652,126 @@ def debug_db_schema():
     
     return jsonify(result)
 
-@app.route('/uploads/reports/<filename>')
-def serve_upload(filename):
-    from flask import send_from_directory
-    upload_folder = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'reports')
-    return send_from_directory(upload_folder, filename)
+@app.route('/debug/latest-report-images')
+def debug_latest_report_images():
+    """Check the image paths in the latest report"""
+    from models import Report
+    import json
+    
+    # Get the latest report with images
+    latest_report = Report.query.filter(
+        Report.photo_path.isnot(None),
+        Report.photo_path != 'null',
+        Report.photo_path != ''
+    ).order_by(Report.id.desc()).first()
+    
+    if not latest_report:
+        return jsonify({'error': 'No reports with images found'})
+    
+    # Parse photo paths
+    photo_paths = []
+    if latest_report.photo_path:
+        try:
+            if isinstance(latest_report.photo_path, str) and latest_report.photo_path.startswith('['):
+                photo_paths = json.loads(latest_report.photo_path)
+            elif isinstance(latest_report.photo_path, str):
+                photo_paths = [latest_report.photo_path]
+        except:
+            photo_paths = [latest_report.photo_path]
+    
+    # Generate full URLs
+    full_urls = []
+    for path in photo_paths:
+        if path.startswith('/'):
+            full_url = f"http://localhost:5000{path}"
+        else:
+            full_url = f"http://localhost:5000/uploads/reports/{path}"
+        full_urls.append(full_url)
+    
+    return jsonify({
+        'report_id': latest_report.id,
+        'station': latest_report.station,
+        'timestamp': latest_report.timestamp.isoformat(),
+        'photo_paths_stored': photo_paths,
+        'full_urls': full_urls,
+        'raw_photo_path': latest_report.photo_path
+    })
+   
+   
+@app.route('/debug/image-test')
+def debug_image_test():
+    import os
+    from flask import current_app
+    
+    # Use the same path as the upload route
+    upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'reports')
+    
+    # Check if folder exists
+    folder_exists = os.path.exists(upload_folder)
+    
+    # List files in the folder
+    files = []
+    if folder_exists:
+        try:
+            files = os.listdir(upload_folder)
+        except Exception as e:
+            return jsonify({'error': str(e)})
+    
+    return jsonify({
+        'upload_folder': upload_folder,
+        'folder_exists': folder_exists,
+        'files': files[:20],  # Show first 20 files
+        'file_count': len(files),
+        'current_directory': os.getcwd(),
+        'root_path': current_app.root_path,
+        'route_working': True
+    })
+    
+@app.route('/debug/folder-structure')
+def debug_folder_structure():
+    import os
+    from flask import current_app
+    
+    root = current_app.root_path
+    results = {
+        'root_path': root,
+        'current_directory': os.getcwd(),
+        'static_exists': os.path.exists(os.path.join(root, 'static')),
+        'static_uploads_exists': os.path.exists(os.path.join(root, 'static', 'uploads')),
+        'static_uploads_reports_exists': os.path.exists(os.path.join(root, 'static', 'uploads', 'reports')),
+        'uploads_exists': os.path.exists(os.path.join(root, 'uploads')),
+        'uploads_reports_exists': os.path.exists(os.path.join(root, 'uploads', 'reports')),
+    }
+    
+    # If reports folder exists, list files
+    reports_folder = os.path.join(root, 'static', 'uploads', 'reports')
+    if results['static_uploads_reports_exists']:
+        results['files_in_static_reports'] = os.listdir(reports_folder)[:20]
+        results['static_file_count'] = len(os.listdir(reports_folder))
+    
+    # Also check alternate location
+    alt_reports = os.path.join(root, 'uploads', 'reports')
+    if results['uploads_reports_exists']:
+        results['files_in_uploads_reports'] = os.listdir(alt_reports)[:20]
+        results['alt_file_count'] = len(os.listdir(alt_reports))
+    
+    # Check if the specific file from your report exists
+    test_file = '20260528_160258_screencapture-localhost-5000-operator-dashboard-2026-05-27-13_49_02.png'
+    test_paths = [
+        os.path.join(root, 'static', 'uploads', 'reports', test_file),
+        os.path.join(root, 'uploads', 'reports', test_file),
+        os.path.join(os.getcwd(), 'static', 'uploads', 'reports', test_file),
+        os.path.join(os.getcwd(), 'uploads', 'reports', test_file),
+    ]
+    
+    results['test_file_search'] = {}
+    for path in test_paths:
+        results['test_file_search'][path] = os.path.exists(path)
+    
+    return jsonify(results)
+
+
+ 
 
 @app.route('/debug/google-config')
 def debug_google_config():
