@@ -3615,6 +3615,39 @@ function updateStationStatusUI(data) {
     southEl.innerHTML = createCongestionPill(southCong, 'xs');
 }
 
+let countdownInterval = null;
+
+function startCountdownTimer() {
+    // Clear existing interval to prevent duplicates
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+    
+    const northEl = document.getElementById('northTime');
+    const southEl = document.getElementById('southTime');
+    
+    countdownInterval = setInterval(() => {
+        // Get current minutes displayed
+        let northText = northEl ? northEl.textContent : '';
+        let southText = southEl ? southEl.textContent : '';
+        
+        // Northbound countdown
+        if (northText && !isNaN(parseInt(northText)) && !northText.includes('CLOSED') && !northText.includes('LAST')) {
+            let newMin = parseInt(northText) - 1;
+            if (newMin < 0) newMin = 0;
+            northEl.innerHTML = `${newMin} <span>min</span>`;
+        }
+        
+        // Southbound countdown
+        if (southText && !isNaN(parseInt(southText)) && !southText.includes('CLOSED') && !southText.includes('LAST')) {
+            let newMin = parseInt(southText) - 1;
+            if (newMin < 0) newMin = 0;
+            southEl.innerHTML = `${newMin} <span>min</span>`;
+        }
+    }, 60000); // Update every minute
+}
+
 function updateTrainScheduleUI(data) {
     const northEl = document.getElementById('northTime');
     const southEl = document.getElementById('southTime');
@@ -3636,9 +3669,8 @@ function updateTrainScheduleUI(data) {
     if (data && data.southbound && data.northbound) {
         const northMinutes = data.northbound.minutes;
         const southMinutes = data.southbound.minutes;
-        const northOrigin = data.northbound.origin || 'Taft';
-        const southOrigin = data.southbound.origin || 'North Ave';
-        
+        const northOrigin = data.northbound.origin; 
+        const southOrigin = data.southbound.origin        
         // Check if trains are available in each direction
         if (data.northbound.available === false) {
             northEl.innerHTML = '<span>LAST TRAIN</span>';
@@ -3684,6 +3716,8 @@ function updateTrainScheduleUI(data) {
             if (southOriginEl) southOriginEl.textContent = 'Arriving from North Ave';
         }
     }
+
+    
 }
 
 // ========== UPDATE BEST TIME UI ==========
@@ -3968,6 +4002,8 @@ async function updateAllUI() {
     // ========== FIX: Always use fetchAlertCount for consistency ==========
     const count = await fetchAlertCount();
     updateAlertBadgeUI(count);
+
+     startCountdownTimer();
 }
 
 // ========== LOCATION FUNCTIONS ==========
@@ -4212,6 +4248,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             const defaultStation = '{{ favorite_station if favorite_station else "North Ave" }}';
             currentStation = defaultStation;
         }
+
+
     }
     
     // ========== UPDATE ALL UI ELEMENTS ==========
@@ -4266,6 +4304,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     startAutoRefresh();
     updateRushAlert();
     updateLastUpdatedTime();
+    startCountdownTimer();
 });
 
 // ========== STATION CHANGE ==========
