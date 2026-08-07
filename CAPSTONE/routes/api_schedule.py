@@ -166,7 +166,6 @@ def test_schedule():
         "timestamp": now.isoformat(),
         "test_result": result
     })
-
 def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
     """Calculate next train arrival times for a station"""
     if target_time is None:
@@ -214,9 +213,13 @@ def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
         result["southbound"]["minutes"] = max(1, int(open_delta))
         result["southbound"]["origin"] = "Opens at " + sb_open.strftime("%I:%M %p")
     else:
-        travel_to_station = station_idx * 3  # ~3 minutes per station
+        # For southbound: train comes from the station immediately north (1 station away)
+        # This is the ARRIVAL time, not travel time from terminal
+        if station_idx == 0:  # North Ave (terminal)
+            travel_to_station = 0  # Train starts here
+        else:
+            travel_to_station = 3  # 1 station away = ~3 minutes
         
-        # FIX: Use target_time, not current time
         minutes_since_midnight = target_time.hour * 60 + target_time.minute + target_time.second / 60.0
         
         first_train_minutes = 4 * 60 + 30  # 4:30 AM from North Ave
@@ -233,7 +236,7 @@ def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
             total_minutes = wait_time + travel_to_station
             result["southbound"]["minutes"] = max(1, int(total_minutes))
             
-            # SOUTHBOUND: Train comes from NORTH
+            # SOUTHBOUND: Train comes from NORTH (station before current)
             if station_idx == 0:
                 result["southbound"]["origin"] = "North Ave (Terminal)"
             else:
@@ -250,7 +253,13 @@ def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
         result["northbound"]["minutes"] = max(1, int(open_delta))
         result["northbound"]["origin"] = "Opens at " + nb_open.strftime("%I:%M %p")
     else:
-        travel_to_station = (len(STATIONS) - 1 - station_idx) * 3
+        # For northbound: train comes from the station immediately south (1 station away)
+        # This is the ARRIVAL time, not travel time from terminal
+        if station_idx == len(STATIONS) - 1:  # Taft (terminal)
+            travel_to_station = 0  # Train starts here
+        else:
+            travel_to_station = 3  # 1 station away = ~3 minutes
+        
         minutes_since_midnight = target_time.hour * 60 + target_time.minute + target_time.second / 60.0
         
         first_train_minutes = 5 * 60 + 5  # 5:05 AM from Taft
@@ -267,17 +276,14 @@ def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
             total_minutes = wait_time + travel_to_station
             result["northbound"]["minutes"] = max(1, int(total_minutes))
             
-            # NORTHBOUND: Train comes from SOUTH
-            if station_idx == 0:
-                result["northbound"]["origin"] = "Taft"
-            elif station_idx < len(STATIONS) - 1:
+            # NORTHBOUND: Train comes from SOUTH (station after current)
+            if station_idx == len(STATIONS) - 1:
+                result["northbound"]["origin"] = "Taft (Terminal)"
+            else:
                 from_idx = station_idx + 1
                 result["northbound"]["origin"] = STATIONS[from_idx]
-            else:
-                result["northbound"]["origin"] = "Taft (Terminal)"
     
     return result
-
 @api_schedule_bp.route('/schedule/compare')
 def compare_stations():
     """Compare wait times at different stations"""
