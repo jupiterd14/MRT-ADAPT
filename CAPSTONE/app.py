@@ -202,16 +202,22 @@ app = Flask(__name__, template_folder='html', static_folder='static')
 app.config.from_object(Config)
 cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
 
-
 @app.route('/warmup')
 def warmup():
+    """Warm up the app by loading models and data for North Ave"""
     import time
     start = time.time()
     
     try:
-        # ✅ Load BOTH directions
+        # Load models
         ensure_single_model_loaded("North Ave", "Northbound")
         ensure_single_model_loaded("North Ave", "Southbound")
+        
+        # ⭐ Pre-cache data using Parquet
+        from services.feature_engineering import get_station_dataframe_cached
+        get_station_dataframe_cached("North Ave", "Northbound")
+        get_station_dataframe_cached("North Ave", "Southbound")
+        
         elapsed = time.time() - start
         
         return jsonify({
@@ -222,6 +228,7 @@ def warmup():
         })
     except Exception as e:
         return jsonify({"status": "failed", "error": str(e)}), 500
+    
 def get_memory_usage():
     """Helper to get memory usage"""
     try:
@@ -361,7 +368,6 @@ def ensure_lstm_for_retraining():
     else:
         print("⚠️ LSTM models not loaded - retraining will be disabled")
         app.config['LSTM_PREDICTOR'] = None
-
 def ensure_single_model_loaded(station_name, direction):
     global directional_models_cached, directional_scalers_cached, historical_data
     
@@ -372,15 +378,27 @@ def ensure_single_model_loaded(station_name, direction):
     
     model_key = f"{station_name}_{direction}"
     
-    #  MEMORY LIMIT: Only load 2 model
-    if len(directional_models_cached) >= 2:
-        print(f"⚠️ Model limit reached (2). Skipping {station_name}_{direction}")
-        gc.collect()
-        return
-    
+    # ⭐ FIX: Check if this specific model is already loaded
     if model_key in directional_models_cached:
         print(f"✅ Model {model_key} already loaded")
         return
+    
+    # ⭐ FIX: Only check limit if we're trying to load a DIFFERENT station
+    # Count how many models are loaded for THIS station
+    station_models = [k for k in directional_models_cached.keys() if station_name in k]
+    
+    # If we already have models for this station, don't load more
+    # But if we're loading for a new station, we can load up to 2
+    if len(directional_models_cached) >= 4:
+        # Check if any of the loaded models are for this station
+        if not station_models:
+            print(f"⚠️ Model limit reached (2). Skipping {station_name}_{direction}")
+            gc.collect()
+            return
+        # If we already have models for this station, load the other direction
+        elif len(station_models) >= 2:
+            print(f"⚠️ Both directions already loaded for {station_name}")
+            return
     
     print(f"🔄 Loading single model: {model_key}")
     
@@ -404,7 +422,6 @@ def ensure_single_model_loaded(station_name, direction):
     
     app.config['DIRECTIONAL_MODELS'] = directional_models_cached
     app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
-
 app.config['ENSURE_SINGLE_MODEL_LOADED'] = ensure_single_model_loaded
 
 @app.route('/debug/app-config')

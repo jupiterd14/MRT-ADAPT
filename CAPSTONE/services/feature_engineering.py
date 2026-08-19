@@ -2,6 +2,21 @@
 Feature engineering for LSTM predictions - OPTIMIZED FOR SPEED
 """
 
+# Add memory monitoring
+import psutil
+import tracemalloc
+
+def get_memory_usage():
+    """Get current memory usage in MB"""
+    process = psutil.Process()
+    return process.memory_info().rss / (1024 * 1024)
+
+def log_memory_usage(stage=""):
+    """Log memory usage at a specific stage"""
+    mem = get_memory_usage()
+    print(f"   📊 Memory ({stage}): {mem:.1f} MB")
+    
+
 import os 
 import gc
 import pandas as pd
@@ -70,7 +85,104 @@ def load_data_fast():
     # Return None - we'll load data on demand in get_station_dataframe
     return None
 
-
+def get_hourly_window_from_csv(station_name, direction, target_datetime, seq_length=24):
+    """
+    Directly read only the needed 24-hour window from CSV files.
+    Returns a DataFrame with hourly data AND all feature columns.
+    """
+    station_num = STATION_NUMBERS.get(station_name)
+    if not station_num:
+        return None
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(script_dir, 'data (2022-2024)')
+    
+    end_time = target_datetime
+    start_time = target_datetime - timedelta(hours=seq_length)
+    
+    hourly_frames = []
+    CHUNK_SIZE = 50000
+    
+    csv_files = ['2022.csv', '2023.csv', '2024.csv']
+    
+    for csv_file in csv_files:
+        filepath = os.path.join(data_dir, csv_file)
+        if not os.path.exists(filepath):
+            continue
+        
+        try:
+            needed_columns = ['StationEntry', 'StationExit', 'Date', 'Time', 'TotalPassenger']
+            
+            for chunk in pd.read_csv(filepath,
+                                    chunksize=CHUNK_SIZE,
+                                    usecols=needed_columns,
+                                    dtype={'StationEntry': 'int16', 'StationExit': 'int16', 'TotalPassenger': 'float32'}):
+                
+                if direction == 'Northbound':
+                    mask = chunk['StationExit'] == station_num
+                else:
+                    mask = chunk['StationEntry'] == station_num
+                
+                filtered = chunk[mask]
+                if len(filtered) == 0:
+                    del chunk, filtered
+                    gc.collect()
+                    continue
+                
+                filtered['datetime'] = pd.to_datetime(filtered['Date'] + ' ' + filtered['Time'])
+                filtered = filtered.set_index('datetime')
+                filtered = filtered[['TotalPassenger']]
+                
+                window_data = filtered[(filtered.index >= start_time) & (filtered.index < end_time)]
+                if len(window_data) > 0:
+                    hourly = window_data.resample('H').sum()
+                    hourly_frames.append(hourly)
+                
+                del chunk, filtered, window_data
+                gc.collect()
+                
+        except Exception as e:
+            print(f"⚠️ Error reading {csv_file}: {e}")
+            continue
+    
+    if not hourly_frames:
+        return None
+    
+    combined = pd.concat(hourly_frames)
+    combined = combined.sort_index()
+    combined = combined[~combined.index.duplicated(keep='first')]
+    
+    # ========== ADD FEATURE ENGINEERING ==========
+    capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+    
+    # Calculate congestion
+    feature_scaler = get_feature_scaler(station_name, direction)
+    if feature_scaler is not None:
+        training_max = feature_scaler.data_max_[-1] if hasattr(feature_scaler, 'data_max_') else 50
+    else:
+        training_max = min(capacity * 0.3, 50)
+    
+    percentage = (combined['TotalPassenger'] / capacity * 100).clip(0, 100)
+    combined['congestion'] = (percentage / 100) * training_max
+    combined['congestion_percentage'] = percentage
+    combined['raw_passengers'] = combined['TotalPassenger']
+    
+    # Add time features
+    combined = add_cyclical_time_features(combined)
+    combined = add_smart_operating_flags(combined)
+    combined = smart_data_cleaner(combined)
+    
+    # Add date-based features
+    combined['is_weekend'] = (combined.index.weekday >= 5).astype(np.int8)
+    combined['is_christmas_season'] = np.array([is_christmas_season(d) for d in combined.index], dtype=np.int8)
+    combined['is_payday'] = combined.index.day.isin([15, 30, 31]).astype(np.int8)
+    combined['is_friday'] = (combined.index.weekday == 4).astype(np.int8)
+    combined['is_rush_hour'] = ((combined['hour'].between(7, 9)) | (combined['hour'].between(17, 19))).astype(np.int8)
+    combined['is_holiday'] = 0
+    combined['is_special_event'] = 0
+    
+    print(f"   ✅ Window has {len(combined)} hours with features")
+    return combined
 
 def categorize_congestion(congestion_value, capacity=None, station_name=None):
     """
@@ -145,8 +257,7 @@ def get_feature_scaler(station_name, direction):
         return None
 def get_station_dataframe(station_name, direction):
     """
-    Memory-optimized - reads ONLY the needed station data from CSV
-    Uses StationEntry and StationExit columns (NO 'Station' column!)
+    Memory-optimized - streams CSV files and only keeps the needed data
     """
     global _STATION_DATA_CACHE
     
@@ -157,55 +268,79 @@ def get_station_dataframe(station_name, direction):
         print(f"📦 Using cached data for {cache_key}")
         return _STATION_DATA_CACHE[cache_key]
     
-    print(f"📊 Loading data for {cache_key} from CSV...")
+    print(f"📊 Loading real data for {cache_key} from CSV (streaming mode)...")
     
-    # ✅ Use absolute path
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(script_dir, 'data (2022-2024)')
     
     csv_files = ['2022.csv', '2023.csv', '2024.csv']
-    
-    all_data = []
     station_num = STATION_NUMBERS.get(station_name)
     
     if not station_num:
         print(f"❌ Unknown station: {station_name}")
         return None
     
+    all_hourly_data = []
+    CHUNK_SIZE = 20000  # Balanced chunk size
+    
     for csv_file in csv_files:
         filepath = os.path.join(data_dir, csv_file)
-        if os.path.exists(filepath):
-            print(f"   ✅ Found: {filepath}")
-            try:
-                chunk_size = 10000
-                for chunk in pd.read_csv(filepath, chunksize=chunk_size):
-                    if direction == 'Northbound':
-                        filtered = chunk[chunk['StationExit'] == station_num]
-                    else:
-                        filtered = chunk[chunk['StationEntry'] == station_num]
+        if not os.path.exists(filepath):
+            print(f"   ⚠️ File not found: {filepath}")
+            continue
+            
+        print(f"   📄 Processing: {csv_file}")
+        try:
+            # Read only needed columns
+            needed_columns = ['StationEntry', 'StationExit', 'Date', 'Time', 'TotalPassenger']
+            
+            # Process in chunks
+            for chunk in pd.read_csv(filepath, 
+                                    chunksize=CHUNK_SIZE,
+                                    usecols=needed_columns,
+                                    dtype={'StationEntry': 'int16', 'StationExit': 'int16', 'TotalPassenger': 'float32'}):
+                
+                # Filter for this station
+                if direction == 'Northbound':
+                    filtered = chunk[chunk['StationExit'] == station_num]
+                else:
+                    filtered = chunk[chunk['StationEntry'] == station_num]
+                
+                if len(filtered) > 0:
+                    # Convert to datetime and resample immediately
+                    filtered['datetime'] = pd.to_datetime(filtered['Date'] + ' ' + filtered['Time'])
+                    filtered = filtered.set_index('datetime')
+                    filtered = filtered[['TotalPassenger']]
                     
-                    if len(filtered) > 0:
-                        all_data.append(filtered)
-                    del chunk
-                    gc.collect()
-            except Exception as e:
-                print(f"⚠️ Error loading {csv_file}: {e}")
-        else:
-            print(f"   ❌ File not found: {filepath}")
+                    # Resample to hourly (aggregates and reduces size)
+                    hourly = filtered.resample('H').sum()
+                    all_hourly_data.append(hourly)
+                
+                # Free memory
+                del chunk, filtered
+                gc.collect()
+                
+        except Exception as e:
+            print(f"   ⚠️ Error processing {csv_file}: {e}")
+            continue
     
-    if not all_data:
-        print(f"⚠️ No data found for {cache_key}")
-        _STATION_DATA_CACHE[cache_key] = None
+    if not all_hourly_data:
+        print(f"⚠️ No real data found for {cache_key}")
         return None
     
-    # Combine filtered data
-    combined = pd.concat(all_data)
-    combined['datetime'] = pd.to_datetime(combined['Date'] + ' ' + combined['Time'])
-    combined = combined.set_index('datetime')
+    # Combine all hourly data
+    print(f"   🔄 Combining {len(all_hourly_data)} chunks...")
+    combined = pd.concat(all_hourly_data)
+    del all_hourly_data
+    gc.collect()
+    
+    # Sort by datetime
     combined = combined.sort_index()
     
-    # Resample to hourly
-    hourly = combined.resample('H').sum()
+    # Remove duplicates (if any)
+    combined = combined[~combined.index.duplicated(keep='first')]
+    
+    print(f"   ✅ Loaded {len(combined)} hours of real data")
     
     # ========== CALCULATE CONGESTION ==========
     capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
@@ -216,42 +351,36 @@ def get_station_dataframe(station_name, direction):
     else:
         training_max = min(capacity * 0.3, 50)
     
-    percentage = (hourly['TotalPassenger'] / capacity * 100).clip(0, 100)
-    hourly['congestion'] = (percentage / 100) * training_max
-    hourly['congestion_percentage'] = percentage
-    hourly['raw_passengers'] = hourly['TotalPassenger']
-    # ==========================================
+    percentage = (combined['TotalPassenger'] / capacity * 100).clip(0, 100)
+    combined['congestion'] = (percentage / 100) * training_max
+    combined['congestion_percentage'] = percentage
+    combined['raw_passengers'] = combined['TotalPassenger']
     
     # Add time features
-    hourly = add_cyclical_time_features(hourly)
-    hourly = add_smart_operating_flags(hourly)
-    hourly = smart_data_cleaner(hourly)
+    combined = add_cyclical_time_features(combined)
+    combined = add_smart_operating_flags(combined)
+    combined = smart_data_cleaner(combined)
     
     # Add date-based features
-    hourly['is_weekend'] = (hourly.index.weekday >= 5).astype(np.int8)
-    hourly['is_christmas_season'] = np.array([is_christmas_season(d) for d in hourly.index], dtype=np.int8)
-    hourly['is_payday'] = hourly.index.day.isin([15, 30, 31]).astype(np.int8)
-    hourly['is_friday'] = (hourly.index.weekday == 4).astype(np.int8)
-    hourly['is_rush_hour'] = ((hourly['hour'].between(7, 9)) | (hourly['hour'].between(17, 19))).astype(np.int8)
-    hourly['is_holiday'] = 0
-    hourly['is_special_event'] = 0
+    combined['is_weekend'] = (combined.index.weekday >= 5).astype(np.int8)
+    combined['is_christmas_season'] = np.array([is_christmas_season(d) for d in combined.index], dtype=np.int8)
+    combined['is_payday'] = combined.index.day.isin([15, 30, 31]).astype(np.int8)
+    combined['is_friday'] = (combined.index.weekday == 4).astype(np.int8)
+    combined['is_rush_hour'] = ((combined['hour'].between(7, 9)) | (combined['hour'].between(17, 19))).astype(np.int8)
+    combined['is_holiday'] = 0
+    combined['is_special_event'] = 0
     
-    # Free memory
-    del combined
-    del all_data
-    gc.collect()
-    
-    # SMALL CACHE - Keep only 2 stations in memory
+    # ⭐ Cache only the hourly data (not the full raw data)
     if len(_STATION_DATA_CACHE) >= 2:
         oldest_key = next(iter(_STATION_DATA_CACHE))
         print(f"🗑️ Removing oldest from cache: {oldest_key}")
         del _STATION_DATA_CACHE[oldest_key]
         gc.collect()
     
-    _STATION_DATA_CACHE[cache_key] = hourly
-    print(f"✅ Loaded {len(hourly)} hours for {cache_key}")
-    return hourly
-
+    _STATION_DATA_CACHE[cache_key] = combined
+    print(f"✅ Cached {len(combined)} hours for {cache_key}")
+    
+    return combined
 def get_baseline_features(target_datetime, seq_length=24):
     """Cache baseline features for repeated lookups"""
     cache_key = f"{target_datetime.strftime('%Y%m%d%H')}_{seq_length}"
@@ -290,48 +419,79 @@ def get_baseline_features(target_datetime, seq_length=24):
     
     return _BASELINE_FEATURES_CACHE[cache_key].copy()
 
+def get_station_dataframe_cached(station_name, direction):
+    """
+    Load full dataset once and cache as Parquet for faster future loads.
+    Uses less memory than CSV and loads faster.
+    """
+    global _STATION_DATA_CACHE
+    cache_key = f"{station_name}_{direction}"
+    
+    if cache_key in _STATION_DATA_CACHE:
+        print(f"📦 Using memory cache for {cache_key}")
+        return _STATION_DATA_CACHE[cache_key]
+    
+    # Check for Parquet cache
+    cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data_cache')
+    os.makedirs(cache_dir, exist_ok=True)
+    parquet_file = os.path.join(cache_dir, f'{cache_key}.parquet')
+    
+    if os.path.exists(parquet_file):
+        try:
+            print(f"📦 Loading cached Parquet: {parquet_file}")
+            df = pd.read_parquet(parquet_file)
+            _STATION_DATA_CACHE[cache_key] = df
+            return df
+        except Exception as e:
+            print(f"⚠️ Error loading Parquet: {e}")
+            # Continue to regenerate
+    
+    # Generate from CSV using get_station_dataframe
+    print(f"🔄 Generating Parquet cache for {cache_key} from CSV...")
+    df = get_station_dataframe(station_name, direction)
+    
+    if df is not None and len(df) > 0:
+        try:
+            # Save as Parquet (compressed)
+            df.to_parquet(parquet_file, compression='gzip')
+            print(f"✅ Saved cache to {parquet_file} ({len(df)} rows)")
+            _STATION_DATA_CACHE[cache_key] = df
+        except Exception as e:
+            print(f"⚠️ Could not save Parquet: {e}")
+            # Still keep in memory
+            _STATION_DATA_CACHE[cache_key] = df
+    
+    return df
+
 def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
-    """Get feature sequence - congestion is scaled, then ALL 29 features go through scaler"""
+    """Get feature sequence - uses windowed CSV loading for memory efficiency"""
     station_name = unquote(station_name)
     direction = unquote(direction)
     
-    hourly = get_station_dataframe(station_name, direction)
-    if hourly is None:
-        print(f"⚠️ No hourly data for {station_name} {direction}, using baseline")
+    # Try to load only the needed window from CSV
+    window_df = get_hourly_window_from_csv(station_name, direction, target_datetime, seq_length)
+    
+    if window_df is None or len(window_df) == 0:
+        print(f"⚠️ No real data in window for {station_name} {direction}, using baseline")
         return get_baseline_features(target_datetime, seq_length)
     
-    # Handle 2025 predictions
-    if target_datetime.year >= 2025:
-        try:
-            lookback_end = target_datetime.replace(year=2024)
-        except:
-            lookback_end = target_datetime.replace(year=2024, month=2, day=28)
-        start_lookback = lookback_end - timedelta(hours=seq_length)
+    # Ensure we have all feature columns
+    missing_cols = [col for col in FEATURE_COLS if col not in window_df.columns]
+    if missing_cols:
+        print(f"   ⚠️ Missing columns: {missing_cols[:5]}... using baseline")
+        return get_baseline_features(target_datetime, seq_length)
+    
+    # If we have less than seq_length hours, pad with baseline
+    if len(window_df) < seq_length:
+        print(f"   ⚠️ Only {len(window_df)} hours in window, padding with baseline")
+        missing_count = seq_length - len(window_df)
+        baseline = get_baseline_features(target_datetime, missing_count)
+        window_features = window_df[FEATURE_COLS].values.astype(np.float32)
+        features = np.vstack([baseline, window_features])
     else:
-        start_lookback = target_datetime - timedelta(hours=seq_length)
-        lookback_end = target_datetime
-    
-    # Get available data in the window
-    sequence_df = hourly[(hourly.index >= start_lookback) & (hourly.index < lookback_end)]
-    
-    available_rows = len(sequence_df)
-    
-    if available_rows == 0:
-        return get_baseline_features(target_datetime, seq_length)
-    
-    # Get features with raw passenger counts
-    if available_rows == seq_length:
-        features_df = sequence_df[FEATURE_COLS].copy()
-        features = features_df.values.astype(np.float32)
-    elif available_rows >= 10:
-        features_df = sequence_df[FEATURE_COLS].copy()
-        features = features_df.values.astype(np.float32)
-        if available_rows < seq_length:
-            missing_count = seq_length - available_rows
-            baseline_features = get_baseline_features(target_datetime, missing_count)
-            features = np.vstack([baseline_features, features])
-    else:
-        return get_baseline_features(target_datetime, seq_length)
+        # Take the last seq_length hours
+        window_df = window_df.tail(seq_length)
+        features = window_df[FEATURE_COLS].values.astype(np.float32)
     
     # Ensure exactly seq_length rows
     if len(features) != seq_length:
@@ -341,30 +501,11 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
             while len(features) < seq_length:
                 features = np.vstack([features, features[-1:]])
     
-    
-    # ========== APPLY FEATURE SCALER TO ALL 29 FEATURES ==========
+    # Apply feature scaler
     feature_scaler = get_feature_scaler(station_name, direction)
-    
     if feature_scaler is not None:
         try:
-            #print("\n========== BEFORE SCALING ==========")
-            #print("First row:", features[0])
-            #print("Congestion range:",
-                #features[:, -1].min(),
-                #features[:, -1].max())
-
-            # Scale all 29 features
             features = feature_scaler.transform(features)
-
-            #print("\n========== AFTER SCALING ==========")
-            #print("First row:", features[0])
-            #print("Congestion range:",
-                #features[:, -1].min(),
-                #features[:, -1].max())
-
-            #print(f"✅ Scaled all {features.shape[1]} features")
-            #print(f"✅ Final shape: {features.shape}")
-
         except Exception as e:
             print(f"⚠️ Feature scaling failed: {e}")
     
