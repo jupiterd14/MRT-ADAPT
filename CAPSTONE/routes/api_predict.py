@@ -104,11 +104,23 @@ TRAINS_PER_HOUR = {
 
 # ========== CORRECTION FACTOR GENERATION (ADD THIS AFTER load_correction_factors) ==========
 
+
+def ensure_models_loaded():
+    """Ensure models are loaded before making predictions"""
+    ensure_fn = current_app.config.get('ENSURE_MODELS_LOADED')
+    if ensure_fn:
+        ensure_fn()
+    ensure_lstm_fn = current_app.config.get('ENSURE_LSTM_LOADED')
+    if ensure_lstm_fn:
+        ensure_lstm_fn()
+        
 def get_raw_prediction(station_name, direction, target_datetime):
     """
     Returns the raw passenger count from the model (WITHOUT correction factor).
     Used internally to compute correction factors.
     """
+    
+    ensure_models_loaded()
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
     
@@ -145,6 +157,9 @@ def compute_and_save_correction_factors(test_days=30, end_date=None):
     model predictions to actual historical passenger counts.
     Saves to correction_factors.pkl.
     """
+    
+    ensure_models_loaded()
+    
     from services.feature_engineering import get_station_dataframe
     import numpy as np
     import pickle
@@ -410,6 +425,8 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
     Congestion = (Passenger Count / 95th Percentile) × 100
     This gives commuters a meaningful 0-100% score.
     """
+    
+    ensure_models_loaded()
     
     if target_datetime is None:
         target_datetime = Config.get_current_time()
@@ -942,6 +959,8 @@ def simulate_day(station_name):
 #added 2
 def _get_directional_prediction_with_details(station_name, direction, target_datetime):
     """Helper function that returns both congestion and passenger count using percentile approach"""
+    
+    ensure_models_loaded()
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
     
