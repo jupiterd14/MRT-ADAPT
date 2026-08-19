@@ -2036,7 +2036,6 @@ async function fetchStationData() {
     try {
         console.log('🚀 Fetching fresh map data from LIVE MAP API (with overrides)...');
         
-        // Fetch both live map data AND overrides
         const [response, overrideResponse] = await Promise.all([
             fetch(`/api/live-map/directions/v2?_=${Date.now()}`),
             fetch(`/api/operator/debug-override?_=${Date.now()}`)
@@ -2048,7 +2047,6 @@ async function fetchStationData() {
         
         console.log('📋 Active overrides:', activeOverrides);
         
-        // Check operating hours
         const nowTime = new Date();
         const hour = nowTime.getHours();
         const minute = nowTime.getMinutes();
@@ -2059,21 +2057,19 @@ async function fetchStationData() {
         
         const processedData = { northbound: {}, southbound: {} };
         
-        // ========== Process each station with override awareness ==========
+        // ========== Process each station ==========
         for (const station of stations) {
-            const northData = data.northbound?.[station];
-            const southData = data.southbound?.[station];
+            const northData = data.northbound?.[station] || null;
+            const southData = data.southbound?.[station] || null;
             
-            // Check for overrides for this station
             const northOverrideKey = `${station}_northbound`;
             const southOverrideKey = `${station}_southbound`;
             const northOverride = activeOverrides[northOverrideKey] || null;
             const southOverride = activeOverrides[southOverrideKey] || null;
             
-            // ===== NORTHBOUND =====
+            // ===== NORTHBOUND with FALLBACK =====
             const isNorthOverridden = !!northOverride;
             if (isNorthOverridden) {
-                // Use override value
                 const overrideCong = northOverride.congestion || northOverride.level || 25;
                 const overrideStatus = northOverride.level || getStatusText(overrideCong);
                 processedData.northbound[station] = {
@@ -2081,10 +2077,9 @@ async function fetchStationData() {
                     wait_time: northData?.wait_time || getWaitTime(overrideCong),
                     status: overrideStatus,
                     overridden: true,
-                    override_info: northOverride // Store full override info
+                    override_info: northOverride
                 };
             } else if (isClosed) {
-                // MRT is closed and no override
                 processedData.northbound[station] = { 
                     congestion: 0, 
                     wait_time: 'CLOSED', 
@@ -2092,19 +2087,28 @@ async function fetchStationData() {
                     overridden: false,
                     override_info: null
                 };
-            } else {
-                // Normal operation
-                const northCong = northData?.congestion ?? 25;
+            } else if (northData) {
+                const northCong = northData.congestion ?? 25;
                 processedData.northbound[station] = {
                     congestion: northCong,
-                    wait_time: northData?.wait_time || getWaitTime(northCong),
-                    status: northData?.status || getStatusText(northCong),
+                    wait_time: northData.wait_time || getWaitTime(northCong),
+                    status: northData.status || getStatusText(northCong),
+                    overridden: false,
+                    override_info: null
+                };
+            } else {
+                // ========== FALLBACK: No data from API ==========
+                console.log(`⚠️ No northbound data for ${station}, using fallback`);
+                processedData.northbound[station] = {
+                    congestion: 25,
+                    wait_time: '5-10 min',
+                    status: 'Light',
                     overridden: false,
                     override_info: null
                 };
             }
             
-            // ===== SOUTHBOUND =====
+            // ===== SOUTHBOUND with FALLBACK =====
             const isSouthOverridden = !!southOverride;
             if (isSouthOverridden) {
                 const overrideCong = southOverride.congestion || southOverride.level || 25;
@@ -2124,12 +2128,22 @@ async function fetchStationData() {
                     overridden: false,
                     override_info: null
                 };
-            } else {
-                const southCong = southData?.congestion ?? 25;
+            } else if (southData) {
+                const southCong = southData.congestion ?? 25;
                 processedData.southbound[station] = {
                     congestion: southCong,
-                    wait_time: southData?.wait_time || getWaitTime(southCong),
-                    status: southData?.status || getStatusText(southCong),
+                    wait_time: southData.wait_time || getWaitTime(southCong),
+                    status: southData.status || getStatusText(southCong),
+                    overridden: false,
+                    override_info: null
+                };
+            } else {
+                // ========== FALLBACK: No data from API ==========
+                console.log(`⚠️ No southbound data for ${station}, using fallback`);
+                processedData.southbound[station] = {
+                    congestion: 25,
+                    wait_time: '5-10 min',
+                    status: 'Light',
                     overridden: false,
                     override_info: null
                 };
@@ -2140,13 +2154,23 @@ async function fetchStationData() {
         lastFetchTime = now;
         isUpdating = false;
         
-        console.log('✅ Map data loaded with overrides');
+        console.log('✅ Map data loaded with fallbacks');
         return processedData;
         
     } catch (error) {
         console.error('Fetch failed:', error);
         isUpdating = false;
-        return cachedData || directionData;
+        
+        // Return cached data or create fallback data
+        if (cachedData) return cachedData;
+        
+        // Create emergency fallback data
+        const fallbackData = { northbound: {}, southbound: {} };
+        for (const station of stations) {
+            fallbackData.northbound[station] = { congestion: 25, wait_time: '5-10 min', status: 'Light', overridden: false, override_info: null };
+            fallbackData.southbound[station] = { congestion: 25, wait_time: '5-10 min', status: 'Light', overridden: false, override_info: null };
+        }
+        return fallbackData;
     }
 }
 // ========== OPTIMIZED: Batch DOM Updates With Nearest Location Glow ==========
@@ -2165,8 +2189,16 @@ function renderStations() {
         
         const isNearest = (station === nearestStationName);
         row.className = `station-row ${isNearest ? 'nearest-station' : ''}`;
-        row.onclick = (function(s) { return function() { openModal(s); }; })(station);
         
+        // ========== FIX: Always attach click handler, even if no data ==========
+        row.onclick = (function(s) { 
+            return function() { 
+                console.log(`🖱️ Clicked on: ${s}`);
+                openModal(s); 
+            }; 
+        })(station);
+        
+        // If no data, show loading state but still make it clickable
         if (!stationInfo) {
             row.innerHTML = `
                 <div class="station-text-group">
@@ -2198,7 +2230,6 @@ function renderStations() {
         
         const colorClass = getStatusClass(congestion);
         
-        // ========== SIMPLE "OVERRIDDEN" TEXT ==========
         let overrideText = '';
         if (isOverridden) {
             overrideText = `<span style="font-size: 8px; color: #8B5CF6; background: #EDE9FE; padding: 1px 6px; border-radius: 8px; border: 1px solid #8B5CF6; margin-left: 4px; font-weight: 600; text-transform: uppercase;">
@@ -2211,7 +2242,6 @@ function renderStations() {
         const displayColorClass = (status === 'CLOSED' && !isOverridden) ? 'bg-light' : colorClass;
         const markerStyle = (status === 'CLOSED' && !isOverridden) ? 'background: #94A3B8;' : '';
         
-        // Purple ring for overridden stations
         const overrideRing = isOverridden ? 'style="border: 3px solid #8B5CF6; box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);"' : '';
         
         row.innerHTML = `
@@ -2443,26 +2473,49 @@ function setDirection(direction) {
 }
 
 function openModal(stationName) {
-    const stationData = currentDirection === 'north'
+    console.log(`📋 Opening modal for: ${stationName}`);
+    
+    // Try to get data from both directions
+    let stationData = currentDirection === 'north'
         ? directionData.northbound[stationName]
         : directionData.southbound[stationName];
     
+    // If no data in current direction, try the other direction
     if (!stationData) {
-        console.error('No data for station:', stationName);
-        return;
+        console.log(`⚠️ No data for ${stationName} in ${currentDirection} direction, trying fallback`);
+        stationData = currentDirection === 'north'
+            ? directionData.southbound[stationName]
+            : directionData.northbound[stationName];
+    }
+    
+    // If still no data, create default data
+    if (!stationData) {
+        console.log(`⚠️ No data found for ${stationName}, using default`);
+        stationData = {
+            congestion: 25,
+            wait_time: '5-10 min',
+            status: 'Light',
+            overridden: false,
+            override_info: null
+        };
     }
     
     const congestion = stationData.congestion || 0;
-    const status = getStatusText(congestion);
+    const status = stationData.status || getStatusText(congestion);
     const isOverridden = stationData.overridden || false;
     const overrideInfo = stationData.override_info || null;
     const message = getStatusMessage(stationName, congestion);
     
-    document.getElementById('modalStationName').textContent = stationName;
-    document.getElementById('modalStatusText').textContent = status;
-    document.getElementById('modalBodyText').textContent = message;
+    // Update modal elements
+    const nameEl = document.getElementById('modalStationName');
+    const statusTextEl = document.getElementById('modalStatusText');
+    const bodyEl = document.getElementById('modalBodyText');
+    const statusBadge = document.getElementById('modalStatusBadge');
     
-    // ========== SIMPLE OVERRIDE SECTION IN MODAL ==========
+    if (nameEl) nameEl.textContent = stationName;
+  if (statusTextEl) statusTextEl.textContent = status.toUpperCase();
+    
+    // Build modal body with override section if applicable
     let overrideSection = '';
     if (isOverridden && overrideInfo) {
         const operatorName = overrideInfo.operator || 'Unknown';
@@ -2477,7 +2530,7 @@ function openModal(stationName) {
                     <strong style="color: #6D28D9;">Operator Override Active</strong>
                 </div>
                 <div style="font-size: 13px; color: #4C1D95;">
-                    <div><strong>Operator:</strong> ${operatorName}</div>
+                    
                     <div><strong>Congestion:</strong> ${level}</div>
                     <div><strong>Expires:</strong> ${expiry}</div>
                     ${reason ? `<div><strong>Reason:</strong> ${reason}</div>` : ''}
@@ -2486,26 +2539,73 @@ function openModal(stationName) {
         `;
     }
     
-    // Update modal body to include override section
-    const modalBody = document.getElementById('modalBodyText');
-    modalBody.innerHTML = `
-        ${message}
-        ${overrideSection}
-    `;
-    
-    const statusBadge = document.getElementById('modalStatusBadge');
-    statusBadge.className = 'status-badge';
-    
-    if (isOverridden) {
-        statusBadge.classList.add('override');
-    } else {
-        if (congestion > 80) statusBadge.classList.add('Severely congested');
-        else if (congestion > 60) statusBadge.classList.add('Congested');
-        else if (congestion > 30) statusBadge.classList.add('Moderate congestion');
-        else statusBadge.classList.add('Light congestion');
+    if (bodyEl) {
+        bodyEl.innerHTML = `
+            ${message}
+            ${overrideSection}
+        `;
     }
     
-    document.getElementById('stationModal').classList.add('active');
+    // Update status badge
+  // Update status badge
+if (statusBadge) {
+    statusBadge.className = 'status-badge';
+    
+    // Check if overridden and get the override level
+    let displayStatus = status;
+    let isOverrideActive = false;
+    
+    if (isOverridden && overrideInfo) {
+        isOverrideActive = true;
+        // Use the override level for display
+        displayStatus = overrideInfo.level || status;
+    }
+    
+    // Determine color class based on congestion value
+    let colorClass = '';
+    const congValue = isOverrideActive ? (overrideInfo.congestion || congestion) : congestion;
+    
+    displayStatus = displayStatus.toUpperCase();
+    if (congValue > 80) colorClass = 'severe';
+    else if (congValue > 60) colorClass = 'congested';
+    else if (congValue > 30) colorClass = 'moderate';
+    else colorClass = 'light';
+    
+    // Add the color class
+    statusBadge.classList.add(colorClass);
+    
+    // If overridden, add a small override indicator
+ // If overridden, just keep the color class but no purple styling
+if (isOverrideActive) {
+    // Remove all purple styling - just use the color class
+    statusBadge.style.border = '';
+    statusBadge.style.boxShadow = '';
+    statusBadge.style.background = ''; // Let CSS handle it
+    
+    const dot = statusBadge.querySelector('.dot');
+    if (dot) {
+        dot.style.background = ''; // Let CSS handle it
+    }
+} else {
+    // Reset styles for non-override
+    statusBadge.style.border = '';
+    statusBadge.style.boxShadow = '';
+    statusBadge.style.background = '';
+    const dot = statusBadge.querySelector('.dot');
+    if (dot) {
+        dot.style.background = '';
+    }
+}
+}
+    
+    // Show modal
+    const modal = document.getElementById('stationModal');
+    if (modal) {
+        modal.classList.add('active');
+        console.log(`✅ Modal opened for ${stationName}`);
+    } else {
+        console.error('❌ Modal element not found');
+    }
 }
 function closeModal() {
     document.getElementById('stationModal').classList.remove('active');

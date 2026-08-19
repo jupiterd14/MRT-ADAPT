@@ -1050,6 +1050,37 @@ def debug_lstm_predict(station, direction):
             'direction': direction
         })
 
+
+@app.route('/debug/find-uploads')
+def debug_find_uploads():
+    """Find where uploads are actually stored"""
+    import os
+    from flask import current_app
+    
+    root = current_app.root_path
+    results = {
+        'root': root,
+        'search_results': {}
+    }
+    
+    # Search for uploads folder
+    search_paths = [
+        os.path.join(root, 'uploads'),
+        os.path.join(root, 'static', 'uploads'),
+        os.path.join(root, 'static', 'uploads', 'reports'),
+        os.path.join(root, 'uploads', 'reports'),
+        os.path.join(os.path.dirname(root), 'uploads'),  # One level up
+        os.path.join(os.path.dirname(root), 'static', 'uploads'),
+    ]
+    
+    for path in search_paths:
+        exists = os.path.exists(path)
+        results['search_results'][path] = {
+            'exists': exists,
+            'contents': os.listdir(path) if exists else []
+        }
+    
+    return jsonify(results)
 # ============ MAIN ============
 if __name__ == '__main__':
     print("\n" + "="*50)
