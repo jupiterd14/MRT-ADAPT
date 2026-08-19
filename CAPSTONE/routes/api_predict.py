@@ -108,17 +108,28 @@ TRAINS_PER_HOUR = {
 def ensure_models_loaded(station_name=None, direction=None):
     """Ensure models are loaded - only load what's needed"""
     
+    # ✅ ALWAYS try to load just the specific model first
     if station_name and direction:
-        # Load just this one model
         ensure_fn = current_app.config.get('ENSURE_SINGLE_MODEL_LOADED')
         if ensure_fn:
             ensure_fn(station_name, direction)
-    else:
-        # Fallback: load all models (shouldn't happen often)
-        ensure_fn = current_app.config.get('ENSURE_MODELS_LOADED')
-        if ensure_fn:
-            ensure_fn()
-            
+            return
+    
+    # If we have station_name but no direction, load both directions
+    if station_name and not direction:
+        for d in ['Northbound', 'Southbound']:
+            ensure_fn = current_app.config.get('ENSURE_SINGLE_MODEL_LOADED')
+            if ensure_fn:
+                ensure_fn(station_name, d)
+        return
+    
+    # ⚠️ FALLBACK: Only load ALL models as last resort
+    # This should rarely happen - only if something goes wrong
+    print("⚠️ WARNING: Loading ALL models (memory intensive!)")
+    ensure_fn = current_app.config.get('ENSURE_MODELS_LOADED')
+    if ensure_fn:
+        ensure_fn()
+        
 def get_raw_prediction(station_name, direction, target_datetime):
     """
     Returns the raw passenger count from the model (WITHOUT correction factor).
@@ -1373,6 +1384,9 @@ def directional_forecast_all():
             "congestion": round(float(south_cong), 1),
             "status": get_status(south_cong)
         }
+        import gc
+        gc.collect()
+    
     
     return jsonify(result)
 @api_predict_bp.route('/debug-model-output/<station_name>')
