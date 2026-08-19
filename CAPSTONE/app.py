@@ -504,6 +504,7 @@ def raw_prediction(station_name, direction):
     from services import get_feature_sequence_for_station
     import numpy as np
     
+    ensure_models_loaded()
     model_key = f"{station_name}_{direction}"
     
     if model_key not in directional_models_cached:
@@ -864,6 +865,7 @@ def debug_google_config():
     
 @app.route('/debug/model-status')
 def debug_model_status():
+    ensure_models_loaded()
     return jsonify({
         'directional_models_loaded': len(directional_models_cached),
         'stations': STATIONS,
@@ -895,6 +897,8 @@ def debug_raw_model_output(station_name, direction):
     import numpy as np
     from datetime import datetime
     
+    ensure_models_loaded()
+     
     now = datetime.now()
     model_key = f"{station_name}_{direction}"
     
