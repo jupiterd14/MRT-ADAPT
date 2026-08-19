@@ -1,4 +1,36 @@
+# ========== MEMORY OPTIMIZATION ==========
 import os
+import gc
+
+# 1. Reduce TensorFlow memory usage
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Reduce logging
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
+
+# 2. Limit CPU threads
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
+os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+
+# 3. Force garbage collection
+gc.set_threshold(100, 5, 5)  # More aggressive GC
+
+import tensorflow as tf
+
+# 4. Configure TensorFlow for memory efficiency
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except RuntimeError as e:
+        print(e)
+
+# 5. Disable eager execution for less memory
+tf.config.run_functions_eagerly(False)
+
+print("✅ Memory optimization applied!")
+# ===========================================
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 from flask import Flask, session, flash, redirect, url_for, jsonify, request
@@ -190,9 +222,8 @@ def warmup():
     start = time.time()
     
     try:
-        # Load North Ave models
+        # ✅ Only load ONE model
         ensure_single_model_loaded("North Ave", "Northbound")
-        ensure_single_model_loaded("North Ave", "Southbound")
         elapsed = time.time() - start
         
         return jsonify({
@@ -344,29 +375,26 @@ def ensure_lstm_for_retraining():
         print("⚠️ LSTM models not loaded - retraining will be disabled")
         app.config['LSTM_PREDICTOR'] = None
 
-# ============ SINGLE MODEL LAZY LOADING ============
 def ensure_single_model_loaded(station_name, direction):
     global directional_models_cached, directional_scalers_cached, historical_data
     
-    # ✅ MEMORY LIMIT: Only load up to 4 models (2 stations)
-    if directional_models_cached and len(directional_models_cached) >= 4:
-        print(f"⚠️ Model limit reached (4). Skipping {station_name}_{direction}")
-        return
-    
+    # Initialize if None
     if directional_models_cached is None:
         directional_models_cached = {}
         directional_scalers_cached = {}
-        
-        historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
-        
-        import services
-        services.historical_entry = historical_data.get('historical_entry', {})
-        services.historical_exit = historical_data.get('historical_exit', {})
-        services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
-        services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
     
+    # ✅ Define model_key ONCE at the beginning
     model_key = f"{station_name}_{direction}"
+    
+    # ✅ MEMORY LIMIT: Only load 1 model
+    if len(directional_models_cached) >= 1:
+        print(f"⚠️ Model limit reached (1). Skipping {station_name}_{direction}")
+        gc.collect()
+        return
+    
+    # ✅ Check if already loaded
     if model_key in directional_models_cached:
+        print(f"✅ Model {model_key} already loaded")
         return
     
     print(f"🔄 Loading single model: {model_key}")
@@ -381,20 +409,29 @@ def ensure_single_model_loaded(station_name, direction):
             directional_scalers_cached[f"{model_key}_target"] = scalers.get('target')
             print(f"✅ Loaded model for {model_key}")
             
-            # ✅ Force garbage collection
-            import gc
+            # Force garbage collection
             gc.collect()
         else:
             print(f"❌ Failed to load model for {model_key}")
             
     except Exception as e:
         print(f"❌ Error loading {model_key}: {e}")
+        import traceback
+        traceback.print_exc()
     
     app.config['DIRECTIONAL_MODELS'] = directional_models_cached
     app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
-
-app.config['ENSURE_SINGLE_MODEL_LOADED'] = ensure_single_model_loaded
-
+    
+    # Check memory after loading
+    try:
+        import psutil
+        process = psutil.Process()
+        mem = process.memory_info().rss / (1024 * 1024)
+        print(f"📊 Current memory: {mem:.1f}MB")
+        if mem > 200:
+            print("⚠️ Memory high, consider upgrading Render plan")
+    except:
+        pass
 # ============ WRAPPER FUNCTIONS ============
 def get_directional_prediction_wrapper(station_name, direction, target_datetime=None):
     # Try LSTM first (if loaded)
@@ -981,8 +1018,10 @@ if __name__ == '__main__':
     print("MRT-3 PREDICTION SYSTEM READY!")
     print("="*50)
     print(f"✓ {len(directional_models_cached) if directional_models_cached else 0} directional models loaded")
-    print(f"✓ {len(historical_data['historical_entry']) if historical_data else 0} stations with historical data")
-    print(f"✓ {len(STATIONS)} total stations configured")
+    if historical_data:
+        print(f"✓ {len(historical_data['historical_entry']) if historical_data else 0} stations with historical data")
+    else:
+        print("✓ Historical data will load on demand")
     
     lstm_predictor = app.config.get('LSTM_PREDICTOR')
     if lstm_predictor:
