@@ -1,37 +1,25 @@
-# ========== MEMORY OPTIMIZATION ==========
 import os
 import gc
 
-# 1. Reduce TensorFlow memory usage
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Reduce logging
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
+# Reduce Python memory
+os.environ['PYTHONHASHSEED'] = '0'
+os.environ['PYTHONMALLOC'] = 'malloc'
 
-# 2. Limit CPU threads
+# Limit TensorFlow memory
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
 os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
-# 3. Force garbage collection
-gc.set_threshold(100, 5, 5)  # More aggressive GC
+# Aggressive garbage collection
+gc.set_threshold(50, 3, 3)
 
 import tensorflow as tf
-
-# 4. Configure TensorFlow for memory efficiency
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-    try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    except RuntimeError as e:
-        print(e)
-
-# 5. Disable eager execution for less memory
 tf.config.run_functions_eagerly(False)
+tf.keras.backend.clear_session()
 
-print("✅ Memory optimization applied!")
-# ===========================================
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+print("✅ Extreme memory optimization applied!")
 
 from flask import Flask, session, flash, redirect, url_for, jsonify, request
 from extensions import cache
@@ -1012,6 +1000,19 @@ def admin_import_csvs():
         'data_directory': data_dir
     })
 
+
+# ========== MEMORY TRACING ==========
+import tracemalloc
+tracemalloc.start()
+
+# At the end of startup, add:
+snapshot = tracemalloc.take_snapshot()
+top_stats = snapshot.statistics('lineno')
+
+print("\n🔍 TOP 10 MEMORY USERS:")
+for stat in top_stats[:10]:
+    print(stat)
+    
 # ============ MAIN ============
 if __name__ == '__main__':
     print("\n" + "="*50)
