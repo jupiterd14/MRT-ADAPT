@@ -216,6 +216,50 @@ def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY,
         'direction_counts': direction_counts
     }
 
+
+def load_single_model(station, direction, model_path='models_2022-2024_v8'):
+    """Load a SINGLE model for one station-direction (memory efficient)"""
+    model_key = f"{station}_{direction}"
+    result = {'model': None, 'feature': None, 'target': None}
+    
+    # Try both naming conventions
+    model_path_v1 = os.path.join(model_path, f'{model_key}_lstm_enhanced.keras')
+    model_path_v2 = os.path.join(model_path, f'{model_key}_best.keras')
+    
+    model_file = None
+    if os.path.exists(model_path_v1):
+        model_file = model_path_v1
+    elif os.path.exists(model_path_v2):
+        model_file = model_path_v2
+    
+    if model_file is None:
+        print(f"⚠️ No model file for {model_key}")
+        return None, result
+    
+    try:
+        # Load the model
+        model = tf.keras.models.load_model(model_file, custom_objects={'rmse': rmse})
+        result['model'] = model
+        
+        # Load feature scaler
+        feature_scaler_path = os.path.join(model_path, f'{model_key}_feature_scaler.pkl')
+        target_scaler_path = os.path.join(model_path, f'{model_key}_target_scaler.pkl')
+        
+        if os.path.exists(feature_scaler_path):
+            with open(feature_scaler_path, 'rb') as f:
+                result['feature'] = pickle.load(f)
+        
+        if os.path.exists(target_scaler_path):
+            with open(target_scaler_path, 'rb') as f:
+                result['target'] = pickle.load(f)
+        
+        print(f"✅ Loaded single model: {model_key}")
+        return model, result
+        
+    except Exception as e:
+        print(f"❌ Error loading {model_key}: {e}")
+        return None, result
+    
 def _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY):
     global historical_entry, historical_exit, hourly_avg_entry, hourly_avg_exit, direction_counts
     
