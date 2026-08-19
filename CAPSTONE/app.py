@@ -52,36 +52,7 @@ from routes import (
 _MODELS_CACHE = {}
 _MODELS_CACHE_FILE = None
 
-@app.route('/warmup')
-def warmup():
-    """Warm up models - call this first to avoid timeouts"""
-    import time
-    start = time.time()
-    
-    try:
-        # Load North Ave models
-        ensure_single_model_loaded("North Ave", "Northbound")
-        ensure_single_model_loaded("North Ave", "Southbound")
-        elapsed = time.time() - start
-        
-        return jsonify({
-            "status": "warmup complete",
-            "models_loaded": len(directional_models_cached) if directional_models_cached else 0,
-            "elapsed_seconds": round(elapsed, 2),
-            "memory_mb": get_memory_usage()
-        })
-    except Exception as e:
-        return jsonify({"status": "failed", "error": str(e)}), 500
 
-def get_memory_usage():
-    """Helper to get memory usage"""
-    try:
-        import psutil
-        process = psutil.Process()
-        return round(process.memory_info().rss / (1024 * 1024), 2)
-    except:
-        return 0
-    
 def get_models_cache_path():
     cache_dir = tempfile.gettempdir()
     return os.path.join(cache_dir, 'mrt3_models_cache.pkl')
@@ -211,6 +182,38 @@ app = Flask(__name__, template_folder='html', static_folder='static')
 app.config.from_object(Config)
 cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
 
+
+@app.route('/warmup')
+def warmup():
+    """Warm up models - call this first to avoid timeouts"""
+    import time
+    start = time.time()
+    
+    try:
+        # Load North Ave models
+        ensure_single_model_loaded("North Ave", "Northbound")
+        ensure_single_model_loaded("North Ave", "Southbound")
+        elapsed = time.time() - start
+        
+        return jsonify({
+            "status": "warmup complete",
+            "models_loaded": len(directional_models_cached) if directional_models_cached else 0,
+            "elapsed_seconds": round(elapsed, 2),
+            "memory_mb": get_memory_usage()
+        })
+    except Exception as e:
+        return jsonify({"status": "failed", "error": str(e)}), 500
+
+def get_memory_usage():
+    """Helper to get memory usage"""
+    try:
+        import psutil
+        process = psutil.Process()
+        return round(process.memory_info().rss / (1024 * 1024), 2)
+    except:
+        return 0
+    
+    
 @app.route('/api/test')
 def api_test():
     return jsonify({"status": "ok", "message": "API is working", "time": datetime.now().isoformat()})
