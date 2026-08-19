@@ -105,22 +105,27 @@ TRAINS_PER_HOUR = {
 # ========== CORRECTION FACTOR GENERATION (ADD THIS AFTER load_correction_factors) ==========
 
 
-def ensure_models_loaded():
-    """Ensure models are loaded before making predictions"""
-    ensure_fn = current_app.config.get('ENSURE_MODELS_LOADED')
-    if ensure_fn:
-        ensure_fn()
-    ensure_lstm_fn = current_app.config.get('ENSURE_LSTM_LOADED')
-    if ensure_lstm_fn:
-        ensure_lstm_fn()
-        
+def ensure_models_loaded(station_name=None, direction=None):
+    """Ensure models are loaded - only load what's needed"""
+    
+    if station_name and direction:
+        # Load just this one model
+        ensure_fn = current_app.config.get('ENSURE_SINGLE_MODEL_LOADED')
+        if ensure_fn:
+            ensure_fn(station_name, direction)
+    else:
+        # Fallback: load all models (shouldn't happen often)
+        ensure_fn = current_app.config.get('ENSURE_MODELS_LOADED')
+        if ensure_fn:
+            ensure_fn()
+            
 def get_raw_prediction(station_name, direction, target_datetime):
     """
     Returns the raw passenger count from the model (WITHOUT correction factor).
     Used internally to compute correction factors.
     """
     
-    ensure_models_loaded()
+    ensure_models_loaded(station_name, direction)
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
     
@@ -158,7 +163,7 @@ def compute_and_save_correction_factors(test_days=30, end_date=None):
     Saves to correction_factors.pkl.
     """
     
-    ensure_models_loaded()
+ 
     
     from services.feature_engineering import get_station_dataframe
     import numpy as np
@@ -426,7 +431,7 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
     This gives commuters a meaningful 0-100% score.
     """
     
-    ensure_models_loaded()
+    ensure_models_loaded(station_name, direction)
     
     if target_datetime is None:
         target_datetime = Config.get_current_time()
@@ -960,7 +965,7 @@ def simulate_day(station_name):
 def _get_directional_prediction_with_details(station_name, direction, target_datetime):
     """Helper function that returns both congestion and passenger count using percentile approach"""
     
-    ensure_models_loaded()
+    ensure_models_loaded(station_name, direction)
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
     

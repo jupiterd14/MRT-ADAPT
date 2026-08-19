@@ -297,6 +297,58 @@ def ensure_lstm_loaded():
 
 app.config['ENSURE_LSTM_LOADED'] = ensure_lstm_loaded
 
+
+# ============ SINGLE MODEL LAZY LOADING ============
+# Load ONLY the model needed for a specific station/direction
+# This prevents memory issues on Render's free tier
+
+def ensure_single_model_loaded(station_name, direction):
+    """Load ONLY ONE model for a specific station-direction"""
+    global directional_models_cached, directional_scalers_cached, historical_data
+    
+    # Initialize if not done yet
+    if directional_models_cached is None:
+        directional_models_cached = {}
+        directional_scalers_cached = {}
+        
+        # Load historical data (small, always needed)
+        historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
+        
+        # Update services with historical data
+        import services
+        services.historical_entry = historical_data.get('historical_entry', {})
+        services.historical_exit = historical_data.get('historical_exit', {})
+        services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
+        services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
+    
+    # Check if THIS SPECIFIC model is already loaded
+    model_key = f"{station_name}_{direction}"
+    if model_key in directional_models_cached:
+        return  # Already loaded
+    
+    print(f"🔄 Loading single model: {model_key}")
+    
+    # Load ONLY this one model
+    try:
+        from services.model_loader import load_single_model
+        model, scalers = load_single_model(station_name, direction, DIRECTIONAL_MODELS_PATH)
+        
+        if model:
+            directional_models_cached[model_key] = model
+            directional_scalers_cached[f"{model_key}_feature"] = scalers.get('feature')
+            directional_scalers_cached[f"{model_key}_target"] = scalers.get('target')
+            print(f"✅ Loaded model for {model_key}")
+        else:
+            print(f"❌ Failed to load model for {model_key}")
+            
+    except Exception as e:
+        print(f"❌ Error loading {model_key}: {e}")
+    
+    # Update app config with whatever models we have
+    app.config['DIRECTIONAL_MODELS'] = directional_models_cached
+    app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+app.config['ENSURE_SINGLE_MODEL_LOADED'] = ensure_single_model_loaded
+
 # ============ WRAPPER FUNCTIONS ============
 def get_directional_prediction_wrapper(station_name, direction, target_datetime=None):
     """Get directional prediction with LSTM enhancement"""
