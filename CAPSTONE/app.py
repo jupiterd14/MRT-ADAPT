@@ -504,7 +504,8 @@ def raw_prediction(station_name, direction):
     from services import get_feature_sequence_for_station
     import numpy as np
     
-    ensure_models_loaded()
+    ensure_single_model_loaded(station_name, direction)
+    
     model_key = f"{station_name}_{direction}"
     
     if model_key not in directional_models_cached:
@@ -592,6 +593,7 @@ def test_real_model(station_name):
     now = datetime.now()
     
     for direction in ['Northbound', 'Southbound']:
+        ensure_single_model_loaded(station_name, direction)
         model_key = f"{station_name}_{direction}"
         
         if model_key in directional_models_cached:
@@ -865,11 +867,10 @@ def debug_google_config():
     
 @app.route('/debug/model-status')
 def debug_model_status():
-    ensure_models_loaded()
     return jsonify({
-        'directional_models_loaded': len(directional_models_cached),
+        'directional_models_loaded': len(directional_models_cached) if directional_models_cached else 0,
         'stations': STATIONS,
-        'models': list(directional_models_cached.keys())[:10]
+        'models': list(directional_models_cached.keys())[:10] if directional_models_cached else []
     })
 
 @app.route('/debug/clear-cache')
@@ -897,8 +898,7 @@ def debug_raw_model_output(station_name, direction):
     import numpy as np
     from datetime import datetime
     
-    ensure_models_loaded()
-     
+    ensure_single_model_loaded(station_name, direction)
     now = datetime.now()
     model_key = f"{station_name}_{direction}"
     
