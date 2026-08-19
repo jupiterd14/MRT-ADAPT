@@ -146,40 +146,45 @@ def get_feature_scaler(station_name, direction):
 def get_station_dataframe(station_name, direction):
     """
     Memory-optimized - reads ONLY the needed station data from CSV
-    Uses a small LRU cache (max 2 stations)
+    Uses StationEntry and StationExit columns (NO 'Station' column!)
     """
     global _STATION_DATA_CACHE
     
     cache_key = f"{station_name}_{direction}"
     
-    # ✅ Return from small cache if available
+    # Return from cache if available
     if cache_key in _STATION_DATA_CACHE:
         print(f"📦 Using cached data for {cache_key}")
         return _STATION_DATA_CACHE[cache_key]
     
-    # ✅ Read ONLY this station's data from CSV
-    print(f"📊 Loading data for {cache_key} from CSV (no full data load)...")
+    print(f"📊 Loading data for {cache_key} from CSV...")
     
     data_dir = 'services/data (2022-2024)'
     csv_files = ['2022.csv', '2023.csv', '2024.csv']
     
     all_data = []
+    station_num = STATION_NUMBERS.get(station_name)
+    
+    if not station_num:
+        print(f"❌ Unknown station: {station_name}")
+        return None
     
     for csv_file in csv_files:
         filepath = os.path.join(data_dir, csv_file)
         if os.path.exists(filepath):
             try:
-                # ✅ Read in chunks to save memory
                 chunk_size = 10000
                 for chunk in pd.read_csv(filepath, chunksize=chunk_size):
-                    # Filter for this station and direction
-                    filtered = chunk[
-                        (chunk['Station'] == station_name) & 
-                        (chunk['Direction'] == direction)
-                    ]
+                    # ✅ FIX: Use StationEntry and StationExit
+                    if direction == 'Northbound':
+                        # Northbound: StationExit is the destination
+                        filtered = chunk[chunk['StationExit'] == station_num]
+                    else:  # Southbound
+                        # Southbound: StationEntry is the origin
+                        filtered = chunk[chunk['StationEntry'] == station_num]
+                    
                     if len(filtered) > 0:
                         all_data.append(filtered)
-                    # Free memory
                     del chunk
                     gc.collect()
             except Exception as e:
@@ -199,25 +204,36 @@ def get_station_dataframe(station_name, direction):
     # Resample to hourly
     hourly = combined.resample('H').sum()
     
+    # Add time features
+    hourly = add_cyclical_time_features(hourly)
+    hourly = add_smart_operating_flags(hourly)
+    hourly = smart_data_cleaner(hourly)
+    
+    # Add date-based features
+    hourly['is_weekend'] = (hourly.index.weekday >= 5).astype(np.int8)
+    hourly['is_christmas_season'] = np.array([is_christmas_season(d) for d in hourly.index], dtype=np.int8)
+    hourly['is_payday'] = hourly.index.day.isin([15, 30, 31]).astype(np.int8)
+    hourly['is_friday'] = (hourly.index.weekday == 4).astype(np.int8)
+    hourly['is_rush_hour'] = ((hourly['hour'].between(7, 9)) | (hourly['hour'].between(17, 19))).astype(np.int8)
+    hourly['is_holiday'] = 0
+    hourly['is_special_event'] = 0
+    
     # Free memory
     del combined
     del all_data
     gc.collect()
     
-    # ✅ SMALL CACHE - Keep only 2 stations in memory
+    # SMALL CACHE - Keep only 2 stations in memory
     if len(_STATION_DATA_CACHE) >= 2:
         oldest_key = next(iter(_STATION_DATA_CACHE))
         print(f"🗑️ Removing oldest from cache: {oldest_key}")
         del _STATION_DATA_CACHE[oldest_key]
         gc.collect()
     
-    # Store in cache
     _STATION_DATA_CACHE[cache_key] = hourly
     
     print(f"✅ Loaded {len(hourly)} hours for {cache_key}")
     return hourly
-
-
     
 def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
     """Get feature sequence - congestion is scaled, then ALL 29 features go through scaler"""
