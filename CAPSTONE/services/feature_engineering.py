@@ -175,12 +175,9 @@ def get_station_dataframe(station_name, direction):
             try:
                 chunk_size = 10000
                 for chunk in pd.read_csv(filepath, chunksize=chunk_size):
-                    # ✅ FIX: Use StationEntry and StationExit
                     if direction == 'Northbound':
-                        # Northbound: StationExit is the destination
                         filtered = chunk[chunk['StationExit'] == station_num]
-                    else:  # Southbound
-                        # Southbound: StationEntry is the origin
+                    else:
                         filtered = chunk[chunk['StationEntry'] == station_num]
                     
                     if len(filtered) > 0:
@@ -203,6 +200,21 @@ def get_station_dataframe(station_name, direction):
     
     # Resample to hourly
     hourly = combined.resample('H').sum()
+    
+    # ========== CALCULATE CONGESTION ==========
+    capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+    
+    feature_scaler = get_feature_scaler(station_name, direction)
+    if feature_scaler is not None:
+        training_max = feature_scaler.data_max_[-1] if hasattr(feature_scaler, 'data_max_') else 50
+    else:
+        training_max = min(capacity * 0.3, 50)
+    
+    percentage = (hourly['TotalPassenger'] / capacity * 100).clip(0, 100)
+    hourly['congestion'] = (percentage / 100) * training_max
+    hourly['congestion_percentage'] = percentage
+    hourly['raw_passengers'] = hourly['TotalPassenger']
+    # ========================================
     
     # Add time features
     hourly = add_cyclical_time_features(hourly)
@@ -234,112 +246,6 @@ def get_station_dataframe(station_name, direction):
     
     print(f"✅ Loaded {len(hourly)} hours for {cache_key}")
     return hourly
-    
-def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
-    """Get feature sequence - congestion is scaled, then ALL 29 features go through scaler"""
-    station_name = unquote(station_name)
-    direction = unquote(direction)
-    
-    hourly = get_station_dataframe(station_name, direction)
-    
-    # ========== DEBUG: Check the data right after loading ==========
-    print("\n" + "="*60)
-    print("🔍 DEBUG: After get_station_dataframe:")
-    print("="*60)
-    print(hourly[["TotalPassenger", "congestion"]].head(10))
-    print(f"TotalPassenger type: {hourly['TotalPassenger'].dtype}")
-    print(f"congestion type: {hourly['congestion'].dtype}")
-    print("="*60 + "\n")
-    
-    if hourly is None:
-        print(f"⚠️ No hourly data for {station_name} {direction}, using baseline")
-        return get_baseline_features(target_datetime, seq_length)
-    
-    # Handle 2025 predictions
-    if target_datetime.year >= 2025:
-        try:
-            lookback_end = target_datetime.replace(year=2024)
-        except:
-            lookback_end = target_datetime.replace(year=2024, month=2, day=28)
-        start_lookback = lookback_end - timedelta(hours=seq_length)
-    else:
-        start_lookback = target_datetime - timedelta(hours=seq_length)
-        lookback_end = target_datetime
-    
-    # Get available data in the window
-    sequence_df = hourly[(hourly.index >= start_lookback) & (hourly.index < lookback_end)]
-    
-    # ========== DEBUG: Check after slicing ==========
-    print("\n" + "="*60)
-    print("🔍 DEBUG: After slicing the time window:")
-    print("="*60)
-    if len(sequence_df) > 0:
-        print(sequence_df[["TotalPassenger", "congestion"]].head(10))
-    else:
-        print("No data in the time window")
-    print("="*60 + "\n")
-    
-    available_rows = len(sequence_df)
-    
-    if available_rows == 0:
-        return get_baseline_features(target_datetime, seq_length)
-    
-    # Get features with raw passenger counts
-    if available_rows == seq_length:
-        features_df = sequence_df[FEATURE_COLS].copy()
-        features = features_df.values.astype(np.float32)
-    elif available_rows >= 10:
-        features_df = sequence_df[FEATURE_COLS].copy()
-        features = features_df.values.astype(np.float32)
-        if available_rows < seq_length:
-            missing_count = seq_length - available_rows
-            baseline_features = get_baseline_features(target_datetime, missing_count)
-            features = np.vstack([baseline_features, features])
-    else:
-        return get_baseline_features(target_datetime, seq_length)
-    
-    # Ensure exactly seq_length rows
-    if len(features) != seq_length:
-        if len(features) > seq_length:
-            features = features[:seq_length]
-        else:
-            while len(features) < seq_length:
-                features = np.vstack([features, features[-1:]])
-    
-    # ========== DEBUG: Check features before scaling ==========
-    #print("\n" + "="*60)
-    #print("🔍 DEBUG: Before scaling - congestion values from features array:")
-    #print("="*60)
-    #print(f"Congestion values: {features[:, -1][:10]}")
-    #print("="*60 + "\n")
-    
-    # ========== APPLY FEATURE SCALER TO ALL 29 FEATURES ==========
-    feature_scaler = get_feature_scaler(station_name, direction)
-    
-    if feature_scaler is not None:
-        try:
-            print("\n========== BEFORE SCALING ==========")
-            print("First row:", features[0])
-            print("Congestion range:",
-                features[:, -1].min(),
-                features[:, -1].max())
-
-            # Scale all 29 features
-            features = feature_scaler.transform(features)
-
-            print("\n========== AFTER SCALING ==========")
-            print("First row:", features[0])
-            print("Congestion range:",
-                features[:, -1].min(),
-                features[:, -1].max())
-
-            print(f"✅ Scaled all {features.shape[1]} features")
-            print(f"✅ Final shape: {features.shape}")
-
-        except Exception as e:
-            print(f"⚠️ Feature scaling failed: {e}")
-    
-    return features
 def get_baseline_features(target_datetime, seq_length=24):
     """Cache baseline features for repeated lookups"""
     cache_key = f"{target_datetime.strftime('%Y%m%d%H')}_{seq_length}"
