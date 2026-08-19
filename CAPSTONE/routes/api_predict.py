@@ -1,8 +1,3 @@
-
-
-## Complete Updated `api_predict.py`
-
-
 """
 PREDICTION API - ML Model Endpoints Only
 Purpose: Raw congestion predictions from ML models
@@ -35,49 +30,54 @@ CORRECTION_FILE = 'correction_factors.pkl'
 P95_CACHE = {}          # Global cache: key = "station_direction" -> p95 value
 P95_FILE = 'p95_percentiles.json'
 
-def load_p95_percentiles():
-    """
-    Load or compute the 95th percentile of historical passenger counts
-    for each station-direction. Caches to disk for fast reload.
-    """
-    global P95_CACHE
-
+# ========== LAZY LOAD P95 - ONLY WHEN NEEDED ==========
+def get_p95_percentile(station_name, direction):
+    """Lazy load P95 only when needed - loads just one station at a time"""
+    key = f"{station_name}_{direction}"
+    
+    # Check memory cache first
+    if key in P95_CACHE:
+        return P95_CACHE[key]
+    
+    # Check disk cache
     if os.path.exists(P95_FILE):
         try:
             with open(P95_FILE, 'r') as f:
-                P95_CACHE = json.load(f)
-            print(f"✅ Loaded p95 percentiles from {P95_FILE} ({len(P95_CACHE)} entries)")
-            return
+                all_p95 = json.load(f)
+                if key in all_p95:
+                    P95_CACHE[key] = all_p95[key]
+                    return P95_CACHE[key]
         except Exception as e:
             print(f"⚠️ Could not load p95 cache: {e}")
-
-    print("📊 Computing 95th percentiles from historical data...")
+    
+    # Compute just this one station's p95
     from services.feature_engineering import get_station_dataframe
     import numpy as np
-
-    for station in STATIONS:
-        for direction in ['Northbound', 'Southbound']:
-            key = f"{station}_{direction}"
-            hourly = get_station_dataframe(station, direction)
-            if hourly is not None and len(hourly) > 0:
-                passengers = hourly['TotalPassenger'].values
-                p95 = np.percentile(passengers, 95)
-                P95_CACHE[key] = round(float(p95), 2)
-                print(f"   {key}: p95 = {P95_CACHE[key]:.0f}")
+    
+    hourly = get_station_dataframe(station_name, direction)
+    if hourly is not None and len(hourly) > 0:
+        p95 = np.percentile(hourly['TotalPassenger'].values, 95)
+        P95_CACHE[key] = round(float(p95), 2)
+        
+        # Save to disk cache (append to existing)
+        try:
+            if os.path.exists(P95_FILE):
+                with open(P95_FILE, 'r') as f:
+                    all_p95 = json.load(f)
             else:
-                # Fallback: use platform capacity as a rough substitute
-                P95_CACHE[key] = MRT3_PLATFORM_CAPACITY.get(station, 1000)
-                print(f"   {key}: no data, using capacity = {P95_CACHE[key]:.0f}")
-
-    try:
-        with open(P95_FILE, 'w') as f:
-            json.dump(P95_CACHE, f, indent=2)
-        print(f"✅ Saved p95 percentiles to {P95_FILE}")
-    except Exception as e:
-        print(f"⚠️ Could not save p95 cache: {e}")
-
-# Call it after defining STATIONS and before any prediction endpoint
-load_p95_percentiles()
+                all_p95 = {}
+            all_p95[key] = P95_CACHE[key]
+            with open(P95_FILE, 'w') as f:
+                json.dump(all_p95, f, indent=2)
+        except Exception as e:
+            print(f"⚠️ Could not save p95: {e}")
+        
+        return P95_CACHE[key]
+    
+    # Fallback: use platform capacity
+    fallback = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+    P95_CACHE[key] = fallback
+    return fallback
 
 
 def load_correction_factors():
@@ -92,8 +92,7 @@ def load_correction_factors():
 load_correction_factors()
 
 # ========== CONGESTION CONFIGURATION ==========
-# Historical peaks are kept for reference only - NOT used for congestion calculation
-HISTORICAL_PEAKS = {}  # For reference only
+HISTORICAL_PEAKS = {}  # For reference only - LAZY LOADED
 
 # Trains per hour schedule (for throughput method - not currently used)
 TRAINS_PER_HOUR = {
@@ -102,33 +101,29 @@ TRAINS_PER_HOUR = {
     19: 20, 20: 16, 21: 12, 22: 8, 23: 0
 }
 
-# ========== CORRECTION FACTOR GENERATION (ADD THIS AFTER load_correction_factors) ==========
-
-
 def ensure_models_loaded(station_name=None, direction=None):
-    """Ensure models are loaded - only load what's needed"""
+    """Ensure models are loaded - ONLY loads what's needed"""
+    ensure_fn = current_app.config.get('ENSURE_SINGLE_MODEL_LOADED')
     
-    # ✅ ALWAYS try to load just the specific model first
-    if station_name and direction:
-        ensure_fn = current_app.config.get('ENSURE_SINGLE_MODEL_LOADED')
-        if ensure_fn:
-            ensure_fn(station_name, direction)
-            return
-    
-    # If we have station_name but no direction, load both directions
-    if station_name and not direction:
-        for d in ['Northbound', 'Southbound']:
-            ensure_fn = current_app.config.get('ENSURE_SINGLE_MODEL_LOADED')
-            if ensure_fn:
-                ensure_fn(station_name, d)
+    if not ensure_fn:
+        print("⚠️ No ensure function found in app config")
         return
     
-    # ⚠️ FALLBACK: Only load ALL models as last resort
-    # This should rarely happen - only if something goes wrong
-    print("⚠️ WARNING: Loading ALL models (memory intensive!)")
-    ensure_fn = current_app.config.get('ENSURE_MODELS_LOADED')
-    if ensure_fn:
-        ensure_fn()
+    if station_name and direction:
+        # Load just this one model
+        ensure_fn(station_name, direction)
+        return
+    
+    if station_name:
+        # Load both directions for this station
+        for d in ['Northbound', 'Southbound']:
+            ensure_fn(station_name, d)
+        return
+    
+    # If no station specified, load only ONE default station (not all!)
+    print("⚠️ No station specified, loading North Ave only")
+    ensure_fn("North Ave", "Northbound")
+    ensure_fn("North Ave", "Southbound")
         
 def get_raw_prediction(station_name, direction, target_datetime):
     """
@@ -154,10 +149,7 @@ def get_raw_prediction(station_name, direction, target_datetime):
         if feature_scaler is None or target_scaler is None:
             return None
 
-        # Feature scaler already applied in get_feature_sequence_for_station? 
-        # Actually the features returned are already scaled, so we must not scale again.
-        # But in get_directional_prediction, they don't re-scale; they just reshape.
-        # So we use features as-is.
+        # Features are already scaled, just reshape
         input_sequence = features.reshape(1, 24, -1)
         raw_scaled = directional_models[model_key].predict(input_sequence, verbose=0)[0][0]
         passenger_count = float(target_scaler.inverse_transform([[raw_scaled]])[0][0])
@@ -174,8 +166,6 @@ def compute_and_save_correction_factors(test_days=30, end_date=None):
     Saves to correction_factors.pkl.
     """
     
- 
-    
     from services.feature_engineering import get_station_dataframe
     import numpy as np
     import pickle
@@ -186,7 +176,6 @@ def compute_and_save_correction_factors(test_days=30, end_date=None):
         end_date = Config.get_current_time()
     start_date = end_date - timedelta(days=test_days)
 
-    # Use the same STATIONS list defined at the top
     for station in STATIONS:
         for direction in ['Northbound', 'Southbound']:
             model_key = f"{station}_{direction}"
@@ -233,59 +222,37 @@ def compute_and_save_correction_factors(test_days=30, end_date=None):
     print(f"✅ Saved {len(factors)} correction factors to {CORRECTION_FILE}")
     return factors
 
-def load_historical_peaks():
-    """Load historical peaks for REFERENCE ONLY - NOT used for congestion calculation"""
-    global HISTORICAL_PEAKS
+# ========== LAZY LOAD HISTORICAL PEAKS - ONLY WHEN NEEDED ==========
+def get_historical_peak(station_name, direction):
+    """Lazy load historical peak for just one station-direction"""
+    key = f"{station_name}_{direction}"
     
-    peaks_file = 'historical_peaks.json'
-    if os.path.exists(peaks_file):
-        try:
-            with open(peaks_file, 'r') as f:
-                HISTORICAL_PEAKS = json.load(f)
-            print(f"✅ Loaded historical peaks from {peaks_file} (for reference only)")
-            return HISTORICAL_PEAKS
-        except Exception as e:
-            print(f"⚠️ Could not load peaks file: {e}")
+    # Check if already loaded
+    if key in HISTORICAL_PEAKS:
+        return HISTORICAL_PEAKS[key]
     
-    print("📊 Calculating historical peaks for reference only...")
-    from services.feature_engineering import load_data_fast, get_station_dataframe
+    # Compute just this one
+    from services.feature_engineering import get_station_dataframe
     import numpy as np
     
-    df = load_data_fast()
-    if df is None:
-        print("❌ Could not load data for peak calculation")
-        return {}
+    hourly = get_station_dataframe(station_name, direction)
+    if hourly is not None and len(hourly) > 0:
+        passengers = hourly['TotalPassenger'].values
+        peak_abs = float(passengers.max())
+        HISTORICAL_PEAKS[key] = {
+            "peak": peak_abs,
+            "absolute_max": peak_abs,
+            "percentile": 100
+        }
+        return HISTORICAL_PEAKS[key]
     
-    for station in STATIONS:
-        for direction in ['Northbound', 'Southbound']:
-            hourly = get_station_dataframe(station, direction)
-            if hourly is not None and len(hourly) > 0:
-                passengers = hourly['TotalPassenger'].values
-                peak_abs = float(passengers.max())
-                key = f"{station}_{direction}"
-                HISTORICAL_PEAKS[key] = {
-                    "peak": peak_abs,
-                    "absolute_max": peak_abs,
-                    "percentile": 100
-                }
-                print(f"   {key}: abs max = {peak_abs:.0f}")
-    
-    try:
-        with open(peaks_file, 'w') as f:
-            json.dump(HISTORICAL_PEAKS, f, indent=2)
-        print(f"✅ Saved historical peaks to {peaks_file}")
-    except Exception as e:
-        print(f"⚠️ Could not save peaks file: {e}")
-    
-    return HISTORICAL_PEAKS
+    return None
 
-HISTORICAL_PEAKS = load_historical_peaks()
 def get_active_overrides():
     """Get active overrides - check app config first (instant), fallback to file."""
     # 1. Check in-memory config first (immediate updates from operator)
     overrides = current_app.config.get('overrides', {})
     if overrides:
-        print(f"📄 api_predict.py LOADED from config: {overrides}")
         return overrides
     
     # 2. Fallback to file (on startup or if config is empty)
@@ -294,7 +261,6 @@ def get_active_overrides():
         try:
             with open(overrides_file, 'r') as f:
                 overrides = json.load(f)
-            print(f"📄 api_predict.py LOADED from file: {overrides}")
             # Also cache to config for future requests
             if overrides:
                 current_app.config['overrides'] = overrides
@@ -352,9 +318,7 @@ def historical_patterns(station_name):
             hourly_std = df.groupby(df.index.hour)['TotalPassenger'].std()
             
             # Convert to congestion using p95
-            p95 = P95_CACHE.get(f"{station}_{direction}")
-            if p95 is None:
-                p95 = np.percentile(df['TotalPassenger'].values, 95)
+            p95 = get_p95_percentile(station, direction)
             
             results[direction] = {
                 "hourly_avg_congestion": {
@@ -434,7 +398,7 @@ def debug_override_status():
         'config_has_overrides': 'overrides' in current_app.config,
         'current_time': Config.get_current_time().isoformat()
     })
-#added changes here
+
 def get_directional_prediction(station_name, direction, target_datetime=None):
     """
     Get prediction with congestion based on HISTORICAL PERCENTILE.
@@ -468,7 +432,7 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
         return _get_operating_hours_fallback(target_datetime)
     
     try:
-        from services.feature_engineering import get_feature_sequence_for_station, get_station_dataframe
+        from services.feature_engineering import get_feature_sequence_for_station
         import numpy as np
         
         features = get_feature_sequence_for_station(station_name, direction, target_datetime)
@@ -495,40 +459,12 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
         passenger_count = passenger_count * factor
         passenger_count = max(0, passenger_count)  # Ensure non-negative
         
-        # ========== CONGESTION CALCULATION - USING HISTORICAL PERCENTILE ==========
-        p95 = P95_CACHE.get(model_key)
-        if p95 is None:
-            # Fallback: compute on the fly or use capacity
-            hourly = get_station_dataframe(station_name, direction)
-            if hourly is not None and len(hourly) > 0:
-                p95 = np.percentile(hourly['TotalPassenger'].values, 95)
-            else:
-                # Use a reasonable default based on capacity
-                p95 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        # ========== CONGESTION CALCULATION - USING LAZY LOADED P95 ==========
+        p95 = get_p95_percentile(station_name, direction)
         
         # Calculate congestion as percentage of p95
         congestion = (passenger_count / p95) * 100
         congestion = max(0, min(congestion, 100))  # Clamp to 0-100
-        
-        # Determine congestion level (for debugging)
-        if congestion >= 80:
-            level = "SEVERE - Extremely busy"
-        elif congestion >= 60:
-            level = "HEAVY - Very busy"
-        elif congestion >= 40:
-            level = "MODERATE - Normal busyness"
-        else:
-            level = "LIGHT - Not busy at all"
-        
-        # Debug output (commented out to avoid log spam)
-        # print(f"\n========== PREDICTION ==========")
-        # print(f"Station: {station_name} {direction} @ {target_datetime.strftime('%H:%M')}")
-        # print(f"Raw output: {raw_output:.4f}")
-        # print(f"Passengers: {passenger_count:.0f}")
-        # print(f"95th Percentile: {p95:.0f}")
-        # print(f"Congestion: {congestion:.1f}%")
-        # print(f"Status: {level}")
-        # print("================================\n")
         
         return congestion
         
@@ -613,14 +549,8 @@ def debug_pipeline_details(station_name):
         target_scaler = directional_scalers.get(f'{model_key}_target')
         feature_scaler = directional_scalers.get(f'{model_key}_feature')
         
-        # Get p95 from cache (this is what main function uses)
-        p95 = P95_CACHE.get(model_key)
-        if p95 is None:
-            hourly = get_station_dataframe(station, direction)
-            if hourly is not None and len(hourly) > 0:
-                p95 = np.percentile(hourly['TotalPassenger'].values, 95)
-            else:
-                p95 = MRT3_PLATFORM_CAPACITY.get(station, 1000)  # Fallback only
+        # Get p95 using lazy loader
+        p95 = get_p95_percentile(station, direction)
         
         # Get actual historical data for this station
         hourly = get_station_dataframe(station, direction)
@@ -735,15 +665,8 @@ def debug_check_raw_output(station_name):
         target_scaler = directional_scalers.get(f'{model_key}_target')
         feature_scaler = directional_scalers.get(f'{model_key}_feature')
         
-        # Get p95 from cache
-        p95 = P95_CACHE.get(model_key)
-        if p95 is None:
-            from services.feature_engineering import get_station_dataframe
-            hourly = get_station_dataframe(station, direction)
-            if hourly is not None and len(hourly) > 0:
-                p95 = np.percentile(hourly['TotalPassenger'].values, 95)
-            else:
-                p95 = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+        # Get p95 using lazy loader
+        p95 = get_p95_percentile(station, direction)
         
         # Get correction factor
         factor = CORRECTION_FACTORS.get(model_key, 1.0)
@@ -816,6 +739,7 @@ def debug_test_time(station_name, hour):
             results["predictions"][direction] = round(congestion, 1)
     
     return jsonify(results)
+
 @api_predict_bp.route('/debug/simulate-day/<station_name>')
 def simulate_day(station_name):
     """
@@ -972,7 +896,6 @@ def simulate_day(station_name):
     
     return jsonify(results)
 
-#added 2
 def _get_directional_prediction_with_details(station_name, direction, target_datetime):
     """Helper function that returns both congestion and passenger count using percentile approach"""
     
@@ -992,7 +915,7 @@ def _get_directional_prediction_with_details(station_name, direction, target_dat
         return result
     
     try:
-        from services.feature_engineering import get_feature_sequence_for_station, get_station_dataframe
+        from services.feature_engineering import get_feature_sequence_for_station
         import numpy as np
         
         features = get_feature_sequence_for_station(station_name, direction, target_datetime)
@@ -1018,14 +941,8 @@ def _get_directional_prediction_with_details(station_name, direction, target_dat
         passenger_count = passenger_count * factor
         passenger_count = max(0, passenger_count)  # Ensure non-negative
         
-        # ========== CONGESTION CALCULATION - USING CACHED 95th PERCENTILE ==========
-        p95 = P95_CACHE.get(model_key)
-        if p95 is None:
-            hourly = get_station_dataframe(station_name, direction)
-            if hourly is not None and len(hourly) > 0:
-                p95 = np.percentile(hourly['TotalPassenger'].values, 95)
-            else:
-                p95 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        # ========== CONGESTION CALCULATION - USING LAZY LOADED P95 ==========
+        p95 = get_p95_percentile(station_name, direction)
         
         congestion = (passenger_count / p95) * 100
         congestion = max(0, min(congestion, 100))
@@ -1147,6 +1064,7 @@ def debug_target_scaler_test(station_name):
             results[direction] = {"error": "Target scaler not found"}
     
     return jsonify(results)
+
 @api_predict_bp.route('/debug/passenger-prediction/<station_name>')
 def debug_passenger_prediction(station_name):
     """Debug raw passenger predictions vs p95-based congestion - USING P95 PERCENTILE"""
@@ -1186,14 +1104,7 @@ def debug_passenger_prediction(station_name):
                 passenger_count = passenger_count * factor
                 
                 # ========== USE P95 PERCENTILE ==========
-                p95 = P95_CACHE.get(model_key)
-                if p95 is None:
-                    from services.feature_engineering import get_station_dataframe
-                    hourly = get_station_dataframe(station, direction)
-                    if hourly is not None and len(hourly) > 0:
-                        p95 = np.percentile(hourly['TotalPassenger'].values, 95)
-                    else:
-                        p95 = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+                p95 = get_p95_percentile(station, direction)
                 
                 congestion = (passenger_count / p95) * 100
                 congestion = max(0, min(congestion, 100))
@@ -1212,6 +1123,7 @@ def debug_passenger_prediction(station_name):
                 results[f"{hour}:00_{direction}"] = {"error": str(e)}
     
     return jsonify(results)
+
 @api_predict_bp.route('/directional-forecast/<station_name>')
 def directional_forecast(station_name):
     name = station_name.replace('%20', ' ')
@@ -1430,14 +1342,7 @@ def debug_model_output(station_name):
                 factor = CORRECTION_FACTORS.get(model_key, 1.0)
                 passenger_count = passenger_count * factor
                 
-                p95 = P95_CACHE.get(model_key)
-                if p95 is None:
-                    from services.feature_engineering import get_station_dataframe
-                    hourly = get_station_dataframe(station, direction)
-                    if hourly is not None and len(hourly) > 0:
-                        p95 = np.percentile(hourly['TotalPassenger'].values, 95)
-                    else:
-                        p95 = MRT3_PLATFORM_CAPACITY.get(station, 100)
+                p95 = get_p95_percentile(station, direction)
                         
                 congestion = (passenger_count / p95) * 100
                 congestion = max(0, min(congestion, 100))
@@ -1477,15 +1382,8 @@ def model_evaluation():
     if model_key not in directional_models:
         return jsonify({"error": f"Model {model_key} not found"})
 
-    # ---------- USE CACHED P95 ----------
-    p95 = P95_CACHE.get(model_key)
-    if p95 is None:
-        # fallback: compute from all historical data
-        hourly = get_station_dataframe(station, direction)
-        if hourly is not None and len(hourly) > 0:
-            p95 = np.percentile(hourly['TotalPassenger'].values, 95)
-        else:
-            p95 = MRT3_PLATFORM_CAPACITY.get(station, 1000)   # last resort
+    # ---------- USE LAZY LOADED P95 ----------
+    p95 = get_p95_percentile(station, direction)
     print(f"🔍 Using p95 = {p95:.0f} for {station} {direction}")
 
     def get_congestion_category(cong):
@@ -1605,6 +1503,7 @@ def model_evaluation():
             for i in range(min(10, len(predictions)))
         ]
     })
+
 @api_predict_bp.route('/confusion-matrix')
 def confusion_matrix_endpoint():
     """Generate confusion matrix visualization data"""
