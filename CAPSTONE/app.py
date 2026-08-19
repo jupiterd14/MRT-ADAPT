@@ -1292,6 +1292,25 @@ def debug_lstm_predict(station, direction):
         })
 
 
+@app.route('/debug/list-models')
+def debug_list_models():
+    import os
+    import glob
+    
+    model_dir = 'models_2022-2024_v8'
+    if not os.path.exists(model_dir):
+        return jsonify({'error': f'Directory {model_dir} not found'})
+    
+    files = glob.glob(os.path.join(model_dir, '*.keras'))
+    file_names = [os.path.basename(f) for f in files]
+    
+    return jsonify({
+        'directory': model_dir,
+        'exists': os.path.exists(model_dir),
+        'model_files': file_names,
+        'count': len(file_names)
+    })
+
 @app.route('/debug/find-uploads')
 def debug_find_uploads():
     """Find where uploads are actually stored"""

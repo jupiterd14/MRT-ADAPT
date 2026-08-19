@@ -16,6 +16,15 @@ dow_avg_exit = {}
 direction_counts = {}
 station_time_series = {}
 
+# Station name mapping (display name → file name)
+STATION_FILE_MAP = {
+    "North Avenue": "North Ave",
+    "Quezon Avenue": "Quezon Ave",
+    "Shaw Boulevard": "Shaw Blvd",
+    "Ayala Avenue": "Ayala Ave",
+    "Boni Avenue": "Boni Ave",
+}
+
 # Register the rmse function so it can be loaded
 @register_keras_serializable()
 def rmse(y_true, y_pred):
@@ -96,6 +105,16 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
     directional_models = {}
     directional_scalers = {}
     
+    
+    station_map = {
+        "North Avenue": "North Ave",
+        "Quezon Avenue": "Quezon Ave",
+        "Shaw Boulevard": "Shaw Blvd",
+        "Ayala Avenue": "Ayala Ave",
+        "Boni Avenue": "Boni Ave",
+    }
+    
+    
     print(f"📂 Loading models from: {DIRECTIONAL_MODELS_PATH}")
     
     # Check if directory exists
@@ -106,7 +125,9 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
     
     for station in STATIONS:
         for direction in ['Northbound', 'Southbound']:
-            model_key = f"{station}_{direction}"
+            
+            station_file = STATION_FILE_MAP.get(station, station)
+            model_key = f"{station_file}_{direction}"  # FIXED!
             
             # Try both naming conventions
             model_path_v1 = os.path.join(DIRECTIONAL_MODELS_PATH, f'{model_key}_lstm_enhanced.keras')
@@ -219,7 +240,8 @@ def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY,
 
 def load_single_model(station, direction, model_path='models_2022-2024_v8'):
     """Load a SINGLE model for one station-direction (memory efficient)"""
-    model_key = f"{station}_{direction}"
+    station_file = STATION_FILE_MAP.get(station, station)
+    model_key = f"{station_file}_{direction}
     result = {'model': None, 'feature': None, 'target': None}
     
     # Try both naming conventions
