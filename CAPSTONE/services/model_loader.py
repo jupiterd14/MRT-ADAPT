@@ -1,49 +1,17 @@
-# ============================================================
-# MEMORY OPTIMIZATION - MUST BE FIRST!
-# ============================================================
 import os
 import gc
 
-# Environment variables to reduce memory
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
 os.environ['TF_NUM_INTEROP_THREADS'] = '1'
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
-os.environ['TF_DETERMINISTIC_OPS'] = '1'
-os.environ['TF_CPP_VLOG_LEVEL'] = '0'
 
-# Aggressive garbage collection
 gc.set_threshold(50, 3, 3)
 
 import tensorflow as tf
-
-# Disable eager execution (saves memory)
 tf.config.run_functions_eagerly(False)
-
-# Disable XLA (uses memory)
-tf.config.optimizer.set_jit(False)
-
-# Configure GPU memory
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-    try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-            # Limit GPU memory to 128MB
-            tf.config.experimental.set_virtual_device_configuration(
-                gpu,
-                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=128)]
-            )
-    except RuntimeError as e:
-        print(e)
-
-# Clear any existing sessions
 tf.keras.backend.clear_session()
-
-print(f"✅ TensorFlow memory optimized! TF version: {tf.__version__}")
-print("=" * 50)
+print("✅ TensorFlow memory optimized in model_loader.py")
 
 # ============================================================
 # REST OF IMPORTS
