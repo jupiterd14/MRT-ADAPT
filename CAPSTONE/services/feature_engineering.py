@@ -183,7 +183,7 @@ def get_station_dataframe(station_name, direction):
                     if len(filtered) > 0:
                         all_data.append(filtered)
                     del chunk
-                    gc.collect()
+                    gc.collect()  # ← Requires import gc at top!
             except Exception as e:
                 print(f"⚠️ Error loading {csv_file}: {e}")
     
@@ -214,7 +214,7 @@ def get_station_dataframe(station_name, direction):
     hourly['congestion'] = (percentage / 100) * training_max
     hourly['congestion_percentage'] = percentage
     hourly['raw_passengers'] = hourly['TotalPassenger']
-    # ========================================
+    # ==========================================
     
     # Add time features
     hourly = add_cyclical_time_features(hourly)
@@ -243,9 +243,9 @@ def get_station_dataframe(station_name, direction):
         gc.collect()
     
     _STATION_DATA_CACHE[cache_key] = hourly
-    
     print(f"✅ Loaded {len(hourly)} hours for {cache_key}")
     return hourly
+
 def get_baseline_features(target_datetime, seq_length=24):
     """Cache baseline features for repeated lookups"""
     cache_key = f"{target_datetime.strftime('%Y%m%d%H')}_{seq_length}"
