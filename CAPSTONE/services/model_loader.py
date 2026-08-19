@@ -241,7 +241,7 @@ def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY,
 def load_single_model(station, direction, model_path='models_2022-2024_v8'):
     """Load a SINGLE model for one station-direction (memory efficient)"""
     station_file = STATION_FILE_MAP.get(station, station)
-    model_key = f"{station_file}_{direction}
+    model_key = f"{station_file}_{direction}"
     result = {'model': None, 'feature': None, 'target': None}
     
     # Try both naming conventions
