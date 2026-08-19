@@ -159,7 +159,7 @@ def get_station_dataframe(station_name, direction):
     
     print(f"📊 Loading data for {cache_key} from CSV...")
     
-    # ✅ FIX: Use absolute path
+    # ✅ Use absolute path
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(script_dir, 'data (2022-2024)')
     
@@ -175,7 +175,7 @@ def get_station_dataframe(station_name, direction):
     for csv_file in csv_files:
         filepath = os.path.join(data_dir, csv_file)
         if os.path.exists(filepath):
-            print(f"   📄 Found: {filepath}")
+            print(f"   ✅ Found: {filepath}")
             try:
                 chunk_size = 10000
                 for chunk in pd.read_csv(filepath, chunksize=chunk_size):
