@@ -2157,8 +2157,9 @@
         <body>
 
             <!-- Override Confirmation Modal -->
+<!-- Override Confirmation Modal -->
 <div id="overrideConfirmModal" class="modal-overlay">
-    <div class="modal-container" style="max-width: 400px;">
+    <div class="modal-container" style="max-width: 450px;">
         <div class="modal-header" style="position: relative; margin-bottom: 20px;">
             <div style="width: 48px; height: 48px; background: #FEF3C7; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
                 <i class="fas fa-exclamation-triangle" style="color: #F59E0B; font-size: 24px;"></i>
@@ -2167,26 +2168,51 @@
             <button onclick="closeOverrideConfirmModal()" style="position: absolute; right: 0; top: 0; background: none; border: none; font-size: 24px; cursor: pointer; color: #94A3B8;">&times;</button>
         </div>
         
-        <div id="overrideConfirmDetails" style="background: #EFF6FF; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-            <p style="margin-bottom: 8px;"><strong><i class="fas fa-edit"></i> Override Details:</strong></p>
-            <p id="confirmOverrideStation" style="font-size: 13px; margin-bottom: 4px;"><strong>Station:</strong> -</p>
-            <p id="confirmOverrideLevel" style="font-size: 13px; margin-bottom: 4px;"><strong>Level:</strong> -</p>
-            <p id="confirmOverrideDuration" style="font-size: 13px; margin-bottom: 4px;"><strong>Duration:</strong> -</p>
-            <p id="confirmOverrideReason" style="font-size: 13px;"><strong>Reason:</strong> -</p>
+        <!-- Enhanced Details Section -->
+        <div id="overrideConfirmDetails" style="background: #F8FAFC; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #E2E8F0;">
+            <p style="margin-bottom: 12px; font-weight: 600; color: #1E293B;">
+                <i class="fas fa-clipboard-list" style="color: #8B5CF6;"></i> Override Summary
+            </p>
+            
+            <!-- Station with icon -->
+            <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #E2E8F0;">
+                <i class="fas fa-subway" style="color: #8B5CF6; width: 20px;"></i>
+                <span style="font-size: 13px; color: #64748B;">Station & Direction:</span>
+                <span id="confirmOverrideStation" style="font-size: 14px; font-weight: 600; color: #1E293B;">-</span>
+            </div>
+            
+            <!-- Congestion Level with colored pill -->
+            <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #E2E8F0;">
+                <i class="fas fa-chart-line" style="color: #8B5CF6; width: 20px;"></i>
+                <span style="font-size: 13px; color: #64748B;">Congestion Level:</span>
+                <span id="confirmOverrideLevel" style="font-size: 14px; font-weight: 600; padding: 4px 14px; border-radius: 20px; display: inline-block;">-</span>
+            </div>
+            
+            <!-- Duration -->
+            <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #E2E8F0;">
+                <i class="fas fa-clock" style="color: #8B5CF6; width: 20px;"></i>
+                <span style="font-size: 13px; color: #64748B;">Duration:</span>
+                <span id="confirmOverrideDuration" style="font-size: 14px; font-weight: 600; color: #1E293B;">-</span>
+            </div>
+            
+            <!-- Reason -->
+            <div style="display: flex; align-items: flex-start; gap: 12px; padding: 8px 0;">
+                <i class="fas fa-pen" style="color: #8B5CF6; width: 20px; margin-top: 2px;"></i>
+                <span style="font-size: 13px; color: #64748B;">Reason:</span>
+                <span id="confirmOverrideReason" style="font-size: 14px; font-weight: 500; color: #1E293B; flex: 1;">-</span>
+            </div>
         </div>
         
-        <p style="color: var(--text-light); font-size: 13px; margin-bottom: 24px;">
-            <i class="fas fa-info-circle"></i> This will override the congestion level until the duration expires or you manually remove it.
-        </p>
-        
-        <div class="modal-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
-            <button class="btn-cancel" onclick="closeOverrideConfirmModal()" style="padding: 10px 20px;">Cancel</button>
-            <button class="btn-apply" id="confirmOverrideBtn" style="background: #F59E0B; padding: 10px 20px;">
+        <!-- Action buttons -->
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; padding-top: 16px; border-top: 1px solid #E2E8F0;">
+            <button class="btn-cancel" onclick="closeOverrideConfirmModal()" style="padding: 10px 24px;">Cancel</button>
+            <button class="btn-apply" id="confirmOverrideBtn" style="background: #F59E0B; padding: 10px 24px; border: none; border-radius: 10px; color: white; font-weight: 600; cursor: pointer; transition: all 0.2s;">
                 <i class="fas fa-check"></i> Yes, Apply Override
             </button>
         </div>
     </div>
 </div>
+
 
             <!-- Flag Report Confirmation Modal (NEW IMPROVED VERSION) -->
     <div id="flagReportModal" class="modal-overlay">
@@ -5154,7 +5180,7 @@ function displayOperatorReports(reports) {
     if (duration === 'manual') durationText = 'Until manually removed';
     
     document.getElementById('confirmOverrideStation').textContent = `${stationName} (${directionText})`;
-    document.getElementById('confirmOverrideLevel').textContent = `${levelText} (${currentSelectedCongestion}%)`;
+document.getElementById('confirmOverrideLevel').textContent = levelText;
     document.getElementById('confirmOverrideDuration').textContent = durationText;
     document.getElementById('confirmOverrideReason').textContent = reason || 'No reason provided';
     

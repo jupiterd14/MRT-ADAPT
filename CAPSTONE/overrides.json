@@ -1,0 +1,14 @@
+{
+  "Taft_northbound": {
+    "station": "Taft",
+    "direction": "northbound",
+    "level": "severe",
+    "congestion": 90,
+    "operator": "jcpingol1@gmail.com",
+    "reason": "testing",
+    "expiry": 1787146947.736634,
+    "timestamp": "2026-08-19T20:42:27.736634",
+    "duration_minutes": 60,
+    "created_at": "2026-08-19T20:42:27.736634"
+  }
+}
