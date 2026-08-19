@@ -1389,6 +1389,7 @@ def directional_forecast_all():
     
     
     return jsonify(result)
+
 @api_predict_bp.route('/debug-model-output/<station_name>')
 def debug_model_output(station_name):
     """Check raw model output for different times - FIXED with capacity"""
