@@ -2,9 +2,11 @@
 Feature engineering for LSTM predictions - OPTIMIZED FOR SPEED
 """
 
+import os 
+import gc
 import pandas as pd
 import numpy as np
-import os
+
 import pickle
 from datetime import datetime, timedelta
 from urllib.parse import unquote
