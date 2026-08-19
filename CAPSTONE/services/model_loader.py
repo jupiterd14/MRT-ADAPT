@@ -264,41 +264,40 @@ def _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY):
 STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
             "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
             "Ayala Ave", "Magallanes", "Taft"]
-
+# ==================================================
+# AUTO-LOAD MODELS ON IMPORT - DISABLED FOR LAZY LOADING
+# ==================================================
+# Models will be loaded lazily by app.py on first request
+# Commented out to prevent memory issues on Render free tier
 print("=" * 50)
-print("🔄 Auto-loading directional models on import...")
+print("⚠️ AUTO-LOADING DISABLED - Models will load on first request")
 print("=" * 50)
-load_directional_models(STATIONS)
-print(f"✅ Loaded {len(directional_models)} models")
-print(f"✅ Loaded {len(directional_scalers)} scalers")
 
-# Print debug info about target scalers
-target_scalers = [k for k in directional_scalers.keys() if 'target' in k.lower()]
-print(f"✅ Found {len(target_scalers)} target scalers")
-if target_scalers:
-    first_scaler = directional_scalers[target_scalers[0]]
-    if hasattr(first_scaler, 'data_min_') and hasattr(first_scaler, 'data_max_'):
-        print(f"   First scaler range: {float(first_scaler.data_min_[0]):.1f} to {float(first_scaler.data_max_[0]):.1f}")
-    print(f"   Example target scaler: {target_scalers[0]}")
+# These will be loaded by app.py's lazy loading function
+# Keep them as None initially
+# directional_models = {}  # Already defined above
+# directional_scalers = {}  # Already defined above
 
 # ========== NO AUTO-FIX - Keep original scalers as they are ==========
 print("\n" + "="*50)
 print("✅ Using original target scalers from model files (passenger counts)")
 print("="*50)
 
-# Print final scaler info
-print("\n" + "="*50)
-print("📊 FINAL SCALER STATUS:")
-print("="*50)
-for key in directional_scalers.keys():
-    if '_target' in key:
-        scaler = directional_scalers[key]
-        if hasattr(scaler, 'data_min_') and hasattr(scaler, 'data_max_'):
-            print(f"  {key}: min={float(scaler.data_min_[0]):.1f}, max={float(scaler.data_max_[0]):.1f}")
+# Print final scaler info (but only if models are loaded)
+if directional_models:
+    print("\n" + "="*50)
+    print("📊 FINAL SCALER STATUS:")
+    print("="*50)
+    for key in directional_scalers.keys():
+        if '_target' in key:
+            scaler = directional_scalers[key]
+            if hasattr(scaler, 'data_min_') and hasattr(scaler, 'data_max_'):
+                print(f"  {key}: min={float(scaler.data_min_[0]):.1f}, max={float(scaler.data_max_[0]):.1f}")
+else:
+    print("⚠️ Models not loaded at startup (lazy loading enabled)")
 
 print("=" * 50)
 print("✅ model_loader.py loaded successfully!")
-print(f"✅ directional_models count: {len(directional_models)}")
-print(f"✅ directional_scalers count: {len(directional_scalers)}")
-print(f"✅ Sample model keys: {list(directional_models.keys())[:3]}")
+print(f"✅ directional_models count: {len(directional_models)} (loaded on demand)")
+print(f"✅ directional_scalers count: {len(directional_scalers)} (loaded on demand)")
 print("=" * 50)
