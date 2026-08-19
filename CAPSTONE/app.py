@@ -211,62 +211,91 @@ app.register_blueprint(email_bp, url_prefix='/api/profile')
 @app.context_processor
 def inject_now():
     return {'now': datetime.now()}
-
-# ============ LOAD MODELS AND HISTORICAL DATA WITH CACHING ============
+# ============ LAZY LOADING - Only load models when needed ============
 print("\n" + "="*50)
-print("LOADING MRT-3 PREDICTION SYSTEM")
+print("MRT-3 PREDICTION SYSTEM - LAZY LOADING MODE")
 print("="*50)
+print("⏳ Models will load on first request (not at startup)")
+print("💡 First request may take 10-30 seconds")
+print("="*50 + "\n")
 
-# Load models with caching
+# Don't load models yet - just set up the config
 DIRECTIONAL_MODELS_PATH = 'models_2022-2024_v8'
-directional_models_cached, directional_scalers_cached = load_models_with_cache(STATIONS, DIRECTIONAL_MODELS_PATH)
 
-# Load historical data with caching
-historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
+# Initialize empty placeholders - will be filled on first request
+directional_models_cached = None
+directional_scalers_cached = None
+historical_data = None
 
-# Update the services module with loaded data so other modules can access them
-import services
-services.directional_models = directional_models_cached
-services.directional_scalers = directional_scalers_cached
-services.historical_entry = historical_data.get('historical_entry', {})
-services.historical_exit = historical_data.get('historical_exit', {})
-services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
-services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
-
-print(f"✓ System ready with {len(directional_models_cached)} directional models")
-print(f"✓ Historical data loaded for {len(historical_data['historical_entry'])} stations")
-
-app.config['DIRECTIONAL_MODELS'] = directional_models_cached
-app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
-
-print("="*50 + "\n")
-
-# ============ LOAD LSTM MODELS FROM KAGGLE ============
-print("\n" + "="*50)
-print("LOADING LSTM MODELS FOR ENHANCED PREDICTIONS")
-print("="*50)
-
-# Initialize LSTM predictor with your Kaggle models
-LSTM_MODEL_PATH = 'models_2022-2024_v8'  # Your Kaggle model folder
-
-# Create predictor instance
-lstm_predictor = MRT3LSTMPredictor(model_path=LSTM_MODEL_PATH)
-
-# Load models
-if lstm_predictor.load_models():
-    print(f"✅ LSTM models loaded successfully!")
-    print(f"   📊 Loaded {len(lstm_predictor.models)} station-direction models")
-    print(f"   📈 Average Congestion MAE: 2.63%")
-    print(f"   📈 Average R²: 0.9749")
-    app.config['LSTM_PREDICTOR'] = lstm_predictor
+# Create a function to lazy load models
+def ensure_models_loaded():
+    """Load models only when needed (on first API call)"""
+    global directional_models_cached, directional_scalers_cached, historical_data
     
-    # Optional: Start weekly retraining
-    schedule_weekly_retraining(app)
-else:
-    print("⚠️ LSTM models not loaded - using fallback predictions")
-    app.config['LSTM_PREDICTOR'] = None
+    if directional_models_cached is not None:
+        return  # Already loaded
+    
+    print("🔄 Loading models on-demand (first request)...")
+    print("⏳ This may take 10-30 seconds...")
+    
+    # Load models with caching
+    directional_models_cached, directional_scalers_cached = load_models_with_cache(STATIONS, DIRECTIONAL_MODELS_PATH)
+    
+    # Load historical data with caching
+    historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
+    
+    # Update the services module with loaded data
+    import services
+    services.directional_models = directional_models_cached
+    services.directional_scalers = directional_scalers_cached
+    services.historical_entry = historical_data.get('historical_entry', {})
+    services.historical_exit = historical_data.get('historical_exit', {})
+    services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
+    services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
+    
+    print(f"✓ System ready with {len(directional_models_cached)} directional models")
+    print(f"✓ Historical data loaded for {len(historical_data['historical_entry'])} stations")
+    
+    app.config['DIRECTIONAL_MODELS'] = directional_models_cached
+    app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
 
+# Store function in app config for use in routes
+app.config['ENSURE_MODELS_LOADED'] = ensure_models_loaded
+# ============ LSTM MODELS - LAZY LOADING ============
+print("\n" + "="*50)
+print("LSTM MODELS - LAZY LOADING")
+print("="*50)
+print("⏳ LSTM models will load on first prediction request")
 print("="*50 + "\n")
+
+LSTM_MODEL_PATH = 'models_2022-2024_v8'
+lstm_predictor = None
+
+def ensure_lstm_loaded():
+    """Lazy load LSTM models on first request"""
+    global lstm_predictor
+    
+    if lstm_predictor is not None:
+        return
+    
+    print("🔄 Loading LSTM models on-demand...")
+    lstm_predictor = MRT3LSTMPredictor(model_path=LSTM_MODEL_PATH)
+    
+    if lstm_predictor.load_models():
+        print(f"✅ LSTM models loaded successfully!")
+        print(f"   📊 Loaded {len(lstm_predictor.models)} station-direction models")
+        app.config['LSTM_PREDICTOR'] = lstm_predictor
+        
+        # Start weekly retraining in background (won't block startup)
+        try:
+            schedule_weekly_retraining(app)
+        except Exception as e:
+            print(f"⚠️ Weekly retraining not started: {e}")
+    else:
+        print("⚠️ LSTM models not loaded - using fallback predictions")
+        app.config['LSTM_PREDICTOR'] = None
+
+app.config['ENSURE_LSTM_LOADED'] = ensure_lstm_loaded
 
 # ============ WRAPPER FUNCTIONS ============
 def get_directional_prediction_wrapper(station_name, direction, target_datetime=None):
