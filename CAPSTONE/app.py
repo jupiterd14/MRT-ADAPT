@@ -545,7 +545,7 @@ with app.app_context():
     except Exception as e:
         print(f"Note: {e}")
 
-    # ========== CHECK FOR CSV FILES (NO DOWNLOAD) ==========
+    # ========== AUTO-IMPORT CSV FILES (RENDER FIX) ==========
     data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'services', 'data (2022-2024)')
     csv_files = ['2022.csv', '2023.csv', '2024.csv']
 
@@ -555,9 +555,16 @@ with app.app_context():
         print("✅ All CSV files present! (not loading into memory)")
     else:
         print(f"⚠️ Some CSV files missing: {[f for f in csv_files if not os.path.exists(os.path.join(data_dir, f))]}")
-        print("   They will be downloaded when data is needed")
-        # ✅ DON'T call import_csv_files() here!
-
+        print("🔄 Auto-importing CSV files from Google Drive...")
+        results = import_csv_files()  # ✅ CALL the import function!
+        
+        # Verify after import
+        all_present_now = all(os.path.exists(os.path.join(data_dir, f)) for f in csv_files)
+        if all_present_now:
+            print("✅ CSV files imported successfully!")
+        else:
+            print("⚠️ Some CSV files still missing!")
+    # ===========================================
 # ============ ADMIN RETRAINING ENDPOINT ============
 @app.route('/admin/retrain', methods=['POST'])
 def admin_retrain():
