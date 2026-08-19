@@ -138,6 +138,61 @@ def load_historical_with_cache(stations, base_capacity):
     
     return historical_data
 
+# ============ CSV IMPORT FUNCTION ============
+def import_csv_files():
+    """Function to import CSV files - can be called from anywhere"""
+    import requests
+    import os
+    import json
+    from datetime import datetime
+    
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'services', 'data (2022-2024)')
+    os.makedirs(data_dir, exist_ok=True)
+    
+    file_sources = {
+        '2022.csv': {
+            'google': 'https://drive.google.com/uc?export=download&id=1IFMhSnvU6Tps-9AAEmRL3Jn7oDbhdlVA',
+            'backup': None
+        },
+        '2023.csv': {
+            'google': 'https://drive.google.com/uc?export=download&id=14H6zXJxXHMX4kt3-1tkXc0gUH066cuF_',
+            'backup': None
+        },
+        '2024.csv': {
+            'google': 'https://drive.google.com/uc?export=download&id=1xDbrMdTomXkrGQ5i54FBDE6yEWrXAO1N',
+            'backup': None
+        },
+    }
+    
+    results = {}
+    for filename, sources in file_sources.items():
+        filepath = os.path.join(data_dir, filename)
+        try:
+            print(f"📥 Downloading {filename} from Google Drive...")
+            session = requests.Session()
+            response = session.get(sources['google'], stream=True, timeout=120)
+            
+            content_type = response.headers.get('Content-Type', '')
+            if 'text/html' in content_type:
+                response = session.get(sources['google'] + '&confirm=1', stream=True, timeout=120)
+                content_type = response.headers.get('Content-Type', '')
+            
+            if response.status_code == 200 and 'text/html' not in content_type:
+                with open(filepath, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                file_size = os.path.getsize(filepath) / (1024 * 1024)
+                results[filename] = {'status': 'success', 'size_mb': round(file_size, 2)}
+                print(f"✅ Downloaded {filename} ({file_size:.2f} MB)")
+            else:
+                results[filename] = {'status': 'failed', 'error': 'Invalid response'}
+                print(f"❌ Failed to download {filename}")
+        except Exception as e:
+            results[filename] = {'status': 'failed', 'error': str(e)}
+            print(f"❌ Error downloading {filename}: {e}")
+    
+    return results
+
 # ============ APP INITIALIZATION ============
 app = Flask(__name__, template_folder='html', static_folder='static')
 app.config.from_object(Config)
@@ -496,6 +551,22 @@ with app.app_context():
             
     except Exception as e:
         print(f"Note: {e}")
+
+    # ========== AUTO-IMPORT CSV FILES ==========
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'services', 'data (2022-2024)')
+    csv_files = ['2022.csv', '2023.csv', '2024.csv']
+    
+    missing = [f for f in csv_files if not os.path.exists(os.path.join(data_dir, f))]
+    if missing:
+        print(f"⚠️ Missing CSV files: {missing}")
+        print("🔄 Auto-importing CSV files from Google Drive...")
+        results = import_csv_files()
+        if all(r.get('status') == 'success' for r in results.values()):
+            print("✅ CSV files imported successfully!")
+        else:
+            print("⚠️ Some imports failed, using synthetic data")
+    else:
+        print("✅ All CSV files present!")
 
 # ============ DEBUG ROUTES ============
 @app.route('/debug/raw-prediction/<station_name>/<direction>')
@@ -1346,8 +1417,8 @@ if __name__ == '__main__':
     print("\n" + "="*50)
     print("MRT-3 PREDICTION SYSTEM READY!")
     print("="*50)
-    print(f"✓ {len(directional_models_cached)} directional models loaded")
-    print(f"✓ {len(historical_data['historical_entry'])} stations with historical data")
+    print(f"✓ {len(directional_models_cached) if directional_models_cached else 0} directional models loaded")
+    print(f"✓ {len(historical_data['historical_entry']) if historical_data else 0} stations with historical data")
     print(f"✓ {len(STATIONS)} total stations configured")
     
     # Check if LSTM models are loaded
