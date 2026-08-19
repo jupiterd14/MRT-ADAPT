@@ -1412,6 +1412,23 @@ def debug_find_uploads():
         }
     
     return jsonify(results)
+
+@app.route('/debug/memory')
+def debug_memory():
+    import psutil
+    import gc
+    gc.collect()
+    
+    memory = psutil.virtual_memory()
+    process = psutil.Process()
+    
+    return jsonify({
+        'system_total_mb': memory.total / (1024 * 1024),
+        'system_available_mb': memory.available / (1024 * 1024),
+        'system_used_mb': memory.used / (1024 * 1024),
+        'process_memory_mb': process.memory_info().rss / (1024 * 1024),
+        'models_loaded': len(directional_models_cached) if directional_models_cached else 0
+    })
 # ============ MAIN ============
 if __name__ == '__main__':
     print("\n" + "="*50)
