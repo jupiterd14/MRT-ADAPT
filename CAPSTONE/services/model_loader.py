@@ -1,10 +1,61 @@
+# ============================================================
+# MEMORY OPTIMIZATION - MUST BE FIRST!
+# ============================================================
 import os
-import pickle
+import gc
+
+# Environment variables to reduce memory
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
+os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
+os.environ['TF_DETERMINISTIC_OPS'] = '1'
+os.environ['TF_CPP_VLOG_LEVEL'] = '0'
+
+# Aggressive garbage collection
+gc.set_threshold(50, 3, 3)
+
 import tensorflow as tf
+
+# Disable eager execution (saves memory)
+tf.config.run_functions_eagerly(False)
+
+# Disable XLA (uses memory)
+tf.config.optimizer.set_jit(False)
+
+# Configure GPU memory
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+            # Limit GPU memory to 128MB
+            tf.config.experimental.set_virtual_device_configuration(
+                gpu,
+                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=128)]
+            )
+    except RuntimeError as e:
+        print(e)
+
+# Clear any existing sessions
+tf.keras.backend.clear_session()
+
+print(f"✅ TensorFlow memory optimized! TF version: {tf.__version__}")
+print("=" * 50)
+
+# ============================================================
+# REST OF IMPORTS
+# ============================================================
+import pickle
 from tensorflow.keras.saving import register_keras_serializable
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 
+# ============================================================
+# GLOBAL VARIABLES - EMPTY, NO DATA LOADED
+# ============================================================
 directional_models = {}
 directional_scalers = {}
 historical_entry = {}
@@ -100,11 +151,15 @@ def debug_prediction(station, direction, features):
     return pred_congestion
 
 def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_v8'):
+    """
+    Load ALL directional models - USE WITH CAUTION!
+    This loads all 26 models and uses ~300MB memory.
+    Only use if you have enough memory.
+    """
     global directional_models, directional_scalers
     
     directional_models = {}
     directional_scalers = {}
-    
     
     station_map = {
         "North Avenue": "North Ave",
@@ -113,7 +168,6 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
         "Ayala Avenue": "Ayala Ave",
         "Boni Avenue": "Boni Ave",
     }
-    
     
     print(f"📂 Loading models from: {DIRECTIONAL_MODELS_PATH}")
     
@@ -127,7 +181,7 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
         for direction in ['Northbound', 'Southbound']:
             
             station_file = STATION_FILE_MAP.get(station, station)
-            model_key = f"{station_file}_{direction}"  # FIXED!
+            model_key = f"{station_file}_{direction}"
             
             # Try both naming conventions
             model_path_v1 = os.path.join(DIRECTIONAL_MODELS_PATH, f'{model_key}_lstm_enhanced.keras')
@@ -161,13 +215,16 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
                 else:
                     print(f"    ⚠️ Feature scaler not found: {feature_scaler_path}")
                 
-                # Load target scaler - KEEP ORIGINAL, DON'T MODIFY
+                # Load target scaler
                 if os.path.exists(target_scaler_path):
                     with open(target_scaler_path, 'rb') as f:
                         directional_scalers[f'{model_key}_target'] = pickle.load(f)
                 else:
                     print(f"    ⚠️ Target scaler not found: {target_scaler_path}")
                     print(f"    Will use fallback: multiply by 100")
+                
+                # Force garbage collection after each model
+                gc.collect()
                 
             except Exception as e:
                 print(f"  ❌ Error loading {model_key}: {e}")
@@ -182,7 +239,6 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
     print(f"✅ Target scalers loaded: {len(target_scalers)}")
     if target_scalers:
         print(f"   Examples: {target_scalers[:3]}")
-        # Show the actual range of the first target scaler
         first_scaler = directional_scalers[target_scalers[0]]
         if hasattr(first_scaler, 'data_min_') and hasattr(first_scaler, 'data_max_'):
             print(f"   First scaler range: {float(first_scaler.data_min_[0]):.1f} to {float(first_scaler.data_max_[0]):.1f}")
@@ -191,6 +247,7 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
 
 def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY, 
                                historical_cache='historical_data_cache_2023_2024.pkl'):
+    """Load historical data - USE WITH CAUTION! This loads data into memory."""
     global historical_entry, historical_exit, hourly_avg_entry, hourly_avg_exit
     global dow_avg_entry, dow_avg_exit, direction_counts
     
@@ -237,9 +294,12 @@ def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY,
         'direction_counts': direction_counts
     }
 
-
 def load_single_model(station, direction, model_path='models_2022-2024_v8'):
-    """Load a SINGLE model for one station-direction (memory efficient)"""
+    """
+    Load a SINGLE model for one station-direction (memory efficient)
+    This is the recommended way to load models.
+    Only ~20-30MB per model.
+    """
     station_file = STATION_FILE_MAP.get(station, station)
     model_key = f"{station_file}_{direction}"
     result = {'model': None, 'feature': None, 'target': None}
@@ -281,8 +341,25 @@ def load_single_model(station, direction, model_path='models_2022-2024_v8'):
     except Exception as e:
         print(f"❌ Error loading {model_key}: {e}")
         return None, result
+
+def unload_model(model_key):
+    """Unload a model to free memory"""
+    global directional_models, directional_scalers
     
+    if model_key in directional_models:
+        del directional_models[model_key]
+        print(f"🗑️ Unloaded model: {model_key}")
+    
+    # Remove scalers
+    for key in list(directional_scalers.keys()):
+        if model_key in key:
+            del directional_scalers[key]
+    
+    gc.collect()
+    tf.keras.backend.clear_session()
+
 def _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY):
+    """Generate synthetic historical data (fallback)"""
     global historical_entry, historical_exit, hourly_avg_entry, hourly_avg_exit, direction_counts
     
     for station in STATIONS:
@@ -330,37 +407,17 @@ def _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY):
 STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
             "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
             "Ayala Ave", "Magallanes", "Taft"]
+
 # ==================================================
-# AUTO-LOAD MODELS ON IMPORT - DISABLED FOR LAZY LOADING
+# NO AUTO-LOADING - Everything loads on demand
 # ==================================================
-# Models will be loaded lazily by app.py on first request
-# Commented out to prevent memory issues on Render free tier
 print("=" * 50)
-print("⚠️ AUTO-LOADING DISABLED - Models will load on first request")
+print("⚠️ AUTO-LOADING DISABLED - Models load on first request")
 print("=" * 50)
 
-# These will be loaded by app.py's lazy loading function
-# Keep them as None initially
-# directional_models = {}  # Already defined above
-# directional_scalers = {}  # Already defined above
-
-# ========== NO AUTO-FIX - Keep original scalers as they are ==========
 print("\n" + "="*50)
 print("✅ Using original target scalers from model files (passenger counts)")
 print("="*50)
-
-# Print final scaler info (but only if models are loaded)
-if directional_models:
-    print("\n" + "="*50)
-    print("📊 FINAL SCALER STATUS:")
-    print("="*50)
-    for key in directional_scalers.keys():
-        if '_target' in key:
-            scaler = directional_scalers[key]
-            if hasattr(scaler, 'data_min_') and hasattr(scaler, 'data_max_'):
-                print(f"  {key}: min={float(scaler.data_min_[0]):.1f}, max={float(scaler.data_max_[0]):.1f}")
-else:
-    print("⚠️ Models not loaded at startup (lazy loading enabled)")
 
 print("=" * 50)
 print("✅ model_loader.py loaded successfully!")
