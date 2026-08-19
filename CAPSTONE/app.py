@@ -1,7 +1,7 @@
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
-from flask import Flask, session, flash, redirect, url_for, jsonify
+from flask import Flask, session, flash, redirect, url_for, jsonify, request
 from extensions import cache
 from dotenv import load_dotenv
 import warnings
