@@ -45,130 +45,28 @@ MRT3_PLATFORM_CAPACITY = {
 }
 
 import joblib
-
 def process_raw_data():
-    """Load the training data (2022-2024) that the models were trained on"""
-    # ========== FIX: Explicitly load only 2022-2024 data ==========
-    data_files = []
-    possible_years = ['2022', '2023', '2024']
-    
-    # Get the directory where this script is located
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    for year in possible_years:
-        # Try multiple paths with explicit priority
-        paths = [
-            os.path.join(script_dir, f'data (2022-2024)/{year}.csv'),
-            os.path.join(script_dir, f'../data (2022-2024)/{year}.csv'),
-            os.path.join(script_dir, f'{year}.csv'),
-            os.path.join(script_dir, f'data/{year}.csv'),
-            f'data (2022-2024)/{year}.csv',
-            f'../data (2022-2024)/{year}.csv',
-            f'{year}.csv',
-            f'data/{year}.csv'
-        ]
-        
-        found = False
-        for path in paths:
-            if os.path.exists(path):
-                print(f"📊 Loading {year} data from: {path}")
-                try:
-                    df = pd.read_csv(path)
-                    data_files.append(df)
-                    found = True
-                    break
-                except Exception as e:
-                    print(f"   ❌ Error reading {path}: {e}")
-        
-        if not found:
-            print(f"⚠️ {year}.csv not found, skipping...")
-    
-    if not data_files:
-        print("❌ No training data files found (2022, 2023, 2024)")
-        print("   Looking for: 2022.csv, 2023.csv, 2024.csv in:")
-        print(f"   - {os.path.join(script_dir, 'data (2022-2024)/')}")
-        print("   - ./")
-        print("   - data/")
-        return None
-    
-    # Combine all data
-    df = pd.concat(data_files, ignore_index=True)
-    print(f"✅ Loaded {len(df)} rows from {len(data_files)} years of training data")
-    print(f"   Date range: {df['Date'].min()} to {df['Date'].max()}")
-    
-    # Check passenger counts
-    if 'TotalPassenger' in df.columns:
-        print(f"   Passenger count - min: {df['TotalPassenger'].min()}, max: {df['TotalPassenger'].max()}, mean: {df['TotalPassenger'].mean():.1f}")
-    
-    # Process the data
-    df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'])
-    df['hour'] = df['datetime'].dt.hour
-    df['weekday'] = df['datetime'].dt.weekday
-    df['month'] = df['datetime'].dt.month
-    df['day'] = df['datetime'].dt.day
-    df['minute'] = df['datetime'].dt.minute
-    
-    # Add features
-    df = add_cyclical_time_features(df)
-    df = add_smart_operating_flags(df)
-    df = smart_data_cleaner(df)
-    
-    df['is_weekend'] = (df['datetime'].dt.weekday >= 5).astype(np.int8)
-    df['is_holiday'] = 0
-    df['is_special_event'] = 0
-    df['is_christmas_season'] = np.array([is_christmas_season(d) for d in df['datetime']], dtype=np.int8)
-    df['is_payday'] = df['datetime'].apply(is_payday).astype(np.int8)
-    df['is_friday'] = df['datetime'].apply(is_friday).astype(np.int8)
-    df['is_rush_hour'] = ((df['hour'].between(7, 9)) | (df['hour'].between(17, 19))).astype(np.int8)
-    df['Direction'] = df.apply(infer_direction, axis=1)
-    
-    return df
+    """Legacy function - no longer used"""
+    print("⚠️ process_raw_data() is deprecated - using on-demand loading")
+    return None
 
 def load_data_fast():
-    """Optimized data loading - creates cache on first run"""
+    """
+    Memory-optimized data loading - ONLY loads data when needed,
+    and doesn't keep ALL data in memory.
+    """
     global _DATA_CACHE
     
-    if _DATA_CACHE is not None:
-        return _DATA_CACHE
+    # ❌ REMOVE the global cache - it's causing memory issues!
+    # We'll load data on-demand instead
     
-    preprocessed_path = 'data/preprocessed.parquet'
+    # Read only the needed data for a specific station
+    # This is handled by get_station_dataframe now
     
-    # Try loading preprocessed data first
-    if os.path.exists(preprocessed_path):
-        try:
-            print("📊 Loading preprocessed data from cache...")
-            _DATA_CACHE = pd.read_parquet(preprocessed_path)
-            
-            # Verify we have 2022-2024 data
-            years_loaded = _DATA_CACHE['datetime'].dt.year.unique().tolist()
-            print(f"   Years in data: {years_loaded}")
-            print(f"   Date range: {_DATA_CACHE['datetime'].min()} to {_DATA_CACHE['datetime'].max()}")
-            
-            # If only 2025 data, force reload from CSV
-            if years_loaded == [2025] or (len(years_loaded) == 1 and years_loaded[0] >= 2025):
-                print("⚠️ WARNING: Only 2025 data found! Forcing reload from CSV files...")
-                os.remove(preprocessed_path)
-                _DATA_CACHE = None
-                return load_data_fast()  # Recursively reload
-            
-            return _DATA_CACHE
-            
-        except Exception as e:
-            print(f"⚠️ Error loading cache: {e}")
-            _DATA_CACHE = None
+    print("📊 Using memory-optimized data loading (no full data cache)")
     
-    # Process raw data and save cache
-    print("📊 Processing raw data from CSV files...")
-    _DATA_CACHE = process_raw_data()
-    if _DATA_CACHE is not None:
-        # Create directory if it doesn't exist
-        os.makedirs('data', exist_ok=True)
-        _DATA_CACHE.to_parquet(preprocessed_path, compression='snappy')
-        print(f"💾 Saved preprocessed data to {preprocessed_path} for future runs")
-    else:
-        return None
-    
-    return _DATA_CACHE
+    # Return None - we'll load data on demand in get_station_dataframe
+    return None
 
 
 
@@ -243,180 +141,78 @@ def get_feature_scaler(station_name, direction):
     else:
         print(f"   ⚠️ No feature scaler found at: {scaler_path}")
         return None
-    
 def get_station_dataframe(station_name, direction):
-    """Cache station-specific dataframes - SCALED CONGESTION TO MATCH TRAINING"""
+    """
+    Memory-optimized - reads ONLY the needed station data from CSV
+    Uses a small LRU cache (max 2 stations)
+    """
+    global _STATION_DATA_CACHE
+    
     cache_key = f"{station_name}_{direction}"
     
-    # Return from memory cache if available
+    # ✅ Return from small cache if available
     if cache_key in _STATION_DATA_CACHE:
+        print(f"📦 Using cached data for {cache_key}")
         return _STATION_DATA_CACHE[cache_key]
     
-    df = load_data_fast()
-    if df is None:
-        return None
+    # ✅ Read ONLY this station's data from CSV
+    print(f"📊 Loading data for {cache_key} from CSV (no full data load)...")
     
-    station_num = STATION_NUMBERS.get(station_name)
-    if not station_num:
-        print(f"❌ Unknown station: {station_name}")
-        return None
+    data_dir = 'services/data (2022-2024)'
+    csv_files = ['2022.csv', '2023.csv', '2024.csv']
     
-    # Filter by station metrics and tracking direction
-    if station_name == "North Ave":
-        if direction == 'Northbound':
-            station_df = df[df['StationExit'] == station_num].copy()
-        else:
-            station_df = df[df['StationEntry'] == station_num].copy()
-    elif station_name == "Taft":
-        if direction == 'Northbound':
-            station_df = df[df['StationEntry'] == station_num].copy()
-        else:
-            station_df = df[df['StationExit'] == station_num].copy()
-    else:
-        if direction == 'Northbound':
-            station_df = df[df['StationExit'] == station_num].copy()
-        else:
-            station_df = df[df['StationEntry'] == station_num].copy()
+    all_data = []
     
-    # Filter by direction and sort
-    station_df = station_df[station_df['Direction'] == direction].sort_values('datetime')
+    for csv_file in csv_files:
+        filepath = os.path.join(data_dir, csv_file)
+        if os.path.exists(filepath):
+            try:
+                # ✅ Read in chunks to save memory
+                chunk_size = 10000
+                for chunk in pd.read_csv(filepath, chunksize=chunk_size):
+                    # Filter for this station and direction
+                    filtered = chunk[
+                        (chunk['Station'] == station_name) & 
+                        (chunk['Direction'] == direction)
+                    ]
+                    if len(filtered) > 0:
+                        all_data.append(filtered)
+                    # Free memory
+                    del chunk
+                    gc.collect()
+            except Exception as e:
+                print(f"⚠️ Error loading {csv_file}: {e}")
     
-    if len(station_df) < 100:
-        print(f"⚠️ Not enough data for {station_name} {direction}: {len(station_df)} rows")
+    if not all_data:
+        print(f"⚠️ No data found for {cache_key}")
         _STATION_DATA_CACHE[cache_key] = None
         return None
     
-    # Get current time to exclude incomplete hour
-    current_time = Config.get_current_time()
-    current_hour_floor = current_time.replace(minute=0, second=0, microsecond=0)
+    # Combine filtered data
+    combined = pd.concat(all_data)
+    combined['datetime'] = pd.to_datetime(combined['Date'] + ' ' + combined['Time'])
+    combined = combined.set_index('datetime')
+    combined = combined.sort_index()
     
-    # Exclude current incomplete hour
-    station_df = station_df[station_df['datetime'] < current_hour_floor]
+    # Resample to hourly
+    hourly = combined.resample('H').sum()
     
-    # Aggregate to hourly
-    station_df['hour_timestamp'] = station_df['datetime'].dt.floor('h')
-    hourly = station_df.groupby('hour_timestamp').agg({
-        'TotalPassenger': 'sum',
-        'hour': 'first', 'weekday': 'first', 'month': 'first',
-        'minute': 'first',
-        'hour_sin': 'first', 'hour_cos': 'first',
-        'dow_sin': 'first', 'dow_cos': 'first',
-        'month_sin': 'first', 'month_cos': 'first',
-        'time_decimal': 'first',
-        'is_operating_hour': 'first',
-        'minute_normalized': 'first',
-        'is_morning_rush': 'first', 'is_evening_rush': 'first', 'is_noon': 'first',
-        'is_pre_opening': 'first', 'is_post_closing': 'first',
-        'minutes_until_closing': 'first', 'minutes_since_opening': 'first',
-        'time_normalized': 'first',
-        'is_weekend': 'first', 'is_holiday': 'first', 'is_special_event': 'first',
-        'is_christmas_season': 'first', 'is_payday': 'first', 'is_friday': 'first',
-        'is_rush_hour': 'first',
-        'is_maintenance_record': 'first', 'is_extended_hours': 'first'
-    }).reset_index()
+    # Free memory
+    del combined
+    del all_data
+    gc.collect()
     
-  
+    # ✅ SMALL CACHE - Keep only 2 stations in memory
+    if len(_STATION_DATA_CACHE) >= 2:
+        oldest_key = next(iter(_STATION_DATA_CACHE))
+        print(f"🗑️ Removing oldest from cache: {oldest_key}")
+        del _STATION_DATA_CACHE[oldest_key]
+        gc.collect()
     
-    # Create complete hour range
-    if len(hourly) > 0:
-        min_date = hourly['hour_timestamp'].min().floor('D')
-        max_date = hourly['hour_timestamp'].max().ceil('D')
-        all_hours = pd.date_range(start=min_date, end=max_date, freq='h')
-        
-        hourly.set_index('hour_timestamp', inplace=True)
-        hourly = hourly.reindex(all_hours)
-        
-        # ========== CRITICAL FIX: CONVERT BACK TO DATAFRAME ==========
-        if not isinstance(hourly, pd.DataFrame):
-            print(f"⚠️ Converting hourly from {type(hourly)} to DataFrame")
-            hourly = pd.DataFrame(hourly)
-        
-        # Now safely use the index
-        # Fill closed hours with zeros for passenger count
-        if 'TotalPassenger' not in hourly.columns:
-            hourly['TotalPassenger'] = 0
-        
-        closed_hour_mask = (hourly.index.hour >= 22) | (hourly.index.hour <= 4)
-        hourly.loc[closed_hour_mask, 'TotalPassenger'] = 0
-        hourly['TotalPassenger'] = hourly['TotalPassenger'].fillna(0)
-
-        # ========== RECOMPUTE ALL TIME-BASED FEATURES FROM THE INDEX ==========
-        hourly['hour'] = hourly.index.hour
-        hourly['weekday'] = hourly.index.weekday
-        hourly['month'] = hourly.index.month
-        hourly['minute'] = hourly.index.minute
-
-        # Re-add cyclical and operational features
-        hourly = add_cyclical_time_features(hourly)
-        hourly = add_smart_operating_flags(hourly)
-
-        # Re-add flags that depend on the date
-        hourly['is_weekend'] = (hourly.index.weekday >= 5).astype(np.int8)
-        hourly['is_christmas_season'] = np.array([is_christmas_season(d) for d in hourly.index.date], dtype=np.int8)
-        hourly['is_payday'] = hourly.index.day.isin([15, 30, 31]).astype(np.int8)
-        hourly['is_friday'] = (hourly.index.weekday == 4).astype(np.int8)
-        hourly['is_rush_hour'] = ((hourly['hour'].between(7, 9)) | (hourly['hour'].between(17, 19))).astype(np.int8)
-
-        hourly['is_holiday'] = 0
-        hourly['is_special_event'] = 0
-
-        if not isinstance(hourly, pd.DataFrame):
-            hourly = pd.DataFrame(hourly)
-
-        # Recompute maintenance and extended hours flags
-        hourly = smart_data_cleaner(hourly)
-
-        if not isinstance(hourly, pd.DataFrame):
-            hourly = pd.DataFrame(hourly)
-
-        # ========== CONGESTION FEATURE AND CATEGORIES (FIXED) ==========
-        capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-
-        # Get the feature scaler to know the expected range for congestion
-        feature_scaler = get_feature_scaler(station_name, direction)
-        if feature_scaler is not None:
-            training_max = feature_scaler.data_max_[-1]  # The max value the scaler was trained on
-            training_min = feature_scaler.data_min_[-1]  # The min value (usually 0)
-        else:
-            # Fallback: estimate from capacity
-            training_max = min(capacity * 0.3, 50)  # Reasonable default
-            training_min = 0
-
-        # Scale congestion to match the training range:
-        # Step 1: Convert raw passenger counts to percentage of capacity (0-100%)
-        # Step 2: Scale percentage to the training range (0 to training_max)
-        percentage = (hourly['TotalPassenger'] / capacity * 100).clip(0, 100)
-        hourly['congestion'] = (percentage / 100) * training_max
-
-        # Store the percentage for display and categorization
-        hourly['congestion_percentage'] = percentage
-        hourly['raw_passengers'] = hourly['TotalPassenger']
-        
-        # 3. Add congestion categories for confusion matrix
-        hourly['congestion_category'] = 0  # Default to Light
-        hourly.loc[hourly['congestion_percentage'] >= 30, 'congestion_category'] = 1  # Moderate
-        hourly.loc[hourly['congestion_percentage'] >= 60, 'congestion_category'] = 2  # Congested
-        hourly.loc[hourly['congestion_percentage'] >= 90, 'congestion_category'] = 3  # Severely Congested
-        
-        # Add category names for readability
-        category_names = {
-            0: 'Light',
-            1: 'Moderate',
-            2: 'Congested',
-            3: 'Severely Congested'
-        }
-        hourly['congestion_category_name'] = hourly['congestion_category'].map(category_names)
-        
-        # FINAL CHECK: Force hour values from index one more time
-        hourly['hour'] = hourly.index.hour
-        
-        hourly = hourly.sort_index()
-    
-    # Store in memory cache
+    # Store in cache
     _STATION_DATA_CACHE[cache_key] = hourly
-
     
- 
+    print(f"✅ Loaded {len(hourly)} hours for {cache_key}")
     return hourly
 
 
