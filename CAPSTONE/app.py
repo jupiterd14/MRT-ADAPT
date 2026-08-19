@@ -205,13 +205,13 @@ cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 @app.route('/warmup')
 def warmup():
-    """Warm up models - call this first to avoid timeouts"""
     import time
     start = time.time()
     
     try:
-        # ✅ Only load ONE model
+        # ✅ Load BOTH directions
         ensure_single_model_loaded("North Ave", "Northbound")
+        ensure_single_model_loaded("North Ave", "Southbound")
         elapsed = time.time() - start
         
         return jsonify({
@@ -222,7 +222,6 @@ def warmup():
         })
     except Exception as e:
         return jsonify({"status": "failed", "error": str(e)}), 500
-
 def get_memory_usage():
     """Helper to get memory usage"""
     try:
@@ -373,9 +372,9 @@ def ensure_single_model_loaded(station_name, direction):
     
     model_key = f"{station_name}_{direction}"
     
-    # ✅ MEMORY LIMIT: Only load 1 model
-    if len(directional_models_cached) >= 1:
-        print(f"⚠️ Model limit reached (1). Skipping {station_name}_{direction}")
+    #  MEMORY LIMIT: Only load 2 model
+    if len(directional_models_cached) >= 2:
+        print(f"⚠️ Model limit reached (2). Skipping {station_name}_{direction}")
         gc.collect()
         return
     
