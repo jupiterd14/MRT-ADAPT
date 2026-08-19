@@ -1099,6 +1099,105 @@ def debug_lstm_status():
         'feature_cols_count': len(lstm_predictor.feature_cols) if lstm_predictor.feature_cols else 0,
         'capacities_loaded': bool(lstm_predictor.capacities)
     })
+    
+@app.route('/admin/import-csvs', methods=['GET', 'POST'])
+def admin_import_csvs():
+    """Import CSV files from Google Drive (Render workaround)"""
+    import requests
+    import os
+    import json
+    from datetime import datetime
+
+    # 🔐 Your secret token
+    SECRET_TOKEN = "mrt3_import_2024"  # CHANGE THIS!
+
+    # Check authentication
+    token = request.args.get('secret') or request.json.get('secret') if request.is_json else None
+    if token != SECRET_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    # Define where to save files
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'services', 'data (2022-2024)')
+    os.makedirs(data_dir, exist_ok=True)
+
+    # 🔽 YOUR GOOGLE DRIVE FILE IDs (EXTRACTED FROM YOUR LINKS)
+    file_ids = {
+        '2022.csv': '1IFMhSnvU6Tps-9AAEmRL3Jn7oDbhdlVA',
+        '2023.csv': '14H6zXJxXHMX4kt3-1tkXc0gUH066cuF_',
+        '2024.csv': '1xDbrMdTomXkrGQ5i54FBDE6yEWrXAO1N',
+    }
+
+    results = {}
+
+    for filename, file_id in file_ids.items():
+        filepath = os.path.join(data_dir, filename)
+        # Google Drive direct download URL with confirmation
+        url = f"https://drive.google.com/uc?export=download&id={file_id}"
+
+        try:
+            print(f"📥 Downloading {filename} from Google Drive...")
+            
+            # Start a session to handle cookies
+            session = requests.Session()
+            response = session.get(url, stream=True, timeout=300)
+
+            # Check if we need to handle the confirmation page
+            if 'confirm' in response.text and 'text/html' in response.headers.get('Content-Type', ''):
+                print("🔄 Google Drive confirmation page detected, handling it...")
+                # Extract the confirmation token
+                import re
+                match = re.search(r'confirm=([^&]+)', response.text)
+                if match:
+                    confirm_token = match.group(1)
+                    # Second request with confirmation token
+                    download_url = f"https://drive.google.com/uc?export=download&confirm={confirm_token}&id={file_id}"
+                    response = session.get(download_url, stream=True, timeout=300)
+                else:
+                    return jsonify({"error": f"Could not extract confirmation token for {filename}"}), 500
+
+            # Save the file
+            if response.status_code == 200:
+                with open(filepath, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                file_size = os.path.getsize(filepath) / (1024 * 1024)
+                results[filename] = {
+                    'status': 'success',
+                    'size_mb': round(file_size, 2),
+                    'path': filepath
+                }
+                print(f"✅ Downloaded {filename} ({file_size:.2f} MB)")
+            else:
+                results[filename] = {
+                    'status': 'failed',
+                    'error': f'HTTP {response.status_code}'
+                }
+                print(f"❌ Failed to download {filename}: HTTP {response.status_code}")
+
+        except Exception as e:
+            results[filename] = {
+                'status': 'failed',
+                'error': str(e)
+            }
+            print(f"❌ Error downloading {filename}: {e}")
+
+    # Clear cache so app reloads data
+    try:
+        cache_files = ['mrt3_historical_cache.pkl', 'historical_data_cache_2023_2024.pkl']
+        for cache_file in cache_files:
+            cache_path = os.path.join('/tmp', cache_file)
+            if os.path.exists(cache_path):
+                os.remove(cache_path)
+                print(f"🗑️ Removed cache: {cache_file}")
+    except Exception as e:
+        print(f"⚠️ Could not clear cache: {e}")
+
+    return jsonify({
+        'success': True,
+        'message': 'CSV import completed',
+        'results': results,
+        'data_directory': data_dir
+    })
 
 @app.route('/debug/lstm-predict/<station>/<direction>')
 def debug_lstm_predict(station, direction):
