@@ -619,7 +619,7 @@ def raw_prediction(station_name, direction):
         return jsonify({'error': f'Model {model_key} not found'})
     
     try:
-        now = datetime.now()
+        now = Config.get_current_time()
         sequence = get_feature_sequence_for_station(station_name, direction, now)
         
         if sequence is None:
@@ -661,7 +661,7 @@ def test_feature_sequence(station, direction):
     station = unquote(station)
     direction = unquote(direction)
     
-    now = datetime.now()
+    now = Config.get_current_time()
     sequence = get_feature_sequence_for_station(station, direction, now)
     
     result = {
@@ -684,7 +684,7 @@ def test_real_model(station_name):
     import numpy as np
     
     results = {}
-    now = datetime.now()
+    now = Config.get_current_time()
     
     for direction in ['Northbound', 'Southbound']:
         ensure_single_model_loaded(station_name, direction)
@@ -769,7 +769,7 @@ def debug_raw_model_output(station_name, direction):
     from datetime import datetime
     
     ensure_single_model_loaded(station_name, direction)
-    now = datetime.now()
+    now = Config.get_current_time()
     model_key = f"{station_name}_{direction}"
     
     result = {
