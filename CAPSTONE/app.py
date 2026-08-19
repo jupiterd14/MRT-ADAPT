@@ -371,7 +371,6 @@ def ensure_single_model_loaded(station_name, direction):
         directional_models_cached = {}
         directional_scalers_cached = {}
     
-    # ✅ Define model_key ONCE at the beginning
     model_key = f"{station_name}_{direction}"
     
     # ✅ MEMORY LIMIT: Only load 1 model
@@ -380,7 +379,6 @@ def ensure_single_model_loaded(station_name, direction):
         gc.collect()
         return
     
-    # ✅ Check if already loaded
     if model_key in directional_models_cached:
         print(f"✅ Model {model_key} already loaded")
         return
@@ -396,8 +394,6 @@ def ensure_single_model_loaded(station_name, direction):
             directional_scalers_cached[f"{model_key}_feature"] = scalers.get('feature')
             directional_scalers_cached[f"{model_key}_target"] = scalers.get('target')
             print(f"✅ Loaded model for {model_key}")
-            
-            # Force garbage collection
             gc.collect()
         else:
             print(f"❌ Failed to load model for {model_key}")
@@ -409,17 +405,18 @@ def ensure_single_model_loaded(station_name, direction):
     
     app.config['DIRECTIONAL_MODELS'] = directional_models_cached
     app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+
+app.config['ENSURE_SINGLE_MODEL_LOADED'] = ensure_single_model_loaded
+
+@app.route('/debug/app-config')
+def debug_app_config():
+    return jsonify({
+        'ENSURE_SINGLE_MODEL_LOADED': app.config.get('ENSURE_SINGLE_MODEL_LOADED') is not None,
+        'DIRECTIONAL_MODELS': app.config.get('DIRECTIONAL_MODELS') is not None,
+        'DIRECTIONAL_SCALERS': app.config.get('DIRECTIONAL_SCALERS') is not None,
+        'models_loaded': len(directional_models_cached) if directional_models_cached else 0
+    })
     
-    # Check memory after loading
-    try:
-        import psutil
-        process = psutil.Process()
-        mem = process.memory_info().rss / (1024 * 1024)
-        print(f"📊 Current memory: {mem:.1f}MB")
-        if mem > 200:
-            print("⚠️ Memory high, consider upgrading Render plan")
-    except:
-        pass
 # ============ WRAPPER FUNCTIONS ============
 def get_directional_prediction_wrapper(station_name, direction, target_datetime=None):
     # Try LSTM first (if loaded)
