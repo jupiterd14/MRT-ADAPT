@@ -159,7 +159,10 @@ def get_station_dataframe(station_name, direction):
     
     print(f"📊 Loading data for {cache_key} from CSV...")
     
-    data_dir = 'services/data (2022-2024)'
+    # ✅ FIX: Use absolute path
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(script_dir, 'data (2022-2024)')
+    
     csv_files = ['2022.csv', '2023.csv', '2024.csv']
     
     all_data = []
@@ -172,6 +175,7 @@ def get_station_dataframe(station_name, direction):
     for csv_file in csv_files:
         filepath = os.path.join(data_dir, csv_file)
         if os.path.exists(filepath):
+            print(f"   📄 Found: {filepath}")
             try:
                 chunk_size = 10000
                 for chunk in pd.read_csv(filepath, chunksize=chunk_size):
@@ -183,9 +187,11 @@ def get_station_dataframe(station_name, direction):
                     if len(filtered) > 0:
                         all_data.append(filtered)
                     del chunk
-                    gc.collect()  # ← Requires import gc at top!
+                    gc.collect()
             except Exception as e:
                 print(f"⚠️ Error loading {csv_file}: {e}")
+        else:
+            print(f"   ❌ File not found: {filepath}")
     
     if not all_data:
         print(f"⚠️ No data found for {cache_key}")
