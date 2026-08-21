@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>MRT-3 Tracker | Login</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -448,6 +449,9 @@
             .auth-card { padding: 15px 30px; }
             .divider, .social-row { margin-bottom: 10px; margin-top: 10px; }
         }
+
+
+    
     </style>
 </head>
 <body>
@@ -569,6 +573,57 @@
     </div>
 
     <script>
+
+        (function() {
+    // Check if user is already logged in (session check)
+    fetch('/api/check-session')
+        .then(response => response.json())
+        .then(data => {
+            if (data.logged_in) {
+                // If already logged in, redirect to dashboard
+                const role = data.role || 'user';
+                if (role === 'admin') {
+                    window.location.href = '/admin-dashboard';
+                } else if (role === 'operator') {
+                    window.location.href = '/operator-dashboard';
+                } else {
+                    window.location.href = '/user-dashboard';
+                }
+            }
+        })
+        .catch(() => {
+            // If fetch fails, stay on login page
+            console.log('Session check failed, staying on login page');
+        });
+    
+    // Push a new state to prevent back button from going to protected pages
+    history.pushState(null, null, location.href);
+    
+    window.addEventListener('popstate', function(event) {
+        // Check session again when back button is pressed
+        fetch('/api/check-session')
+            .then(response => response.json())
+            .then(data => {
+                if (data.logged_in) {
+                    // If logged in, redirect to dashboard
+                    const role = data.role || 'user';
+                    if (role === 'admin') {
+                        window.location.href = '/admin-dashboard';
+                    } else if (role === 'operator') {
+                        window.location.href = '/operator-dashboard';
+                    } else {
+                        window.location.href = '/user-dashboard';
+                    }
+                } else {
+                    // If not logged in, stay on login page
+                    history.pushState(null, null, location.href);
+                }
+            })
+            .catch(() => {
+                history.pushState(null, null, location.href);
+            });
+    });
+})();
         let resetEmail = '';
         let resetTimer = null;
         let resetSeconds = 300;
@@ -938,6 +993,8 @@
                 showToast('Please fill in both email and password fields.', 'error');
             }
         });
+        // ========== PREVENT BACK BUTTON AFTER LOGOUT ==========
+
     </script>
 </body>
 </html>

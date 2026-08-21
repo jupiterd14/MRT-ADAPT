@@ -6,6 +6,11 @@
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>MRT-3 | Operator Panel</title>
+              <!-- ========== NO-CACHE META TAGS ========== -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2152,6 +2157,17 @@
 }
 
 
+   body {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            transition: none !important;
+        }
+        /* Show only when loaded class is added */
+        body.loaded {
+            opacity: 1 !important;
+            visibility: visible !important;
+            transition: opacity 0.3s ease !important;
+        }
             </style>
         </head>
         <body>
@@ -2903,6 +2919,31 @@
             
         </div>
     <script>
+
+
+    (function() {
+        // Push a new state to prevent back button from going to protected pages
+        history.pushState(null, null, location.href);
+        
+        window.addEventListener('popstate', function(event) {
+            // Check session again when back button is pressed
+            fetch('/api/check-session')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.logged_in) {
+                        // If not logged in, redirect to login
+                        window.location.replace('/login');
+                    } else {
+                        // If logged in, stay on the page
+                        history.pushState(null, null, location.href);
+                    }
+                })
+                .catch(() => {
+                    // If fetch fails, redirect to login
+                    window.location.replace('/login');
+                });
+        });
+    })();
     console.log("🚇 Operator Dashboard Initializing...");
     console.log("Managed Stations:", {{ managed_stations | tojson }});
     
@@ -3692,43 +3733,81 @@ async function confirmArchiveBroadcast() {
         });
     }
 
-    async function loadCongestionData() {
-    console.log("Loading congestion data for operator dashboard...");
+   async function loadCongestionData() {
+    console.log("🔄 Loading congestion data for operator dashboard...");
     showLoadingOverlay();
+    
     try {
-        const response = await fetch(`/api/operator/station-status?_=${Date.now()}`);
+        const timestamp = Date.now();
+        console.log(`📡 Fetching: /api/operator/station-status?_=${timestamp}`);
+        
+        const response = await fetch(`/api/operator/station-status?_=${timestamp}`);
+        
         if (!response.ok) {
+            console.error(`❌ HTTP Error: ${response.status} ${response.statusText}`);
             throw new Error(`HTTP ${response.status}`);
         }
-        const data = await response.json();
         
-        if (!data.stations) {
-            console.warn("No stations data received");
+        const data = await response.json();
+        console.log("📊 Raw API Response:", data);
+        
+        // ========== CHECK DATA STRUCTURE ==========
+        if (!data || !data.stations || !Array.isArray(data.stations)) {
+            console.error("❌ Invalid data structure - missing 'stations' array");
+            console.log("Data received:", data);
+            
+            // Show error in tables
+            document.getElementById('southbound-body').innerHTML = 
+                `<tr><td colspan="3" style="text-align:center;color:#EF4444;padding:20px;">
+                    <i class="fas fa-exclamation-triangle"></i> No station data available
+                </td></tr>`;
+            document.getElementById('northbound-body').innerHTML = 
+                `<tr><td colspan="3" style="text-align:center;color:#EF4444;padding:20px;">
+                    <i class="fas fa-exclamation-triangle"></i> No station data available
+                </td></tr>`;
+            hideLoadingOverlay();
             return;
         }
         
         const stations = data.stations;
+        console.log(`📊 Found ${stations.length} stations in response`);
+        
+        // ========== LOG FIRST STATION STRUCTURE ==========
+        if (stations.length > 0) {
+            console.log("🔍 Sample station structure:", stations[0]);
+            console.log("   - northbound:", stations[0].northbound);
+            console.log("   - southbound:", stations[0].southbound);
+        }
         
         let severeCount = 0, congestedCount = 0, moderateCount = 0, lightCount = 0;
         const southRows = [];
         const northRows = [];
 
-        // ========== NORTHBOUND ==========
+        // ========== NORTHBOUND TABLE ==========
+        console.log("📋 Building NORTHBOUND table...");
+        
         for (const station of stations) {
-            const name = station.name;
-            const northCong = station.northbound.congestion || 0;
+            const name = station.name || station.station || 'Unknown';
             
-            // ========== FIX: Properly check overridden ==========
-            const isNorthOverridden = station.northbound.overridden === true || 
-                                      station.northbound.overridden === 'true' || 
-                                      station.northbound.overridden === 'True' ||
-                                      station.northbound.overridden === 1;
+            // ========== SAFE ACCESS WITH FALLBACKS ==========
+            const northData = station.northbound || {};
+            const southData = station.southbound || {};
+            
+            const northCong = typeof northData.congestion === 'number' ? northData.congestion : 0;
+            const southCong = typeof southData.congestion === 'number' ? southData.congestion : 0;
+            
+            // ========== OVERRIDE CHECK - CASE INSENSITIVE ==========
+            const isNorthOverridden = northData.overridden === true || 
+                                      northData.overridden === 'true' || 
+                                      northData.overridden === 'True' ||
+                                      northData.overridden === 1;
+            
+            const isSouthOverridden = southData.overridden === true || 
+                                      southData.overridden === 'true' || 
+                                      southData.overridden === 'True' ||
+                                      southData.overridden === 1;
 
-            // Log for debugging
-            if (name === 'Taft') {
-                console.log(`🔍 Taft northbound - overridden value:`, station.northbound.overridden, '→ isNorthOverridden:', isNorthOverridden);
-            }
-
+            // ========== CLOSED CHECK ==========
             const nowTime = new Date();
             const hour = nowTime.getHours();
             const minute = nowTime.getMinutes();
@@ -3737,6 +3816,7 @@ async function confirmArchiveBroadcast() {
             const OPERATING_END = 22.5;
             const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
 
+            // ========== NORTHBOUND STATUS ==========
             let nClass = 'light', nText = 'LIGHT';
             
             if (isClosed) {
@@ -3749,7 +3829,7 @@ async function confirmArchiveBroadcast() {
                 else { lightCount++; }
             }
            
-            const canManageNorth = managedStations.includes(name);
+            const canManageNorth = managedStations && managedStations.includes(name);
             
             let btnHtmlNorth;
             if (isNorthOverridden) {
@@ -3773,28 +3853,31 @@ async function confirmArchiveBroadcast() {
 
             northRows.push(`
                 <tr ${isNorthOverridden ? 'style="background:#FEF2F2;"' : ''}>
-                    <td style="font-weight:500;">${name}${northStatus}</td>
+                    <td style="font-weight:500;">${escapeHtml(name)}${northStatus}</td>
                     <td><span class="badge ${nClass}">${nText}</span></td>
                     <td>${btnHtmlNorth}</td>
                 </tr>
             `);
         }
 
-        // ========== SOUTHBOUND ==========
+        // ========== SOUTHBOUND TABLE ==========
+        console.log("📋 Building SOUTHBOUND table...");
+        
+        // Reset counts for southbound (they're cumulative, so we need to track separately)
+        // Actually, the counts should be per direction, but we're counting all stations
+        // Let's re-count for southbound properly
+        let southSevere = 0, southCongested = 0, southModerate = 0, southLight = 0;
+        
         for (const station of [...stations].reverse()) {
-            const name = station.name;
-            const southCong = station.southbound.congestion || 0;
+            const name = station.name || station.station || 'Unknown';
             
-            // ========== FIX: Properly check overridden ==========
-            const isSouthOverridden = station.southbound.overridden === true || 
-                                      station.southbound.overridden === 'true' || 
-                                      station.southbound.overridden === 'True' ||
-                                      station.southbound.overridden === 1;
-
-            // Log for debugging
-            if (name === 'Taft') {
-                console.log(`🔍 Taft southbound - overridden value:`, station.southbound.overridden, '→ isSouthOverridden:', isSouthOverridden);
-            }
+            const southData = station.southbound || {};
+            const southCong = typeof southData.congestion === 'number' ? southData.congestion : 0;
+            
+            const isSouthOverridden = southData.overridden === true || 
+                                      southData.overridden === 'true' || 
+                                      southData.overridden === 'True' ||
+                                      southData.overridden === 1;
             
             let sClass = 'light', sText = 'LIGHT';
 
@@ -3810,13 +3893,13 @@ async function confirmArchiveBroadcast() {
                 sClass = 'closed';
                 sText = 'CLOSED';
             } else {
-                if (southCong > 80) { sClass = 'severe'; sText = 'SEVERE'; severeCount++; }
-                else if (southCong > 60) { sClass = 'congested'; sText = 'CONGESTED'; congestedCount++; }
-                else if (southCong > 30) { sClass = 'moderate'; sText = 'MODERATE'; moderateCount++; }
-                else { lightCount++; }
+                if (southCong > 80) { sClass = 'severe'; sText = 'SEVERE'; southSevere++; }
+                else if (southCong > 60) { sClass = 'congested'; sText = 'CONGESTED'; southCongested++; }
+                else if (southCong > 30) { sClass = 'moderate'; sText = 'MODERATE'; southModerate++; }
+                else { southLight++; }
             }
         
-            const canManageSouth = managedStations.includes(name);
+            const canManageSouth = managedStations && managedStations.includes(name);
             
             let btnHtmlSouth;
             if (isSouthOverridden) {
@@ -3840,28 +3923,40 @@ async function confirmArchiveBroadcast() {
 
             southRows.push(`
                 <tr ${isSouthOverridden ? 'style="background:#FEF2F2;"' : ''}>
-                    <td style="font-weight:500;">${name}${southStatus}</td>
+                    <td style="font-weight:500;">${escapeHtml(name)}${southStatus}</td>
                     <td><span class="badge ${sClass}">${sText}</span></td>
                     <td>${btnHtmlSouth}</td>
                 </tr>
             `);
         }
 
-        // Update the DOM
-        document.getElementById('severe-count').textContent = severeCount;
-        document.getElementById('congested-count').textContent = congestedCount;
-        document.getElementById('moderate-count').textContent = moderateCount;
-        document.getElementById('light-count').textContent = lightCount;
+        // ========== UPDATE STAT CARDS ==========
+        // Use the larger counts (combined north+south)
+        document.getElementById('severe-count').textContent = severeCount + southSevere;
+        document.getElementById('congested-count').textContent = congestedCount + southCongested;
+        document.getElementById('moderate-count').textContent = moderateCount + southModerate;
+        document.getElementById('light-count').textContent = lightCount + southLight;
 
+        // ========== UPDATE TABLES ==========
         document.getElementById('southbound-body').innerHTML = southRows.join('');
         document.getElementById('northbound-body').innerHTML = northRows.join('');
 
-        console.log(`Dashboard updated: Severe=${severeCount}, Congested=${congestedCount}, Moderate=${moderateCount}, Light=${lightCount}`);
+        console.log(`✅ Dashboard updated: Severe=${severeCount + southSevere}, Congested=${congestedCount + southCongested}, Moderate=${moderateCount + southModerate}, Light=${lightCount + southLight}`);
 
     } catch (error) {
-        console.error('Error loading congestion data:', error);
+        console.error('❌ Error loading congestion data:', error);
+        
+        // Show error in tables
+        const errorMsg = `<tr><td colspan="3" style="text-align:center;color:#EF4444;padding:20px;">
+            <i class="fas fa-exclamation-triangle"></i> Error: ${escapeHtml(error.message)}
+        </td></tr>`;
+        
+        const southBody = document.getElementById('southbound-body');
+        const northBody = document.getElementById('northbound-body');
+        if (southBody) southBody.innerHTML = errorMsg;
+        if (northBody) northBody.innerHTML = errorMsg;
     } finally {
-        hideLoadingOverlay(); 
+        hideLoadingOverlay();
     }
 }
  async function fetchOperatorReports() {
@@ -5319,67 +5414,195 @@ async function confirmRemoveOverride() {
         if (dropdown) dropdown.classList.toggle('show');
     }
     
-    function initFilters() {
-        const chips = document.querySelectorAll('.chip');
-        if (chips.length > 0) chips[0].classList.add('active');
-        
-        chips.forEach(chip => {
-            chip.addEventListener('click', function() {
-                chips.forEach(c => c.classList.remove('active'));
-                this.classList.add('active');
-            });
-        });
-        
-        document.querySelectorAll('.badge-filter').forEach(badge => {
-            badge.addEventListener('click', function() {
-                this.classList.toggle('active-filter');
-            });
-        });
-        
-        const selectAllBtn = document.querySelector('.select-all');
-        if (selectAllBtn) {
-            selectAllBtn.addEventListener('click', function() {
-                const checkboxes = document.querySelectorAll('#stationsGridFilter input');
-                const allChecked = Array.from(checkboxes).every(c => c.checked);
-                checkboxes.forEach(c => c.checked = !allChecked);
-            });
+  function initFilters() {
+    // ========== DATE CHIPS ==========
+    const chips = document.querySelectorAll('.chip');
+    
+    // Default: 'Today' is active
+    chips.forEach(chip => {
+        if (chip.dataset.date === 'today') {
+            chip.classList.add('active');
         }
+    });
+    
+    chips.forEach(chip => {
+        chip.addEventListener('click', function() {
+            chips.forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            console.log("📅 Date filter selected:", this.dataset.date);
+        });
+    });
+    
+    // ========== CONGESTION LEVEL BADGES ==========
+    document.querySelectorAll('.badge-filter').forEach(badge => {
+        badge.addEventListener('click', function() {
+            this.classList.toggle('active-filter');
+            
+            // Update visual style
+            if (this.classList.contains('active-filter')) {
+                this.style.background = '#3B82F6';
+                this.style.color = 'white';
+                this.style.borderColor = '#3B82F6';
+            } else {
+                const level = this.dataset.level;
+                const colors = {
+                    severe: { bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5' },
+                    congested: { bg: '#FFEDD5', color: '#9A3412', border: '#FDBA74' },
+                    moderate: { bg: '#FEF9C3', color: '#854D0E', border: '#FDE047' },
+                    light: { bg: '#DCFCE7', color: '#166534', border: '#86EFAC' }
+                };
+                if (colors[level]) {
+                    this.style.background = colors[level].bg;
+                    this.style.color = colors[level].color;
+                    this.style.borderColor = colors[level].border;
+                }
+            }
+        });
+    });
+    
+    // ========== SELECT ALL STATIONS ==========
+    const selectAllBtn = document.querySelector('.select-all');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function() {
+            const checkboxes = document.querySelectorAll('#stationsGridFilter input');
+            const allChecked = Array.from(checkboxes).every(c => c.checked);
+            checkboxes.forEach(c => c.checked = !allChecked);
+            console.log("📋 Select all stations:", !allChecked);
+        });
+    }
+}
+  function applyOperatorFilters() {
+    console.log("🔄 APPLY FILTERS BUTTON CLICKED!");
+    
+    // Get selected congestion levels
+    const selectedLevels = [];
+    document.querySelectorAll('.badge-filter.active-filter').forEach(badge => {
+        selectedLevels.push(badge.dataset.level);
+    });
+    
+    // Get selected stations
+    const selectedStations = [];
+    document.querySelectorAll('#stationsGridFilter input:checked').forEach(cb => {
+        selectedStations.push(cb.value);
+    });
+    
+    // Get date filter
+    let dateRange = null;
+    const activeChip = document.querySelector('.chip.active');
+    if (activeChip) {
+        dateRange = activeChip.dataset.date;
     }
     
-    function applyOperatorFilters() {
-        const selectedLevels = [];
-        document.querySelectorAll('.badge-filter.active-filter').forEach(badge => {
-            selectedLevels.push(badge.dataset.level);
-        });
+    console.log("📊 Date filter:", dateRange);
+    console.log("📊 Selected levels:", selectedLevels);
+    console.log("📍 Selected stations:", selectedStations);
+    
+    let filteredReports = [...allReportsData];
+    
+    // ========== FILTER BY DATE ==========
+    if (dateRange && dateRange !== 'all') {
+        const now = new Date();
+        let dateLimit = new Date();
         
-        const selectedStations = [];
-        document.querySelectorAll('#stationsGridFilter input:checked').forEach(cb => {
-            selectedStations.push(cb.value);
-        });
+        // Check if reports are from a different year (e.g., 2025)
+        let reportYear = null;
+        let useReportYear = false;
         
-        let filteredReports = [...allReportsData];
-        
-        if (selectedStations.length > 0) {
-            filteredReports = filteredReports.filter(report => 
-                selectedStations.includes(report.station)
-            );
+        // Detect report year from first few reports
+        for (let i = 0; i < Math.min(5, allReportsData.length); i++) {
+            if (allReportsData[i].timestamp) {
+                const testDate = new Date(allReportsData[i].timestamp);
+                if (testDate.getFullYear() !== now.getFullYear()) {
+                    reportYear = testDate.getFullYear();
+                    useReportYear = true;
+                    console.log(`Detected report year: ${reportYear} vs system year: ${now.getFullYear()}`);
+                    break;
+                }
+            }
         }
         
-        if (selectedLevels.length > 0) {
-            filteredReports = filteredReports.filter(report => {
-                let level = '';
-                if (report.reported_congestion > 80) level = 'severe';
-                else if (report.reported_congestion > 60) level = 'congested';
-                else if (report.reported_congestion > 30) level = 'moderate';
-                else level = 'light';
-                return selectedLevels.includes(level);
-            });
+        let today;
+        if (useReportYear && reportYear) {
+            today = new Date(reportYear, now.getMonth(), now.getDate());
+        } else {
+            today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         }
+        today.setHours(0, 0, 0, 0);
         
-        displayOperatorReports(filteredReports);
-        toggleFilterDropdown();
+        filteredReports = filteredReports.filter(report => {
+            if (!report.timestamp) return false;
+            try {
+                const reportDate = new Date(report.timestamp);
+                const reportDateOnly = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
+                reportDateOnly.setHours(0, 0, 0, 0);
+                
+                switch(dateRange) {
+                    case 'today': {
+                        return reportDateOnly.getTime() === today.getTime();
+                    }
+                    case 'yesterday': {
+                        const yesterday = new Date(today);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        return reportDateOnly.getTime() === yesterday.getTime();
+                    }
+                    case 'week': {
+                        const weekAgo = new Date(today);
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return reportDateOnly >= weekAgo;
+                    }
+                    case 'month': {
+                        const monthAgo = new Date(today);
+                        monthAgo.setDate(monthAgo.getDate() - 30);
+                        return reportDateOnly <= monthAgo;
+                    }
+                    default:
+                        return true;
+                }
+            } catch(e) {
+                console.error("Error parsing date:", e);
+                return false;
+            }
+        });
+        console.log("📅 After date filter:", filteredReports.length);
     }
-
+    
+    // ========== FILTER BY STATIONS ==========
+    if (selectedStations.length > 0 && selectedStations.length < allStations.length) {
+        filteredReports = filteredReports.filter(report => 
+            selectedStations.includes(report.station)
+        );
+        console.log("📍 After station filter:", filteredReports.length);
+    }
+    
+    // ========== FILTER BY CONGESTION LEVEL ==========
+    if (selectedLevels.length > 0) {
+        filteredReports = filteredReports.filter(report => {
+            let level = '';
+            if (report.reported_congestion > 80) level = 'severe';
+            else if (report.reported_congestion > 60) level = 'congested';
+            else if (report.reported_congestion > 30) level = 'moderate';
+            else level = 'light';
+            return selectedLevels.includes(level);
+        });
+        console.log("📊 After level filter:", filteredReports.length);
+    }
+    
+    console.log("📋 Final filtered reports count:", filteredReports.length);
+    
+    // Display filtered reports
+    displayOperatorReports(filteredReports);
+    
+    // Close dropdown
+    const dropdown = document.getElementById('filterDropdown');
+    if (dropdown) dropdown.classList.remove('show');
+    
+    // Show toast with count
+    if (filteredReports.length === 0) {
+        showToast('📭', 'No reports match your filters');
+    } else {
+        showToast('✅', `Showing ${filteredReports.length} report(s)`);
+    }
+}
     // ========== BROADCAST DIRECTION FUNCTIONS ==========
     function selectBroadcastDirection(direction) {
         broadcastDirection = direction;
@@ -5434,8 +5657,10 @@ async function confirmRemoveOverride() {
     window.loadArchivedBroadcasts = loadArchivedBroadcasts;
     window.loadAllBroadcasts = loadAllBroadcasts;
     
+window.applyOperatorFilters = applyOperatorFilters;
     // ========== INITIALIZE ==========
     document.addEventListener('DOMContentLoaded', async () => {
+           document.body.classList.add('loaded');
         console.log("DOM fully loaded, initializing...");
         initCustomDisruption();
         updateDate();

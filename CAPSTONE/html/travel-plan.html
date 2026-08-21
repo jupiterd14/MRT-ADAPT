@@ -1501,6 +1501,105 @@ nav {
     }
 }
 
+
+@media screen and (max-width: 768px) {
+    /* Hide sidebar */
+    .sidebar {
+        display: none !important;
+    }
+    
+    /* Show bottom nav */
+    .bottom-nav {
+        display: block !important;
+    }
+    
+    body {
+        display: block !important;
+        overflow-y: auto !important;
+        height: auto !important;
+    }
+    
+    .main-content {
+        padding: 10px 10px !important;
+        margin-bottom: 70px !important;
+        overflow-y: auto !important;
+        height: calc(100vh - 70px) !important;
+    }
+    
+    /* ===== DROPDOWN SIZES - FIXED ===== */
+    .station-dropdown {
+        height: 34px !important;
+        font-size: 11px !important;
+        padding: 0 8px !important;
+        border-radius: 8px !important;
+        min-height: 34px !important;
+    }
+    
+    .custom-date-input,
+    .custom-time-input {
+        height: 34px !important;
+        padding: 2px 6px !important;
+        border-radius: 8px !important;
+    }
+    
+    .custom-select {
+        font-size: 10px !important;
+        padding: 2px 2px !important;
+        min-height: 28px !important;
+        height: 28px !important;
+    }
+    
+    /* ===== REST OF YOUR MOBILE STYLES ===== */
+    .planner-card {
+        padding: 12px !important;
+    }
+    
+    .input-row {
+        gap: 6px !important;
+        margin-bottom: 10px !important;
+    }
+    
+    .select-label {
+        font-size: 8px !important;
+        margin-bottom: 2px !important;
+    }
+    
+    .details-row {
+        gap: 6px !important;
+    }
+    
+    .time-period {
+        font-size: 9px !important;
+        min-width: 18px !important;
+    }
+    
+    .time-separator {
+        font-size: 11px !important;
+    }
+    
+    .swap-icon {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 11px !important;
+        min-width: 28px !important;
+    }
+    
+    .btn-plan {
+        height: 36px !important;
+        font-size: 12px !important;
+        min-width: 120px !important;
+        padding: 0 14px !important;
+    }
+    
+    .btn-cancel {
+        height: 36px !important;
+        width: 36px !important;
+        min-width: 36px !important;
+        font-size: 13px !important;
+    }
+    
+    /* Keep the rest of your mobile styles... */
+}
 /* ========== EXTRA SMALL DEVICES ========== */
 @media screen and (max-width: 480px) {
     .custom-date-input,
@@ -1627,6 +1726,126 @@ nav {
 /* Remove arrow for IE/Edge */
 .custom-time-input .custom-select::-ms-expand {
     display: none !important;
+}
+
+/* ========== MOBILE DROPDOWN OPTIMIZATION ========== */
+/* Make dropdowns smaller and more compact on mobile */
+@media screen and (max-width: 768px) {
+    /* Make the dropdown containers smaller */
+    .station-dropdown {
+        height: 36px !important;
+        font-size: 12px !important;
+        padding: 0 10px !important;
+        border-radius: 10px !important;
+        min-height: 36px !important;
+    }
+    
+    /* Make the custom date/time inputs smaller */
+    .custom-date-input,
+    .custom-time-input {
+        height: 36px !important;
+        padding: 2px 8px !important;
+        border-radius: 10px !important;
+    }
+    
+    /* Make the select elements inside smaller */
+    .custom-select {
+        font-size: 11px !important;
+        padding: 4px 2px !important;
+        min-height: 30px !important;
+        height: 30px !important;
+    }
+    
+    /* Make the input row tighter */
+    .input-row {
+        gap: 6px !important;
+        margin-bottom: 12px !important;
+    }
+    
+    /* Make the select labels smaller */
+    .select-label {
+        font-size: 9px !important;
+        margin-bottom: 3px !important;
+    }
+    
+    /* Make the details row tighter */
+    .details-row {
+        gap: 6px !important;
+    }
+    
+    /* Make the time period label smaller */
+    .time-period {
+        font-size: 10px !important;
+        min-width: 20px !important;
+    }
+    
+    /* Make the time separator smaller */
+    .time-separator {
+        font-size: 12px !important;
+    }
+    
+    /* Reduce padding on the card */
+    .planner-card {
+        padding: 12px !important;
+    }
+    
+    /* Make the from/to dropdowns smaller */
+    .select-group {
+        min-width: 0 !important;
+    }
+    
+    /* Swap icon smaller */
+    .swap-icon {
+        width: 30px !important;
+        height: 30px !important;
+        font-size: 12px !important;
+        min-width: 30px !important;
+    }
+    
+    /* PLAN button smaller */
+    .btn-plan {
+        height: 38px !important;
+        font-size: 13px !important;
+        min-width: 140px !important;
+        padding: 0 16px !important;
+    }
+    
+    .btn-cancel {
+        height: 38px !important;
+        width: 40px !important;
+        min-width: 40px !important;
+        font-size: 14px !important;
+    }
+}
+
+/* ========== DISABLED DATE OPTIONS ========== */
+.custom-select option:disabled {
+    color: #94A3B8 !important;
+    background-color: #F1F5F9 !important;
+    cursor: not-allowed !important;
+}
+
+/* Show a subtle indicator for disabled dates */
+.custom-date-input .custom-select option:disabled::after {
+    content: " (past)";
+    font-size: 8px;
+    color: 
+    
+}
+
+/* ========== DISABLED DATE OPTIONS ========== */
+.custom-select option:disabled {
+    color: #94A3B8 !important;
+    background-color: #F1F5F9 !important;
+    cursor: not-allowed !important;
+    font-style: italic;
+}
+
+/* Optional: Add a small indicator for disabled options */
+.custom-select option:disabled::after {
+    content: " (past)";
+    font-size: 8px;
+    color: #94A3B8;
 }
 </style>
 </head>
@@ -1826,7 +2045,10 @@ nav {
                 <select class="custom-select" id="minuteSelect">
                     <!-- Minutes will be populated by JS -->
                 </select>
-                <span class="time-period" id="timePeriod">AM</span>
+               <select class="custom-select" id="ampmSelect" style="min-width: 40px; flex: 0.5;">
+    <option value="AM">AM</option>
+    <option value="PM">PM</option>
+</select>
             </div>
         </div>
     </div>
@@ -2228,10 +2450,35 @@ async function updateStationCongestion() {
         console.log('Error fetching to congestion:', e);
     }
 }
-
-// ========== POPULATE CUSTOM DATE/TIME SELECTS ==========
+// ========== POPULATE CUSTOM DATE/TIME SELECTS (WITH PAST DATE DISABLED) ==========
+// ========== POPULATE CUSTOM DATE/TIME SELECTS (WITH PAST DATES DISABLED) ==========
 function populateDateTimeSelects() {
-    // Months
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const currentDay = now.getDate();
+    
+    // ========== YEARS (Only current year and future years) ==========
+    const yearSelect = document.getElementById('yearSelect');
+    if (yearSelect) {
+        yearSelect.innerHTML = '';
+        // Show current year and next 2 years
+        for (let year = 2025; year <= 2027; year++) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            // Disable past years
+            if (year < currentYear) {
+                option.disabled = true;
+                option.style.color = '#94A3B8';
+                option.style.backgroundColor = '#F1F5F9';
+            }
+            yearSelect.appendChild(option);
+        }
+        yearSelect.value = currentYear;
+    }
+    
+    // ========== MONTHS ==========
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 
                    'July', 'August', 'September', 'October', 'November', 'December'];
     const monthSelect = document.getElementById('monthSelect');
@@ -2239,37 +2486,26 @@ function populateDateTimeSelects() {
         monthSelect.innerHTML = '';
         months.forEach((month, index) => {
             const option = document.createElement('option');
-            option.value = index + 1;
+            const monthNum = index + 1;
+            option.value = monthNum;
             option.textContent = month;
+            
+            // Disable past months if current year is selected
+            const selectedYear = parseInt(yearSelect?.value || currentYear);
+            if (selectedYear === currentYear && monthNum < currentMonth) {
+                option.disabled = true;
+                option.style.color = '#94A3B8';
+                option.style.backgroundColor = '#F1F5F9';
+            }
             monthSelect.appendChild(option);
         });
+        monthSelect.value = currentMonth;
     }
     
-    // Days
-    const daySelect = document.getElementById('daySelect');
-    if (daySelect) {
-        daySelect.innerHTML = '';
-        for (let i = 1; i <= 31; i++) {
-            const option = document.createElement('option');
-            option.value = String(i).padStart(2, '0');
-            option.textContent = i;
-            daySelect.appendChild(option);
-        }
-    }
+    // ========== DAYS (Dynamic based on selected month/year) ==========
+    updateDays();
     
-    // Years
-    const yearSelect = document.getElementById('yearSelect');
-    if (yearSelect) {
-        yearSelect.innerHTML = '';
-        for (let i = 2025; i <= 2026; i++) {
-            const option = document.createElement('option');
-            option.value = i;
-            option.textContent = i;
-            yearSelect.appendChild(option);
-        }
-    }
-    
-    // Hours (4 AM to 11 PM)
+    // ========== HOURS (4 AM to 11 PM) ==========
     const hourSelect = document.getElementById('hourSelect');
     if (hourSelect) {
         hourSelect.innerHTML = '';
@@ -2280,9 +2516,13 @@ function populateDateTimeSelects() {
             option.textContent = displayHour;
             hourSelect.appendChild(option);
         }
+        // Set current hour + 1
+        let currentHour = now.getHours() + 1;
+        if (currentHour > 23) currentHour = 23;
+        hourSelect.value = String(Math.min(currentHour, 23)).padStart(2, '0');
     }
     
-    // Minutes (in 5-minute increments)
+    // ========== MINUTES (in 5-minute increments) ==========
     const minuteSelect = document.getElementById('minuteSelect');
     if (minuteSelect) {
         minuteSelect.innerHTML = '';
@@ -2292,35 +2532,111 @@ function populateDateTimeSelects() {
             option.textContent = String(i).padStart(2, '0');
             minuteSelect.appendChild(option);
         }
+        const currentMinute = Math.floor(now.getMinutes() / 5) * 5;
+        minuteSelect.value = String(Math.min(currentMinute, 55)).padStart(2, '0');
     }
     
-    // Set current date and time (add 1 hour)
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentDay = now.getDate();
-    let currentHour = now.getHours() + 1;
-    if (currentHour > 23) currentHour = 23;
-    const currentMinute = Math.floor(now.getMinutes() / 5) * 5;
+    // ========== AM/PM ==========
+    const ampmSelect = document.getElementById('ampmSelect');
+    if (ampmSelect) {
+        const hour = parseInt(document.getElementById('hourSelect')?.value || 12);
+        ampmSelect.value = hour >= 12 ? 'PM' : 'AM';
+    }
     
-    if (monthSelect) monthSelect.value = currentMonth;
-    if (daySelect) daySelect.value = String(currentDay).padStart(2, '0');
-    if (yearSelect) yearSelect.value = 2025;
-    if (hourSelect) hourSelect.value = String(Math.min(currentHour, 23)).padStart(2, '0');
-    if (minuteSelect) minuteSelect.value = String(Math.min(currentMinute, 55)).padStart(2, '0');
+    // ========== Add event listeners for dynamic days ==========
+    monthSelect?.addEventListener('change', function() {
+        updateDays();
+        // Also update time period when month changes (keep current time)
+    });
+    
+    yearSelect?.addEventListener('change', function() {
+        updateDays();
+    });
     
     updateTimePeriod();
 }
 
-// ========== UPDATE TIME PERIOD (AM/PM) ==========
-function updateTimePeriod() {
-    const hourSelect = document.getElementById('hourSelect');
-    const periodSpan = document.getElementById('timePeriod');
-    if (hourSelect && periodSpan) {
-        const hour = parseInt(hourSelect.value);
-        periodSpan.textContent = hour >= 12 ? 'PM' : 'AM';
+// ========== UPDATE DAYS BASED ON SELECTED MONTH/YEAR ==========
+function updateDays() {
+    const monthSelect = document.getElementById('monthSelect');
+    const yearSelect = document.getElementById('yearSelect');
+    const daySelect = document.getElementById('daySelect');
+    
+    if (!monthSelect || !yearSelect || !daySelect) return;
+    
+    const month = parseInt(monthSelect.value);
+    const year = parseInt(yearSelect.value);
+    const now = new Date();
+    const currentDay = now.getDate();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    
+    // Get number of days in selected month
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    daySelect.innerHTML = '';
+    for (let i = 1; i <= daysInMonth; i++) {
+        const option = document.createElement('option');
+        const dayStr = String(i).padStart(2, '0');
+        option.value = dayStr;
+        option.textContent = i;
+        
+        // Disable past days if current month/year
+        if (year === currentYear && month === currentMonth && i < currentDay) {
+            option.disabled = true;
+            option.style.color = '#94A3B8';
+            option.style.backgroundColor = '#F1F5F9';
+        }
+        daySelect.appendChild(option);
+    }
+    
+    // Set selected day
+    if (year === currentYear && month === currentMonth) {
+        daySelect.value = String(currentDay).padStart(2, '0');
+    } else {
+        daySelect.value = '01'; // First day of future months
     }
 }
 
+// ========== UPDATE DAYS BASED ON SELECTED MONTH/YEAR ==========
+function updateDays() {
+    const monthSelect = document.getElementById('monthSelect');
+    const yearSelect = document.getElementById('yearSelect');
+    const daySelect = document.getElementById('daySelect');
+    
+    if (!monthSelect || !yearSelect || !daySelect) return;
+    
+    const month = parseInt(monthSelect.value);
+    const year = parseInt(yearSelect.value);
+    const now = new Date();
+    const currentDay = now.getDate();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    
+    // Get number of days in selected month
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    daySelect.innerHTML = '';
+    for (let i = 1; i <= daysInMonth; i++) {
+        const option = document.createElement('option');
+        option.value = String(i).padStart(2, '0');
+        option.textContent = i;
+        
+        // Disable past days if current month/year
+        if (year === currentYear && month === currentMonth && i < currentDay) {
+            option.disabled = true;
+            option.style.color = '#94A3B8';
+        }
+        daySelect.appendChild(option);
+    }
+    
+    // Set selected day
+    if (year === currentYear && month === currentMonth) {
+        daySelect.value = String(currentDay).padStart(2, '0');
+    } else {
+        daySelect.value = '01'; // First day of future months
+    }
+}
 // ========== GET FORMATTED DATE/TIME ==========
 function getFormattedDateTime() {
     const month = document.getElementById('monthSelect')?.value || '1';
@@ -2328,11 +2644,17 @@ function getFormattedDateTime() {
     const year = document.getElementById('yearSelect')?.value || '2025';
     const hour = document.getElementById('hourSelect')?.value || '12';
     const minute = document.getElementById('minuteSelect')?.value || '00';
+    const ampm = document.getElementById('ampmSelect')?.value || 'AM';
+    
+    // Convert 12-hour to 24-hour if needed
+    let hour24 = parseInt(hour);
+    if (ampm === 'PM' && hour24 < 12) hour24 += 12;
+    if (ampm === 'AM' && hour24 === 12) hour24 = 0;
     
     return {
         date: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-        time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-        display: `${month}/${day}/${year} at ${hour}:${minute}`
+        time: `${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+        display: `${month}/${day}/${year} at ${hour}:${minute} ${ampm}`
     };
 }
 
@@ -2937,6 +3259,71 @@ function showToast(message, type = 'success') {
         toast.remove();
     }, 3000);
 }
+
+// ========== ULTRA COMPACT MOBILE DROPDOWNS ==========
+function applyUltraCompactMobile() {
+    // Only apply on mobile devices
+    if (window.innerWidth <= 768) {
+        // Station dropdowns - even smaller
+        document.querySelectorAll('.station-dropdown').forEach(el => {
+            el.style.height = '28px';
+            el.style.fontSize = '10px';
+            el.style.padding = '0 6px';
+            el.style.minHeight = '28px';
+            el.style.borderRadius = '6px';
+        });
+        
+        // Date/time inputs
+        document.querySelectorAll('.custom-date-input, .custom-time-input').forEach(el => {
+            el.style.height = '28px';
+            el.style.padding = '1px 4px';
+            el.style.borderRadius = '6px';
+        });
+        
+        // Selects inside
+        document.querySelectorAll('.custom-select').forEach(el => {
+            el.style.fontSize = '9px';
+            el.style.padding = '1px 1px';
+            el.style.minHeight = '22px';
+            el.style.height = '22px';
+        });
+        
+        // Buttons
+        document.querySelectorAll('.btn-plan').forEach(el => {
+            el.style.height = '30px';
+            el.style.fontSize = '10px';
+            el.style.minWidth = '80px';
+            el.style.padding = '0 10px';
+        });
+        
+        document.querySelectorAll('.btn-cancel').forEach(el => {
+            el.style.height = '30px';
+            el.style.width = '30px';
+            el.style.minWidth = '30px';
+            el.style.fontSize = '11px';
+        });
+        
+        // Swap icon
+        document.querySelectorAll('.swap-icon').forEach(el => {
+            el.style.width = '24px';
+            el.style.height = '24px';
+            el.style.fontSize = '10px';
+            el.style.minWidth = '24px';
+        });
+        
+        console.log('✅ Ultra compact dropdowns applied!');
+    }
+}
+
+// Call it when page loads and on resize
+document.addEventListener('DOMContentLoaded', function() {
+    applyUltraCompactMobile();
+});
+
+window.addEventListener('resize', function() {
+    // Re-apply on resize (in case user rotates phone)
+    applyUltraCompactMobile();
+});
 
 // Override any old functions - force the new one to be used
 window.getCongestionAlerts = fetchAlertCount;

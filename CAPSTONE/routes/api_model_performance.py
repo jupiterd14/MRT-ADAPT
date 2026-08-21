@@ -1580,8 +1580,7 @@ def run_auto_tests():
                     pred_congestion_pct = api_prediction(station_name, direction, target_time)
                     
                     if pred_congestion_pct is not None and pred_congestion_pct >= 0:
-                        pred_passengers = (pred_congestion_pct / 100) * p95
-                        pred_congestion = calculate_commuter_congestion(pred_passengers, station_name, direction)
+                        pred_congestion = pred_congestion_pct
                         actual_congestion = target['actual_congestion']
                         abs_error = abs(pred_congestion - actual_congestion)
                         
@@ -1794,7 +1793,7 @@ def preprocess_large_csv(filepath, max_rows=None):
 def upload_batch_test():
     """
     Upload a CSV file and run batch predictions.
-    NOW WITH ROBUST SAMPLING AND DEBUGGING.
+    NOW WITH FIXED PREDICTION LOGIC - Uses prediction directly without recalculation.
     """
     try:
         # Check if file exists
@@ -1873,10 +1872,9 @@ def upload_batch_test():
         print(f"📊 First row: {df.iloc[0].to_dict()}")
         
         # ============================================================
-        # RUN PREDICTIONS
+        # RUN PREDICTIONS - FIXED: Use prediction directly
         # ============================================================
         from routes.api_predict import get_directional_prediction as api_prediction
-        from services.feature_engineering import get_station_dataframe
         
         results = []
         errors = 0
@@ -1898,25 +1896,12 @@ def upload_batch_test():
                     target_time = pd.to_datetime(row['datetime'])
                     actual_congestion = float(row['actual_congestion'])
                     
-                    # Get historical data for 95th percentile
-                    historical_hourly = get_station_dataframe(station, direction)
-                    if historical_hourly is None or len(historical_hourly) == 0:
+                    # FIXED: Get prediction (already returns congestion % 0-100)
+                    pred_congestion = api_prediction(station, direction, target_time)
+                    
+                    if pred_congestion is None or pred_congestion < 0:
                         errors += 1
                         continue
-                    
-                    historical_counts = historical_hourly['TotalPassenger'].values
-                    p95 = np.percentile(historical_counts, 95)
-                    
-                    # Get prediction (returns congestion % based on platform capacity)
-                    pred_congestion_pct = api_prediction(station, direction, target_time)
-                    
-                    if pred_congestion_pct is None or pred_congestion_pct < 0:
-                        errors += 1
-                        continue
-                    
-                    # Convert to commuter-friendly congestion
-                    pred_passengers = (pred_congestion_pct / 100) * p95
-                    pred_congestion = calculate_commuter_congestion(pred_passengers, station, direction)
                     
                     # Calculate errors
                     abs_error = abs(pred_congestion - actual_congestion)
@@ -2008,6 +1993,7 @@ def upload_batch_test():
         except:
             pass
         
+        # Return proper JSON error with traceback
         return jsonify({
             'success': False,
             'error': f'Upload failed: {str(e)}',

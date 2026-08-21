@@ -5,6 +5,7 @@ import json, time, math, os
 from .auth import login_required, log_activity
 from flask_caching import Cache
 from extensions import cache
+from config import Config
 
 operator_bp = Blueprint('operator', __name__)
 
@@ -39,20 +40,37 @@ def load_overrides():
             print(f"Error loading overrides: {e}")
             return {}
     return {}
+
 def save_overrides(overrides):
     """Save overrides to file"""
     print(f"📝 SAVING OVERRIDES: {overrides}")
-    print(f"📝 Stack trace:")  # This will show who's calling it
-    import traceback
-    traceback.print_stack()
     try:
         with open(OVERRIDES_FILE, 'w') as f:
             json.dump(overrides, f, indent=2)
         print(f"✅ Saved {len(overrides)} overrides to file")
     except Exception as e:
         print(f"Error saving overrides: {e}")
-        
 
+# ========== SINGLE get_active_overrides FUNCTION ==========
+def get_active_overrides():
+    """Get active overrides from file with expiry check"""
+    overrides = load_overrides()
+    
+    # Use datetime.now() for consistency
+    now = datetime.now()
+    now_timestamp = now.timestamp()
+    
+    # Filter out expired overrides
+    active_overrides = {}
+    for key, override in overrides.items():
+        expiry = override.get('expiry')
+        if expiry is None or expiry > now_timestamp:
+            active_overrides[key] = override
+        else:
+            print(f"⏰ Override expired: {key}")
+    
+    print(f"📄 Active overrides: {active_overrides}")
+    return active_overrides
 
 def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name):
     """
@@ -178,55 +196,7 @@ def get_reports():
         import traceback
         traceback.print_exc()
         return jsonify([]), 500
-    
-@operator_bp.route('/api/broadcasts/active', methods=['GET'])
-def get_active_broadcasts():
-    """Get only active broadcasts for user dashboard"""
-    try:
-        now = datetime.now()
-        
-        # Auto-expire old broadcasts
-        expired_by_date = Broadcast.query.filter(
-            Broadcast.is_active == True,
-            Broadcast.expires_at != None,
-            Broadcast.expires_at <= now
-        ).all()
-        
-        for broadcast in expired_by_date:
-            broadcast.is_active = False
-        
-        if expired_by_date:
-            db.session.commit()
-            print(f"Auto-expired {len(expired_by_date)} broadcasts")
-        
-        # Only return active broadcasts
-        active_broadcasts = Broadcast.query.filter(
-            Broadcast.is_active == True
-        ).order_by(Broadcast.created_at.desc()).all()
-        
-        result = []
-        for broadcast in active_broadcasts:
-            stations = json.loads(broadcast.stations) if broadcast.stations else []
-            result.append({
-                'id': broadcast.id,
-                'title': broadcast.title,
-                'message': broadcast.message,
-                'disruption_type': broadcast.disruption_type,
-                'stations': stations,
-                'severity': broadcast.severity,
-                'direction': getattr(broadcast, 'direction', 'both'),
-                'created_at': broadcast.created_at.isoformat(),
-                'expires_at': broadcast.expires_at.isoformat() if broadcast.expires_at else None,
-                'is_active': broadcast.is_active,
-                'time': broadcast.created_at.isoformat()
-            })
-        
-        return jsonify({'success': True, 'broadcasts': result})
-    except Exception as e:
-        print(f"Error getting active broadcasts: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-    
-    
+
 @operator_bp.route('/api/broadcasts/public', methods=['GET'])
 def get_public_broadcasts():
     """Get active broadcasts for public alerts page"""
@@ -291,92 +261,151 @@ def get_public_broadcasts():
     except Exception as e:
         print(f"Error getting public broadcasts: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+    
+# Add this helper function at the top of your operator.py file
+def get_live_map_data_direct():
+    """Get live map data directly without HTTP calls"""
+    try:
+        from flask import current_app
+        
+        # Try to import the live_map module
+        try:
+            from .live_map import get_directional_data
+            return get_directional_data()
+        except ImportError:
+            pass
+        
+        # Try using the cache
+        cache = current_app.extensions.get('cache')
+        if cache:
+            cached_data = cache.get('live_map_data')
+            if cached_data:
+                return cached_data
+        
+        # Fallback: generate data
+        data = {'northbound': {}, 'southbound': {}}
+        for station in STATIONS:
+            base = 20 + (hash(station) % 50)
+            data['northbound'][station] = {
+                'congestion': base,
+                'status': _get_status_from_congestion(base),
+                'wait_time': _get_wait_time(base),
+                'ridership': base * 10
+            }
+            base2 = 25 + (hash(station + 'south') % 50)
+            data['southbound'][station] = {
+                'congestion': base2,
+                'status': _get_status_from_congestion(base2),
+                'wait_time': _get_wait_time(base2),
+                'ridership': base2 * 10
+            }
+        return data
+        
+    except Exception as e:
+        print(f"Error getting live map data: {e}")
+        return None
 @operator_bp.route('/api/operator/station-status')
 def operator_station_status():
-    """Get station status for operator dashboard - uses the same logic as live map v2."""
+    """Get station status for operator dashboard."""
     try:
-        # Forward the request to the live map v2 endpoint (internal call)
-        from flask import current_app
-        with current_app.test_client() as client:
-            # Add a timestamp to avoid caching
-            response = client.get('/api/live-map/directions/v2?_=' + str(int(time.time())))
-            data = response.get_json()
+        print("🔍 Starting operator_station_status...")
+        
+        # Get live data directly
+        data = get_live_map_data_direct()
+        
+        if not data:
+            print("⚠️ No live data available, using fallback")
+            # Return fallback data directly
+            return jsonify({'stations': _generate_fallback_stations(), 'fallback': True})
+        
+        # ========== GET ACTIVE OVERRIDES ==========
+        active_overrides = get_active_overrides()
+        
+        # ========== PROCESS DATA ==========
+        stations_list = STATIONS
+        northbound_data = data.get('northbound', {})
+        southbound_data = data.get('southbound', {})
+        
+        result = []
+        for station in stations_list:
+            north = northbound_data.get(station, {})
+            south = southbound_data.get(station, {})
             
-            if not data or 'northbound' not in data:
-                return jsonify({'stations': []}), 500
+            # Check overrides
+            north_key = f"{station}_northbound"
+            south_key = f"{station}_southbound"
             
-            # ========== GET ACTIVE OVERRIDES ==========
-            active_overrides = get_active_overrides()
-            print(f"🔍 Active overrides in station-status: {active_overrides}")
+            is_north_overridden = False
+            is_south_overridden = False
             
-            # Transform the v2 response into the format expected by the operator dashboard
-            stations_list = current_app.config.get('STATIONS', STATIONS)
-            result = [] 
-            for station in stations_list:
-                north = data['northbound'].get(station, {})
-                south = data['southbound'].get(station, {})
-                
-                # ========== MANUALLY CHECK FOR OVERRIDES ==========
-                north_key = f"{station}_northbound"
-                south_key = f"{station}_southbound"
-                
-                # Check if override exists (case insensitive)
-                is_north_overridden = False
-                is_south_overridden = False
-                
-                # ========== FIX: Use the override value ONLY if it exists in active_overrides ==========
-                for key in active_overrides.keys():
-                    if key.lower() == north_key.lower():
-                        is_north_overridden = True
-                        # Override congestion value from the override, NOT from north
-                        north_congestion = active_overrides[key].get('congestion', north.get('congestion', 0))
-                        north['congestion'] = north_congestion
-                        print(f"🔧 Northbound override for {station}: {north_congestion}%")
-                    if key.lower() == south_key.lower():
-                        is_south_overridden = True
-                        # Override congestion value from the override, NOT from south
-                        south_congestion = active_overrides[key].get('congestion', south.get('congestion', 0))
-                        south['congestion'] = south_congestion
-                        print(f"🔧 Southbound override for {station}: {south_congestion}%")
-                
-                # ========== FIX: If NOT overridden, use the live map value (which comes from the model) ==========
-                # The north and south already have the correct values from the live map response
-                # We just need to make sure we're not accidentally keeping stale override values
-                
-                # Log for Taft specifically
-                if station == "Taft":
-                    print(f"🔍 Taft - north_overridden: {is_north_overridden}, north_congestion: {north.get('congestion', 0)}")
-                    print(f"🔍 Taft - south_overridden: {is_south_overridden}, south_congestion: {south.get('congestion', 0)}")
-                
-                result.append({
-                    'name': station,
-                    'northbound': {
-                        'congestion': north.get('congestion', 0),
-                        'status_text': north.get('status', 'LIGHT'),
-                        'status_class': 'status-' + north.get('status', 'light').lower(),
-                        'wait_time': north.get('wait_time', 'N/A'),
-                        'ridership': north.get('ridership', 0),
-                        'overridden': is_north_overridden
-                    },
-                    'southbound': {
-                        'congestion': south.get('congestion', 0),
-                        'status_text': south.get('status', 'LIGHT'),
-                        'status_class': 'status-' + south.get('status', 'light').lower(),
-                        'wait_time': south.get('wait_time', 'N/A'),
-                        'ridership': south.get('ridership', 0),
-                        'overridden': is_south_overridden
-                    }
-                })
+            for key in active_overrides.keys():
+                if key.lower() == north_key.lower():
+                    is_north_overridden = True
+                    north['congestion'] = active_overrides[key].get('congestion', north.get('congestion', 0))
+                if key.lower() == south_key.lower():
+                    is_south_overridden = True
+                    south['congestion'] = active_overrides[key].get('congestion', south.get('congestion', 0))
             
-            print(f"✅ Returning {len(result)} stations with override status")
-            return jsonify({'stations': result})
-            
+            result.append({
+                'name': station,
+                'northbound': {
+                    'congestion': north.get('congestion', 0),
+                    'status': north.get('status', _get_status_from_congestion(north.get('congestion', 0))),
+                    'wait_time': north.get('wait_time', _get_wait_time(north.get('congestion', 0))),
+                    'ridership': north.get('ridership', 0),
+                    'overridden': is_north_overridden
+                },
+                'southbound': {
+                    'congestion': south.get('congestion', 0),
+                    'status': south.get('status', _get_status_from_congestion(south.get('congestion', 0))),
+                    'wait_time': south.get('wait_time', _get_wait_time(south.get('congestion', 0))),
+                    'ridership': south.get('ridership', 0),
+                    'overridden': is_south_overridden
+                }
+            })
+        
+        print(f"✅ Returning {len(result)} stations")
+        return jsonify({'stations': result})
+        
     except Exception as e:
-        print(f"Error in operator_station_status: {e}")
+        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'stations': []}), 500
-    
+        # Return fallback data instead of 500
+        return jsonify({'stations': _generate_fallback_stations(), 'error': str(e)})
+
+def _generate_fallback_stations():
+    """Generate fallback station data for when the main data source fails"""
+    fallback = []
+    for station in STATIONS:
+        fallback.append({
+            'name': station,
+            'northbound': {'congestion': 25, 'status': 'MODERATE', 'wait_time': '5-10 min', 'ridership': 500, 'overridden': False},
+            'southbound': {'congestion': 25, 'status': 'MODERATE', 'wait_time': '5-10 min', 'ridership': 550, 'overridden': False}
+        })
+    return fallback
+def _get_status_from_congestion(congestion):
+    """Helper function to get status text from congestion"""
+    if congestion > 80:
+        return 'SEVERE'
+    elif congestion > 50:
+        return 'CONGESTED'
+    elif congestion > 25:
+        return 'MODERATE'
+    else:
+        return 'LIGHT'
+
+def _get_wait_time(congestion):
+    """Helper function to get wait time from congestion"""
+    if congestion > 80:
+        return '15-20 min'
+    elif congestion > 50:
+        return '10-15 min'
+    elif congestion > 25:
+        return '5-10 min'
+    else:
+        return '2-5 min'
+
 @operator_bp.route('/api/operator/debug-override')
 def debug_override():
     """Debug override status"""
@@ -388,7 +417,7 @@ def debug_override():
         'current_timestamp': time.time(),
         'overrides_file_exists': os.path.exists(OVERRIDES_FILE)
     })
-    
+
 def get_operator_stations(user_id):
     """Get list of stations assigned to an operator"""
     user = User.query.get(user_id)
@@ -520,7 +549,7 @@ def operator_profile():
                          user=user,
                          managed_stations=managed_stations,
                          all_stations=STATIONS)
-    
+
 @operator_bp.route('/api/operator/broadcast/<int:broadcast_id>', methods=['PUT'])
 def update_broadcast(broadcast_id):
     """Update a broadcast - handles both editing and archiving"""
@@ -563,7 +592,7 @@ def update_broadcast(broadcast_id):
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
-    
+
 @operator_bp.route('/api/operator/broadcast/<int:broadcast_id>', methods=['DELETE'])
 def delete_broadcast(broadcast_id):
     """Archive a broadcast (soft delete)"""
@@ -635,27 +664,6 @@ def send_broadcast():
         db.session.rollback()
         print(f"Error sending broadcast: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    
-def get_active_overrides():
-    """Get active overrides from file with expiry check - uses Config time for consistency"""
-    overrides = load_overrides()
-    
-    # ========== FIX: Use Config time instead of system time ==========
-    from config import Config
-    config_time = Config.get_current_time()
-    now_timestamp = config_time.timestamp()
-    
-    # Filter out expired overrides
-    active_overrides = {}
-    for key, override in overrides.items():
-        expiry = override.get('expiry')
-        if expiry is None or expiry > now_timestamp:
-            active_overrides[key] = override
-        else:
-            print(f"⏰ Override expired: {key} (expired at {datetime.fromtimestamp(expiry)})")
-    
-    print(f"📄 operator.py LOADED: {active_overrides}")
-    return active_overrides
 
 @operator_bp.route('/api/operator/override-congestion', methods=['POST'])
 def override_congestion():
@@ -914,8 +922,8 @@ def archive_report(report_id):
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
-    
-    
+
+
 @operator_bp.route('/api/operator/broadcast/<int:broadcast_id>', methods=['GET'])
 def get_broadcast(broadcast_id):
     """Get a single broadcast for editing"""
@@ -960,6 +968,7 @@ def get_broadcast(broadcast_id):
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
+
 @operator_bp.route('/api/operator/clear-override', methods=['POST'])
 def clear_override():
     try:
@@ -1068,7 +1077,7 @@ def clear_override():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
-   
+
 @operator_bp.route('/api/operator/review-flagged/<int:report_id>', methods=['POST'])
 def review_flagged_report(report_id):
     data = request.json
