@@ -291,7 +291,6 @@ def get_public_broadcasts():
     except Exception as e:
         print(f"Error getting public broadcasts: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-
 @operator_bp.route('/api/operator/station-status')
 def operator_station_status():
     """Get station status for operator dashboard - uses the same logic as live map v2."""
@@ -306,6 +305,10 @@ def operator_station_status():
             if not data or 'northbound' not in data:
                 return jsonify({'stations': []}), 500
             
+            # ========== GET ACTIVE OVERRIDES ==========
+            active_overrides = get_active_overrides()
+            print(f"🔍 Active overrides in station-status: {active_overrides}")
+            
             # Transform the v2 response into the format expected by the operator dashboard
             stations_list = current_app.config.get('STATIONS', STATIONS)
             result = [] 
@@ -313,6 +316,37 @@ def operator_station_status():
                 north = data['northbound'].get(station, {})
                 south = data['southbound'].get(station, {})
                 
+                # ========== MANUALLY CHECK FOR OVERRIDES ==========
+                north_key = f"{station}_northbound"
+                south_key = f"{station}_southbound"
+                
+                # Check if override exists (case insensitive)
+                is_north_overridden = False
+                is_south_overridden = False
+                
+                # ========== FIX: Use the override value ONLY if it exists in active_overrides ==========
+                for key in active_overrides.keys():
+                    if key.lower() == north_key.lower():
+                        is_north_overridden = True
+                        # Override congestion value from the override, NOT from north
+                        north_congestion = active_overrides[key].get('congestion', north.get('congestion', 0))
+                        north['congestion'] = north_congestion
+                        print(f"🔧 Northbound override for {station}: {north_congestion}%")
+                    if key.lower() == south_key.lower():
+                        is_south_overridden = True
+                        # Override congestion value from the override, NOT from south
+                        south_congestion = active_overrides[key].get('congestion', south.get('congestion', 0))
+                        south['congestion'] = south_congestion
+                        print(f"🔧 Southbound override for {station}: {south_congestion}%")
+                
+                # ========== FIX: If NOT overridden, use the live map value (which comes from the model) ==========
+                # The north and south already have the correct values from the live map response
+                # We just need to make sure we're not accidentally keeping stale override values
+                
+                # Log for Taft specifically
+                if station == "Taft":
+                    print(f"🔍 Taft - north_overridden: {is_north_overridden}, north_congestion: {north.get('congestion', 0)}")
+                    print(f"🔍 Taft - south_overridden: {is_south_overridden}, south_congestion: {south.get('congestion', 0)}")
                 
                 result.append({
                     'name': station,
@@ -322,7 +356,7 @@ def operator_station_status():
                         'status_class': 'status-' + north.get('status', 'light').lower(),
                         'wait_time': north.get('wait_time', 'N/A'),
                         'ridership': north.get('ridership', 0),
-                        'overridden': north.get('overridden', False)
+                        'overridden': is_north_overridden
                     },
                     'southbound': {
                         'congestion': south.get('congestion', 0),
@@ -330,10 +364,11 @@ def operator_station_status():
                         'status_class': 'status-' + south.get('status', 'light').lower(),
                         'wait_time': south.get('wait_time', 'N/A'),
                         'ridership': south.get('ridership', 0),
-                        'overridden': south.get('overridden', False)
+                        'overridden': is_south_overridden
                     }
                 })
             
+            print(f"✅ Returning {len(result)} stations with override status")
             return jsonify({'stations': result})
             
     except Exception as e:
@@ -601,24 +636,26 @@ def send_broadcast():
         print(f"Error sending broadcast: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
     
-    
 def get_active_overrides():
-    """Get active overrides from file with expiry check"""
+    """Get active overrides from file with expiry check - uses Config time for consistency"""
     overrides = load_overrides()
-    now = datetime.now().timestamp()
+    
+    # ========== FIX: Use Config time instead of system time ==========
+    from config import Config
+    config_time = Config.get_current_time()
+    now_timestamp = config_time.timestamp()
     
     # Filter out expired overrides
     active_overrides = {}
     for key, override in overrides.items():
         expiry = override.get('expiry')
-        if expiry is None or expiry > now:
+        if expiry is None or expiry > now_timestamp:
             active_overrides[key] = override
         else:
             print(f"⏰ Override expired: {key} (expired at {datetime.fromtimestamp(expiry)})")
     
     print(f"📄 operator.py LOADED: {active_overrides}")
     return active_overrides
-
 
 @operator_bp.route('/api/operator/override-congestion', methods=['POST'])
 def override_congestion():
@@ -923,7 +960,6 @@ def get_broadcast(broadcast_id):
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
-    
 @operator_bp.route('/api/operator/clear-override', methods=['POST'])
 def clear_override():
     try:
@@ -938,44 +974,84 @@ def clear_override():
         
         print(f"🔧 CLEARING OVERRIDE: {target_key}")
         
-        # Load from file
+        # ========== 1. LOAD AND REMOVE FROM FILE ==========
         overrides = load_overrides()
         
         if target_key not in overrides:
-            return jsonify({'success': False, 'error': f'No active override found for {station} ({direction})'}), 404
+            print(f"⚠️ No override found for {target_key} in file")
+        else:
+            del overrides[target_key]
+            save_overrides(overrides)
+            print(f"✅ Removed from file: {target_key}")
         
-        # Remove from file
-        del overrides[target_key]
-        save_overrides(overrides)
+        # ========== 2. REMOVE FROM APP CONFIG ==========
+        if 'overrides' in current_app.config:
+            if target_key in current_app.config['overrides']:
+                del current_app.config['overrides'][target_key]
+                print(f"✅ Removed from app config: {target_key}")
+            # ALSO check for lowercase version
+            lower_key = target_key.lower()
+            if lower_key in current_app.config['overrides']:
+                del current_app.config['overrides'][lower_key]
+                print(f"✅ Removed from app config: {lower_key}")
         
-        # Remove from app config
-        if 'overrides' in current_app.config and target_key in current_app.config['overrides']:
-            del current_app.config['overrides'][target_key]
-            print(f"✅ Removed override from app config: {target_key}")
-        
-        # ========== CLEAR THE CACHE FOR THIS STATION ==========
+        # ========== 3. CLEAR CACHE ==========
         try:
-            # Get the actual cache instance from the app extensions
             cache_instance = current_app.extensions.get('cache')
             
             if cache_instance:
-                print(f"🗑️ Clearing cache for {station} after clearing override...")
+                print(f"🗑️ Clearing cache for {station}...")
                 
-                # Delete ALL possible cache keys for this station
+                # Clear all cache for this station
+                keys_deleted = 0
                 for hour in range(24):
-                    cache_instance.delete(f"forecast_{station}_{hour}")
-                    cache_instance.delete(f"view//forecast_{station}_{hour}")
-                    cache_instance.delete(f"view/forecast_{station}_{hour}")
+                    key_variations = [
+                        f"forecast_{station}_{hour}",
+                        f"forecast_{station.lower()}_{hour}",
+                        f"view//forecast_{station}_{hour}",
+                        f"view/forecast_{station}_{hour}",
+                        f"forecast_{station}_{hour}_northbound",
+                        f"forecast_{station}_{hour}_southbound",
+                        f"forecast_{station}_{hour}_both",
+                        f"station_{station}_{hour}",
+                        f"live_map_{station}_{hour}",
+                        f"api/live-map/directions/v2_{station}_{hour}",
+                    ]
+                    
+                    for key in key_variations:
+                        try:
+                            cache_instance.delete(key)
+                            keys_deleted += 1
+                        except:
+                            pass
                 
-                print(f"✅ Cleared forecast caches for {station}")
+                # Clear "all stations" caches
+                for hour in range(24):
+                    all_keys = [
+                        f"all_stations_{hour}",
+                        f"view//all_stations_{hour}",
+                        f"view/all_stations_{hour}",
+                        f"live_map_all_{hour}",
+                    ]
+                    for key in all_keys:
+                        try:
+                            cache_instance.delete(key)
+                            keys_deleted += 1
+                        except:
+                            pass
+                
+                print(f"✅ Cleared {keys_deleted} cache keys for {station}")
             else:
                 print("⚠️ Cache instance not found")
                 
         except Exception as cache_error:
             print(f"⚠️ Could not clear cache: {cache_error}")
         
-        print(f"✅ Override cleared: {target_key}")
+        # ========== 4. FORCE RELOAD ==========
+        active = get_active_overrides()
+        print(f"📄 Active overrides after clear: {active}")
         
+        # ========== 5. LOG ==========
         log_activity(
             session.get('user_id'), 'operator', session.get('username'),
             'clear_override', f'Cleared override for {station} ({direction})'
@@ -983,11 +1059,14 @@ def clear_override():
         
         return jsonify({
             'success': True, 
-            'message': f'Override cleared successfully for {station} ({direction})'
+            'message': f'Override cleared successfully for {station} ({direction})',
+            'active_overrides': active
         })
         
     except Exception as e:
-        print(f"Error clearing override: {e}")
+        print(f"❌ Error clearing override: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
    
 @operator_bp.route('/api/operator/review-flagged/<int:report_id>', methods=['POST'])

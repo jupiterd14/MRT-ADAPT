@@ -1994,8 +1994,7 @@ async function checkRemainingReports() {
             }
         }
     }
-
-    async function fetchAlertCount() {
+async function fetchAlertCount() {
     const now = Date.now();
     
     // Use cached alert count if still valid
@@ -2015,6 +2014,10 @@ async function checkRemainingReports() {
         let allAlerts = [];
         const nowDate = new Date();
         const hour = nowDate.getHours();
+        const minutes = nowDate.getMinutes();
+        const timeDecimal = hour + minutes / 60;
+        const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
         
         // ========== 1. Rush Hour Alert ==========
         if ((hour >= 7 && hour <= 9)) {
@@ -2052,19 +2055,23 @@ async function checkRemainingReports() {
             allAlerts.push({ id: 'service-maintenance-night-permanent' });
         }
         
-        // ========== 5. Congestion alerts from live map (GROUPED) ==========
+        // ========== 5. Check if MRT is closed ==========
+        const isClosed = timeDecimal < OPERATING_START || timeDecimal >= OPERATING_END;
+        if (isClosed) {
+            allAlerts.push({ id: 'service-closed-permanent' });
+        }
+        
+        // ========== 6. Congestion alerts from live map ==========
         try {
             const response = await fetch('/api/live-map/directions/v2');
             const data = await response.json();
             
             if (data && data.northbound && data.southbound) {
-                // Group stations by severity
                 const grouped = {
                     northbound: { severe: [], congested: [], moderate: [], light: [] },
                     southbound: { severe: [], congested: [], moderate: [], light: [] }
                 };
                 
-                // Process northbound
                 for (const [station, stationData] of Object.entries(data.northbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.northbound.severe.push(station);
@@ -2073,7 +2080,6 @@ async function checkRemainingReports() {
                     else if (congestion > 0) grouped.northbound.light.push(station);
                 }
                 
-                // Process southbound
                 for (const [station, stationData] of Object.entries(data.southbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.southbound.severe.push(station);
@@ -2082,7 +2088,6 @@ async function checkRemainingReports() {
                     else if (congestion > 0) grouped.southbound.light.push(station);
                 }
                 
-                // ONLY COUNT GROUPS THAT HAVE STATIONS
                 if (grouped.northbound.severe.length > 0) allAlerts.push({ id: 'north-severe-permanent' });
                 if (grouped.northbound.congested.length > 0) allAlerts.push({ id: 'north-congested-permanent' });
                 if (grouped.northbound.moderate.length > 0) allAlerts.push({ id: 'north-moderate-permanent' });
@@ -2097,7 +2102,7 @@ async function checkRemainingReports() {
             console.log('Could not fetch congestion alerts:', e);
         }
         
-        // ========== 6. Broadcasts ==========
+        // ========== 7. Broadcasts ==========
         try {
             const broadcastResponse = await fetch('/api/broadcasts/public');
             const broadcastData = await broadcastResponse.json();
@@ -2110,35 +2115,28 @@ async function checkRemainingReports() {
             console.log('Could not fetch broadcasts:', e);
         }
         
-        // ========== ONLY COUNT CONGESTION ALERTS ==========
-        const congestionAlertIds = [
-            'north-severe-permanent', 'north-congested-permanent', 
-            'north-moderate-permanent', 'north-light-permanent',
-            'south-severe-permanent', 'south-congested-permanent',
-            'south-moderate-permanent', 'south-light-permanent'
-        ];
-        
-        let congestionCount = 0;
+        // ========== COUNT ALL UNREAD ALERTS (not just congestion) ==========
+        let unreadCount = 0;
         for (const alert of allAlerts) {
-            if (congestionAlertIds.includes(alert.id)) {
-                congestionCount++;
+            if (!readAlerts.has(alert.id)) {
+                unreadCount++;
             }
         }
-
-        // Cache the result - ONLY congestion alerts
-        cachedAlertCount = congestionCount;
+        
+        // Cache the result
+        cachedAlertCount = unreadCount;
         cachedAlertCountTime = now;
-
-        console.log('📊 Travel Plan - Congestion alerts only:', congestionCount);
-        console.log('📊 Total alerts (all types):', allAlerts.length);
-        return congestionCount;
+       
+        console.log('📊 All alerts found:', allAlerts.length);
+console.log('📊 Read alerts:', readAlerts.size);
+console.log('📊 Unread count:', unreadCount);
+        return unreadCount;
         
     } catch (error) {
         console.error('Error calculating alert count:', error);
         return 0;
     }
 }
-
     // ========== CHECK ALERT COUNT AND UPDATE BADGE ==========
     async function checkAlertCount() {
         const alertCount = await fetchAlertCount();

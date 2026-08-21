@@ -1626,10 +1626,9 @@ async function getCongestionAlerts() {
         }
     } catch (e) {}
 }
-
-  async function debugAlertCount() {
+async function debugAlertCount() {
     try {
-        // First check actual alerts
+        // Count actual unread alerts from currentAlerts
         const actualUnread = currentAlerts.filter(a => a.unread === true && !readAlerts.has(a.id)).length;
         
         // If we have actual alerts, use that count
@@ -1647,7 +1646,6 @@ async function getCongestionAlerts() {
         return { count: 0 };
     }
 }
-
     // Main Alert Loader
     async function loadAlerts() {
         if (isLoading) return;

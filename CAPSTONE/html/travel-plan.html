@@ -2691,16 +2691,18 @@ function getPreviousStation(station) {
 let cachedAlertCount = null;
 let cachedAlertCountTime = 0;
 const ALERT_CACHE_DURATION = 30000;
-
+// ========== FIXED: fetchAlertCount() FOR TRAVEL PLAN PAGE ==========
+// ========== FIXED: fetchAlertCount() FOR TRAVEL PLAN PAGE ==========
 async function fetchAlertCount() {
     const now = Date.now();
     
+    // Use cached alert count if still valid
     if (cachedAlertCount !== null && (now - cachedAlertCountTime) < ALERT_CACHE_DURATION) {
-        console.log('📦 Using cached alert count:', cachedAlertCount);
         return cachedAlertCount;
     }
     
     try {
+        // Get read status from localStorage
         let readAlerts = new Set();
         const saved = localStorage.getItem('readAlerts');
         if (saved) {
@@ -2710,42 +2712,74 @@ async function fetchAlertCount() {
         let allAlerts = [];
         const nowDate = new Date();
         const hour = nowDate.getHours();
+        const minutes = nowDate.getMinutes();
+        const timeDecimal = hour + minutes / 60;
+        const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
         
+        console.log('🔍 Travel Plan - Fetching all alerts at hour:', hour);
+        
+        // ========== 1. Rush Hour Alert ==========
         if ((hour >= 7 && hour <= 9)) {
             allAlerts.push({ id: 'rush-morning-permanent' });
+            console.log('  ✅ Added morning rush alert');
         } else if ((hour >= 17 && hour <= 19)) {
             allAlerts.push({ id: 'rush-evening-permanent' });
+            console.log('  ✅ Added evening rush alert');
         }
         
+        // ========== 2. Advisory Alert ==========
         if (hour >= 0 && hour < 5) {
             allAlerts.push({ id: 'advisory-early-morning-permanent' });
+            console.log('  ✅ Added early morning advisory');
         } else if (hour >= 5 && hour < 7) {
             allAlerts.push({ id: 'advisory-pre-rush-permanent' });
+            console.log('  ✅ Added pre-rush advisory');
         } else if (hour >= 10 && hour < 16) {
             allAlerts.push({ id: 'advisory-midday-permanent' });
+            console.log('  ✅ Added midday advisory');
         } else if (hour >= 20 && hour < 22.5) {
             allAlerts.push({ id: 'advisory-late-evening-permanent' });
+            console.log('  ✅ Added late evening advisory');
         } else if (hour >= 22.5 || hour === 23) {
             allAlerts.push({ id: 'advisory-service-ended-permanent' });
+            console.log('  ✅ Added service ended advisory');
         }
         
+        // ========== 3. Congestion Advisory ==========
         if (hour >= 21 || hour < 5) {
             allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
+            console.log('  ✅ Added offpeak congestion advisory');
         } else if (hour >= 14 && hour < 17) {
             allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
+            console.log('  ✅ Added midafternoon congestion advisory');
         }
         
+        // ========== 4. Service Notices ==========
         const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
         if (isWeekend) {
             allAlerts.push({ id: 'service-weekend-permanent' });
+            console.log('  ✅ Added weekend service notice');
         }
         if (hour >= 23 || hour <= 3) {
             allAlerts.push({ id: 'service-maintenance-night-permanent' });
+            console.log('  ✅ Added maintenance notice');
         }
         
+        // ========== 5. Check if MRT is closed ==========
+        const isClosed = timeDecimal < OPERATING_START || timeDecimal >= OPERATING_END;
+        if (isClosed) {
+            allAlerts.push({ id: 'service-closed-permanent' });
+            console.log('  ✅ Added service closed alert');
+        }
+        
+        // ========== 6. Congestion alerts from live map ==========
         try {
+            console.log('  🔄 Fetching congestion alerts from API...');
             const response = await fetch('/api/live-map/directions/v2');
             const data = await response.json();
+            
+            let congestionAlertCount = 0;
             
             if (data && data.northbound && data.southbound) {
                 const grouped = {
@@ -2769,92 +2803,121 @@ async function fetchAlertCount() {
                     else if (congestion > 0) grouped.southbound.light.push(station);
                 }
                 
-                if (grouped.northbound.severe.length > 0) allAlerts.push({ id: 'north-severe-permanent' });
-                if (grouped.northbound.congested.length > 0) allAlerts.push({ id: 'north-congested-permanent' });
-                if (grouped.northbound.moderate.length > 0) allAlerts.push({ id: 'north-moderate-permanent' });
-                if (grouped.northbound.light.length > 0) allAlerts.push({ id: 'north-light-permanent' });
+                if (grouped.northbound.severe.length > 0) {
+                    allAlerts.push({ id: 'north-severe-permanent' });
+                    congestionAlertCount++;
+                }
+                if (grouped.northbound.congested.length > 0) {
+                    allAlerts.push({ id: 'north-congested-permanent' });
+                    congestionAlertCount++;
+                }
+                if (grouped.northbound.moderate.length > 0) {
+                    allAlerts.push({ id: 'north-moderate-permanent' });
+                    congestionAlertCount++;
+                }
+                if (grouped.northbound.light.length > 0) {
+                    allAlerts.push({ id: 'north-light-permanent' });
+                    congestionAlertCount++;
+                }
                 
-                if (grouped.southbound.severe.length > 0) allAlerts.push({ id: 'south-severe-permanent' });
-                if (grouped.southbound.congested.length > 0) allAlerts.push({ id: 'south-congested-permanent' });
-                if (grouped.southbound.moderate.length > 0) allAlerts.push({ id: 'south-moderate-permanent' });
-                if (grouped.southbound.light.length > 0) allAlerts.push({ id: 'south-light-permanent' });
+                if (grouped.southbound.severe.length > 0) {
+                    allAlerts.push({ id: 'south-severe-permanent' });
+                    congestionAlertCount++;
+                }
+                if (grouped.southbound.congested.length > 0) {
+                    allAlerts.push({ id: 'south-congested-permanent' });
+                    congestionAlertCount++;
+                }
+                if (grouped.southbound.moderate.length > 0) {
+                    allAlerts.push({ id: 'south-moderate-permanent' });
+                    congestionAlertCount++;
+                }
+                if (grouped.southbound.light.length > 0) {
+                    allAlerts.push({ id: 'south-light-permanent' });
+                    congestionAlertCount++;
+                }
+                
+                console.log(`  ✅ Added ${congestionAlertCount} congestion alerts`);
             }
         } catch (e) {
-            console.log('Could not fetch congestion alerts:', e);
+            console.log('  ❌ Could not fetch congestion alerts:', e);
         }
         
+        // ========== 7. Broadcasts ==========
         try {
+            console.log('  🔄 Fetching broadcasts...');
             const broadcastResponse = await fetch('/api/broadcasts/public');
             const broadcastData = await broadcastResponse.json();
             if (broadcastData.success && broadcastData.broadcasts) {
+                let broadcastCount = 0;
                 broadcastData.broadcasts.forEach(b => {
                     allAlerts.push({ id: `broadcast-${b.id}` });
+                    broadcastCount++;
                 });
+                console.log(`  ✅ Added ${broadcastCount} broadcasts`);
             }
         } catch (e) {
-            console.log('Could not fetch broadcasts:', e);
+            console.log('  ❌ Could not fetch broadcasts:', e);
         }
         
-        const congestionAlertIds = [
-            'north-severe-permanent', 'north-congested-permanent', 
-            'north-moderate-permanent', 'north-light-permanent',
-            'south-severe-permanent', 'south-congested-permanent',
-            'south-moderate-permanent', 'south-light-permanent'
-        ];
-        
-        let congestionCount = 0;
+        // ========== COUNT ALL UNREAD ALERTS ==========
+        let unreadCount = 0;
         for (const alert of allAlerts) {
-            if (congestionAlertIds.includes(alert.id)) {
-                congestionCount++;
+            if (!readAlerts.has(alert.id)) {
+                unreadCount++;
             }
         }
-
-        cachedAlertCount = congestionCount;
+        
+        // Cache the result
+        cachedAlertCount = unreadCount;
         cachedAlertCountTime = now;
-
-        console.log('📊 Travel Plan - Congestion alerts only:', congestionCount);
-        return congestionCount;
+        
+        // Store in sessionStorage for persistence
+        try {
+            sessionStorage.setItem('alertCount', unreadCount.toString());
+        } catch (e) {}
+        
+        console.log('📊 Travel Plan - ALL alerts count:', allAlerts.length);
+        console.log('📊 Travel Plan - UNREAD alerts count:', unreadCount);
+        console.log('📊 Travel Plan - Read alerts in localStorage:', readAlerts.size);
+        return unreadCount;
         
     } catch (error) {
         console.error('Error calculating alert count:', error);
         return 0;
     }
 }
-
-// ========== CHECK ALERT COUNT ==========
 async function checkAlertCount() {
     const alertCount = await fetchAlertCount();
     
+    // Header badge
     const badge = document.getElementById('alertBadge');
-    const sidebarBadge = document.getElementById('sidebarAlertCount');
-    
-    const bellDisplayValue = alertCount > 9 ? '9+' : alertCount;
-    const sidebarDisplayValue = alertCount;
-    
     if (badge) {
         if (alertCount > 0) {
-            badge.textContent = bellDisplayValue;
-            badge.style.backgroundColor = 'var(--red)';
+            badge.textContent = alertCount > 9 ? '9+' : alertCount;
             badge.style.display = 'flex';
+            badge.style.backgroundColor = 'var(--red)';
         } else {
             badge.textContent = '0';
-            badge.style.backgroundColor = '#94A3B8';
             badge.style.display = 'flex';
+            badge.style.backgroundColor = '#94A3B8';
         }
     }
     
+    // Sidebar badge
+    const sidebarBadge = document.getElementById('sidebarAlertCount');
     if (sidebarBadge) {
-        if (alertCount > 0) { 
-            sidebarBadge.textContent = sidebarDisplayValue;
-            sidebarBadge.style.display = 'block'; 
-        } else { 
-            sidebarBadge.style.display = 'none'; 
+        if (alertCount > 0) {
+            sidebarBadge.textContent = alertCount;
+            sidebarBadge.style.display = 'block';
+        } else {
+            sidebarBadge.style.display = 'none';
         }
     }
     
+    // Sync mobile badge
     syncMobileAlertBadge();
 }
-
 // ========== SHOW TOAST ==========
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
@@ -2874,6 +2937,16 @@ function showToast(message, type = 'success') {
         toast.remove();
     }, 3000);
 }
+
+// Override any old functions - force the new one to be used
+window.getCongestionAlerts = fetchAlertCount;
+window.getCongestionAlertsOnly = fetchAlertCount;
+window.fetchAlertCount = fetchAlertCount;
+
+// Force the badge to update with the new count
+setTimeout(() => {
+    checkAlertCount();
+}, 1000);
     </script>
 </body>
 </html>

@@ -71,6 +71,7 @@ from routes import (
 # ============ CACHE SETUP FOR FAST RELOADS ============
 _MODELS_CACHE = {}
 _MODELS_CACHE_FILE = None
+_MODELS_LOADED = False  # Track if models are loaded
 
 
 def get_models_cache_path():
@@ -82,25 +83,26 @@ def get_historical_cache_path():
     return os.path.join(cache_dir, 'mrt3_historical_cache.pkl')
 
 def load_models_with_cache(stations, models_path):
-    global _MODELS_CACHE
+    global _MODELS_CACHE, _MODELS_LOADED
     
-    cache_file = get_models_cache_path()
-    
-    if _MODELS_CACHE.get('loaded'):
+    if _MODELS_LOADED:
         print("✓ Using models from memory cache")
         return _MODELS_CACHE['directional_models'], _MODELS_CACHE['directional_scalers']
+    
+    cache_file = get_models_cache_path()
     
     if os.path.exists(cache_file):
         try:
             print("📦 Loading models from disk cache (fast)...")
             with open(cache_file, 'rb') as f:
                 _MODELS_CACHE = pickle.load(f)
+            _MODELS_LOADED = True
             print(f"✓ Loaded {len(_MODELS_CACHE['directional_models'])} models from cache")
             return _MODELS_CACHE['directional_models'], _MODELS_CACHE['directional_scalers']
         except Exception as e:
             print(f"Cache load failed: {e}, reloading from source...")
     
-    print("🔄 Loading models from source (first time only - this may take a while)...")
+    print("🔄 Loading ALL 26 models from source (first time only - this may take a while)...")
     directional_models, directional_scalers = load_directional_models(stations, models_path)
     
     _MODELS_CACHE = {
@@ -108,6 +110,7 @@ def load_models_with_cache(stations, models_path):
         'directional_scalers': directional_scalers,
         'loaded': True
     }
+    _MODELS_LOADED = True
     
     try:
         with open(cache_file, 'wb') as f:
@@ -204,19 +207,13 @@ cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 @app.route('/warmup')
 def warmup():
-    """Warm up the app by loading models and data for North Ave"""
+    """Warm up the app by loading ALL models and data at startup"""
     import time
     start = time.time()
     
     try:
-        # Load models
-        ensure_single_model_loaded("North Ave", "Northbound")
-        ensure_single_model_loaded("North Ave", "Southbound")
-        
-        # ⭐ Pre-cache data using Parquet
-        from services.feature_engineering import get_station_dataframe_cached
-        get_station_dataframe_cached("North Ave", "Northbound")
-        get_station_dataframe_cached("North Ave", "Southbound")
+        # Load ALL models at once
+        preload_all_models()
         
         elapsed = time.time() - start
         
@@ -300,7 +297,7 @@ def inject_now():
 
 # ============ LAZY LOADING - Only load models when needed ============
 print("\n" + "="*50)
-print("MRT-3 PREDICTION SYSTEM - LAZY LOADING MODE")
+print("MRT-3 PREDICTION SYSTEM - MODELS WILL LOAD ON FIRST REQUEST")
 print("="*50)
 print("⏳ Models will load on first request (not at startup)")
 print("💡 First request may take 10-30 seconds")
@@ -368,8 +365,54 @@ def ensure_lstm_for_retraining():
     else:
         print("⚠️ LSTM models not loaded - retraining will be disabled")
         app.config['LSTM_PREDICTOR'] = None
+
+# ============ PRELOAD ALL MODELS ============
+def preload_all_models():
+    """
+    Preload ALL 26 models at startup or on first request.
+    Once loaded, they stay in memory and are reused.
+    This is the most efficient way to handle models.
+    """
+    global directional_models_cached, directional_scalers_cached, _MODELS_LOADED
+    
+    # Check if already loaded
+    if _MODELS_LOADED and directional_models_cached is not None:
+        print(f"✅ All models already loaded! ({len(directional_models_cached)}/26)")
+        return directional_models_cached, directional_scalers_cached
+    
+    print("\n" + "="*60)
+    print("🔄 PRELOADING ALL 26 MODELS...")
+    print("="*60)
+    
+    # Load models with cache
+    directional_models_cached, directional_scalers_cached = load_models_with_cache(STATIONS, DIRECTIONAL_MODELS_PATH)
+    
+    # Load historical data
+    historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
+    
+    # Update services module
+    import services
+    services.directional_models = directional_models_cached
+    services.directional_scalers = directional_scalers_cached
+    services.historical_entry = historical_data.get('historical_entry', {})
+    services.historical_exit = historical_data.get('historical_exit', {})
+    services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
+    services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
+    
+    # Store in app config
+    app.config['DIRECTIONAL_MODELS'] = directional_models_cached
+    app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+    
+    print("="*60)
+    print(f"✅ All models loaded! ({len(directional_models_cached)}/26 models)")
+    print(f"✅ Historical data loaded for {len(historical_data['historical_entry'])} stations")
+    print("="*60 + "\n")
+    
+    return directional_models_cached, directional_scalers_cached
+
 def ensure_single_model_loaded(station_name, direction):
-    global directional_models_cached, directional_scalers_cached, historical_data
+    """Load a single model if not already loaded - NO LIMIT"""
+    global directional_models_cached, directional_scalers_cached
     
     # Initialize if None
     if directional_models_cached is None:
@@ -378,29 +421,12 @@ def ensure_single_model_loaded(station_name, direction):
     
     model_key = f"{station_name}_{direction}"
     
-    # ⭐ FIX: Check if this specific model is already loaded
+    # Check if already loaded
     if model_key in directional_models_cached:
-        print(f"✅ Model {model_key} already loaded")
+        print(f"✅ Model {model_key} already loaded ({len(directional_models_cached)}/26)")
         return
     
-    # ⭐ FIX: Only check limit if we're trying to load a DIFFERENT station
-    # Count how many models are loaded for THIS station
-    station_models = [k for k in directional_models_cached.keys() if station_name in k]
-    
-    # If we already have models for this station, don't load more
-    # But if we're loading for a new station, we can load up to 2
-    if len(directional_models_cached) >= 4:
-        # Check if any of the loaded models are for this station
-        if not station_models:
-            print(f"⚠️ Model limit reached (2). Skipping {station_name}_{direction}")
-            gc.collect()
-            return
-        # If we already have models for this station, load the other direction
-        elif len(station_models) >= 2:
-            print(f"⚠️ Both directions already loaded for {station_name}")
-            return
-    
-    print(f"🔄 Loading single model: {model_key}")
+    print(f"🔄 Loading single model: {model_key} ({len(directional_models_cached)+1}/26)")
     
     try:
         from services.model_loader import load_single_model
@@ -410,7 +436,7 @@ def ensure_single_model_loaded(station_name, direction):
             directional_models_cached[model_key] = model
             directional_scalers_cached[f"{model_key}_feature"] = scalers.get('feature')
             directional_scalers_cached[f"{model_key}_target"] = scalers.get('target')
-            print(f"✅ Loaded model for {model_key}")
+            print(f"✅ Loaded model {model_key} ({len(directional_models_cached)}/26)")
             gc.collect()
         else:
             print(f"❌ Failed to load model for {model_key}")
@@ -422,6 +448,7 @@ def ensure_single_model_loaded(station_name, direction):
     
     app.config['DIRECTIONAL_MODELS'] = directional_models_cached
     app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+
 app.config['ENSURE_SINGLE_MODEL_LOADED'] = ensure_single_model_loaded
 
 @app.route('/debug/app-config')
@@ -582,6 +609,7 @@ with app.app_context():
         else:
             print("⚠️ Some CSV files still missing!")
     # ===========================================
+
 # ============ ADMIN RETRAINING ENDPOINT ============
 @app.route('/admin/retrain', methods=['POST'])
 def admin_retrain():
@@ -770,6 +798,7 @@ def debug_model_status():
 
 @app.route('/debug/clear-cache')
 def debug_clear_cache():
+    """Clear all caches - useful for forcing a fresh load"""
     cache_files = [get_models_cache_path(), get_historical_cache_path()]
     results = {}
     
@@ -780,10 +809,14 @@ def debug_clear_cache():
         else:
             results[os.path.basename(cache_file)] = "not found"
     
+    # Also clear memory cache flag
+    global _MODELS_LOADED
+    _MODELS_LOADED = False
+    
     return jsonify({
         "status": "Cache cleared",
         "files": results,
-        "message": "Restart the app to reload models from source"
+        "message": "Restart the app or call /warmup to reload models from source"
     })
 
 @app.route('/debug/raw-model-output/<station_name>/<direction>')
@@ -1035,6 +1068,11 @@ if __name__ == '__main__':
     print("\n" + "="*50)
     print("MRT-3 PREDICTION SYSTEM READY!")
     print("="*50)
+    
+    # ⭐ PRELOAD ALL MODELS AT STARTUP ⭐
+    print("\n🔄 PRELOADING ALL MODELS AT STARTUP...")
+    preload_all_models()
+    
     print(f"✓ {len(directional_models_cached) if directional_models_cached else 0} directional models loaded")
     if historical_data:
         print(f"✓ {len(historical_data['historical_entry']) if historical_data else 0} stations with historical data")
@@ -1047,9 +1085,8 @@ if __name__ == '__main__':
     else:
         print("⚠️ LSTM models not loaded - they will load when retraining is triggered")
     
-    print("\n💡 TIP: First load may take 10-30 seconds (loading models)")
-    print("💡 Subsequent reloads will take only 1-2 seconds (using cache)")
-    print("\n🗑️  To force fresh model loading: visit /debug/clear-cache")
+    print("\n💡 TIP: All models are pre-loaded in memory for fast predictions")
+    print("💡 To force fresh model loading: visit /debug/clear-cache")
     print("\n🔄 To trigger weekly retraining: POST /admin/retrain")
     print("\n🌐 Open http://localhost:5000")
     print("="*50 + "\n")
