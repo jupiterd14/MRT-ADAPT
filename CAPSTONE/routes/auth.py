@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, make_response
 from models import User, db
 from models.activity_log import ActivityLog
 from werkzeug.security import check_password_hash
@@ -27,6 +27,17 @@ def log_activity(user_id, user_type, user_email, action, details=None):
     except Exception as e:
         print(f"Error logging activity: {e}")
 
+def no_cache(f):
+    """Decorator to prevent browser caching of protected pages"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        response = make_response(f(*args, **kwargs))
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '-1'
+        return response
+    return decorated_function
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -41,10 +52,73 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+@auth_bp.before_app_request
+def check_session_validity():
+    """Check if session is valid on every request - prevents back button access"""
+    from flask import request, session, flash, redirect, url_for
+    
+    # Skip login, signup, static, and public routes
+    public_endpoints = [
+        'auth.login', 
+        'auth.google_login', 
+        'auth.google_authorize', 
+        'auth.signup',
+        'auth.check_session',
+        'static'
+    ]
+    
+    if request.endpoint in public_endpoints:
+        return None
+    
+    # If user_id is in session, verify it's actually valid
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+        if not user or not user.is_active:
+            session.clear()
+            flash('Your session has expired. Please log in again.', 'warning')
+            return redirect(url_for('auth.login'))
+        return None
+    else:
+        # If no user_id and we're on a protected page, redirect to login
+        if request.endpoint and not request.endpoint.startswith('auth.'):
+            flash('Please log in to access this page.', 'warning')
+            return redirect(url_for('auth.login'))
+    
+    return None
+
+@auth_bp.route('/api/check-session')
+def check_session():
+    """Check if user session is still valid - used by frontend JavaScript"""
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+        if user and user.is_active:
+            return jsonify({
+                'logged_in': True, 
+                'username': session.get('username'),
+                'role': session.get('role')
+            })
+    return jsonify({'logged_in': False})
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@no_cache
 def login():
+    """Login page - with no-cache to prevent back button issues"""
     error = None
     error_type = None
+    
+    # On GET request, check if user is actually logged in
+    if request.method == 'GET':
+        if 'user_id' in session:
+            user = User.query.get(session['user_id'])
+            if user and user.is_active:
+                if user.role == 'admin':
+                    return redirect(url_for('admin.admin_dashboard'))
+                elif user.role == 'operator':
+                    return redirect(url_for('operator.operator_dashboard'))
+                else:
+                    return redirect(url_for('user.user_dashboard'))
+            else:
+                session.clear()
     
     invite_email = request.args.get('email')
     invite_temp = request.args.get('temp')
@@ -131,7 +205,9 @@ def login():
     return render_template('login.html', error=error, error_type=error_type)
 
 @auth_bp.route('/signup', methods=['GET', 'POST'])
+@no_cache
 def signup():
+    """Signup page - with no-cache"""
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -175,14 +251,18 @@ def signup():
     return render_template('signup.html', error=error, email=email)
 
 @auth_bp.route('/logout')
+@no_cache
 def logout():
+    """Logout - with no-cache and session clearing"""
     if 'user_id' in session:
         log_activity(session.get('user_id'), session.get('role'), 
                     session.get('username'), 'logout', 'User logged out')
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('auth.login'))
+
 @auth_bp.route('/login/google')
+@no_cache
 def google_login():
     """Initiate Google OAuth login with account selection options"""
     from flask import current_app
@@ -193,7 +273,6 @@ def google_login():
     redirect_uri = url_for('auth.google_authorize', _external=True)
     
     # Get the google client from the oauth instance stored in app config
-    # Instead of accessing extensions directly
     google = current_app.config.get('GOOGLE_CLIENT')
     
     if google is None:
@@ -208,8 +287,8 @@ def google_login():
     
     return google.authorize_redirect(redirect_uri, **client_kwargs)
 
-
 @auth_bp.route('/login/google/authorize')
+@no_cache
 def google_authorize():
     """Handle Google OAuth callback - With proper logging"""
     from flask import current_app
@@ -293,9 +372,9 @@ def google_authorize():
                     f'Google login exception: {str(e)} from IP: {request.remote_addr}')
         flash('Google login failed. Please try again or use email/password.', 'error')
         return redirect(url_for('auth.login'))
-    
 
 @auth_bp.route('/operator-signup', methods=['POST'])
+@no_cache
 def operator_signup():
     """Handle operator signup from invitation"""
     try:

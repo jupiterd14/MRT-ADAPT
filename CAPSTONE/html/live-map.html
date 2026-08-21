@@ -1436,6 +1436,19 @@ nav {
 .station-row:nth-child(odd) .nearest-badge {
     margin-left: auto; /* Keeps text right-aligned on odd rows */
 }
+
+/* ========== CLOSED STATUS - GREY ========== */
+.status-badge.closed {
+    background: #E2E8F0 !important;
+    border: 2px solid #94A3B8 !important;
+}
+.status-badge.closed span {
+    color: #64748B !important;
+}
+.status-badge.closed .dot {
+    background: #94A3B8 !important;
+    animation: none !important;
+}
 </style>
 
 
@@ -2502,7 +2515,18 @@ function openModal(stationName) {
     const status = stationData.status || getStatusText(congestion);
     const isOverridden = stationData.overridden || false;
     const overrideInfo = stationData.override_info || null;
-    const message = getStatusMessage(stationName, congestion);
+    
+    // ========== CHECK IF STATION IS CLOSED ==========
+    const isClosed = status === 'CLOSED' || congestion === 0 && waitTime === 'CLOSED';
+    
+    // Get appropriate message based on status
+    let message;
+    if (isClosed && !isOverridden) {
+        // CLOSED message - different dialogue
+        message = ` ${stationName} Station is currently CLOSED. MRT-3 operations run from 4:30 AM to 10:30 PM daily.`;
+    } else {
+        message = getStatusMessage(stationName, congestion);
+    }
     
     // Update modal elements
     const nameEl = document.getElementById('modalStationName');
@@ -2511,7 +2535,7 @@ function openModal(stationName) {
     const statusBadge = document.getElementById('modalStatusBadge');
     
     if (nameEl) nameEl.textContent = stationName;
-  if (statusTextEl) statusTextEl.textContent = status.toUpperCase();
+    if (statusTextEl) statusTextEl.textContent = isClosed && !isOverridden ? 'CLOSED' : status.toUpperCase();
     
     // Build modal body with override section if applicable
     let overrideSection = '';
@@ -2528,7 +2552,6 @@ function openModal(stationName) {
                     <strong style="color: #6D28D9;">Operator Override Active</strong>
                 </div>
                 <div style="font-size: 13px; color: #4C1D95;">
-                    
                     <div><strong>Congestion:</strong> ${level}</div>
                     <div><strong>Expires:</strong> ${expiry}</div>
                     ${reason ? `<div><strong>Reason:</strong> ${reason}</div>` : ''}
@@ -2544,57 +2567,59 @@ function openModal(stationName) {
         `;
     }
     
-    // Update status badge
-  // Update status badge
-if (statusBadge) {
-    statusBadge.className = 'status-badge';
-    
-    // Check if overridden and get the override level
-    let displayStatus = status;
-    let isOverrideActive = false;
-    
-    if (isOverridden && overrideInfo) {
-        isOverrideActive = true;
-        // Use the override level for display
-        displayStatus = overrideInfo.level || status;
+    // ========== UPDATE STATUS BADGE - GREY FOR CLOSED ==========
+    if (statusBadge) {
+        statusBadge.className = 'status-badge';
+        
+        let displayStatus = status;
+        let isOverrideActive = false;
+        
+        if (isOverridden && overrideInfo) {
+            isOverrideActive = true;
+            displayStatus = overrideInfo.level || status;
+        }
+        
+        // Determine color class based on congestion value
+        let colorClass = '';
+        const congValue = isOverrideActive ? (overrideInfo.congestion || congestion) : congestion;
+        
+        displayStatus = displayStatus.toUpperCase();
+        
+        // ========== FIX: Check if closed ==========
+        if (isClosed && !isOverridden) {
+            colorClass = 'closed'; // New class for closed
+        } else if (congValue > 80) {
+            colorClass = 'severe';
+        } else if (congValue > 60) {
+            colorClass = 'congested';
+        } else if (congValue > 30) {
+            colorClass = 'moderate';
+        } else {
+            colorClass = 'light';
+        }
+        
+        // Add the color class
+        statusBadge.classList.add(colorClass);
+        
+        // If overridden, add override styling
+        if (isOverrideActive) {
+            statusBadge.style.border = '';
+            statusBadge.style.boxShadow = '';
+            statusBadge.style.background = '';
+            const dot = statusBadge.querySelector('.dot');
+            if (dot) {
+                dot.style.background = '';
+            }
+        } else {
+            statusBadge.style.border = '';
+            statusBadge.style.boxShadow = '';
+            statusBadge.style.background = '';
+            const dot = statusBadge.querySelector('.dot');
+            if (dot) {
+                dot.style.background = '';
+            }
+        }
     }
-    
-    // Determine color class based on congestion value
-    let colorClass = '';
-    const congValue = isOverrideActive ? (overrideInfo.congestion || congestion) : congestion;
-    
-    displayStatus = displayStatus.toUpperCase();
-    if (congValue > 80) colorClass = 'severe';
-    else if (congValue > 60) colorClass = 'congested';
-    else if (congValue > 30) colorClass = 'moderate';
-    else colorClass = 'light';
-    
-    // Add the color class
-    statusBadge.classList.add(colorClass);
-    
-    // If overridden, add a small override indicator
- // If overridden, just keep the color class but no purple styling
-if (isOverrideActive) {
-    // Remove all purple styling - just use the color class
-    statusBadge.style.border = '';
-    statusBadge.style.boxShadow = '';
-    statusBadge.style.background = ''; // Let CSS handle it
-    
-    const dot = statusBadge.querySelector('.dot');
-    if (dot) {
-        dot.style.background = ''; // Let CSS handle it
-    }
-} else {
-    // Reset styles for non-override
-    statusBadge.style.border = '';
-    statusBadge.style.boxShadow = '';
-    statusBadge.style.background = '';
-    const dot = statusBadge.querySelector('.dot');
-    if (dot) {
-        dot.style.background = '';
-    }
-}
-}
     
     // Show modal
     const modal = document.getElementById('stationModal');

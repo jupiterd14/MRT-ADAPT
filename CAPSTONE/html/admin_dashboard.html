@@ -2633,22 +2633,19 @@ async function loadStationStatus() {
     const tbody = document.getElementById('stationStatusBody');
     tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Loading...</td></tr>';
     try {
-        const OPERATING_START = 4.5;
-        const OPERATING_END = 22.5;
-        const now = new Date();
-        const hour = now.getHours() + (now.getMinutes() / 60);
+        const OPERATING_START_ADMIN = 4.5;   // 4:30 AM
+        const OPERATING_END_ADMIN = 22.5;    // 10:30 PM
+        const nowAdmin = new Date();
+        const hourAdmin = nowAdmin.getHours() + (nowAdmin.getMinutes() / 60);
+        const isClosedAdmin = hourAdmin < OPERATING_START_ADMIN || hourAdmin > OPERATING_END_ADMIN;
         
-        if (!cachedStationData || (now - lastFetchTime) > CACHE_DURATION) {
-            // Fetch live map data
+        if (!cachedStationData || (nowAdmin - lastFetchTime) > CACHE_DURATION) {
             const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
             const data = await response.json();
             
-            // Also fetch active overrides
             const overrideResponse = await fetch('/api/operator/debug-override?_=${Date.now()}');
             const overrideData = await overrideResponse.json();
             const activeOverrides = overrideData.active_overrides || {};
-            
-            console.log('📋 Active overrides from API:', activeOverrides);
             
             if (!data.northbound || !data.southbound) {
                 throw new Error('No station data received');
@@ -2658,14 +2655,10 @@ async function loadStationStatus() {
                 const northData = data.northbound[station] || { congestion: 0, status: 'LIGHT' };
                 const southData = data.southbound[station] || { congestion: 0, status: 'LIGHT' };
                 
-                // Check for overrides - the key format is `${station}_northbound` or `${station}_southbound`
                 const northOverrideKey = `${station}_northbound`;
                 const southOverrideKey = `${station}_southbound`;
                 const northOverride = activeOverrides[northOverrideKey] || null;
                 const southOverride = activeOverrides[southOverrideKey] || null;
-                
-                console.log(`📍 ${station} - North override:`, northOverride);
-                console.log(`📍 ${station} - South override:`, southOverride);
                 
                 return {
                     name: station,
@@ -2689,7 +2682,7 @@ async function loadStationStatus() {
             });
             
             cachedStationData = { stations, overrides: activeOverrides };
-            lastFetchTime = now;
+            lastFetchTime = nowAdmin;
         }
         
         const stations = cachedStationData.stations;
@@ -2698,56 +2691,49 @@ async function loadStationStatus() {
         
         let stationList = stations.map(s => {
             const directionData = currentDirection === 'north' ? s.northbound : s.southbound;
-            // Try multiple key formats
-const directionMap = {
-    'north': ['northbound', 'north'],
-    'south': ['southbound', 'south']
-};
-const directionVariants = directionMap[currentDirection] || [currentDirection];
-
-let hasOverride = false;
-let overrideInfo = null;
-let foundKey = null;
-
-for (const dirVariant of directionVariants) {
-    const possibleKeys = [
-        `${s.name}_${dirVariant}`,
-        `${s.name}_${dirVariant.toLowerCase()}`,
-        `${s.name.toLowerCase()}_${dirVariant}`,
-        `${s.name}_${dirVariant.charAt(0)}`, // e.g., Taft_n
-        `${s.name.replace(' ', '')}_${dirVariant}` // e.g., Taft_northbound
-    ];
-    
-    // Also try with "Ave" variations
-    if (s.name.includes(' Ave')) {
-        const shortName = s.name.replace(' Ave', '');
-        possibleKeys.push(`${shortName}_${dirVariant}`);
-        possibleKeys.push(`${shortName}_${dirVariant.toLowerCase()}`);
-    }
-    if (s.name.includes(' Blvd')) {
-        const shortName = s.name.replace(' Blvd', '');
-        possibleKeys.push(`${shortName}_${dirVariant}`);
-        possibleKeys.push(`${shortName}_${dirVariant.toLowerCase()}`);
-    }
-    
-    for (const key of possibleKeys) {
-        if (overrides[key]) {
-            hasOverride = true;
-            overrideInfo = overrides[key];
-            foundKey = key;
-            console.log(`✅ Found override for ${s.name}: key="${key}"`);
-            break;
-        }
-    }
-    if (hasOverride) break;
-}
+            const directionMap = {
+                'north': ['northbound', 'north'],
+                'south': ['southbound', 'south']
+            };
+            const directionVariants = directionMap[currentDirection] || [currentDirection];
             
-            // If there's an override, use its congestion value
+            let hasOverride = false;
+            let overrideInfo = null;
+            
+            for (const dirVariant of directionVariants) {
+                const possibleKeys = [
+                    `${s.name}_${dirVariant}`,
+                    `${s.name}_${dirVariant.toLowerCase()}`,
+                    `${s.name.toLowerCase()}_${dirVariant}`,
+                    `${s.name}_${dirVariant.charAt(0)}`,
+                    `${s.name.replace(' ', '')}_${dirVariant}`
+                ];
+                
+                if (s.name.includes(' Ave')) {
+                    const shortName = s.name.replace(' Ave', '');
+                    possibleKeys.push(`${shortName}_${dirVariant}`);
+                    possibleKeys.push(`${shortName}_${dirVariant.toLowerCase()}`);
+                }
+                if (s.name.includes(' Blvd')) {
+                    const shortName = s.name.replace(' Blvd', '');
+                    possibleKeys.push(`${shortName}_${dirVariant}`);
+                    possibleKeys.push(`${shortName}_${dirVariant.toLowerCase()}`);
+                }
+                
+                for (const key of possibleKeys) {
+                    if (overrides[key]) {
+                        hasOverride = true;
+                        overrideInfo = overrides[key];
+                        break;
+                    }
+                }
+                if (hasOverride) break;
+            }
+            
             let congestion = directionData?.congestion || 0;
             let statusText = directionData?.status_text || 'LIGHT';
             let statusClass = directionData?.status_class || 'status-light';
             
-            // If overridden, update the status based on override congestion
             if (hasOverride && overrideInfo) {
                 const overrideCong = overrideInfo.congestion || overrideInfo.level || 25;
                 congestion = overrideCong;
@@ -2781,9 +2767,13 @@ for (const dirVariant of directionVariants) {
             let statusClass = 'status-light';
             let displayText = s.status_text || 'LIGHT';
             
-            // Normalize status text for display
             const statusUpper = s.status_text.toUpperCase();
-            if (statusUpper === 'SEVERE' || statusUpper === 'SEVERELY CONGESTED' || s.congestion > 80) {
+            
+            // ========== PRIORITIZE CLOSED STATUS ==========
+            if (isClosedAdmin) {
+                statusClass = 'status-closed';
+                displayText = 'CLOSED';
+            } else if (statusUpper === 'SEVERE' || statusUpper === 'SEVERELY CONGESTED' || s.congestion > 80) {
                 statusClass = 'status-severe';
                 displayText = 'SEVERE';
             } else if (statusUpper === 'CONGESTED' || s.congestion > 60) {
@@ -2792,43 +2782,35 @@ for (const dirVariant of directionVariants) {
             } else if (statusUpper === 'MODERATE' || s.congestion > 30) {
                 statusClass = 'status-moderate';
                 displayText = 'MODERATE';
-            } else if (statusUpper === 'CLOSED') {
-                statusClass = 'status-closed';
-                displayText = 'CLOSED';
             } else {
                 statusClass = 'status-light';
                 displayText = 'LIGHT';
             }
             
-            // Override display
-           // Override display - show status text instead of percentage
-// Override display - show status text only (no remove button)
-let overrideDisplay = '<span style="color:#94A3B8; font-size:12px;">—</span>';
-if (s.has_override && s.override_info) {
-    const info = s.override_info;
-    const level = info.congestion || info.level || 25;
-    const statusText = getStatusText(level);
-    
-    // Get color based on status
-    let statusColor = '#8B5CF6';
-    let bgColor = '#EDE9FE';
-    if (level > 80) { statusColor = '#DC2626'; bgColor = '#FEE2E2'; }
-    else if (level > 60) { statusColor = '#EA580C'; bgColor = '#FFEDD5'; }
-    else if (level > 30) { statusColor = '#D97706'; bgColor = '#FEF3C7'; }
-    else { statusColor = '#16A34A'; bgColor = '#DCFCE7'; }
-    
-   overrideDisplay = `
-    <span data-station="${s.name}" data-direction="${currentDirection}" 
-          style="background:${bgColor}; color:${statusColor}; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600; border:1px solid ${statusColor}; display:inline-flex; align-items:center; gap:4px; cursor:pointer; transition:all 0.2s;"
-          onmouseover="this.style.transform='scale(1.05)'"
-          onmouseout="this.style.transform='scale(1)'"
-          onclick="showOverrideDetails('${s.name}', '${currentDirection}')">
-        <i class="fas fa-pen" style="font-size:9px;"></i> ${statusText}
-    </span>
-`;
-}
+            let overrideDisplay = '<span style="color:#94A3B8; font-size:12px;">—</span>';
+            if (s.has_override && s.override_info) {
+                const info = s.override_info;
+                const level = info.congestion || info.level || 25;
+                const statusText = getStatusText(level);
+                
+                let statusColor = '#8B5CF6';
+                let bgColor = '#EDE9FE';
+                if (level > 80) { statusColor = '#DC2626'; bgColor = '#FEE2E2'; }
+                else if (level > 60) { statusColor = '#EA580C'; bgColor = '#FFEDD5'; }
+                else if (level > 30) { statusColor = '#D97706'; bgColor = '#FEF3C7'; }
+                else { statusColor = '#16A34A'; bgColor = '#DCFCE7'; }
+                
+                overrideDisplay = `
+                    <span data-station="${s.name}" data-direction="${currentDirection}" 
+                          style="background:${bgColor}; color:${statusColor}; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600; border:1px solid ${statusColor}; display:inline-flex; align-items:center; gap:4px; cursor:pointer; transition:all 0.2s;"
+                          onmouseover="this.style.transform='scale(1.05)'"
+                          onmouseout="this.style.transform='scale(1)'"
+                          onclick="showOverrideDetails('${s.name}', '${currentDirection}')">
+                        <i class="fas fa-pen" style="font-size:9px;"></i> ${statusText}
+                    </span>
+                `;
+            }
             
-            // Add override indicator next to station name
             const overrideBadge = s.has_override ? 
                 '<span style="background:#8B5CF6; color:white; padding:2px 8px; border-radius:12px; font-size:9px; margin-left:4px;"><i class="fas fa-pen"></i></span>' : '';
             
@@ -2839,7 +2821,6 @@ if (s.has_override && s.override_info) {
             </tr>`;
         }).join('');
         
-        // Update direction buttons
         const northBtn = document.getElementById('northBtn'), southBtn = document.getElementById('southBtn');
         if (northBtn && southBtn) {
             northBtn.classList.toggle('active', currentDirection === 'north');
@@ -2847,15 +2828,12 @@ if (s.has_override && s.override_info) {
         }
         document.getElementById('currentDirLabel').innerHTML = currentDirection === 'north' ? 'Northbound' : 'Southbound';
         
-        console.log('✅ Admin station status updated from Live Map API');
-        
     } catch (error) {
         console.error('Error loading station status:', error);
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:red;">Error loading data. Please refresh.</td></tr>';
     }
-    setupOverrideHandlers();
+    setupOverrideClickHandler();
 }
-
 
 // ========== EVENT DELEGATION FOR OVERRIDE BADGES ==========
 // Add this after loadStationStatus() function
