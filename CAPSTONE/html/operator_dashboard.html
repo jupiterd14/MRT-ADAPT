@@ -2283,39 +2283,40 @@
             </div>
         </div>
 
-            <!-- Remove Override Confirmation Modal -->
-        <div id="removeOverrideModal" class="modal-overlay">
-            <div class="modal-container" style="max-width: 400px;">
-                <div class="modal-header">
-                    <div style="width: 48px; height: 48px; background: #FEE2E2; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-exclamation-triangle" style="color: #EF4444; font-size: 24px;"></i>
-                    </div>
-                    <h2 style="margin-left: 12px;">Remove Override</h2>
-                </div>
-                
-                <div class="modal-subtitle" id="removeOverrideMessage" style="margin-bottom: 20px;">
-                    Remove manual override for <strong id="removeOverrideStationName">North Ave</strong>? This will revert to automatic congestion data.
-                </div>
-                
-                <div style="background: #FEF3C7; border-radius: 12px; padding: 12px; margin-bottom: 20px;">
-                    <div style="display: flex; gap: 10px; align-items: flex-start;">
-                        <i class="fas fa-info-circle" style="color: #D97706; margin-top: 2px;"></i>
-                        <div style="font-size: 12px; color: #92400E;">
-                            <strong>What happens next?</strong><br>
-                            The system will use forecasted predictions and historical data to determine congestion levels for this station.
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="modal-actions" style="justify-content: space-between; gap: 12px;">
-                    <button class="btn-cancel" onclick="closeRemoveOverrideModal()" style="flex: 1;">
-                        <i class="fas fa-times"></i> Cancel
-                    </button>
-                    <button class="btn-apply" id="confirmRemoveOverrideBtn" style="background: #EF4444; flex: 1;">
-                        <i class="fas fa-trash"></i> Remove Override
-                    </button>
+      <!-- Remove Override Confirmation Modal -->
+<div id="removeOverrideModal" class="modal-overlay">
+    <div class="modal-container" style="max-width: 400px;">
+        <div class="modal-header">
+            <div style="width: 48px; height: 48px; background: #FEE2E2; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-exclamation-triangle" style="color: #EF4444; font-size: 24px;"></i>
+            </div>
+            <h2 style="margin-left: 12px;">Remove Override</h2>
+        </div>
+        
+        <div class="modal-subtitle" id="removeOverrideMessage" style="margin-bottom: 20px;">
+            Remove manual override for <strong id="removeOverrideStationName">North Ave</strong>? This will revert to automatic congestion data.
+        </div>
+        
+        <div style="background: #FEF3C7; border-radius: 12px; padding: 12px; margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+                <i class="fas fa-info-circle" style="color: #D97706; margin-top: 2px;"></i>
+                <div style="font-size: 12px; color: #92400E;">
+                    <strong>What happens next?</strong><br>
+                    The system will use forecasted predictions and historical data to determine congestion levels for this station.
                 </div>
             </div>
+        </div>
+        
+        <div class="modal-actions" style="justify-content: space-between; gap: 12px;">
+            <button class="btn-cancel" onclick="closeRemoveOverrideModal()" style="flex: 1;">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+            <button class="btn-apply" id="confirmRemoveOverrideBtn" onclick="confirmRemoveOverride()" style="background: #EF4444; flex: 1;">
+                <i class="fas fa-trash"></i> Remove Override
+            </button>
+        </div>
+    </div>
+</div>
         </div>
 
 
@@ -3691,7 +3692,6 @@ async function confirmArchiveBroadcast() {
         });
     }
 
-    
     async function loadCongestionData() {
     console.log("Loading congestion data for operator dashboard...");
     showLoadingOverlay();
@@ -3713,16 +3713,23 @@ async function confirmArchiveBroadcast() {
         const southRows = [];
         const northRows = [];
 
-        
-        
-        // ========== NORTHBOUND: Keep original order (North Ave → Taft) ==========
+        // ========== NORTHBOUND ==========
         for (const station of stations) {
             const name = station.name;
             const northCong = station.northbound.congestion || 0;
-            const isNorthOverridden = station.northbound.overridden || false;
             
+            // ========== FIX: Properly check overridden ==========
+            const isNorthOverridden = station.northbound.overridden === true || 
+                                      station.northbound.overridden === 'true' || 
+                                      station.northbound.overridden === 'True' ||
+                                      station.northbound.overridden === 1;
 
-              const nowTime = new Date();
+            // Log for debugging
+            if (name === 'Taft') {
+                console.log(`🔍 Taft northbound - overridden value:`, station.northbound.overridden, '→ isNorthOverridden:', isNorthOverridden);
+            }
+
+            const nowTime = new Date();
             const hour = nowTime.getHours();
             const minute = nowTime.getMinutes();
             const currentTime = hour + minute/60;
@@ -3730,42 +3737,31 @@ async function confirmArchiveBroadcast() {
             const OPERATING_END = 22.5;
             const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
 
-
             let nClass = 'light', nText = 'LIGHT';
-
-        
             
-            
-             if (isClosed) {
-                 nClass = 'closed';
-                  nText = 'CLOSED';
-            }
-            else {
-            if (northCong > 80) { nClass = 'severe'; nText = 'SEVERE'; severeCount++; }
-          
-            else if (northCong > 60) { nClass = 'congested'; nText = 'CONGESTED'; congestedCount++; }
-            else if (northCong > 30) { nClass = 'moderate'; nText = 'MODERATE'; moderateCount++; }
-            else { lightCount++; }
-            
+            if (isClosed) {
+                nClass = 'closed';
+                nText = 'CLOSED';
+            } else {
+                if (northCong > 80) { nClass = 'severe'; nText = 'SEVERE'; severeCount++; }
+                else if (northCong > 60) { nClass = 'congested'; nText = 'CONGESTED'; congestedCount++; }
+                else if (northCong > 30) { nClass = 'moderate'; nText = 'MODERATE'; moderateCount++; }
+                else { lightCount++; }
             }
            
             const canManageNorth = managedStations.includes(name);
             
             let btnHtmlNorth;
-            if (canManageNorth) {
-                if (isNorthOverridden) {
-                    btnHtmlNorth = `<button class="btn-override" onclick="removeOverride('${name}', 'northbound')" style="background:#EF4444; color:white;">
-                        <i class="fas fa-trash"></i> Remove Override
-                    </button>`;
-                } else if(isClosed) {
+            if (isNorthOverridden) {
+                btnHtmlNorth = `<button class="btn-override" onclick="removeOverride('${name}', 'northbound')" style="background:#EF4444; color:white; padding:6px 12px; border:none; border-radius:6px; cursor:pointer;">
+                    <i class="fas fa-trash"></i> Remove Override
+                </button>`;
+            } else if(isClosed) {
                 btnHtmlNorth = `<button class="btn-override" disabled style="opacity:0.5;"><i class="fas fa-lock"></i> CLOSED</button>`;
-                }
-                
-                else {
-                    btnHtmlNorth = `<button class="btn-override" onclick="openOverrideModal('${name}', 'northbound')">
-                        <i class="fas fa-edit"></i> Override
-                    </button>`;
-                }
+            } else if (canManageNorth) {
+                btnHtmlNorth = `<button class="btn-override" onclick="openOverrideModal('${name}', 'northbound')">
+                    <i class="fas fa-edit"></i> Override
+                </button>`;
             } else {
                 btnHtmlNorth = `<button class="btn-override" disabled style="opacity:0.5;"><i class="fas fa-lock"></i> No Access</button>`;
             }
@@ -3774,8 +3770,6 @@ async function confirmArchiveBroadcast() {
                 `<span style="color:#EF4444; font-size:10px; background:#FEE2E2; padding:2px 8px; border-radius:12px; margin-left:6px;">
                     <i class="fas fa-pen"></i> Overridden
                 </span>` : '';
-
-                
 
             northRows.push(`
                 <tr ${isNorthOverridden ? 'style="background:#FEF2F2;"' : ''}>
@@ -3786,15 +3780,25 @@ async function confirmArchiveBroadcast() {
             `);
         }
 
-        // ========== SOUTHBOUND: REVERSED order (Taft → North Ave) ==========
+        // ========== SOUTHBOUND ==========
         for (const station of [...stations].reverse()) {
             const name = station.name;
             const southCong = station.southbound.congestion || 0;
-            const isSouthOverridden = station.southbound.overridden || false;
+            
+            // ========== FIX: Properly check overridden ==========
+            const isSouthOverridden = station.southbound.overridden === true || 
+                                      station.southbound.overridden === 'true' || 
+                                      station.southbound.overridden === 'True' ||
+                                      station.southbound.overridden === 1;
+
+            // Log for debugging
+            if (name === 'Taft') {
+                console.log(`🔍 Taft southbound - overridden value:`, station.southbound.overridden, '→ isSouthOverridden:', isSouthOverridden);
+            }
             
             let sClass = 'light', sText = 'LIGHT';
 
-              const nowTime = new Date();
+            const nowTime = new Date();
             const hour = nowTime.getHours();
             const minute = nowTime.getMinutes();
             const currentTime = hour + minute/60;
@@ -3802,37 +3806,29 @@ async function confirmArchiveBroadcast() {
             const OPERATING_END = 22.5;
             const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
 
-
             if (isClosed) {
-                 sClass = 'closed';
-                  sText = 'CLOSED';
-            }
-            else {
-                    if (southCong > 80) { sClass = 'severe'; sText = 'SEVERE'; severeCount++; }
-                    else if (southCong > 60) { sClass = 'congested'; sText = 'CONGESTED'; congestedCount++; }
-                    else if (southCong > 30) { sClass = 'moderate'; sText = 'MODERATE'; moderateCount++; }
-                    else { lightCount++; }
+                sClass = 'closed';
+                sText = 'CLOSED';
+            } else {
+                if (southCong > 80) { sClass = 'severe'; sText = 'SEVERE'; severeCount++; }
+                else if (southCong > 60) { sClass = 'congested'; sText = 'CONGESTED'; congestedCount++; }
+                else if (southCong > 30) { sClass = 'moderate'; sText = 'MODERATE'; moderateCount++; }
+                else { lightCount++; }
             }
         
-            
             const canManageSouth = managedStations.includes(name);
             
             let btnHtmlSouth;
-            if (canManageSouth) {
-                if (isSouthOverridden) {
-                    btnHtmlSouth = `<button class="btn-override" onclick="removeOverride('${name}', 'southbound')" style="background:#EF4444; color:white;">
-                        <i class="fas fa-trash"></i> Remove Override
-                    </button>`;
-                } 
-                else if(isClosed) {
+            if (isSouthOverridden) {
+                btnHtmlSouth = `<button class="btn-override" onclick="removeOverride('${name}', 'southbound')" style="background:#EF4444; color:white; padding:6px 12px; border:none; border-radius:6px; cursor:pointer;">
+                    <i class="fas fa-trash"></i> Remove Override
+                </button>`;
+            } else if(isClosed) {
                 btnHtmlSouth = `<button class="btn-override" disabled style="opacity:0.5;">CLOSED</button>`;
-                }
-                
-                else {
-                    btnHtmlSouth = `<button class="btn-override" onclick="openOverrideModal('${name}', 'southbound')">
-                        <i class="fas fa-edit"></i> Override
-                    </button>`;
-                }
+            } else if (canManageSouth) {
+                btnHtmlSouth = `<button class="btn-override" onclick="openOverrideModal('${name}', 'southbound')">
+                    <i class="fas fa-edit"></i> Override
+                </button>`;
             } else {
                 btnHtmlSouth = `<button class="btn-override" disabled style="opacity:0.5;"><i class="fas fa-lock"></i> No Access</button>`;
             }
@@ -5228,22 +5224,25 @@ document.getElementById('confirmOverrideBtn')?.addEventListener('click', async f
         const result = await response.json();
         
         if (result.success) {
-            showToast('', `${data.station} (${data.direction}) set to ${data.level}`);
+            showToast('✅', `${data.station} (${data.direction}) set to ${data.level}`);
             closeOverrideConfirmModal();
-            await loadCongestionData();
-            if (currentForecastStation === data.station) {
-                await updateForecastUI();
-            }
+            window.pendingOverrideData = null;
+            
+            // ========== FORCE FULL PAGE RELOAD ==========
+            // This ensures the UI shows the override immediately
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 500);
+            
         } else { 
-            showToast('⚠️', result.error || 'Failed to set override'); 
+            showToast('❌', result.error || 'Failed to set override'); 
         }
     } catch (error) { 
         console.error('Error applying override:', error);
-        showToast('⚠️', 'Failed to apply override'); 
+        showToast('❌', 'Failed to apply override'); 
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-check"></i> Yes, Apply Override';
-        window.pendingOverrideData = null;
     }
 });
 
@@ -5268,43 +5267,45 @@ document.getElementById('confirmOverrideBtn')?.addEventListener('click', async f
         modal.style.display = 'flex';
     }
 
-    async function confirmRemoveOverride() {
-        const station = window.pendingRemoveOverrideStation;
-        const direction = window.pendingRemoveOverrideDirection;
-        if (!station || !direction) return;
+async function confirmRemoveOverride() {
+    const station = window.pendingRemoveOverrideStation;
+    const direction = window.pendingRemoveOverrideDirection;
+    if (!station || !direction) return;
+    
+    showToast('🔄', `Removing override...`);
+    
+    try {
+        const response = await fetch('/api/operator/clear-override', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                station: station,
+                direction: direction
+            })
+        });
+        const data = await response.json();
         
-        showToast('🔄', `Removing override...`);
-        
-        try {
-            const response = await fetch('/api/operator/clear-override', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    station: station,
-                    direction: direction
-                })
-            });
-            const data = await response.json();
+        if (data.success) {
+            showToast('✅', `Override removed for ${station} (${direction})`);
+            closeRemoveOverrideModal();
             
-            if (data.success) {
-                showToast('', `Override removed for ${station} (${direction})`);
-                await loadCongestionData();
-                if (currentForecastStation === station) {
-                    await updateForecastUI();
-                }
-                closeRemoveOverrideModal();
-            } else {
-                showToast('❌', data.error || 'Failed to remove override');
-            }
-        } catch (error) {
-            console.error('Error removing override:', error);
-            showToast('❌', 'Failed to remove override');
-        } finally {
-            window.pendingRemoveOverrideStation = null;
-            window.pendingRemoveOverrideDirection = null;
+            // ========== FORCE FULL PAGE RELOAD ==========
+            // This ensures everything is fresh
+            setTimeout(() => {
+                window.location.reload(true); // true forces reload from server
+            }, 500);
+            
+        } else {
+            showToast('❌', data.error || 'Failed to remove override');
         }
+    } catch (error) {
+        console.error('Error removing override:', error);
+        showToast('❌', 'Failed to remove override');
+    } finally {
+        window.pendingRemoveOverrideStation = null;
+        window.pendingRemoveOverrideDirection = null;
     }
-
+}
     function closeRemoveOverrideModal() {
         const modal = document.getElementById('removeOverrideModal');
         if (modal) modal.style.display = 'none';

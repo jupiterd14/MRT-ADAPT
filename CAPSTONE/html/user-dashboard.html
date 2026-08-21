@@ -3802,6 +3802,10 @@ async function fetchAlertCount() {
         let allAlerts = [];
         const nowDate = new Date();
         const hour = nowDate.getHours();
+        const minutes = nowDate.getMinutes();
+        const timeDecimal = hour + minutes / 60;
+        const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
         
         // ========== 1. Rush Hour Alert ==========
         if ((hour >= 7 && hour <= 9)) {
@@ -3839,13 +3843,18 @@ async function fetchAlertCount() {
             allAlerts.push({ id: 'service-maintenance-night-permanent' });
         }
         
-        // ========== 5. Congestion alerts from live map (GROUPED) ==========
+        // ========== 5. Check if MRT is closed ==========
+        const isClosed = timeDecimal < OPERATING_START || timeDecimal >= OPERATING_END;
+        if (isClosed) {
+            allAlerts.push({ id: 'service-closed-permanent' });
+        }
+        
+        // ========== 6. Congestion alerts from live map ==========
         try {
             const response = await fetch('/api/live-map/directions/v2');
             const data = await response.json();
             
             if (data && data.northbound && data.southbound) {
-                // Group stations by severity
                 const grouped = {
                     northbound: { severe: [], congested: [], moderate: [], light: [] },
                     southbound: { severe: [], congested: [], moderate: [], light: [] }
@@ -3869,7 +3878,7 @@ async function fetchAlertCount() {
                     else if (congestion > 0) grouped.southbound.light.push(station);
                 }
                 
-                // ONLY COUNT GROUPS THAT HAVE STATIONS
+                // Push alerts for each group that has stations
                 if (grouped.northbound.severe.length > 0) allAlerts.push({ id: 'north-severe-permanent' });
                 if (grouped.northbound.congested.length > 0) allAlerts.push({ id: 'north-congested-permanent' });
                 if (grouped.northbound.moderate.length > 0) allAlerts.push({ id: 'north-moderate-permanent' });
@@ -3884,7 +3893,7 @@ async function fetchAlertCount() {
             console.log('Could not fetch congestion alerts:', e);
         }
         
-        // ========== 6. Broadcasts ==========
+        // ========== 7. Broadcasts ==========
         try {
             const broadcastResponse = await fetch('/api/broadcasts/public');
             const broadcastData = await broadcastResponse.json();
@@ -3897,28 +3906,21 @@ async function fetchAlertCount() {
             console.log('Could not fetch broadcasts:', e);
         }
         
-        // ========== ONLY COUNT CONGESTION ALERTS ==========
-        const congestionAlertIds = [
-            'north-severe-permanent', 'north-congested-permanent', 
-            'north-moderate-permanent', 'north-light-permanent',
-            'south-severe-permanent', 'south-congested-permanent',
-            'south-moderate-permanent', 'south-light-permanent'
-        ];
-        
-        let congestionCount = 0;
+        // ========== COUNT ALL UNREAD ALERTS (not just congestion) ==========
+        let unreadCount = 0;
         for (const alert of allAlerts) {
-            if (congestionAlertIds.includes(alert.id)) {
-                congestionCount++;
+            if (!readAlerts.has(alert.id)) {
+                unreadCount++;
             }
         }
-
-        // Cache the result - ONLY congestion alerts
-        cachedAlertCount = congestionCount;
+        
+        // Cache the result
+        cachedAlertCount = unreadCount;
         cachedAlertCountTime = now;
-
-        console.log('📊 Travel Plan - Congestion alerts only:', congestionCount);
-        console.log('📊 Total alerts (all types):', allAlerts.length);
-        return congestionCount;
+        
+        console.log('📊 Dashboard - Total unread alerts:', unreadCount);
+        console.log('📊 Dashboard - All alerts count:', allAlerts.length);
+        return unreadCount;
         
     } catch (error) {
         console.error('Error calculating alert count:', error);
@@ -4440,6 +4442,15 @@ window.requestLocationPermission = requestLocationPermission;
 window.useNearestStation = useNearestStation;
 window.dismissLocationBanner = dismissLocationBanner;
 window.dismissAlert = dismissAlert;
+// Override any old functions - force the new one to be used
+window.getCongestionAlerts = fetchAlertCount;
+window.getCongestionAlertsOnly = fetchAlertCount;
+window.fetchAlertCount = fetchAlertCount;
+
+// Force the badge to update with the new count
+setTimeout(() => {
+    checkAlertCount();
+}, 1000);
 </script>
 </body>
 </html> 

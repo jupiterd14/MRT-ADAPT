@@ -65,31 +65,56 @@ def load_overrides():
             print(f"Error loading overrides: {e}")
             return {}
     return {}
-
 def get_active_overrides():
-    """Get active overrides - check app config first (instant), fallback to file."""
-    # 1. Check in-memory config first (immediate updates from operator)
+    """Get active overrides - filters out expired ones"""
     from flask import current_app
-    overrides = current_app.config.get('overrides', {})
-    if overrides:
-        print(f"📄 api_other.py LOADED from config: {overrides}")
-        return overrides
+    import time
     
-    # 2. Fallback to file (on startup or if config is empty)
-    overrides_file = 'overrides.json'
-    if os.path.exists(overrides_file):
-        try:
-            with open(overrides_file, 'r') as f:
-                overrides = json.load(f)
-            print(f"📄 api_other.py LOADED from file: {overrides}")
-            # Also cache to config for future requests
-            if overrides:
-                current_app.config['overrides'] = overrides
-            return overrides
-        except Exception as e:
-            print(f"Error loading overrides: {e}")
-            return {}
-    return {}
+    # 1. Check in-memory config first
+    overrides = current_app.config.get('overrides', {})
+    
+    # 2. If config is empty, load from file
+    if not overrides:
+        overrides_file = 'overrides.json'
+        if os.path.exists(overrides_file):
+            try:
+                with open(overrides_file, 'r') as f:
+                    overrides = json.load(f)
+                if overrides:
+                    current_app.config['overrides'] = overrides
+            except Exception as e:
+                print(f"Error loading overrides: {e}")
+                return {}
+    
+    # ========== FILTER OUT EXPIRED OVERRIDES ==========
+    now = time.time()
+    active_overrides = {}
+    expired_keys = []
+    
+    for key, override in overrides.items():
+        expiry = override.get('expiry')
+        if expiry is None or expiry > now:
+            active_overrides[key] = override
+        else:
+            expired_keys.append(key)
+            print(f"⏰ api_other.py: Override expired: {key} (expired at {datetime.fromtimestamp(expiry)})")
+    
+    # If any expired, update the cache
+    if expired_keys:
+        # Update app config with only active overrides
+        current_app.config['overrides'] = active_overrides
+        
+        # Also save back to file (optional)
+        if active_overrides:
+            try:
+                with open(OVERRIDES_FILE, 'w') as f:
+                    json.dump(active_overrides, f, indent=2)
+                print(f"🗑️ Removed {len(expired_keys)} expired overrides from file")
+            except Exception as e:
+                print(f"Error saving cleaned overrides: {e}")
+    
+    print(f"📄 api_other.py ACTIVE overrides: {list(active_overrides.keys())}")
+    return active_overrides
 
 def get_station_predictions_from_config(station_name):
     """Get prediction from app config"""
@@ -237,8 +262,10 @@ def travel_prediction():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+from extensions import cache
 
 @api_other_bp.route('/live-map/directions/v2')
+@cache.cached(timeout=60, key_prefix='live_map_v2')  # Cache for 60 seconds
 def live_map_directions_v2():
     """Consistent with prediction API – uses percentile‑based congestion."""
     try:
@@ -277,40 +304,33 @@ def live_map_directions_v2():
 
             # ----- Northbound -----
             if is_north_overridden:
-                # Get the override data
                 override = active_overrides[north_override_key]
                 north_pred = override.get('congestion', 50)
-                # Calculate ridership based on congestion percentage
                 p95_north = P95_CACHE.get(f"{station}_Northbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))
                 north_passengers = int((north_pred / 100) * p95_north)
-                print(f"🔧 OVERRIDE ACTIVE: {station} Northbound = {north_pred}%")
             else:
-                # Use the same prediction function as the API
                 north_pred = get_directional_prediction(station, 'Northbound', now)
-                # Get p95 for passenger count
                 p95_north = P95_CACHE.get(f"{station}_Northbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))
                 north_passengers = int((north_pred / 100) * p95_north)
 
             # ----- Southbound -----
             if is_south_overridden:
-                # Get the override data
                 override = active_overrides[south_override_key]
                 south_pred = override.get('congestion', 50)
                 p95_south = P95_CACHE.get(f"{station}_Southbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))
                 south_passengers = int((south_pred / 100) * p95_south)
-                print(f"🔧 OVERRIDE ACTIVE: {station} Southbound = {south_pred}%")
             else:
                 south_pred = get_directional_prediction(station, 'Southbound', now)
                 p95_south = P95_CACHE.get(f"{station}_Southbound", MRT3_PLATFORM_CAPACITY.get(station, 1000))
                 south_passengers = int((south_pred / 100) * p95_south)
 
-            # ----- Status & wait time (same as before) -----
+            # ----- Status & wait time -----
             def get_status(cong):
                 if cong > 80:
                     return "SEVERE", "15-20 min"
-                elif cong > 60:
+                elif cong > 50:
                     return "CONGESTED", "10-15 min"
-                elif cong > 30:
+                elif cong > 25:
                     return "MODERATE", "5-10 min"
                 else:
                     return "LIGHT", "2-5 min"
@@ -344,7 +364,8 @@ def live_map_directions_v2():
             "model_version": "percentile_based (p95)",
             "active_overrides": len(active_overrides),
             "requested_time": f"{date_param} {time_param}" if date_param and time_param else None,
-            "is_operating": not is_closed
+            "is_operating": not is_closed,
+            "cached": True  # Indicate this is cached
         })
 
     except Exception as e:
@@ -599,18 +620,18 @@ def live_map_directions():
         def get_wait_time(congestion):
             if congestion > 80:
                 return "15-20 min"
-            elif congestion > 60:
+            elif congestion > 50:
                 return "10-15 min"
-            elif congestion > 30:
+            elif congestion > 25:
                 return "5-10 min"
             return "2-5 min"
         
         def get_status_text(congestion):
             if congestion > 80:
                 return "SEVERELY CONGESTED"
-            elif congestion > 60:
+            elif congestion > 50:
                 return "CONGESTED"
-            elif congestion > 30:
+            elif congestion > 25:
                 return "MODERATE"
             return "LIGHT"
         
@@ -928,10 +949,10 @@ def alerts_count():
                 if avg_cong > 80:  # SEVERE
                     severe_count += 1
                     severity = 'severe'
-                elif avg_cong > 60:  # CONGESTED
+                elif avg_cong > 50:  # CONGESTED
                     congested_count += 1
                     severity = 'congested'
-                elif avg_cong > 30:  # MODERATE
+                elif avg_cong > 25:  # MODERATE
                     moderate_count += 1
                     severity = 'moderate'
                 elif avg_cong > 0:  # LIGHT (any congestion > 0)
@@ -971,10 +992,10 @@ def alerts_count():
                             if avg_cong > 80:
                                 severe_count += 1
                                 severity = 'severe'
-                            elif avg_cong > 60:
+                            elif avg_cong > 50:
                                 congested_count += 1
                                 severity = 'congested'
-                            elif avg_cong > 30:
+                            elif avg_cong > 25:
                                 moderate_count += 1
                                 severity = 'moderate'
                             elif avg_cong > 0:
@@ -1149,9 +1170,9 @@ def get_recommendation(station_name):
                 recommendation = "Consider postponing your trip until after rush hour"
             else:
                 recommendation = "Severe congestion. Consider alternative routes or wait 30 minutes"
-        elif congestion > 60:
+        elif congestion > 50:
             recommendation = "Heavy traffic. Allow extra 10-15 minutes for your journey"
-        elif congestion > 30:
+        elif congestion > 25:
             recommendation = "Moderate traffic. Normal wait times expected"
         else:
             recommendation = "Light traffic. Good time to travel!"
@@ -1196,11 +1217,11 @@ def station_info(station_name):
             status = "SEVERELY CONGESTED"
             color = "critical"
             description = "Extremely crowded. Expect significant delays."
-        elif congestion > 60:
+        elif congestion > 50:
             status = "CONGESTED"
             color = "congested"
             description = "Very busy. Allow extra time."
-        elif congestion > 30:
+        elif congestion > 25:
             status = "MODERATE"
             color = "moderate"
             description = "Moderate crowds. Normal wait times."

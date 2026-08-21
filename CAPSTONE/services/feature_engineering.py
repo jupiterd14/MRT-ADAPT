@@ -35,6 +35,7 @@ _PER_DIRECTION_MAX = None
 _STATION_DATA_CACHE = {}  # Cache for station-specific dataframes
 _FEATURE_SCALER_CACHE = {}  # Cache for scalers
 _BASELINE_FEATURES_CACHE = {}  # Cache for baseline features
+_TYPICAL_PATTERN_CACHE = {}  # Cache for typical day patterns (NEW)
 
 # Station numbers (matching training)
 STATION_NUMBERS = {
@@ -135,7 +136,7 @@ def get_hourly_window_from_csv(station_name, direction, target_datetime, seq_len
                 
                 window_data = filtered[(filtered.index >= start_time) & (filtered.index < end_time)]
                 if len(window_data) > 0:
-                    hourly = window_data.resample('H').sum()
+                    hourly = filtered.resample('h').sum()
                     hourly_frames.append(hourly)
                 
                 del chunk, filtered, window_data
@@ -154,16 +155,10 @@ def get_hourly_window_from_csv(station_name, direction, target_datetime, seq_len
     
     # ========== ADD FEATURE ENGINEERING ==========
     capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-    
-    # Calculate congestion
-    feature_scaler = get_feature_scaler(station_name, direction)
-    if feature_scaler is not None:
-        training_max = feature_scaler.data_max_[-1] if hasattr(feature_scaler, 'data_max_') else 50
-    else:
-        training_max = min(capacity * 0.3, 50)
-    
+
+    # FIX: Use SAME congestion calculation as training
     percentage = (combined['TotalPassenger'] / capacity * 100).clip(0, 100)
-    combined['congestion'] = (percentage / 100) * training_max
+    combined['congestion'] = percentage  # ← Directly use percentage!
     combined['congestion_percentage'] = percentage
     combined['raw_passengers'] = combined['TotalPassenger']
     
@@ -172,6 +167,10 @@ def get_hourly_window_from_csv(station_name, direction, target_datetime, seq_len
     combined = add_smart_operating_flags(combined)
     combined = smart_data_cleaner(combined)
     
+    
+    combined['hour'] = combined.index.hour
+    combined['weekday'] = combined.index.weekday
+    combined['month'] = combined.index.month
     # Add date-based features
     combined['is_weekend'] = (combined.index.weekday >= 5).astype(np.int8)
     combined['is_christmas_season'] = np.array([is_christmas_season(d) for d in combined.index], dtype=np.int8)
@@ -255,6 +254,7 @@ def get_feature_scaler(station_name, direction):
     else:
         print(f"   ⚠️ No feature scaler found at: {scaler_path}")
         return None
+
 def get_station_dataframe(station_name, direction):
     """
     Memory-optimized - streams CSV files and only keeps the needed data
@@ -263,7 +263,6 @@ def get_station_dataframe(station_name, direction):
     
     cache_key = f"{station_name}_{direction}"
     
-    # Return from cache if available
     if cache_key in _STATION_DATA_CACHE:
         print(f"📦 Using cached data for {cache_key}")
         return _STATION_DATA_CACHE[cache_key]
@@ -280,8 +279,16 @@ def get_station_dataframe(station_name, direction):
         print(f"❌ Unknown station: {station_name}")
         return None
     
+    # ========== DETERMINE CORRECT FILTERING BASED ON STATION TYPE ==========
+    # North Ave (Station 1) = Northern Terminal
+    # Taft (Station 13) = Southern Terminal
+    # All others = Middle Stations
+    
+    is_north_terminal = (station_name == "North Ave")
+    is_south_terminal = (station_name == "Taft")
+    
     all_hourly_data = []
-    CHUNK_SIZE = 20000  # Balanced chunk size
+    CHUNK_SIZE = 50000
     
     for csv_file in csv_files:
         filepath = os.path.join(data_dir, csv_file)
@@ -291,32 +298,55 @@ def get_station_dataframe(station_name, direction):
             
         print(f"   📄 Processing: {csv_file}")
         try:
-            # Read only needed columns
             needed_columns = ['StationEntry', 'StationExit', 'Date', 'Time', 'TotalPassenger']
             
-            # Process in chunks
             for chunk in pd.read_csv(filepath, 
                                     chunksize=CHUNK_SIZE,
                                     usecols=needed_columns,
                                     dtype={'StationEntry': 'int16', 'StationExit': 'int16', 'TotalPassenger': 'float32'}):
                 
-                # Filter for this station
+                # ========== CORRECT DIRECTION FILTERING ==========
                 if direction == 'Northbound':
-                    filtered = chunk[chunk['StationExit'] == station_num]
+                    # Northbound = people going NORTH
+                    if is_north_terminal:
+                        # North Ave: Northbound = people EXITING (arriving from south)
+                        filtered = chunk[chunk['StationExit'] == station_num]
+                    elif is_south_terminal:
+                        # Taft: Northbound = people ENTERING (going north)
+                        filtered = chunk[chunk['StationEntry'] == station_num]
+                    else:
+                        # Middle stations: Northbound = people EXITING (arriving from south)
+                        filtered = chunk[chunk['StationExit'] == station_num]
                 else:
-                    filtered = chunk[chunk['StationEntry'] == station_num]
+                    # Southbound = people going SOUTH
+                    if is_north_terminal:
+                        # North Ave: Southbound = people ENTERING (going south)
+                        filtered = chunk[chunk['StationEntry'] == station_num]
+                    elif is_south_terminal:
+                        # Taft: Southbound = people EXITING (arriving from north)
+                        filtered = chunk[chunk['StationExit'] == station_num]
+                    else:
+                        # Middle stations: Southbound = people ENTERING (going south)
+                        filtered = chunk[chunk['StationEntry'] == station_num]
                 
                 if len(filtered) > 0:
-                    # Convert to datetime and resample immediately
                     filtered['datetime'] = pd.to_datetime(filtered['Date'] + ' ' + filtered['Time'])
                     filtered = filtered.set_index('datetime')
                     filtered = filtered[['TotalPassenger']]
                     
-                    # Resample to hourly (aggregates and reduces size)
-                    hourly = filtered.resample('H').sum()
+                    try:
+                        hourly = filtered.resample('h').sum()
+                    except Exception as e:
+                        try:
+                            hourly = filtered.resample('H').sum()
+                        except Exception as e2:
+                            try:
+                                hourly = filtered.resample('1h').sum()
+                            except Exception as e3:
+                                hourly = filtered.groupby(filtered.index.floor('h')).sum()
+                    
                     all_hourly_data.append(hourly)
                 
-                # Free memory
                 del chunk, filtered
                 gc.collect()
                 
@@ -328,38 +358,37 @@ def get_station_dataframe(station_name, direction):
         print(f"⚠️ No real data found for {cache_key}")
         return None
     
-    # Combine all hourly data
     print(f"   🔄 Combining {len(all_hourly_data)} chunks...")
     combined = pd.concat(all_hourly_data)
     del all_hourly_data
     gc.collect()
     
-    # Sort by datetime
     combined = combined.sort_index()
-    
-    # Remove duplicates (if any)
     combined = combined[~combined.index.duplicated(keep='first')]
     
     print(f"   ✅ Loaded {len(combined)} hours of real data")
+    print(f"   📊 Passenger stats - Min: {combined['TotalPassenger'].min():.0f}, Max: {combined['TotalPassenger'].max():.0f}")
     
-    # ========== CALCULATE CONGESTION ==========
-    capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-    
-    feature_scaler = get_feature_scaler(station_name, direction)
-    if feature_scaler is not None:
-        training_max = feature_scaler.data_max_[-1] if hasattr(feature_scaler, 'data_max_') else 50
-    else:
-        training_max = min(capacity * 0.3, 50)
-    
-    percentage = (combined['TotalPassenger'] / capacity * 100).clip(0, 100)
-    combined['congestion'] = (percentage / 100) * training_max
-    combined['congestion_percentage'] = percentage
-    combined['raw_passengers'] = combined['TotalPassenger']
-    
-    # Add time features
+    # ========== ADD TIME FEATURES ==========
     combined = add_cyclical_time_features(combined)
     combined = add_smart_operating_flags(combined)
     combined = smart_data_cleaner(combined)
+    
+    combined['hour'] = combined.index.hour
+    combined['weekday'] = combined.index.weekday
+    combined['month'] = combined.index.month
+    
+    # ========== CALCULATE CONGESTION ==========
+    # ========== CALCULATE CONGESTION ==========
+    capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+
+    # FIX: Use SAME congestion calculation as training
+    # Training uses: congestion = (TotalPassenger / capacity * 100).clip(0, 100)
+    # This gives values 0-100 (percentage of capacity)
+    percentage = (combined['TotalPassenger'] / capacity * 100).clip(0, 100)
+    combined['congestion'] = percentage  # ← Directly use percentage, NO extra scaling!
+    combined['congestion_percentage'] = percentage
+    combined['raw_passengers'] = combined['TotalPassenger']
     
     # Add date-based features
     combined['is_weekend'] = (combined.index.weekday >= 5).astype(np.int8)
@@ -370,8 +399,8 @@ def get_station_dataframe(station_name, direction):
     combined['is_holiday'] = 0
     combined['is_special_event'] = 0
     
-    # ⭐ Cache only the hourly data (not the full raw data)
-    if len(_STATION_DATA_CACHE) >= 2:
+    # Cache
+    if len(_STATION_DATA_CACHE) >= 5:
         oldest_key = next(iter(_STATION_DATA_CACHE))
         print(f"🗑️ Removing oldest from cache: {oldest_key}")
         del _STATION_DATA_CACHE[oldest_key]
@@ -381,8 +410,9 @@ def get_station_dataframe(station_name, direction):
     print(f"✅ Cached {len(combined)} hours for {cache_key}")
     
     return combined
+
 def get_baseline_features(target_datetime, seq_length=24):
-    """Cache baseline features for repeated lookups"""
+    """Cache baseline features for repeated lookups with better defaults"""
     cache_key = f"{target_datetime.strftime('%Y%m%d%H')}_{seq_length}"
     
     if cache_key not in _BASELINE_FEATURES_CACHE:
@@ -401,19 +431,25 @@ def get_baseline_features(target_datetime, seq_length=24):
             default_features[i, 7] = np.sin(2 * np.pi * (loop_time.month - 1) / 12)
             default_features[i, 8] = np.cos(2 * np.pi * (loop_time.month - 1) / 12)
             
-            # ========== USE RAW PASSENGER COUNTS FOR BASELINE ==========
+            # ========== MORE REALISTIC BASELINE CONGESTION ==========
             if 7 <= h_val <= 9:
-                default_features[i, -1] = 3500.0  # Morning rush - raw passengers
+                # Morning rush
+                default_features[i, -1] = 60 + (h_val - 7) * 10  # 60% at 7am, 80% at 9am
             elif 17 <= h_val <= 19:
-                default_features[i, -1] = 4000.0  # Evening rush - raw passengers
+                # Evening rush
+                default_features[i, -1] = 65 + (h_val - 17) * 10  # 65% at 5pm, 85% at 7pm
             elif 10 <= h_val <= 16:
-                default_features[i, -1] = 2000.0  # Midday - raw passengers
+                # Midday
+                default_features[i, -1] = 40 + (h_val - 10) * 3  # 40-58%
             elif 5 <= h_val <= 6:
-                default_features[i, -1] = 800.0   # Early morning - raw passengers
-            elif 20 <= h_val <= 21:
-                default_features[i, -1] = 1500.0  # Late evening - raw passengers
+                # Early morning - increased from 20%
+                default_features[i, -1] = 25 + (h_val - 5) * 10  # 25% at 5am, 35% at 6am
+            elif 20 <= h_val <= 22:
+                # Late evening
+                default_features[i, -1] = 35 - (h_val - 20) * 5  # 35% at 8pm, 25% at 10pm
             else:
-                default_features[i, -1] = 100.0   # Very early/late - raw passengers
+                # Very early/late
+                default_features[i, -1] = 10
         
         _BASELINE_FEATURES_CACHE[cache_key] = default_features
     
@@ -462,56 +498,193 @@ def get_station_dataframe_cached(station_name, direction):
             _STATION_DATA_CACHE[cache_key] = df
     
     return df
-
 def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
-    """Get feature sequence - uses windowed CSV loading for memory efficiency"""
-    station_name = unquote(station_name)
-    direction = unquote(direction)
+    """Get feature sequence - uses actual recent data when available, else typical pattern"""
     
-    # Try to load only the needed window from CSV
-    window_df = get_hourly_window_from_csv(station_name, direction, target_datetime, seq_length)
+    df = get_station_dataframe_cached(station_name, direction)
     
-    if window_df is None or len(window_df) == 0:
-        print(f"⚠️ No real data in window for {station_name} {direction}, using baseline")
+    if df is None or len(df) == 0:
         return get_baseline_features(target_datetime, seq_length)
     
-    # Ensure we have all feature columns
-    missing_cols = [col for col in FEATURE_COLS if col not in window_df.columns]
-    if missing_cols:
-        print(f"   ⚠️ Missing columns: {missing_cols[:5]}... using baseline")
-        return get_baseline_features(target_datetime, seq_length)
+    latest_date = df.index.max()
     
-    # If we have less than seq_length hours, pad with baseline
-    if len(window_df) < seq_length:
-        print(f"   ⚠️ Only {len(window_df)} hours in window, padding with baseline")
-        missing_count = seq_length - len(window_df)
-        baseline = get_baseline_features(target_datetime, missing_count)
-        window_features = window_df[FEATURE_COLS].values.astype(np.float32)
-        features = np.vstack([baseline, window_features])
+    # ========== FIX: Use typical pattern for future dates, but with hour variation ==========
+    # Check if target is in the future (no data available)
+    if target_datetime > latest_date:
+        # Use typical pattern with hour variation
+        lookback_df = build_typical_day_pattern(df, target_datetime, seq_length, station_name, direction)
+        print(f"🔮 Using typical pattern for {station_name} {direction} at hour {target_datetime.hour}")
     else:
-        # Take the last seq_length hours
-        window_df = window_df.tail(seq_length)
-        features = window_df[FEATURE_COLS].values.astype(np.float32)
-    
-    # Ensure exactly seq_length rows
-    if len(features) != seq_length:
-        if len(features) > seq_length:
-            features = features[:seq_length]
+        # Try to get actual data for the lookback window
+        mask = df.index < target_datetime
+        if mask.sum() >= seq_length:
+            # Use actual historical data
+            lookback_df = df[mask].tail(seq_length)
+            print(f"📊 Using actual historical data for {station_name} {direction}")
+        elif mask.sum() > 0:
+            # Use what's available
+            lookback_df = df[mask].tail(seq_length)
+            print(f"📊 Using partial actual data for {station_name} {direction}")
         else:
-            while len(features) < seq_length:
-                features = np.vstack([features, features[-1:]])
+            # No data available - use typical pattern
+            lookback_df = build_typical_day_pattern(df, target_datetime, seq_length, station_name, direction)
+            print(f"🔮 Using typical pattern for {station_name} {direction}")
     
-    # Apply feature scaler
-    feature_scaler = get_feature_scaler(station_name, direction)
-    if feature_scaler is not None:
-        try:
-            features = feature_scaler.transform(features)
-        except Exception as e:
-            print(f"⚠️ Feature scaling failed: {e}")
+    # Make sure congestion column is in the right range (0-100)
+    if 'congestion' in lookback_df.columns:
+        lookback_df['congestion'] = lookback_df['congestion'].clip(0, 100)
     
+    features = lookback_df[FEATURE_COLS].values.astype(np.float32)
     return features
-
-# Add this global cache
+def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=None, direction=None):
+    """
+    Build a typical day pattern from historical averages with HOUR-SPECIFIC patterns.
+    """
+    date_key = target_datetime.strftime('%Y%m%d_%H')
+    cache_key = f"{station_name}_{direction}_{date_key}"
+    
+    if cache_key in _TYPICAL_PATTERN_CACHE:
+        print(f"📦 Using cached typical pattern for {station_name} {direction} at hour {target_datetime.hour}")
+        return _TYPICAL_PATTERN_CACHE[cache_key].copy()
+    
+    capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000) if station_name else 1000
+    
+    # ========== GET HOUR-SPECIFIC CONGESTION FROM REAL DATA ==========
+    hourly_congestion = {}
+    
+    for hour in range(24):
+        hour_data = df[df.index.hour == hour]
+        non_zero = hour_data[hour_data['TotalPassenger'] > 0]
+        
+        if len(non_zero) > 50:
+            # Use P75 for realistic peak patterns
+            hourly_congestion[hour] = non_zero['congestion'].quantile(0.75)
+        elif len(non_zero) > 20:
+            # Use median if less data
+            hourly_congestion[hour] = non_zero['congestion'].median()
+        else:
+            hourly_congestion[hour] = 0
+    
+    # ========== APPLY REALISTIC RUSH HOUR PATTERNS ==========
+    # Override with realistic values based on station and direction
+    
+    # Check if this is a terminal station
+    is_terminal = station_name in ["North Ave", "Taft"]
+    
+    for hour in range(24):
+        # ========== EARLY MORNING (5-6 AM) ==========
+        if 5 <= hour <= 6:
+            if direction == 'Northbound':
+                # Northbound early morning - commuters heading to work
+                if is_terminal:
+                    # Terminals have higher early morning traffic
+                    base = 30 + (hour - 5) * 15  # 30% at 5am, 45% at 6am
+                else:
+                    base = 25 + (hour - 5) * 10  # 25% at 5am, 35% at 6am
+            else:
+                # Southbound early morning - lighter
+                if is_terminal:
+                    base = 20 + (hour - 5) * 10  # 20% at 5am, 30% at 6am
+                else:
+                    base = 15 + (hour - 5) * 10  # 15% at 5am, 25% at 6am
+            hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), base)
+        
+        # ========== MORNING RUSH (7-9 AM) ==========
+        elif 7 <= hour <= 9:
+            if direction == 'Northbound':
+                # Northbound morning rush - people heading to work
+                if is_terminal:
+                    base = 50 + (hour - 7) * 20  # 50% at 7am, 70% at 8am, 90% at 9am
+                else:
+                    base = 40 + (hour - 7) * 15  # 40% at 7am, 55% at 8am, 70% at 9am
+            else:
+                # Southbound morning rush - lighter (reverse commute)
+                if is_terminal:
+                    base = 30 + (hour - 7) * 15  # 30% at 7am, 45% at 8am, 60% at 9am
+                else:
+                    base = 25 + (hour - 7) * 10  # 25% at 7am, 35% at 8am, 45% at 9am
+            hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), base)
+        
+        # ========== MIDDAY (10 AM - 4 PM) ==========
+        elif 10 <= hour <= 16:
+            # Moderate congestion
+            base = 30 + (hour - 10) * 2  # 30-42% throughout midday
+            hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), base)
+        
+        # ========== EVENING RUSH (5-7 PM) ==========
+        elif 17 <= hour <= 19:
+            if direction == 'Northbound':
+                # Northbound evening rush - people heading home
+                if is_terminal:
+                    base = 60 + (hour - 17) * 15  # 60% at 5pm, 75% at 6pm, 90% at 7pm
+                else:
+                    base = 50 + (hour - 17) * 15  # 50% at 5pm, 65% at 6pm, 80% at 7pm
+            else:
+                # Southbound evening rush - reverse commute
+                if is_terminal:
+                    base = 40 + (hour - 17) * 15  # 40% at 5pm, 55% at 6pm, 70% at 7pm
+                else:
+                    base = 35 + (hour - 17) * 10  # 35% at 5pm, 45% at 6pm, 55% at 7pm
+            hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), base)
+        
+        # ========== LATE EVENING (8-10 PM) ==========
+        elif 20 <= hour <= 22:
+            # Decreasing congestion
+            base = 40 - (hour - 20) * 10  # 40% at 8pm, 30% at 9pm, 20% at 10pm
+            hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), base)
+    
+    # ========== ENSURE TERMINAL STATIONS HAVE HIGHER BASE ==========
+    if is_terminal:
+        for hour in [5, 6, 7, 8, 17, 18, 19]:
+            if direction == 'Northbound':
+                hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), 35)
+            else:
+                hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), 25)
+    
+    # ========== CREATE THE SEQUENCE ==========
+    typical_data = []
+    target_hour = target_datetime.hour
+    
+    for i in range(seq_length):
+        hour = (target_hour - (seq_length - i)) % 24
+        congestion_val = hourly_congestion.get(hour, 20)
+        typical_data.append(congestion_val)
+    
+    # Create DataFrame
+    base_date = target_datetime.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+    index = [base_date + timedelta(hours=i) for i in range(seq_length)]
+    
+    typical_df = pd.DataFrame({
+        'congestion': typical_data,
+        'TotalPassenger': [c / 100 * capacity for c in typical_data]
+    }, index=index)
+    
+    # Add all feature columns
+    typical_df = add_cyclical_time_features(typical_df)
+    typical_df = add_smart_operating_flags(typical_df)
+    typical_df = smart_data_cleaner(typical_df)
+    
+    typical_df['hour'] = typical_df.index.hour
+    typical_df['weekday'] = typical_df.index.weekday
+    typical_df['month'] = typical_df.index.month
+    
+    typical_df['is_weekend'] = (typical_df.index.weekday >= 5).astype(np.int8)
+    typical_df['is_christmas_season'] = np.array([is_christmas_season(d) for d in typical_df.index], dtype=np.int8)
+    typical_df['is_payday'] = typical_df.index.day.isin([15, 30, 31]).astype(np.int8)
+    typical_df['is_friday'] = (typical_df.index.weekday == 4).astype(np.int8)
+    typical_df['is_rush_hour'] = ((typical_df['hour'].between(7, 9)) | (typical_df['hour'].between(17, 19))).astype(np.int8)
+    typical_df['is_holiday'] = 0
+    typical_df['is_special_event'] = 0
+    
+    print(f"   📊 Built typical day pattern for {station_name} {direction} at hour {target_hour}:")
+    print(f"      Avg congestion: {typical_df['congestion'].mean():.1f}%")
+    print(f"      Max congestion: {typical_df['congestion'].max():.1f}%")
+    print(f"      Min congestion: {typical_df['congestion'].min():.1f}%")
+    print(f"      Hour {target_hour} value: {hourly_congestion.get(target_hour, 20):.1f}%")
+    
+    _TYPICAL_PATTERN_CACHE[cache_key] = typical_df.copy()
+    
+    return typical_df
 _TARGET_SCALER_CACHE = {}
 
 def get_target_scaler(station_name, direction):
@@ -551,6 +724,7 @@ def get_target_scaler(station_name, direction):
 def load_data():
     """Legacy function - now uses fast loading"""
     return load_data_fast()
+
 def add_cyclical_time_features(df):
     """Add cyclical time features using the DataFrame index"""
     if not isinstance(df, pd.DataFrame):
@@ -599,6 +773,7 @@ def add_smart_operating_flags(df):
     df['time_normalized'] = np.clip((time_decimal - 4.5) / (23.0 - 4.5), 0, 1)
     
     return df
+
 def smart_data_cleaner(df):
     """Clean data and add maintenance flags using the DataFrame index"""
     if not isinstance(df, pd.DataFrame):
@@ -613,6 +788,7 @@ def smart_data_cleaner(df):
     # DON'T touch congestion here - let get_station_dataframe handle it
     return df
     
+
 def is_christmas_season(date):
     month_day = date.strftime('%m-%d')
     return (month_day >= '12-15') or (month_day <= '01-05')
