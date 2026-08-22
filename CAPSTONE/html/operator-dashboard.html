@@ -1898,105 +1898,127 @@ input:checked + .slider:before {
     };
     
     // ========== DASHBOARD FUNCTIONS ==========
-    async function loadCongestionData() {
-        console.log("Loading congestion data...");
-        try {
-            const response = await fetch('/api/live-map/directions');
-            const data = await response.json();
-            console.log("Congestion data received:", data);
-            
-            let severeCount = 0, congestedCount = 0, moderateCount = 0, lightCount = 0;
-            
-            const getStatusInfo = (congestion) => {
-                if (congestion > 80) return { class: 'severe', text: 'Severe' };
-                if (congestion > 60) return { class: 'congested', text: 'Congested' };
-                if (congestion > 30) return { class: 'moderate', text: 'Moderate' };
-                return { class: 'light', text: 'Light' };
-            };
-            
-            // Southbound table
-            const southboundBody = document.getElementById('southbound-body');
-            if (southboundBody) {
-                const southRows = [];
-                for (const station of allStations) {
-                    const stationData = data.southbound?.[station];
-                    if (stationData) {
-                        const statusInfo = getStatusInfo(stationData.congestion);
-                        if (statusInfo.class === 'severe') severeCount++;
-                        else if (statusInfo.class === 'congested') congestedCount++;
-                        else if (statusInfo.class === 'moderate') moderateCount++;
-                        else lightCount++;
-                        
-                        const isOverridden = stationData.overridden === true;
-                        const canManage = managedStations.includes(station);
-                        
-                        const buttonHtml = canManage 
-                            ? (isOverridden
-                                ? `<button class="btn-override" style="background:#EF4444; color:white;" onclick="removeOverride('${station}')">
-                                     <i class="fas fa-trash"></i> Remove
-                                   </button>`
-                                : `<button class="btn-override" onclick="openOverrideModal('${station}')">
-                                     <i class="fas fa-edit"></i> Override
-                                   </button>`)
-                            : `<button class="btn-override" disabled style="opacity:0.5;">
-                                 <i class="fas fa-lock"></i> No Access
-                               </button>`;
-                        
-                        southRows.push(`
-                            <tr><td style="font-weight:500;">${station}${isOverridden ? ' <span style="font-size:10px; background:#8B5CF6; color:white; padding:2px 6px; border-radius:10px;">OVERRIDDEN</span>' : ''}</td><td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td><td>${buttonHtml}</td></tr>
-                        `);
-                    }
-                }
-                southboundBody.innerHTML = southRows.join('');
-            }
-            
-            // Northbound table - similar structure
-            const northboundBody = document.getElementById('northbound-body');
-            if (northboundBody) {
-                const northRows = [];
-                for (const station of allStations) {
-                    const stationData = data.northbound?.[station];
-                    if (stationData) {
-                        const statusInfo = getStatusInfo(stationData.congestion);
-                        const isOverridden = stationData.overridden === true;
-                        const canManage = managedStations.includes(station);
-                        
-                        const buttonHtml = canManage 
-                            ? (isOverridden
-                                ? `<button class="btn-override" style="background:#EF4444; color:white;" onclick="removeOverride('${station}')">
-                                     <i class="fas fa-trash"></i> Remove
-                                   </button>`
-                                : `<button class="btn-override" onclick="openOverrideModal('${station}')">
-                                     <i class="fas fa-edit"></i> Override
-                                   </button>`)
-                            : `<button class="btn-override" disabled style="opacity:0.5;">
-                                 <i class="fas fa-lock"></i> No Access
-                               </button>`;
-                        
-                        northRows.push(`
-                            <tr><td style="font-weight:500;">${station}${isOverridden ? ' <span style="font-size:10px; background:#8B5CF6; color:white; padding:2px 6px; border-radius:10px;">OVERRIDDEN</span>' : ''}</td><td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td><td>${buttonHtml}</td></tr>
-                        `);
-                    }
-                }
-                northboundBody.innerHTML = northRows.join('');
-            }
-            
-            // Update stat cards
-            const severeEl = document.getElementById('severe-count');
-            const congestedEl = document.getElementById('congested-count');
-            const moderateEl = document.getElementById('moderate-count');
-            const lightEl = document.getElementById('light-count');
-            
-            if (severeEl) severeEl.textContent = severeCount;
-            if (congestedEl) congestedEl.textContent = congestedCount;
-            if (moderateEl) moderateEl.textContent = moderateCount;
-            if (lightEl) lightEl.textContent = lightCount;
-            
-        } catch (error) {
-            console.error('Error loading congestion data:', error);
+   // ========== DASHBOARD FUNCTIONS - FIXED THRESHOLDS ==========
+async function loadCongestionData() {
+    console.log("📊 Loading congestion data from operator API...");
+    try {
+        const response = await fetch('/operator/api/operator/station-status');
+        const data = await response.json();
+        console.log("Congestion data received:", data);
+        
+        if (data.error) {
+            console.warn("API returned error:", data.error);
         }
+        
+        const stations = data.stations || [];
+        console.log(`📊 Received ${stations.length} stations`);
+        
+        let severeCount = 0, congestedCount = 0, moderateCount = 0, lightCount = 0;
+        
+        // ========== FIXED: MATCH BACKEND THRESHOLDS ==========
+        // LIGHT: 0-25%
+        // MODERATE: 25-50%
+        // CONGESTED: 50-80%
+        // SEVERE: >80%
+        const getStatusInfo = (congestion) => {
+            if (congestion > 80) return { class: 'severe', text: 'Severe' };
+            if (congestion > 50) return { class: 'congested', text: 'Congested' };
+            if (congestion > 25) return { class: 'moderate', text: 'Moderate' };
+            return { class: 'light', text: 'Light' };
+        };
+        
+        // Southbound table
+        const southboundBody = document.getElementById('southbound-body');
+        if (southboundBody) {
+            const southRows = [];
+            for (const station of stations) {
+                const stationData = station.southbound || {};
+                const congestion = stationData.congestion || 0;
+                const statusInfo = getStatusInfo(congestion);
+                
+                if (statusInfo.class === 'severe') severeCount++;
+                else if (statusInfo.class === 'congested') congestedCount++;
+                else if (statusInfo.class === 'moderate') moderateCount++;
+                else lightCount++;
+                
+                const isOverridden = stationData.overridden === true;
+                const canManage = managedStations.includes(station.name);
+                
+                const buttonHtml = canManage 
+                    ? (isOverridden
+                        ? `<button class="btn-override" style="background:#EF4444; color:white;" onclick="removeOverride('${station.name}')">
+                             <i class="fas fa-trash"></i> Remove
+                           </button>`
+                        : `<button class="btn-override" onclick="openOverrideModal('${station.name}')">
+                             <i class="fas fa-edit"></i> Override
+                           </button>`)
+                    : `<button class="btn-override" disabled style="opacity:0.5;">
+                         <i class="fas fa-lock"></i> No Access
+                       </button>`;
+                
+                southRows.push(`
+                    <tr>
+                        <td style="font-weight:500;">${station.name}${isOverridden ? ' <span style="font-size:10px; background:#8B5CF6; color:white; padding:2px 6px; border-radius:10px;">OVERRIDDEN</span>' : ''}</td>
+                        <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                        <td>${buttonHtml}</td>
+                    </tr>
+                `);
+            }
+            southboundBody.innerHTML = southRows.join('') || '<tr><td colspan="3" style="text-align:center; color:#64748B;">No data available</td></tr>';
+        }
+        
+        // Northbound table
+        const northboundBody = document.getElementById('northbound-body');
+        if (northboundBody) {
+            const northRows = [];
+            for (const station of stations) {
+                const stationData = station.northbound || {};
+                const congestion = stationData.congestion || 0;
+                const statusInfo = getStatusInfo(congestion);
+                
+                const isOverridden = stationData.overridden === true;
+                const canManage = managedStations.includes(station.name);
+                
+                const buttonHtml = canManage 
+                    ? (isOverridden
+                        ? `<button class="btn-override" style="background:#EF4444; color:white;" onclick="removeOverride('${station.name}')">
+                             <i class="fas fa-trash"></i> Remove
+                           </button>`
+                        : `<button class="btn-override" onclick="openOverrideModal('${station.name}')">
+                             <i class="fas fa-edit"></i> Override
+                           </button>`)
+                    : `<button class="btn-override" disabled style="opacity:0.5;">
+                         <i class="fas fa-lock"></i> No Access
+                       </button>`;
+                
+                northRows.push(`
+                    <tr>
+                        <td style="font-weight:500;">${station.name}${isOverridden ? ' <span style="font-size:10px; background:#8B5CF6; color:white; padding:2px 6px; border-radius:10px;">OVERRIDDEN</span>' : ''}</td>
+                        <td><span class="badge ${statusInfo.class}">${statusInfo.text}</span></td>
+                        <td>${buttonHtml}</td>
+                    </tr>
+                `);
+            }
+            northboundBody.innerHTML = northRows.join('') || '<tr><td colspan="3" style="text-align:center; color:#64748B;">No data available</td></tr>';
+        }
+        
+        // Update stat cards
+        const severeEl = document.getElementById('severe-count');
+        const congestedEl = document.getElementById('congested-count');
+        const moderateEl = document.getElementById('moderate-count');
+        const lightEl = document.getElementById('light-count');
+        
+        if (severeEl) severeEl.textContent = severeCount;
+        if (congestedEl) congestedEl.textContent = congestedCount;
+        if (moderateEl) moderateEl.textContent = moderateCount;
+        if (lightEl) lightEl.textContent = lightCount;
+        
+        console.log(`📊 Summary - Severe: ${severeCount}, Congested: ${congestedCount}, Moderate: ${moderateCount}, Light: ${lightCount}`);
+        
+    } catch (error) {
+        console.error('Error loading congestion data:', error);
     }
-    
+}
     // ========== INCIDENT LOG FUNCTIONS ==========
     async function loadIncidentLogs() {
         console.log("Loading incident logs...");
@@ -2451,8 +2473,8 @@ input:checked + .slider:before {
                         pointBackgroundColor: (context) => {
                             const value = chartData[context.dataIndex];
                             if (value > 80) return '#EF4444';
-                            if (value > 60) return '#F97316';
-                            if (value > 30) return '#F59E0B';
+                            if (value > 50) return '#F97316';
+                            if (value > 25) return '#F59E0B';
                             return '#22C55E';
                         },
                         fill: true,

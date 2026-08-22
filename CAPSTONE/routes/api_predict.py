@@ -31,6 +31,7 @@ P95_CACHE_IN_PROGRESS = set()  # Track which P95s are being computed
 HISTORICAL_PEAKS = {}
 # ========== CORRECTION FACTORS ==========
 CORRECTION_FACTORS = {}
+TYPICAL_PATTERN_CACHE = {} 
 CORRECTION_FILE = 'correction_factors.pkl'
 
 # ========== MODEL CACHE ==========
@@ -209,7 +210,33 @@ def get_p95_percentile(station_name, direction):
         
     finally:
         P95_CACHE_IN_PROGRESS.discard(key)
+    
+def get_typical_pattern_cached(station_name, direction, target_datetime, df=None):
+    """Return typical congestion for the given hour, using a cached full-day pattern."""
+    key = f"{station_name}_{direction}"
+    if key not in TYPICAL_PATTERN_CACHE:
+        if df is None:
+            from services.feature_engineering import get_station_dataframe_cached
+            df = get_station_dataframe_cached(station_name, direction)
+        if df is None:
+            return None
         
+        # Build typical pattern for the whole day (24 hours)
+        from services.feature_engineering import build_typical_day_pattern
+        typical_df = build_typical_day_pattern(df, target_datetime, 24, station_name, direction)
+        if typical_df is not None and len(typical_df) == 24:
+            TYPICAL_PATTERN_CACHE[key] = typical_df['congestion'].tolist()
+        else:
+            TYPICAL_PATTERN_CACHE[key] = None
+
+    day_pattern = TYPICAL_PATTERN_CACHE.get(key)
+    if day_pattern is None:
+        return None
+    hour = target_datetime.hour
+    return day_pattern[hour] if 0 <= hour < 24 else None
+
+
+
 def load_correction_factors():
     global CORRECTION_FACTORS
     if os.path.exists(CORRECTION_FILE):
@@ -729,13 +756,8 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
                 # ========== AGGRESSIVE BOOST LOGIC FOR NOTICEABLE SURGES ==========
                 # ============================================================
                 # Get the typical congestion value for this hour from the pattern
-                try:
-                    typical_df = build_typical_day_pattern(df, target_datetime, 24, station_name, direction)
-                    typical_hour_value = typical_df['congestion'].iloc[-1] if typical_df is not None else 20
-                except Exception as e:
-                    print(f"⚠️ Could not get typical pattern: {e}")
-                    typical_hour_value = 20
-
+# Get the typical congestion value for this hour from the pattern
+                typical_hour_value = get_typical_pattern_cached(station_name, direction, target_datetime, df) or 20
                 # Determine a realistic minimum congestion based on hour, direction, and station type
                 is_terminal = station_name in ["North Ave", "Taft"]
 
@@ -2837,3 +2859,47 @@ def generate_factors():
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+        
+# ========== PRELOAD P95 CACHE FROM DISK ==========
+def preload_p95_cache():
+    """Load all P95 values from disk into memory at startup."""
+    global P95_CACHE
+    if os.path.exists(P95_FILE):
+        try:
+            with open(P95_FILE, 'r') as f:
+                all_p95 = json.load(f)
+                P95_CACHE.update(all_p95)
+                print(f"✅ Preloaded {len(P95_CACHE)} P95 values from disk")
+        except Exception as e:
+            print(f"⚠️ Could not preload P95 cache: {e}")
+
+# ========== PRELOAD TYPICAL PATTERNS ==========
+def preload_typical_patterns():
+    """Preload all typical patterns at startup so they're ready for requests."""
+    from services.feature_engineering import build_typical_day_pattern, get_station_dataframe_cached
+    import time
+    
+    start = time.time()
+    count = 0
+    total = len(STATIONS) * 2
+    
+    for station in STATIONS:
+        for direction in ['Northbound', 'Southbound']:
+            key = f"{station}_{direction}"
+            if key not in TYPICAL_PATTERN_CACHE:
+                df = get_station_dataframe_cached(station, direction)
+                if df is not None:
+                    # Use a reference time (hour doesn't matter, we build all 24)
+                    ref_time = datetime(2024, 1, 1, 12, 0, 0)
+                    typical_df = build_typical_day_pattern(df, ref_time, 24, station, direction)
+                    if typical_df is not None and len(typical_df) == 24:
+                        TYPICAL_PATTERN_CACHE[key] = typical_df['congestion'].tolist()
+                        count += 1
+    
+    print(f"✅ Preloaded {count}/{total} typical patterns in {time.time()-start:.2f}s")
+
+# Call it after preload_p95_cache()
+preload_p95_cache()
+preload_typical_patterns()  
+
+# Call it right after load_correction_factors()

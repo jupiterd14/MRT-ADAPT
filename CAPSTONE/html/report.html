@@ -2238,6 +2238,7 @@ function applyFilters() {
     filterAndDisplayReports();
     toggleFilterDropdown();
 }
+
 function filterAndDisplayReports() {
     console.log("========== FILTERING REPORTS ==========");
     console.log("Total reports before filter:", allReportsData.length);
@@ -2272,78 +2273,58 @@ function filterAndDisplayReports() {
         console.log("After congestion filter:", filteredReports.length);
     }
     
-    // Filter by date range
-    if (activeFilters.dateRange && filteredReports.length > 0) {
-        const now = new Date();
-        
-        // Check if reports are from a different year (e.g., 2025)
-        let reportYear = null;
-        let useReportYear = false;
-        
-        // Check first few reports to detect year mismatch
-        for (let i = 0; i < Math.min(5, allReportsData.length); i++) {
-            if (allReportsData[i].timestamp) {
-                const testDate = new Date(allReportsData[i].timestamp);
-                if (testDate.getFullYear() !== now.getFullYear()) {
-                    reportYear = testDate.getFullYear();
-                    useReportYear = true;
-                    console.log(`Detected report year: ${reportYear} vs system year: ${now.getFullYear()}`);
-                    break;
-                }
-            }
-        }
-        
-        let today;
-        if (useReportYear && reportYear) {
-            // Use the report's year for filtering
-            today = new Date(reportYear, now.getMonth(), now.getDate());
-        } else {
-            today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        }
-        today.setHours(0, 0, 0, 0);
-        
-        console.log("Filtering by date range:", activeFilters.dateRange);
-        console.log("Using date base:", today);
-        
-        filteredReports = filteredReports.filter(report => {
-            if (!report.timestamp) return false;
-            
-            try {
-                const reportDate = new Date(report.timestamp);
-                const reportDateOnly = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
-                reportDateOnly.setHours(0, 0, 0, 0);
-                
-                switch(activeFilters.dateRange) {
-                    case 'today': {
-                        return reportDateOnly.getTime() === today.getTime();
-                    }
-                    case 'yesterday': {
-                        const yesterday = new Date(today);
-                        yesterday.setDate(yesterday.getDate() - 1);
-                        return reportDateOnly.getTime() === yesterday.getTime();
-                    }
-                    case 'week': {
-                        const weekAgo = new Date(today);
-                        weekAgo.setDate(weekAgo.getDate() - 7);
-                        return reportDateOnly >= weekAgo;
-                    }
-                    case 'month': {
-                        // Show reports from 30 days ago and older (30 days +)
-                        const monthAgo = new Date(today);
-                        monthAgo.setDate(monthAgo.getDate() - 30);
-                        return reportDateOnly <= monthAgo;  // Changed from >= to <=
-                    }
-                    default:
-                        return true;
-                }
-            } catch(e) {
-                console.error("Error parsing date for report:", report.id, e);
-                return false;
-            }
-        });
-        console.log("After date filter:", filteredReports.length);
-    }
+    // ========== FILTER BY DATE ==========
+   // ========== FILTER BY DATE ==========
+// ========== FILTER BY DATE ==========
+if (activeFilters.dateRange && filteredReports.length > 0) {
+    // Get current date but FORCE year to 2025
+    const now = new Date();
+    const referenceDate = new Date(2025, now.getMonth(), now.getDate());
+    referenceDate.setHours(0, 0, 0, 0);
     
+    console.log("📅 Using date as reference:", referenceDate.toLocaleDateString());
+    
+    filteredReports = filteredReports.filter(report => {
+        if (!report.timestamp) return false;
+        
+        try {
+            const reportDate = new Date(report.timestamp);
+            if (isNaN(reportDate.getTime())) return false;
+            
+            const reportDateOnly = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
+            reportDateOnly.setHours(0, 0, 0, 0);
+            
+            switch(activeFilters.dateRange) {
+                case 'today': {
+                    return reportDateOnly.getTime() === referenceDate.getTime();
+                }
+                case 'yesterday': {
+                    const yesterday = new Date(referenceDate);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    return reportDateOnly.getTime() === yesterday.getTime();
+                }
+                case 'week': {
+                    const weekAgo = new Date(referenceDate);
+                    weekAgo.setDate(weekAgo.getDate() - 7);
+                    console.log(`Week range: ${weekAgo.toLocaleDateString()} to ${referenceDate.toLocaleDateString()}`);
+                    return reportDateOnly >= weekAgo && reportDateOnly <= referenceDate;
+                }
+                case 'month': {
+                    const monthAgo = new Date(referenceDate);
+                    monthAgo.setDate(monthAgo.getDate() - 30);
+                    console.log(`Month range: ${monthAgo.toLocaleDateString()} to ${referenceDate.toLocaleDateString()}`);
+                    return reportDateOnly >= monthAgo && reportDateOnly <= referenceDate;
+                }
+                default:
+                    return true;
+            }
+        } catch(e) {
+            console.error("Error parsing date for report:", report.id, e);
+            return false;
+        }
+    });
+    console.log("After date filter:", filteredReports.length);
+}
     // If no filters are applied, show all reports
     if ((!activeFilters.congestionLevels || activeFilters.congestionLevels.length === 0) && 
         (!activeFilters.stations || activeFilters.stations.length === 0) && 
@@ -2362,6 +2343,7 @@ function filterAndDisplayReports() {
     
     displayReports(filteredReports);
 }
+
    // ========== IMAGE PREVIEW FUNCTIONS ==========
 function updateImagePreview() {
     console.log('🔄 updateImagePreview called, files:', selectedFiles.length);
