@@ -2467,12 +2467,7 @@ function populateDateTimeSelects() {
             const option = document.createElement('option');
             option.value = year;
             option.textContent = year;
-            // Disable past years
-            if (year < currentYear) {
-                option.disabled = true;
-                option.style.color = '#94A3B8';
-                option.style.backgroundColor = '#F1F5F9';
-            }
+          
             yearSelect.appendChild(option);
         }
         yearSelect.value = currentYear;

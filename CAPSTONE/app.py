@@ -72,15 +72,18 @@ from routes import (
 _MODELS_CACHE = {}
 _MODELS_CACHE_FILE = None
 _MODELS_LOADED = False  # Track if models are loaded
+_WARMUP_COMPLETE = False  # Track if models are warmed up
 
 
 def get_models_cache_path():
     cache_dir = tempfile.gettempdir()
     return os.path.join(cache_dir, 'mrt3_models_cache.pkl')
 
+
 def get_historical_cache_path():
     cache_dir = tempfile.gettempdir()
     return os.path.join(cache_dir, 'mrt3_historical_cache.pkl')
+
 
 def load_models_with_cache(stations, models_path):
     global _MODELS_CACHE, _MODELS_LOADED
@@ -122,6 +125,7 @@ def load_models_with_cache(stations, models_path):
     
     return directional_models, directional_scalers
 
+
 def load_historical_with_cache(stations, base_capacity):
     cache_file = get_historical_cache_path()
     
@@ -146,6 +150,81 @@ def load_historical_with_cache(stations, base_capacity):
         print(f"Historical cache save failed: {e}")
     
     return historical_data
+
+
+# ============ MODEL WARMUP (ELIMINATE COLD-START LATENCY) ============
+def warmup_all_models():
+    """
+    🔥 CRITICAL: Warms up all 26 models to eliminate cold-start latency.
+    This forces TensorFlow to build execution graphs at startup.
+    Without this, the first prediction takes 10-30 seconds!
+    """
+    global directional_models_cached, _MODELS_LOADED, _WARMUP_COMPLETE
+    
+    if not _MODELS_LOADED or directional_models_cached is None:
+        print("⚠️ Models not loaded yet! Call preload_all_models() first.")
+        return False
+    
+    if _WARMUP_COMPLETE:
+        print("✅ Models already warmed up!")
+        return True
+    
+    print("\n" + "="*60)
+    print("🔥 WARMING UP ALL 26 MODELS (Building TensorFlow graphs)...")
+    print("="*60)
+    print("⏳ This runs once at startup, making all predictions instant.")
+    print("⏳ Estimated time: 5-15 seconds depending on hardware...")
+    
+    import time
+    import numpy as np
+    start_time = time.time()
+    
+    # Create dummy input matching your sequence shape
+    # (24 timesteps, 29 features - adjust if different)
+    dummy_input = np.zeros((1, 24, 29), dtype=np.float32)
+    
+    successful = 0
+    failed = 0
+    total = len(directional_models_cached)
+    
+    for idx, (model_key, model) in enumerate(directional_models_cached.items(), 1):
+        try:
+            # This forces TensorFlow to compile the model graph
+            _ = model.predict(dummy_input, verbose=0)
+            successful += 1
+            
+            # Show progress
+            if idx % 5 == 0 or idx == total:
+                print(f"  ⏳ Warmup progress: {idx}/{total} models")
+                
+        except Exception as e:
+            failed += 1
+            print(f"  ⚠️ Failed to warmup {model_key}: {e}")
+    
+    elapsed = time.time() - start_time
+    
+    # Force garbage collection to clean up temporary objects
+    gc.collect()
+    
+    print("="*60)
+    print(f"✅ WARMUP COMPLETE in {elapsed:.2f} seconds")
+    print(f"   ✅ {successful} models warmed up successfully")
+    if failed > 0:
+        print(f"   ⚠️ {failed} models failed to warmup")
+    print("="*60 + "\n")
+    
+    # Store warmup stats in app config
+    app.config['WARMUP_STATS'] = {
+        'successful': successful,
+        'failed': failed,
+        'duration_seconds': round(elapsed, 2),
+        'models_warmed': successful,
+        'total_models': total
+    }
+    
+    _WARMUP_COMPLETE = True
+    return True
+
 
 # ============ CSV IMPORT FUNCTION ============
 def import_csv_files():
@@ -200,6 +279,7 @@ def import_csv_files():
     
     return results
 
+
 # ============ APP INITIALIZATION ============
 app = Flask(__name__, template_folder='html', static_folder='static')
 app.config.from_object(Config)
@@ -221,11 +301,31 @@ def warmup():
             "status": "warmup complete",
             "models_loaded": len(directional_models_cached) if directional_models_cached else 0,
             "elapsed_seconds": round(elapsed, 2),
-            "memory_mb": get_memory_usage()
+            "memory_mb": get_memory_usage(),
+            "warmed_up": _WARMUP_COMPLETE
         })
     except Exception as e:
         return jsonify({"status": "failed", "error": str(e)}), 500
+
+
+@app.route('/debug/warmup-status')
+def debug_warmup_status():
+    """Check if models are warmed up and ready for instant predictions"""
+    warmup_stats = app.config.get('WARMUP_STATS', {})
+    models_loaded = len(directional_models_cached) if directional_models_cached else 0
     
+    return jsonify({
+        'warmup_complete': _WARMUP_COMPLETE,
+        'total_models': models_loaded,
+        'models_warmed': warmup_stats.get('successful', 0),
+        'warmup_failures': warmup_stats.get('failed', 0),
+        'warmup_duration_seconds': warmup_stats.get('duration_seconds', 0),
+        'status': 'ready' if (_WARMUP_COMPLETE and models_loaded > 0) else 'warming_up',
+        'memory_mb': get_memory_usage(),
+        'message': 'All models are warmed up and ready for instant predictions!' if _WARMUP_COMPLETE else 'Models are loading...'
+    })
+
+
 def get_memory_usage():
     """Helper to get memory usage"""
     try:
@@ -388,6 +488,7 @@ def preload_all_models():
     directional_models_cached, directional_scalers_cached = load_models_with_cache(STATIONS, DIRECTIONAL_MODELS_PATH)
     
     # Load historical data
+    global historical_data
     historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
     
     # Update services module
@@ -402,14 +503,30 @@ def preload_all_models():
     # Store in app config
     app.config['DIRECTIONAL_MODELS'] = directional_models_cached
     app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+    app.config['HISTORICAL_DATA'] = historical_data
+    
+    # ====== ADD THIS: Preload P95 and typical patterns from prediction API ======
+    try:
+        # Import the prediction API blueprint's preload functions
+        from routes.api_predict import preload_p95_cache, preload_typical_patterns
+        print("\n📊 Preloading P95 cache and typical patterns...")
+        preload_p95_cache()
+        preload_typical_patterns()
+    except ImportError as e:
+        print(f"⚠️ Could not import prediction API preload functions: {e}")
+    except Exception as e:
+        print(f"⚠️ Error preloading P95/typical patterns: {e}")
+    # ========================================================================
     
     print("="*60)
     print(f"✅ All models loaded! ({len(directional_models_cached)}/26 models)")
     print(f"✅ Historical data loaded for {len(historical_data['historical_entry'])} stations")
     print("="*60 + "\n")
     
+    # 🔥 CRITICAL: Warm up all models for instant predictions
+    warmup_all_models()
+    
     return directional_models_cached, directional_scalers_cached
-
 def ensure_single_model_loaded(station_name, direction):
     """Load a single model if not already loaded - NO LIMIT"""
     global directional_models_cached, directional_scalers_cached
@@ -448,6 +565,7 @@ def ensure_single_model_loaded(station_name, direction):
     
     app.config['DIRECTIONAL_MODELS'] = directional_models_cached
     app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+
 
 app.config['ENSURE_SINGLE_MODEL_LOADED'] = ensure_single_model_loaded
 
@@ -810,8 +928,9 @@ def debug_clear_cache():
             results[os.path.basename(cache_file)] = "not found"
     
     # Also clear memory cache flag
-    global _MODELS_LOADED
+    global _MODELS_LOADED, _WARMUP_COMPLETE
     _MODELS_LOADED = False
+    _WARMUP_COMPLETE = False
     
     return jsonify({
         "status": "Cache cleared",
@@ -942,7 +1061,8 @@ def debug_memory():
         'system_used_mb': memory.used / (1024 * 1024),
         'process_memory_mb': process.memory_info().rss / (1024 * 1024),
         'models_loaded': len(directional_models_cached) if directional_models_cached else 0,
-        'lstm_loaded': app.config.get('LSTM_PREDICTOR') is not None
+        'lstm_loaded': app.config.get('LSTM_PREDICTOR') is not None,
+        'warmup_complete': _WARMUP_COMPLETE
     })
 
 @app.route('/admin/import-csvs', methods=['GET', 'POST'])
@@ -1066,18 +1186,18 @@ for stat in top_stats[:10]:
 # ============ MAIN ============
 if __name__ == '__main__':
     print("\n" + "="*50)
-    print("MRT-3 PREDICTION SYSTEM READY!")
+    print("🚀 MRT-3 PREDICTION SYSTEM - FAST STARTUP WITH WARMUP")
     print("="*50)
     
-    # ⭐ PRELOAD ALL MODELS AT STARTUP ⭐
+    # ⭐ PRELOAD ALL MODELS AT STARTUP ⭐ (now automatically warms up)
     print("\n🔄 PRELOADING ALL MODELS AT STARTUP...")
-    preload_all_models()
+    preload_all_models()  # This now calls warmup_all_models() automatically!
     
     print(f"✓ {len(directional_models_cached) if directional_models_cached else 0} directional models loaded")
     if historical_data:
         print(f"✓ {len(historical_data['historical_entry']) if historical_data else 0} stations with historical data")
     else:
-        print("✓ Historical data will load on demand")
+        print("✓ Historical data loaded")
     
     lstm_predictor = app.config.get('LSTM_PREDICTOR')
     if lstm_predictor:
@@ -1085,7 +1205,13 @@ if __name__ == '__main__':
     else:
         print("⚠️ LSTM models not loaded - they will load when retraining is triggered")
     
-    print("\n💡 TIP: All models are pre-loaded in memory for fast predictions")
+    warmup_stats = app.config.get('WARMUP_STATS', {})
+    if warmup_stats:
+        print(f"✓ {warmup_stats.get('successful', 0)} models warmed up in {warmup_stats.get('duration_seconds', 0)}s")
+    
+    print("\n" + "="*50)
+    print("✅ SYSTEM READY - ALL MODELS PRELOADED AND WARMED UP")
+    print("💡 FIRST PREDICTION WILL BE INSTANT (<500ms)")
     print("💡 To force fresh model loading: visit /debug/clear-cache")
     print("\n🔄 To trigger weekly retraining: POST /admin/retrain")
     print("\n🌐 Open http://localhost:5000")

@@ -306,28 +306,30 @@ def get_live_map_data_direct():
         return None
 @operator_bp.route('/api/operator/station-status')
 def operator_station_status():
-    """Get station status for operator dashboard."""
+    """Get station status for operator dashboard - USING V2 PREDICTION API"""
     try:
-        print("🔍 Starting operator_station_status...")
+        print("🔍 Starting operator_station_status (using V2 API)...")
         
-        # Get live data directly
-        data = get_live_map_data_direct()
+        # ========== USE THE SAME V2 ENDPOINT AS LIVE MAP ==========
+        from flask import current_app
         
-        if not data:
-            print("⚠️ No live data available, using fallback")
-            # Return fallback data directly
+        # Make an internal request to the V2 endpoint
+        with current_app.test_client() as client:
+            response = client.get('/api/live-map/directions/v2')
+            data = response.get_json()
+        
+        if not data or 'northbound' not in data or 'southbound' not in data:
+            print("⚠️ V2 API returned no data, using fallback")
             return jsonify({'stations': _generate_fallback_stations(), 'fallback': True})
+        
+        northbound_data = data.get('northbound', {})
+        southbound_data = data.get('southbound', {})
         
         # ========== GET ACTIVE OVERRIDES ==========
         active_overrides = get_active_overrides()
         
-        # ========== PROCESS DATA ==========
-        stations_list = STATIONS
-        northbound_data = data.get('northbound', {})
-        southbound_data = data.get('southbound', {})
-        
         result = []
-        for station in stations_list:
+        for station in STATIONS:
             north = northbound_data.get(station, {})
             south = southbound_data.get(station, {})
             
@@ -335,16 +337,8 @@ def operator_station_status():
             north_key = f"{station}_northbound"
             south_key = f"{station}_southbound"
             
-            is_north_overridden = False
-            is_south_overridden = False
-            
-            for key in active_overrides.keys():
-                if key.lower() == north_key.lower():
-                    is_north_overridden = True
-                    north['congestion'] = active_overrides[key].get('congestion', north.get('congestion', 0))
-                if key.lower() == south_key.lower():
-                    is_south_overridden = True
-                    south['congestion'] = active_overrides[key].get('congestion', south.get('congestion', 0))
+            is_north_overridden = north_key.lower() in {k.lower() for k in active_overrides.keys()}
+            is_south_overridden = south_key.lower() in {k.lower() for k in active_overrides.keys()}
             
             result.append({
                 'name': station,
@@ -364,16 +358,106 @@ def operator_station_status():
                 }
             })
         
-        print(f"✅ Returning {len(result)} stations")
+        print(f"✅ Returning {len(result)} stations from V2 API")
         return jsonify({'stations': result})
         
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
-        # Return fallback data instead of 500
         return jsonify({'stations': _generate_fallback_stations(), 'error': str(e)})
-
+    
+@operator_bp.route('/api/operator/forecast/<station_name>')
+def operator_forecast(station_name):
+    """Get 6-hour forecast for a station - USES SAME PREDICTIONS AS LIVE MAP"""
+    try:
+        from flask import current_app
+        
+        station = station_name.replace('%20', ' ')
+        now = datetime.now()
+        
+        # Get current time rounded to the hour
+        base_time = now.replace(minute=0, second=0, microsecond=0)
+        
+        forecasts = []
+        
+        for i in range(7):  # 0-6 hours ahead
+            target_time = base_time + timedelta(hours=i)
+            
+            # Use the same prediction function as the live map
+            try:
+                # Import from the prediction module
+                from routes.api_predict import get_directional_prediction
+                
+                north_cong = get_directional_prediction(station, 'Northbound', target_time)
+                south_cong = get_directional_prediction(station, 'Southbound', target_time)
+            except ImportError:
+                # Fallback: use the V2 endpoint
+                with current_app.test_client() as client:
+                    response = client.get(f'/api/live-map/directions/v2?date={target_time.strftime("%Y-%m-%d")}&time={target_time.strftime("%H:%M")}')
+                    data = response.get_json()
+                    
+                    if data and 'northbound' in data and 'southbound' in data:
+                        north_data = data['northbound'].get(station, {})
+                        south_data = data['southbound'].get(station, {})
+                        north_cong = north_data.get('congestion', 0)
+                        south_cong = south_data.get('congestion', 0)
+                    else:
+                        north_cong = 0
+                        south_cong = 0
+            
+            # Handle None values
+            north_cong = north_cong if north_cong is not None else 0
+            south_cong = south_cong if south_cong is not None else 0
+            
+            avg_cong = (north_cong + south_cong) / 2
+            
+            # Get status
+            if avg_cong > 80:
+                status = "SEVERE"
+                color = "critical"
+            elif avg_cong > 50:
+                status = "CONGESTED"
+                color = "congested"
+            elif avg_cong > 25:
+                status = "MODERATE"
+                color = "moderate"
+            else:
+                status = "LIGHT"
+                color = "light"
+            
+            # Format time display
+            if i == 0:
+                time_display = "NOW"
+            elif i == 1:
+                time_display = "1h"
+            else:
+                time_display = f"{i}h"
+            
+            forecasts.append({
+                'hour': target_time.hour,
+                'time': time_display,
+                'time_full': target_time.strftime('%I:%M %p'),
+                'northbound': round(north_cong, 1),
+                'southbound': round(south_cong, 1),
+                'average': round(avg_cong, 1),
+                'status': status,
+                'color': color
+            })
+        
+        return jsonify({
+            'station': station,
+            'timestamp': now.isoformat(),
+            'forecasts': forecasts
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in operator_forecast: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    
+    
 def _generate_fallback_stations():
     """Generate fallback station data for when the main data source fails"""
     fallback = []

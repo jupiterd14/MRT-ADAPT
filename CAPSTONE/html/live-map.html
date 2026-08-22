@@ -1449,12 +1449,615 @@ nav {
     background: #94A3B8 !important;
     animation: none !important;
 }
+
+/* ========== MOVING TRAIN LOADING ANIMATION - 3 CARS ========== */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 34, 77, 0.85);
+    backdrop-filter: blur(6px);
+    z-index: 99999;
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-container {
+    background: white;
+    padding: 40px 50px;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: fadeInScale 0.3s ease-out;
+    max-width: 460px;
+    width: 90%;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Train Track Container */
+.train-track-container {
+    width: 100%;
+    height: 100px;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(
+        180deg,
+        #eef6ff 0%,
+        #d8e7f7 55%,
+        #c5d8ef 100%
+    );
+    border-radius: 12px;
+    padding: 12px 0 10px 0;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
+}
+
+/* Train Tracks */
+.train-tracks {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #7a8a9a;
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3);
+}
+
+.train-tracks::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #7a8a9a;
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3);
+}
+
+.train-tracks::after {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: repeating-linear-gradient(
+        90deg,
+        #8a7a6a 0px,
+        #8a7a6a 5px,
+        transparent 5px,
+        transparent 22px
+    );
+    opacity: 0.35;
+    border-radius: 1px;
+}
+
+/* Moving Train - 3 Cars */
+.moving-train {
+    position: absolute;
+    bottom: 2px;
+    left: 0;
+    animation: trainMoveContinuous 10s linear infinite;
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    z-index: 2;
+}
+
+/* ===== CAR 1 - Main Train Car ===== */
+.train-body {
+    background: linear-gradient(135deg, #00224D 0%, #1a4a7a 100%);
+    border-radius: 4px 10px 0 0;
+    height: 38px;
+    width: 65px;
+    position: relative;
+    border-bottom: 3px solid #FFD700;
+    box-shadow: 0 4px 12px rgba(0, 34, 77, 0.3);
+}
+
+/* Train Windows - 4 windows */
+.train-windows {
+    display: flex;
+    gap: 4px;
+    padding: 5px 6px;
+    justify-content: center;
+}
+
+.train-window {
+    width: 11px;
+    height: 15px;
+    background: #87CEEB;
+    border-radius: 2px;
+    border: 1px solid #4a90d9;
+    animation: windowGlow 1.5s ease-in-out infinite;
+}
+
+.train-window:nth-child(1) { animation-delay: 0s; }
+.train-window:nth-child(2) { animation-delay: 0.3s; }
+.train-window:nth-child(3) { animation-delay: 0.6s; }
+.train-window:nth-child(4) { animation-delay: 0.9s; }
+
+/* Train Headlight */
+.train-headlight {
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #FFD700;
+    border-radius: 50%;
+    box-shadow: 0 0 20px #FFD700, 0 0 40px #FFA500;
+    animation: headlightPulse 1s ease-in-out infinite;
+}
+
+/* Train Wheels */
+.train-wheels {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    padding-top: 2px;
+}
+
+.train-wheel {
+    width: 9px;
+    height: 9px;
+    background: #333;
+    border-radius: 50%;
+    border: 2px solid #555;
+    animation: wheelSpin 0.8s linear infinite;
+}
+
+.train-wheel::after {
+    content: '';
+    display: block;
+    width: 4px;
+    height: 4px;
+    background: #777;
+    border-radius: 50%;
+    margin: 0 auto;
+}
+
+/* ===== CONNECTION 1 ===== */
+.train-connection {
+    width: 6px;
+    height: 9px;
+    background: #1a3a5a;
+    border-radius: 2px;
+    margin-bottom: 4px;
+}
+
+/* ===== CAR 2 - Middle Car ===== */
+.train-car-2 {
+    background: linear-gradient(135deg, #1a3a5a 0%, #2a5a8a 100%);
+    border-radius: 4px 10px 0 0;
+    height: 32px;
+    width: 55px;
+    position: relative;
+    border-bottom: 2px solid #FFD700;
+}
+
+.train-car-2 .train-windows {
+    padding: 4px 5px;
+    gap: 4px;
+}
+
+.train-car-2 .train-window {
+    width: 9px;
+    height: 12px;
+}
+
+.train-car-2 .train-window:nth-child(1) { animation-delay: 0.15s; }
+.train-car-2 .train-window:nth-child(2) { animation-delay: 0.45s; }
+.train-car-2 .train-window:nth-child(3) { animation-delay: 0.75s; }
+.train-car-2 .train-window:nth-child(4) { animation-delay: 1.05s; }
+
+.train-car-2 .train-wheels {
+    gap: 12px;
+}
+
+.train-car-2 .train-wheel {
+    width: 8px;
+    height: 8px;
+}
+
+/* ===== CONNECTION 2 ===== */
+.train-connection-2 {
+    width: 6px;
+    height: 7px;
+    background: #1a3a5a;
+    border-radius: 2px;
+    margin-bottom: 3px;
+}
+
+/* ===== CAR 3 - Last Car (smallest) ===== */
+.train-car-3 {
+    background: linear-gradient(135deg, #0a2a4a 0%, #1a4a7a 100%);
+    border-radius: 4px 10px 0 0;
+    height: 26px;
+    width: 45px;
+    position: relative;
+    border-bottom: 2px solid #FFD700;
+}
+
+.train-car-3 .train-windows {
+    padding: 3px 4px;
+    gap: 3px;
+}
+
+.train-car-3 .train-window {
+    width: 8px;
+    height: 10px;
+}
+
+.train-car-3 .train-window:nth-child(1) { animation-delay: 0.2s; }
+.train-car-3 .train-window:nth-child(2) { animation-delay: 0.5s; }
+.train-car-3 .train-window:nth-child(3) { animation-delay: 0.8s; }
+
+.train-car-3 .train-wheels {
+    gap: 10px;
+}
+
+.train-car-3 .train-wheel {
+    width: 7px;
+    height: 7px;
+}
+
+/* Train rear light (red) */
+.train-rear-light {
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: #FF0000;
+    border-radius: 50%;
+    box-shadow: 0 0 15px #FF0000, 0 0 30px #CC0000;
+    animation: rearLightPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes rearLightPulse {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 15px #FF0000, 0 0 30px #CC0000;
+    }
+    50% {
+        opacity: 0.6;
+        box-shadow: 0 0 10px #FF0000, 0 0 20px #CC0000;
+    }
+}
+
+/* ========== CONTINUOUS TRAIN ANIMATION ========== */
+@keyframes trainMoveContinuous {
+    0% {
+        transform: translateX(-130px);
+    }
+    100% {
+        transform: translateX(calc(100% + 60px));
+    }
+}
+
+@keyframes wheelSpin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes windowGlow {
+    0%, 100% {
+        background: #87CEEB;
+        opacity: 0.7;
+    }
+    50% {
+        background: #FFD700;
+        opacity: 1;
+        box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    }
+}
+
+@keyframes headlightPulse {
+    0%, 100% {
+        box-shadow: 0 0 20px #FFD700, 0 0 40px #FFA500;
+        opacity: 1;
+    }
+    50% {
+        box-shadow: 0 0 30px #FFD700, 0 0 60px #FFA500;
+        opacity: 0.8;
+    }
+}
+
+.loading-subtext {
+    font-size: 13px;
+    color: var(--text-light);
+}
+
+/* Mobile Responsive */
+@media screen and (max-width: 768px) {
+    .loading-container {
+        padding: 30px 25px;
+        max-width: 340px;
+    }
+    
+    .train-track-container {
+        height: 75px;
+        padding: 10px 0 8px 0;
+    }
+    
+    .train-tracks {
+        bottom: 10px;
+        height: 2px;
+    }
+    
+    .train-tracks::before {
+        top: -8px;
+        height: 2px;
+    }
+    
+    .train-body {
+        height: 32px;
+        width: 52px;
+    }
+    
+    .train-car-2 {
+        height: 26px;
+        width: 44px;
+    }
+    
+    .train-car-3 {
+        height: 22px;
+        width: 36px;
+    }
+    
+    .train-window {
+        width: 9px;
+        height: 12px;
+    }
+    
+    .train-car-2 .train-window {
+        width: 7px;
+        height: 10px;
+    }
+    
+    .train-car-3 .train-window {
+        width: 6px;
+        height: 8px;
+    }
+    
+    .train-wheels {
+        gap: 10px;
+    }
+    
+    .train-wheel {
+        width: 7px;
+        height: 7px;
+    }
+    
+    .train-car-2 .train-wheel {
+        width: 6px;
+        height: 6px;
+    }
+    
+    .train-car-3 .train-wheel {
+        width: 5px;
+        height: 5px;
+    }
+    
+    @keyframes trainMoveContinuous {
+        0% {
+            transform: translateX(-100px);
+        }
+        100% {
+            transform: translateX(calc(100% + 50px));
+        }
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .loading-container {
+        padding: 20px 16px;
+        max-width: 290px;
+    }
+    
+    .train-track-container {
+        height: 60px;
+        border-radius: 8px;
+        padding: 8px 0 6px 0;
+    }
+    
+    .train-tracks {
+        bottom: 8px;
+        height: 2px;
+    }
+    
+    .train-tracks::before {
+        top: -6px;
+        height: 2px;
+    }
+    
+    .train-body {
+        height: 24px;
+        width: 40px;
+        border-bottom: 2px solid #FFD700;
+    }
+    
+    .train-car-2 {
+        height: 20px;
+        width: 34px;
+        border-bottom: 2px solid #FFD700;
+    }
+    
+    .train-car-3 {
+        height: 17px;
+        width: 28px;
+        border-bottom: 1.5px solid #FFD700;
+    }
+    
+    .train-window {
+        width: 7px;
+        height: 9px;
+    }
+    
+    .train-car-2 .train-window {
+        width: 6px;
+        height: 8px;
+    }
+    
+    .train-car-3 .train-window {
+        width: 5px;
+        height: 6px;
+    }
+    
+    .train-wheels {
+        gap: 8px;
+    }
+    
+    .train-wheel {
+        width: 6px;
+        height: 6px;
+        border-width: 1.5px;
+    }
+    
+    .train-car-2 .train-wheel {
+        width: 5px;
+        height: 5px;
+    }
+    
+    .train-car-3 .train-wheel {
+        width: 4px;
+        height: 4px;
+    }
+    
+    .train-headlight {
+        right: -3px;
+        width: 6px;
+        height: 6px;
+    }
+    
+    .train-rear-light {
+        left: -3px;
+        width: 5px;
+        height: 5px;
+    }
+    
+    .train-connection {
+        width: 4px;
+        height: 6px;
+        margin-bottom: 2px;
+    }
+    
+    .train-connection-2 {
+        width: 4px;
+        height: 5px;
+        margin-bottom: 2px;
+    }
+    
+    .loading-subtext {
+        font-size: 11px;
+    }
+    
+    @keyframes trainMoveContinuous {
+        0% {
+            transform: translateX(-75px);
+        }
+        100% {
+            transform: translateX(calc(100% + 35px));
+        }
+    }
+}
 </style>
 
 
 </head>
 <body>
 
+    <!-- ========== LOADING OVERLAY WITH MOVING TRAIN - 3 CARS ========== -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-container">
+        <!-- Train Track -->
+        <div class="train-track-container">
+            <div class="train-tracks"></div>
+            
+            <!-- Moving Train - 3 Cars -->
+            <div class="moving-train">
+                <!-- Train Car 1 (Main - Front) -->
+                <div class="train-body">
+                    <div class="train-windows">
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                    </div>
+                    <div class="train-headlight"></div>
+                    <div class="train-wheels">
+                        <div class="train-wheel"></div>
+                        <div class="train-wheel"></div>
+                    </div>
+                </div>
+                
+                <!-- Train Connection 1 -->
+                <div class="train-connection"></div>
+                
+                <!-- Train Car 2 (Middle) -->
+                <div class="train-car-2">
+                    <div class="train-windows">
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                    </div>
+                    <div class="train-wheels">
+                        <div class="train-wheel"></div>
+                        <div class="train-wheel"></div>
+                    </div>
+                </div>
+                
+                <!-- Train Connection 2 -->
+                <div class="train-connection-2"></div>
+                
+                <!-- Train Car 3 (Last - Rear) -->
+                <div class="train-car-3">
+                    <div class="train-windows">
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                        <div class="train-window"></div>
+                    </div>
+                    <div class="train-rear-light"></div>
+                    <div class="train-wheels">
+                        <div class="train-wheel"></div>
+                        <div class="train-wheel"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="loading-subtext">Please wait while we fetch the latest updates...</div>
+    </div>
+</div>
     <!-- Mobile Bottom Navigation -->
 <div class="bottom-nav">
     <div class="bottom-nav-items">
@@ -1755,6 +2358,176 @@ if (!document.getElementById('locationToastStyles')) {
     document.head.appendChild(style);
 }
 
+// ========== LOADING OVERLAY CONTROLS ==========
+function showLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.add('active');
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('active');
+}
+
+// ========== FETCH STATION DATA WITH LOADING OVERLAY ==========
+async function fetchStationData() {
+    const now = Date.now();
+    
+    if (cachedData && (now - lastFetchTime) < CACHE_DURATION) {
+        console.log('📦 Using cached map data');
+        return cachedData;
+    }
+    
+    if (isUpdating) {
+        console.log('⏳ Update already in progress');
+        return cachedData;
+    }
+    
+    isUpdating = true;
+    showLoading(); // <-- Show loading overlay
+    
+    try {
+        console.log('🚀 Fetching fresh map data from LIVE MAP API (with overrides)...');
+        
+        const [response, overrideResponse] = await Promise.all([
+            fetch(`/api/live-map/directions/v2?_=${Date.now()}`),
+            fetch(`/api/operator/debug-override?_=${Date.now()}`)
+        ]);
+        
+        const data = await response.json();
+        const overrideData = await overrideResponse.json();
+        const activeOverrides = overrideData.active_overrides || {};
+        
+        console.log('📋 Active overrides:', activeOverrides);
+        
+        const nowTime = new Date();
+        const hour = nowTime.getHours();
+        const minute = nowTime.getMinutes();
+        const currentTime = hour + minute/60;
+        const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
+        const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
+        
+        const processedData = { northbound: {}, southbound: {} };
+        
+        // ========== Process each station ==========
+        for (const station of stations) {
+            const northData = data.northbound?.[station] || null;
+            const southData = data.southbound?.[station] || null;
+            
+            const northOverrideKey = `${station}_northbound`;
+            const southOverrideKey = `${station}_southbound`;
+            const northOverride = activeOverrides[northOverrideKey] || null;
+            const southOverride = activeOverrides[southOverrideKey] || null;
+            
+            // ===== NORTHBOUND with FALLBACK =====
+            const isNorthOverridden = !!northOverride;
+            if (isNorthOverridden) {
+                const overrideCong = northOverride.congestion || northOverride.level || 25;
+                const overrideStatus = northOverride.level || getStatusText(overrideCong);
+                processedData.northbound[station] = {
+                    congestion: overrideCong,
+                    wait_time: northData?.wait_time || getWaitTime(overrideCong),
+                    status: overrideStatus,
+                    overridden: true,
+                    override_info: northOverride
+                };
+            } else if (isClosed) {
+                processedData.northbound[station] = { 
+                    congestion: 0, 
+                    wait_time: 'CLOSED', 
+                    status: 'CLOSED',
+                    overridden: false,
+                    override_info: null
+                };
+            } else if (northData) {
+                const northCong = northData.congestion ?? 25;
+                processedData.northbound[station] = {
+                    congestion: northCong,
+                    wait_time: northData.wait_time || getWaitTime(northCong),
+                    status: northData.status || getStatusText(northCong),
+                    overridden: false,
+                    override_info: null
+                };
+            } else {
+                // ========== FALLBACK: No data from API ==========
+                console.log(`⚠️ No northbound data for ${station}, using fallback`);
+                processedData.northbound[station] = {
+                    congestion: 25,
+                    wait_time: '5-10 min',
+                    status: 'Light',
+                    overridden: false,
+                    override_info: null
+                };
+            }
+            
+            // ===== SOUTHBOUND with FALLBACK =====
+            const isSouthOverridden = !!southOverride;
+            if (isSouthOverridden) {
+                const overrideCong = southOverride.congestion || southOverride.level || 25;
+                const overrideStatus = southOverride.level || getStatusText(overrideCong);
+                processedData.southbound[station] = {
+                    congestion: overrideCong,
+                    wait_time: southData?.wait_time || getWaitTime(overrideCong),
+                    status: overrideStatus,
+                    overridden: true,
+                    override_info: southOverride
+                };
+            } else if (isClosed) {
+                processedData.southbound[station] = { 
+                    congestion: 0, 
+                    wait_time: 'CLOSED', 
+                    status: 'CLOSED',
+                    overridden: false,
+                    override_info: null
+                };
+            } else if (southData) {
+                const southCong = southData.congestion ?? 25;
+                processedData.southbound[station] = {
+                    congestion: southCong,
+                    wait_time: southData.wait_time || getWaitTime(southCong),
+                    status: southData.status || getStatusText(southCong),
+                    overridden: false,
+                    override_info: null
+                };
+            } else {
+                // ========== FALLBACK: No data from API ==========
+                console.log(`⚠️ No southbound data for ${station}, using fallback`);
+                processedData.southbound[station] = {
+                    congestion: 25,
+                    wait_time: '5-10 min',
+                    status: 'Light',
+                    overridden: false,
+                    override_info: null
+                };
+            }
+        }
+        
+        cachedData = processedData;
+        lastFetchTime = now;
+        isUpdating = false;
+        hideLoading(); // <-- Hide loading overlay
+        
+        console.log('✅ Map data loaded with fallbacks');
+        return processedData;
+        
+    } catch (error) {
+        console.error('Fetch failed:', error);
+        isUpdating = false;
+        hideLoading(); // <-- Hide loading overlay on error
+        
+        // Return cached data or create fallback data
+        if (cachedData) return cachedData;
+        
+        // Create emergency fallback data
+        const fallbackData = { northbound: {}, southbound: {} };
+        for (const station of stations) {
+            fallbackData.northbound[station] = { congestion: 25, wait_time: '5-10 min', status: 'Light', overridden: false, override_info: null };
+            fallbackData.southbound[station] = { congestion: 25, wait_time: '5-10 min', status: 'Light', overridden: false, override_info: null };
+        }
+        return fallbackData;
+    }
+}
 function trackUserLocation() {
     // If test mode is on, use test station
     if (TEST_MODE) {
@@ -2031,161 +2804,7 @@ function goToReport() {
     const stationName = document.getElementById('modalStationName').textContent;
     window.location.href = '/report?station=' + encodeURIComponent(stationName);
 }
-async function fetchStationData() {
-    const now = Date.now();
-    
-    if (cachedData && (now - lastFetchTime) < CACHE_DURATION) {
-        console.log('📦 Using cached map data');
-        return cachedData;
-    }
-    
-    if (isUpdating) {
-        console.log('⏳ Update already in progress');
-        return cachedData;
-    }
-    
-    isUpdating = true;
-    
-    try {
-        console.log('🚀 Fetching fresh map data from LIVE MAP API (with overrides)...');
-        
-        const [response, overrideResponse] = await Promise.all([
-            fetch(`/api/live-map/directions/v2?_=${Date.now()}`),
-            fetch(`/api/operator/debug-override?_=${Date.now()}`)
-        ]);
-        
-        const data = await response.json();
-        const overrideData = await overrideResponse.json();
-        const activeOverrides = overrideData.active_overrides || {};
-        
-        console.log('📋 Active overrides:', activeOverrides);
-        
-        const nowTime = new Date();
-        const hour = nowTime.getHours();
-        const minute = nowTime.getMinutes();
-        const currentTime = hour + minute/60;
-        const OPERATING_START = 4.5;
-        const OPERATING_END = 22.5;
-        const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
-        
-        const processedData = { northbound: {}, southbound: {} };
-        
-        // ========== Process each station ==========
-        for (const station of stations) {
-            const northData = data.northbound?.[station] || null;
-            const southData = data.southbound?.[station] || null;
-            
-            const northOverrideKey = `${station}_northbound`;
-            const southOverrideKey = `${station}_southbound`;
-            const northOverride = activeOverrides[northOverrideKey] || null;
-            const southOverride = activeOverrides[southOverrideKey] || null;
-            
-            // ===== NORTHBOUND with FALLBACK =====
-            const isNorthOverridden = !!northOverride;
-            if (isNorthOverridden) {
-                const overrideCong = northOverride.congestion || northOverride.level || 25;
-                const overrideStatus = northOverride.level || getStatusText(overrideCong);
-                processedData.northbound[station] = {
-                    congestion: overrideCong,
-                    wait_time: northData?.wait_time || getWaitTime(overrideCong),
-                    status: overrideStatus,
-                    overridden: true,
-                    override_info: northOverride
-                };
-            } else if (isClosed) {
-                processedData.northbound[station] = { 
-                    congestion: 0, 
-                    wait_time: 'CLOSED', 
-                    status: 'CLOSED',
-                    overridden: false,
-                    override_info: null
-                };
-            } else if (northData) {
-                const northCong = northData.congestion ?? 25;
-                processedData.northbound[station] = {
-                    congestion: northCong,
-                    wait_time: northData.wait_time || getWaitTime(northCong),
-                    status: northData.status || getStatusText(northCong),
-                    overridden: false,
-                    override_info: null
-                };
-            } else {
-                // ========== FALLBACK: No data from API ==========
-                console.log(`⚠️ No northbound data for ${station}, using fallback`);
-                processedData.northbound[station] = {
-                    congestion: 25,
-                    wait_time: '5-10 min',
-                    status: 'Light',
-                    overridden: false,
-                    override_info: null
-                };
-            }
-            
-            // ===== SOUTHBOUND with FALLBACK =====
-            const isSouthOverridden = !!southOverride;
-            if (isSouthOverridden) {
-                const overrideCong = southOverride.congestion || southOverride.level || 25;
-                const overrideStatus = southOverride.level || getStatusText(overrideCong);
-                processedData.southbound[station] = {
-                    congestion: overrideCong,
-                    wait_time: southData?.wait_time || getWaitTime(overrideCong),
-                    status: overrideStatus,
-                    overridden: true,
-                    override_info: southOverride
-                };
-            } else if (isClosed) {
-                processedData.southbound[station] = { 
-                    congestion: 0, 
-                    wait_time: 'CLOSED', 
-                    status: 'CLOSED',
-                    overridden: false,
-                    override_info: null
-                };
-            } else if (southData) {
-                const southCong = southData.congestion ?? 25;
-                processedData.southbound[station] = {
-                    congestion: southCong,
-                    wait_time: southData.wait_time || getWaitTime(southCong),
-                    status: southData.status || getStatusText(southCong),
-                    overridden: false,
-                    override_info: null
-                };
-            } else {
-                // ========== FALLBACK: No data from API ==========
-                console.log(`⚠️ No southbound data for ${station}, using fallback`);
-                processedData.southbound[station] = {
-                    congestion: 25,
-                    wait_time: '5-10 min',
-                    status: 'Light',
-                    overridden: false,
-                    override_info: null
-                };
-            }
-        }
-        
-        cachedData = processedData;
-        lastFetchTime = now;
-        isUpdating = false;
-        
-        console.log('✅ Map data loaded with fallbacks');
-        return processedData;
-        
-    } catch (error) {
-        console.error('Fetch failed:', error);
-        isUpdating = false;
-        
-        // Return cached data or create fallback data
-        if (cachedData) return cachedData;
-        
-        // Create emergency fallback data
-        const fallbackData = { northbound: {}, southbound: {} };
-        for (const station of stations) {
-            fallbackData.northbound[station] = { congestion: 25, wait_time: '5-10 min', status: 'Light', overridden: false, override_info: null };
-            fallbackData.southbound[station] = { congestion: 25, wait_time: '5-10 min', status: 'Light', overridden: false, override_info: null };
-        }
-        return fallbackData;
-    }
-}
+
 // ========== OPTIMIZED: Batch DOM Updates With Nearest Location Glow ==========
 function renderStations() {
     const container = document.getElementById('stations-container');

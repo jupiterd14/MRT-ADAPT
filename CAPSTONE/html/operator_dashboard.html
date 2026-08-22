@@ -4011,7 +4011,7 @@ function setupFlaggedCard() {
         flaggedCard.onclick = function() {
             const flaggedReports = allReportsData.filter(r => (r.flag_count || 0) > 0 || r.flagged === true);
             if (flaggedReports.length === 0) {
-                showToast('📭', 'No flagged reports for your stations');
+                showToast('', 'No flagged reports for your stations');
                 return;
             }
             displayOperatorReports(flaggedReports);
@@ -5471,7 +5471,7 @@ async function confirmRemoveOverride() {
         });
     }
 }
-  function applyOperatorFilters() {
+function applyOperatorFilters() {
     console.log("🔄 APPLY FILTERS BUTTON CLICKED!");
     
     // Get selected congestion levels
@@ -5499,61 +5499,44 @@ async function confirmRemoveOverride() {
     
     let filteredReports = [...allReportsData];
     
-    // ========== FILTER BY DATE ==========
+    // ========== FILTER BY DATE - FIXED YEAR 2025 ==========
     if (dateRange && dateRange !== 'all') {
+        // Get current date but FORCE year to 2025
         const now = new Date();
-        let dateLimit = new Date();
+        const referenceDate = new Date(2025, now.getMonth(), now.getDate());
+        referenceDate.setHours(0, 0, 0, 0);
         
-        // Check if reports are from a different year (e.g., 2025)
-        let reportYear = null;
-        let useReportYear = false;
-        
-        // Detect report year from first few reports
-        for (let i = 0; i < Math.min(5, allReportsData.length); i++) {
-            if (allReportsData[i].timestamp) {
-                const testDate = new Date(allReportsData[i].timestamp);
-                if (testDate.getFullYear() !== now.getFullYear()) {
-                    reportYear = testDate.getFullYear();
-                    useReportYear = true;
-                    console.log(`Detected report year: ${reportYear} vs system year: ${now.getFullYear()}`);
-                    break;
-                }
-            }
-        }
-        
-        let today;
-        if (useReportYear && reportYear) {
-            today = new Date(reportYear, now.getMonth(), now.getDate());
-        } else {
-            today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        }
-        today.setHours(0, 0, 0, 0);
+        console.log("📅 Using reference date:", referenceDate.toLocaleDateString());
         
         filteredReports = filteredReports.filter(report => {
             if (!report.timestamp) return false;
             try {
                 const reportDate = new Date(report.timestamp);
+                if (isNaN(reportDate.getTime())) return false;
+                
                 const reportDateOnly = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
                 reportDateOnly.setHours(0, 0, 0, 0);
                 
                 switch(dateRange) {
                     case 'today': {
-                        return reportDateOnly.getTime() === today.getTime();
+                        return reportDateOnly.getTime() === referenceDate.getTime();
                     }
                     case 'yesterday': {
-                        const yesterday = new Date(today);
+                        const yesterday = new Date(referenceDate);
                         yesterday.setDate(yesterday.getDate() - 1);
                         return reportDateOnly.getTime() === yesterday.getTime();
                     }
                     case 'week': {
-                        const weekAgo = new Date(today);
+                        const weekAgo = new Date(referenceDate);
                         weekAgo.setDate(weekAgo.getDate() - 7);
-                        return reportDateOnly >= weekAgo;
+                        console.log(`Week range: ${weekAgo.toLocaleDateString()} to ${referenceDate.toLocaleDateString()}`);
+                        return reportDateOnly >= weekAgo && reportDateOnly <= referenceDate;
                     }
                     case 'month': {
-                        const monthAgo = new Date(today);
+                        const monthAgo = new Date(referenceDate);
                         monthAgo.setDate(monthAgo.getDate() - 30);
-                        return reportDateOnly <= monthAgo;
+                        console.log(`Month range: ${monthAgo.toLocaleDateString()} to ${referenceDate.toLocaleDateString()}`);
+                        return reportDateOnly >= monthAgo && reportDateOnly <= referenceDate;
                     }
                     default:
                         return true;
@@ -5563,7 +5546,7 @@ async function confirmRemoveOverride() {
                 return false;
             }
         });
-        console.log("📅 After date filter:", filteredReports.length);
+        console.log(`📅 After date filter (${dateRange}):`, filteredReports.length);
     }
     
     // ========== FILTER BY STATIONS ==========
@@ -5598,9 +5581,9 @@ async function confirmRemoveOverride() {
     
     // Show toast with count
     if (filteredReports.length === 0) {
-        showToast('📭', 'No reports match your filters');
+        showToast('', 'No reports match your filters');
     } else {
-        showToast('✅', `Showing ${filteredReports.length} report(s)`);
+        showToast('', `Showing ${filteredReports.length} report(s)`);
     }
 }
     // ========== BROADCAST DIRECTION FUNCTIONS ==========

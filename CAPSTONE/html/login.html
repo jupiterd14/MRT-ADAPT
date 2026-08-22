@@ -449,9 +449,102 @@
             .auth-card { padding: 15px 30px; }
             .divider, .social-row { margin-bottom: 10px; margin-top: 10px; }
         }
+/* Fix modal content for code inputs */
+.modal-content {
+    max-width: 460px; /* Slightly smaller */
+    padding: 30px 20px; /* Reduced padding */
+}
 
+/* Code input wrapper - ensure it fits */
+.code-input-wrapper {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin: 16px 0;
+    flex-wrap: nowrap;
+}
 
+/* Fixed code inputs with visible numbers */
+.code-input {
+    width: 38px;
+    height: 48px;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 700;
+    border: 2px solid var(--card-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff !important; /* Force white text */
+    outline: none;
+    transition: all 0.15s ease;
+    caret-color: var(--btn-blue);
+    padding: 0;
+}
+
+/* Make placeholder visible */
+.code-input::placeholder {
+    color: #64748b;
+    font-weight: 400;
+    font-size: 14px;
+}
+
+/* Make sure numbers are visible */
+.code-input:focus {
+    border-color: var(--btn-blue);
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.25);
+    outline: none;
+}
+
+/* Filled state - GREEN GLOW */
+.code-input.filled {
+    border-color: var(--success-green);
+    background: rgba(34, 197, 94, 0.15);
+    box-shadow: 0 0 16px rgba(34, 197, 94, 0.12);
+    color: #ffffff !important;
+}
+
+/* Remove number spinners */
+.code-input::-webkit-outer-spin-button,
+.code-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.code-input[type=number] {
+    -moz-appearance: textfield;
+}
+
+/* Mobile responsive */
+@media (max-width: 600px) {
+    .modal-content {
+        max-width: 95%;
+        padding: 20px 12px;
+    }
     
+    .code-input-wrapper {
+        gap: 4px;
+    }
+    
+    .code-input {
+        width: 32px;
+        height: 40px;
+        font-size: 16px;
+        border-radius: 8px;
+    }
+}
+
+@media (max-width: 400px) {
+    .code-input-wrapper {
+        gap: 3px;
+    }
+    
+    .code-input {
+        width: 28px;
+        height: 36px;
+        font-size: 14px;
+        border-radius: 6px;
+    }
+}
     </style>
 </head>
 <body>
@@ -498,16 +591,16 @@
                 <h2 class="modal-title">Verify Code</h2>
                 <p class="modal-message">Enter the 6-digit code sent to <strong id="resetEmailDisplay"></strong></p>
                 
-                <div class="code-input-wrapper">
-                    <input type="text" class="code-input" id="code1" maxlength="1" oninput="moveNext(this, 'code2')">
-                    <input type="text" class="code-input" id="code2" maxlength="1" oninput="moveNext(this, 'code3')">
-                    <input type="text" class="code-input" id="code3" maxlength="1" oninput="moveNext(this, 'code4')">
-                    <input type="text" class="code-input" id="code4" maxlength="1" oninput="moveNext(this, 'code5')">
-                    <input type="text" class="code-input" id="code5" maxlength="1" oninput="moveNext(this, 'code6')">
-                    <input type="text" class="code-input" id="code6" maxlength="1" oninput="moveNext(this, null)">
-                </div>
+            <div class="code-input-wrapper">
+<input type="text" class="code-input" id="code1" maxlength="1" inputmode="numeric" autofocus placeholder="·">
+<input type="text" class="code-input" id="code2" maxlength="1" inputmode="numeric" placeholder="·">
+<input type="text" class="code-input" id="code3" maxlength="1" inputmode="numeric" placeholder="·">
+<input type="text" class="code-input" id="code4" maxlength="1" inputmode="numeric" placeholder="·">
+<input type="text" class="code-input" id="code5" maxlength="1" inputmode="numeric" placeholder="·">
+<input type="text" class="code-input" id="code6" maxlength="1" inputmode="numeric" placeholder="·">
+</div>
 
-                <div class="timer-text" id="timerDisplay">⏱️ <span id="timerSeconds">5:00</span> remaining</div>
+                <div class="timer-text" id="timerDisplay">⏱ <span id="timerSeconds">5:00</span> remaining</div>
                 <div style="margin-top: 6px;">
                     <button class="resend-btn" id="resendBtn" onclick="resendCode()" disabled>Resend Code</button>
                 </div>
@@ -651,23 +744,25 @@
             }
         }
 
-        function resetForgotForm() {
-            document.getElementById('forgotStep1').classList.add('active');
-            document.getElementById('forgotStep2').classList.remove('active');
-            document.getElementById('resetEmail').value = '';
-            document.querySelectorAll('.code-input').forEach(el => el.value = '');
-            document.getElementById('newPassword').value = '';
-            document.getElementById('confirmPassword').value = '';
-            document.getElementById('passwordMatchHint').textContent = '';
-            document.getElementById('timerDisplay').textContent = '⏱️ 5:00 remaining';
-            if (resetTimer) {
-                clearInterval(resetTimer);
-                resetTimer = null;
-            }
-            resetSeconds = 300;
-            document.getElementById('resendBtn').disabled = true;
-        }
-
+      function resetForgotForm() {
+    document.getElementById('forgotStep1').classList.add('active');
+    document.getElementById('forgotStep2').classList.remove('active');
+    document.getElementById('resetEmail').value = '';
+    document.querySelectorAll('.code-input').forEach(el => {
+        el.value = '';
+        el.classList.remove('filled');
+    });
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    document.getElementById('passwordMatchHint').textContent = '';
+    document.getElementById('timerDisplay').textContent = '⏱️ 5:00 remaining';
+    if (resetTimer) {
+        clearInterval(resetTimer);
+        resetTimer = null;
+    }
+    resetSeconds = 300;
+    document.getElementById('resendBtn').disabled = true;
+}
         // Close modals when clicking outside
         window.onclick = function(event) {
             if (event.target.classList.contains('modal-overlay')) {
@@ -724,7 +819,7 @@
                     // Enable resend
                     document.getElementById('resendBtn').disabled = true;
                     
-                    showToast('✅ Verification code sent!', 'success');
+                    showToast(' Verification code sent!', 'success');
                 } else {
                     showToast(data.error || 'Failed to send code', 'error');
                 }
@@ -802,47 +897,121 @@
                 `⏱️ <span style="color: ${resetSeconds <= 60 ? '#ef4444' : '#fbbf24'}; font-weight: 600;">${minutes}:${seconds.toString().padStart(2, '0')}</span> remaining`;
         }
 
-        // ========== CODE INPUT HANDLING ==========
-        function moveNext(current, nextId) {
-            if (current.value.length === 1) {
-                if (nextId) {
-                    document.getElementById(nextId).focus();
-                } else {
-                    // All digits entered, auto-verify
-                    document.getElementById('newPassword').focus();
+      // ========== CODE INPUT HANDLING - FIXED ==========
+// ========== CODE INPUT HANDLING - FIXED ==========
+function moveNext(current, nextId) {
+    // Allow only digits
+    current.value = current.value.replace(/\D/g, '');
+    
+    // Add filled class if value exists
+    if (current.value.length === 1) {
+        current.classList.add('filled');
+    } else {
+        current.classList.remove('filled');
+    }
+    
+    if (current.value.length === 1) {
+        if (nextId) {
+            const nextInput = document.getElementById(nextId);
+            if (nextInput) {
+                nextInput.focus();
+                nextInput.select();
+            }
+        } else {
+            // All digits entered, focus on password
+            document.getElementById('newPassword').focus();
+        }
+    }
+}
+
+// Auto-advance, backspace, and paste handling
+// ========== CODE INPUT HANDLING ==========
+document.querySelectorAll('.code-input').forEach((input, index, inputs) => {
+    // Handle input event
+    input.addEventListener('input', function(e) {
+        // Allow only digits
+        this.value = this.value.replace(/\D/g, '');
+        
+        // Add/remove filled class
+        if (this.value.length === 1) {
+            this.classList.add('filled');
+            // Move to next input
+            const nextInput = inputs[index + 1];
+            if (nextInput) {
+                nextInput.focus();
+                nextInput.select();
+            } else {
+                // Last input filled, focus on password
+                document.getElementById('newPassword').focus();
+            }
+        } else {
+            this.classList.remove('filled');
+        }
+    });
+
+    // Handle backspace
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Backspace') {
+            if (this.value.length === 0) {
+                this.classList.remove('filled');
+                if (index > 0) {
+                    const prevInput = inputs[index - 1];
+                    prevInput.focus();
+                    prevInput.select();
                 }
             }
         }
+        if (e.key === 'Enter') {
+            document.getElementById('resetPasswordBtn').click();
+        }
+    });
 
-        // Auto-advance and backspace on code inputs
-        document.querySelectorAll('.code-input').forEach((input, index, inputs) => {
-            input.addEventListener('keydown', function(e) {
-                if (e.key === 'Backspace' && this.value.length === 0 && index > 0) {
-                    inputs[index - 1].focus();
-                }
-                if (e.key === 'Enter') {
-                    document.getElementById('resetPasswordBtn').click();
-                }
-            });
-            
-            input.addEventListener('paste', function(e) {
-                e.preventDefault();
-                const paste = (e.clipboardData || window.clipboardData).getData('text');
-                const digits = paste.replace(/\D/g, '').slice(0, 6);
-                const inputs = document.querySelectorAll('.code-input');
-                digits.split('').forEach((digit, i) => {
-                    if (inputs[i]) inputs[i].value = digit;
-                });
-                if (digits.length === 6) {
-                    document.getElementById('newPassword').focus();
-                }
-            });
+    // Handle paste
+    input.addEventListener('paste', function(e) {
+        e.preventDefault();
+        const paste = (e.clipboardData || window.clipboardData).getData('text');
+        const digits = paste.replace(/\D/g, '').slice(0, 6);
+        
+        // Clear all inputs first
+        inputs.forEach(el => {
+            el.value = '';
+            el.classList.remove('filled');
         });
+        
+        // Fill in the digits
+        digits.split('').forEach((digit, i) => {
+            if (inputs[i]) {
+                inputs[i].value = digit;
+                inputs[i].classList.add('filled');
+            }
+        });
+        
+        // Focus the next empty input or password
+        if (digits.length === 6) {
+            document.getElementById('newPassword').focus();
+        } else if (digits.length > 0 && digits.length < 6) {
+            inputs[digits.length].focus();
+        }
+    });
 
-        // ========== PASSWORD MATCH CHECK ==========
-        document.getElementById('newPassword').addEventListener('input', checkPasswordMatch);
-        document.getElementById('confirmPassword').addEventListener('input', checkPasswordMatch);
+    // Auto-select on focus
+    input.addEventListener('focus', function() {
+        this.select();
+    });
+});
 
+// Also handle the password field Enter key
+document.getElementById('newPassword').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        document.getElementById('resetPasswordBtn').click();
+    }
+});
+
+document.getElementById('confirmPassword').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        document.getElementById('resetPasswordBtn').click();
+    }
+});
         function checkPasswordMatch() {
             const newPass = document.getElementById('newPassword').value;
             const confirmPass = document.getElementById('confirmPassword').value;
