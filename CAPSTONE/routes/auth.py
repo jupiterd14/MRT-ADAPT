@@ -51,41 +51,48 @@ def login_required(f):
             return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
-
 @auth_bp.before_app_request
 def check_session_validity():
     """Check if session is valid on every request - prevents back button access"""
     from flask import request, session, flash, redirect, url_for
     
-    # Skip login, signup, static, and public routes
+    # ========== CRITICAL: Allow ALL /api/ routes FIRST ==========
+    # This must be the FIRST check!
+    if request.path.startswith('/api/'):
+        return None
+    
+    # Also allow these specific non-API public endpoints
     public_endpoints = [
         'auth.login', 
         'auth.google_login', 
         'auth.google_authorize', 
         'auth.signup',
         'auth.check_session',
-        'static'
+        'static',
+        'public.home',
+        'public.live_map',
+        'public.travel_plan',
+        'public.alerts',
+        'public.report',
+        'user.user_dashboard',
     ]
     
     if request.endpoint in public_endpoints:
         return None
     
-    # If user_id is in session, verify it's actually valid
-    if 'user_id' in session:
-        user = User.query.get(session['user_id'])
-        if not user or not user.is_active:
-            session.clear()
-            flash('Your session has expired. Please log in again.', 'warning')
-            return redirect(url_for('auth.login'))
-        return None
-    else:
-        # If no user_id and we're on a protected page, redirect to login
-        if request.endpoint and not request.endpoint.startswith('auth.'):
-            flash('Please log in to access this page.', 'warning')
-            return redirect(url_for('auth.login'))
+    # For protected endpoints (admin, operator), require login
+    if 'user_id' not in session:
+        flash('Please log in to access this page.', 'warning')
+        return redirect(url_for('auth.login'))
+    
+    # Verify user exists and is active
+    user = User.query.get(session['user_id'])
+    if not user or not user.is_active:
+        session.clear()
+        flash('Your session has expired. Please log in again.', 'warning')
+        return redirect(url_for('auth.login'))
     
     return None
-
 @auth_bp.route('/api/check-session')
 def check_session():
     """Check if user session is still valid - used by frontend JavaScript"""
