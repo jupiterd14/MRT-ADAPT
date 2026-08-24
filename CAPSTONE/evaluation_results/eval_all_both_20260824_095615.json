@@ -1,8 +1,8 @@
 {
-  "station": "Cubao",
-  "direction": "northbound",
-  "total_samples": 30,
-  "timestamp": "2026-07-04T01:52:41.764507",
+  "station": "all",
+  "direction": "both",
+  "total_samples": 794,
+  "timestamp": "2026-08-24T09:56:15.522641",
   "confusion_matrix": {
     "labels": [
       "Light",
@@ -12,53 +12,53 @@
     ],
     "matrix": [
       [
-        13,
-        4,
+        55,
+        100,
         0,
         0
       ],
       [
-        2,
-        8,
-        0,
-        0
-      ],
-      [
-        0,
-        0,
+        76,
+        168,
         0,
         0
       ],
       [
         0,
         0,
+        0,
+        0
+      ],
+      [
+        62,
+        14,
         0,
         0
       ]
     ]
   },
-  "accuracy": 73.33,
-  "precision_weighted": 78.39,
-  "recall_weighted": 72.41,
-  "f1_weighted": 75.22,
+  "accuracy": 41.94,
+  "precision_weighted": 30.82,
+  "recall_weighted": 42.08,
+  "f1_weighted": 35.53,
   "regression_metrics": {
-    "mae": 9.97,
-    "rmse": 13.3,
-    "r2": 0.0835,
-    "mape": 38.47
+    "mae": 21.84,
+    "rmse": 29.7,
+    "r2": -0.6755,
+    "mape": 69.86
   },
   "per_class_metrics": {
     "Light": {
-      "precision": 86.7,
-      "recall": 76.5,
-      "f1_score": 81.2,
-      "support": 17.0
+      "precision": 21.3,
+      "recall": 33.3,
+      "f1_score": 26.0,
+      "support": 165.0
     },
     "Moderate": {
-      "precision": 66.7,
-      "recall": 66.7,
-      "f1_score": 66.7,
-      "support": 12.0
+      "precision": 45.3,
+      "recall": 59.4,
+      "f1_score": 51.4,
+      "support": 283.0
     },
     "Heavy": {
       "precision": 0.0,
@@ -70,24 +70,24 @@
       "precision": 0.0,
       "recall": 0.0,
       "f1_score": 0.0,
-      "support": 0.0
+      "support": 82.0
     }
   },
   "category_distribution": {
     "Light": {
-      "actual": 17,
-      "predicted": 15
+      "actual": 165,
+      "predicted": 258
     },
     "Moderate": {
-      "actual": 12,
-      "predicted": 12
+      "actual": 283,
+      "predicted": 371
     },
     "Heavy": {
       "actual": 0,
       "predicted": 0
     },
     "Severe": {
-      "actual": 0,
+      "actual": 82,
       "predicted": 0
     }
   }

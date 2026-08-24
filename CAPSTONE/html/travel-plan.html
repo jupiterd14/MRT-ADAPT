@@ -2230,8 +2230,8 @@ function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTi
 // Helper function to get congestion text
 function getCongestionText(congestion) {
     if (congestion > 80) return 'SEVERELY CONGESTED';
-    if (congestion > 60) return 'CONGESTED';
-    if (congestion > 30) return 'MODERATE';
+    if (congestion > 50) return 'CONGESTED';
+    if (congestion > 25) return 'MODERATE';
     return 'LIGHT';
 }
 
@@ -3107,16 +3107,16 @@ async function fetchAlertCount() {
                 for (const [station, stationData] of Object.entries(data.northbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.northbound.severe.push(station);
-                    else if (congestion > 60) grouped.northbound.congested.push(station);
-                    else if (congestion > 30) grouped.northbound.moderate.push(station);
+                    else if (congestion > 50) grouped.northbound.congested.push(station);
+                    else if (congestion > 25) grouped.northbound.moderate.push(station);
                     else if (congestion > 0) grouped.northbound.light.push(station);
                 }
                 
                 for (const [station, stationData] of Object.entries(data.southbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.southbound.severe.push(station);
-                    else if (congestion > 60) grouped.southbound.congested.push(station);
-                    else if (congestion > 30) grouped.southbound.moderate.push(station);
+                    else if (congestion > 50) grouped.southbound.congested.push(station);
+                    else if (congestion > 25) grouped.southbound.moderate.push(station);
                     else if (congestion > 0) grouped.southbound.light.push(station);
                 }
                 

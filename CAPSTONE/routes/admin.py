@@ -627,22 +627,16 @@ def station_status():
     try:
         from flask import current_app
         from datetime import datetime
+        from routes.api_predict import get_directional_prediction  # IMPORT FROM API_PREDICT
         
         stations = current_app.config.get('STATIONS', STATIONS)
         now = datetime.now()
         
-        # Get the prediction function from app config (THIS IS THE KEY!)
-        get_directional = current_app.config.get('GET_DIRECTIONAL_PREDICTION')
-        
-        if not get_directional:
-            print("⚠️ GET_DIRECTIONAL_PREDICTION not found in config!")
-            # Fallback
-            return jsonify({'stations': []})
-        
         def get_congestion(station_name, direction):
-            """Get congestion using the app's prediction function (same as Live Map)"""
+            """Get congestion using the SAME function as live map (api_predict)"""
             try:
-                prediction = get_directional(station_name, direction, now)
+                # Use the SAME function as api_other.py live-map endpoint
+                prediction = get_directional_prediction(station_name, direction, now)
                 return max(0, min(100, prediction))
             except Exception as e:
                 print(f"⚠️ Error predicting {station_name} {direction}: {e}")

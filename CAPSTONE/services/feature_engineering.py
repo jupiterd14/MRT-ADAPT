@@ -410,46 +410,71 @@ def get_station_dataframe(station_name, direction):
     print(f"✅ Cached {len(combined)} hours for {cache_key}")
     
     return combined
-
 def get_baseline_features(target_datetime, seq_length=24):
     """Cache baseline features for repeated lookups with better defaults"""
-    cache_key = f"{target_datetime.strftime('%Y%m%d%H')}_{seq_length}"
-    
+    cache_key = f"{target_datetime.strftime('%Y%m%d')}_{target_datetime.weekday()}_{seq_length}"
+      
     if cache_key not in _BASELINE_FEATURES_CACHE:
         default_features = np.zeros((seq_length, len(FEATURE_COLS)), dtype=np.float32)
         for i in range(seq_length):
             loop_time = target_datetime - timedelta(hours=(seq_length - i))
             h_val = loop_time.hour
+            dow = loop_time.weekday()
+            month = loop_time.month
             
             default_features[i, 0] = h_val
-            default_features[i, 1] = loop_time.weekday()
-            default_features[i, 2] = loop_time.month
+            default_features[i, 1] = dow
+            default_features[i, 2] = month
             default_features[i, 3] = np.sin(2 * np.pi * h_val / 24)
             default_features[i, 4] = np.cos(2 * np.pi * h_val / 24)
-            default_features[i, 5] = np.sin(2 * np.pi * loop_time.weekday() / 7)
-            default_features[i, 6] = np.cos(2 * np.pi * loop_time.weekday() / 7)
-            default_features[i, 7] = np.sin(2 * np.pi * (loop_time.month - 1) / 12)
-            default_features[i, 8] = np.cos(2 * np.pi * (loop_time.month - 1) / 12)
+            default_features[i, 5] = np.sin(2 * np.pi * dow / 7)
+            default_features[i, 6] = np.cos(2 * np.pi * dow / 7)
+            default_features[i, 7] = np.sin(2 * np.pi * (month - 1) / 12)
+            default_features[i, 8] = np.cos(2 * np.pi * (month - 1) / 12)
             
-            # ========== MORE REALISTIC BASELINE CONGESTION ==========
-            if 7 <= h_val <= 9:
-                # Morning rush
-                default_features[i, -1] = 60 + (h_val - 7) * 10  # 60% at 7am, 80% at 9am
-            elif 17 <= h_val <= 19:
-                # Evening rush
-                default_features[i, -1] = 65 + (h_val - 17) * 10  # 65% at 5pm, 85% at 7pm
-            elif 10 <= h_val <= 16:
-                # Midday
-                default_features[i, -1] = 40 + (h_val - 10) * 3  # 40-58%
-            elif 5 <= h_val <= 6:
-                # Early morning - increased from 20%
-                default_features[i, -1] = 25 + (h_val - 5) * 10  # 25% at 5am, 35% at 6am
-            elif 20 <= h_val <= 22:
-                # Late evening
-                default_features[i, -1] = 35 - (h_val - 20) * 5  # 35% at 8pm, 25% at 10pm
+            # Weekday vs Weekend
+            default_features[i, 19] = 1 if dow >= 5 else 0  # is_weekend
+            default_features[i, 25] = 1 if dow == 4 else 0  # is_friday
+            
+            # ========== FIX: REALISTIC BASELINE CONGESTION ==========
+            is_weekend = dow >= 5
+            
+            if is_weekend:
+                # Weekend - lighter traffic
+                if 10 <= h_val <= 16:
+                    congestion = 25
+                elif 17 <= h_val <= 19:
+                    congestion = 30
+                elif 7 <= h_val <= 9:
+                    congestion = 15
+                elif 5 <= h_val <= 6:
+                    congestion = 5
+                else:
+                    congestion = 10
             else:
-                # Very early/late
-                default_features[i, -1] = 10
+                # Weekday patterns
+                if 0 <= h_val <= 4:
+                    congestion = 2  # Very early morning
+                elif 5 <= h_val <= 6:
+                    congestion = 5 + (h_val - 5) * 5  # 5% at 5AM, 10% at 6AM
+                elif 7 <= h_val <= 9:
+                    congestion = 20 + (h_val - 7) * 15  # 20% at 7AM, 50% at 9AM
+                elif 10 <= h_val <= 11:
+                    congestion = 35 + (h_val - 10) * 5  # 35% at 10AM, 40% at 11AM
+                elif 12 <= h_val <= 13:
+                    congestion = 40  # Noon
+                elif 14 <= h_val <= 16:
+                    congestion = 35 + (h_val - 14) * 5  # 35% at 2PM, 45% at 4PM
+                elif 17 <= h_val <= 19:
+                    congestion = 50 + (h_val - 17) * 15  # 50% at 5PM, 80% at 7PM
+                elif 20 <= h_val <= 21:
+                    congestion = 60 - (h_val - 20) * 15  # 60% at 8PM, 45% at 9PM
+                elif 22 <= h_val <= 23:
+                    congestion = 25 - (h_val - 22) * 10  # 25% at 10PM, 15% at 11PM
+                else:
+                    congestion = 10
+            
+            default_features[i, -1] = congestion
         
         _BASELINE_FEATURES_CACHE[cache_key] = default_features
     
@@ -537,118 +562,72 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
     features = lookback_df[FEATURE_COLS].values.astype(np.float32)
     return features
 def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=None, direction=None):
-    """
-    Build a typical day pattern from historical averages with HOUR-SPECIFIC patterns.
-    """
-    date_key = target_datetime.strftime('%Y%m%d_%H')
-    cache_key = f"{station_name}_{direction}_{date_key}"
+    """Build a typical day pattern from historical averages with DAY-OF-WEEK awareness"""
+    target_dow = target_datetime.weekday()
+    is_weekend = target_dow >= 5
+    
+    cache_key = f"{station_name}_{direction}_dow_{target_dow}"
     
     if cache_key in _TYPICAL_PATTERN_CACHE:
-        print(f"📦 Using cached typical pattern for {station_name} {direction} at hour {target_datetime.hour}")
+        print(f"📦 Using cached typical pattern for {station_name} {direction} (DOW={target_dow})")
         return _TYPICAL_PATTERN_CACHE[cache_key].copy()
     
     capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000) if station_name else 1000
     
-    # ========== GET HOUR-SPECIFIC CONGESTION FROM REAL DATA ==========
-    hourly_congestion = {}
+    # ========== GROUP BY HOUR AND DAY OF WEEK ==========
+    hourly_congestion = []
     
     for hour in range(24):
-        hour_data = df[df.index.hour == hour]
-        non_zero = hour_data[hour_data['TotalPassenger'] > 0]
+        # Get data for this hour AND this day of week
+        hour_data = df[(df.index.hour == hour) & (df.index.weekday == target_dow)]
         
-        if len(non_zero) > 50:
-            # Use P75 for realistic peak patterns
-            hourly_congestion[hour] = non_zero['congestion'].quantile(0.75)
-        elif len(non_zero) > 20:
-            # Use median if less data
-            hourly_congestion[hour] = non_zero['congestion'].median()
+        if len(hour_data) > 0:
+            congestion_values = hour_data['congestion'].values
+            avg_congestion = np.median(congestion_values) if len(congestion_values) > 0 else 0
+            # Optional debug: print(f"   📊 Hour {hour}: actual data: {len(hour_data)} samples, median={avg_congestion:.1f}%")
         else:
-            hourly_congestion[hour] = 0
-    
-    # ========== APPLY REALISTIC RUSH HOUR PATTERNS ==========
-    # Override with realistic values based on station and direction
-    
-    # Check if this is a terminal station
-    is_terminal = station_name in ["North Ave", "Taft"]
-    
-    for hour in range(24):
-        # ========== EARLY MORNING (5-6 AM) ==========
-        if 5 <= hour <= 6:
-            if direction == 'Northbound':
-                # Northbound early morning - commuters heading to work
-                if is_terminal:
-                    # Terminals have higher early morning traffic
-                    base = 30 + (hour - 5) * 15  # 30% at 5am, 45% at 6am
-                else:
-                    base = 25 + (hour - 5) * 10  # 25% at 5am, 35% at 6am
+            # If no data for this DOW, try same hour any day
+            hour_data_all = df[df.index.hour == hour]
+            if len(hour_data_all) > 0:
+                avg_congestion = np.median(hour_data_all['congestion'].values)
+                # Optional debug: print(f"   📊 Hour {hour}: using all-day data: {len(hour_data_all)} samples, median={avg_congestion:.1f}%")
             else:
-                # Southbound early morning - lighter
-                if is_terminal:
-                    base = 20 + (hour - 5) * 10  # 20% at 5am, 30% at 6am
-                else:
-                    base = 15 + (hour - 5) * 10  # 15% at 5am, 25% at 6am
-            hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), base)
+                avg_congestion = None
         
-        # ========== MORNING RUSH (7-9 AM) ==========
-        elif 7 <= hour <= 9:
-            if direction == 'Northbound':
-                # Northbound morning rush - people heading to work
-                if is_terminal:
-                    base = 50 + (hour - 7) * 20  # 50% at 7am, 70% at 8am, 90% at 9am
-                else:
-                    base = 40 + (hour - 7) * 15  # 40% at 7am, 55% at 8am, 70% at 9am
+        # ========== FIX: REALISTIC FALLBACK VALUES ==========
+        # Only use fallback if NO data exists at all
+        if avg_congestion is None or avg_congestion == 0:
+            # Use realistic values based on historical data (0-5% for early morning)
+            if 0 <= hour <= 4:
+                avg_congestion = 2  # Very early morning
+            elif 5 <= hour <= 6:
+                avg_congestion = 5 + (hour - 5) * 5  # 5% at 5AM, 10% at 6AM
+            elif 7 <= hour <= 9:
+                avg_congestion = 20 + (hour - 7) * 15  # 20% at 7AM, 50% at 9AM
+            elif 10 <= hour <= 11:
+                avg_congestion = 35 + (hour - 10) * 5  # 35% at 10AM, 40% at 11AM
+            elif 12 <= hour <= 13:
+                avg_congestion = 40  # Noon
+            elif 14 <= hour <= 16:
+                avg_congestion = 35 + (hour - 14) * 5  # 35% at 2PM, 45% at 4PM
+            elif 17 <= hour <= 19:
+                avg_congestion = 50 + (hour - 17) * 15  # 50% at 5PM, 80% at 7PM
+            elif 20 <= hour <= 21:
+                avg_congestion = 60 - (hour - 20) * 15  # 60% at 8PM, 45% at 9PM
+            elif 22 <= hour <= 23:
+                avg_congestion = 25 - (hour - 22) * 10  # 25% at 10PM, 15% at 11PM
             else:
-                # Southbound morning rush - lighter (reverse commute)
-                if is_terminal:
-                    base = 30 + (hour - 7) * 15  # 30% at 7am, 45% at 8am, 60% at 9am
-                else:
-                    base = 25 + (hour - 7) * 10  # 25% at 7am, 35% at 8am, 45% at 9am
-            hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), base)
+                avg_congestion = 10
         
-        # ========== MIDDAY (10 AM - 4 PM) ==========
-        elif 10 <= hour <= 16:
-            # Moderate congestion
-            base = 30 + (hour - 10) * 2  # 30-42% throughout midday
-            hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), base)
-        
-        # ========== EVENING RUSH (5-7 PM) ==========
-        elif 17 <= hour <= 19:
-            if direction == 'Northbound':
-                # Northbound evening rush - people heading home
-                if is_terminal:
-                    base = 60 + (hour - 17) * 15  # 60% at 5pm, 75% at 6pm, 90% at 7pm
-                else:
-                    base = 50 + (hour - 17) * 15  # 50% at 5pm, 65% at 6pm, 80% at 7pm
-            else:
-                # Southbound evening rush - reverse commute
-                if is_terminal:
-                    base = 40 + (hour - 17) * 15  # 40% at 5pm, 55% at 6pm, 70% at 7pm
-                else:
-                    base = 35 + (hour - 17) * 10  # 35% at 5pm, 45% at 6pm, 55% at 7pm
-            hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), base)
-        
-        # ========== LATE EVENING (8-10 PM) ==========
-        elif 20 <= hour <= 22:
-            # Decreasing congestion
-            base = 40 - (hour - 20) * 10  # 40% at 8pm, 30% at 9pm, 20% at 10pm
-            hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), base)
+        hourly_congestion.append(avg_congestion)
     
-    # ========== ENSURE TERMINAL STATIONS HAVE HIGHER BASE ==========
-    if is_terminal:
-        for hour in [5, 6, 7, 8, 17, 18, 19]:
-            if direction == 'Northbound':
-                hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), 35)
-            else:
-                hourly_congestion[hour] = max(hourly_congestion.get(hour, 0), 25)
-    
-    # ========== CREATE THE SEQUENCE ==========
+    # ========== BUILD THE SEQUENCE ==========
     typical_data = []
     target_hour = target_datetime.hour
     
     for i in range(seq_length):
         hour = (target_hour - (seq_length - i)) % 24
-        congestion_val = hourly_congestion.get(hour, 20)
-        typical_data.append(congestion_val)
+        typical_data.append(hourly_congestion[hour])
     
     # Create DataFrame
     base_date = target_datetime.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
@@ -676,11 +655,8 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
     typical_df['is_holiday'] = 0
     typical_df['is_special_event'] = 0
     
-    print(f"   📊 Built typical day pattern for {station_name} {direction} at hour {target_hour}:")
-    print(f"      Avg congestion: {typical_df['congestion'].mean():.1f}%")
-    print(f"      Max congestion: {typical_df['congestion'].max():.1f}%")
-    print(f"      Min congestion: {typical_df['congestion'].min():.1f}%")
-    print(f"      Hour {target_hour} value: {hourly_congestion.get(target_hour, 20):.1f}%")
+    print(f"   📊 Built pattern for {station_name} {direction} (DOW={target_dow}):")
+    print(f"      Avg: {typical_df['congestion'].mean():.1f}%, Max: {typical_df['congestion'].max():.1f}%")
     
     _TYPICAL_PATTERN_CACHE[cache_key] = typical_df.copy()
     

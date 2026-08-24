@@ -748,7 +748,6 @@ def send_broadcast():
         db.session.rollback()
         print(f"Error sending broadcast: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-
 @operator_bp.route('/api/operator/override-congestion', methods=['POST'])
 def override_congestion():
     try:
@@ -776,7 +775,6 @@ def override_congestion():
         # Load existing overrides from file
         overrides = load_overrides()
         
-        # ✅ FIX: Use ACTUAL system time, not Config time
         current_time = datetime.now()
         current_timestamp = current_time.timestamp()
         
@@ -788,12 +786,10 @@ def override_congestion():
             print(f"   Current time (system): {current_time}")
             print(f"   Expiry: {expiry} ({duration_minutes} minutes from now)")
         else:
-            # For manual overrides, round to the start of the hour
             current_time = current_time.replace(minute=0, second=0, microsecond=0)
             current_timestamp = current_time.timestamp()
             print(f"   Manual override - rounded to hour: {current_time}")
         
-        # Get operator name
         operator_name = session.get('username', 'operator')
         
         overrides[override_key] = {
@@ -818,37 +814,65 @@ def override_congestion():
         current_app.config['overrides'][override_key] = overrides[override_key]
         print(f"✅ Updated app config with override: {override_key}")
         
-     
+        # ========== CRITICAL FIX: CLEAR CACHE USING CORRECT KEY FORMAT ==========
         try:
-            # Get the actual cache instance from the app extensions
             cache_instance = current_app.extensions.get('cache')
             
             if cache_instance:
-                print(f"🗑️ Clearing cache for {station}...")
+                print(f"🗑️ Clearing all caches for {station}...")
                 
-                # Delete ALL possible cache keys for this station
-                for hour in range(24):
-                    # Try with standard key
-                    cache_instance.delete(f"forecast_{station}_{hour}")
+                # ========== METHOD 1: Try all possible key formats ==========
+                cache_keys_to_delete = [
+                    # V2 endpoint cache keys (the main issue)
+                    'live_map_v2',
+                    'view//live_map_v2',
+                    'view/live_map_v2',
+                    'cache//live_map_v2',
                     
-                    # Try with view prefix that Flask-Caching might add
-                    cache_instance.delete(f"view//forecast_{station}_{hour}")
+                    # Operator station status cache
+                    'operator_station_status',
+                    'view//operator_station_status',
+                    'view/operator_station_status',
                     
-                    # Try with prefix that Flask-Caching might use
-                    cache_instance.delete(f"view/forecast_{station}_{hour}")
+                    # Individual station caches
+                    f"forecast_{station}_{current_time.hour}",
+                    f"view//forecast_{station}_{current_time.hour}",
+                    f"view/forecast_{station}_{current_time.hour}",
+                    
+                    # All stations caches
+                    f"all_stations_{current_time.hour}",
+                    f"view//all_stations_{current_time.hour}",
+                    f"view/all_stations_{current_time.hour}",
+                ]
                 
-                # Also clear the "all stations" cache
+                # Add cache keys for all hours
                 for hour in range(24):
-                    cache_instance.delete(f"all_stations_{hour}")
-                    cache_instance.delete(f"view//all_stations_{hour}")
-                    cache_instance.delete(f"view/all_stations_{hour}")
+                    cache_keys_to_delete.append(f"forecast_{station}_{hour}")
+                    cache_keys_to_delete.append(f"view//forecast_{station}_{hour}")
+                    cache_keys_to_delete.append(f"view/forecast_{station}_{hour}")
+                    cache_keys_to_delete.append(f"all_stations_{hour}")
+                    cache_keys_to_delete.append(f"view//all_stations_{hour}")
+                    cache_keys_to_delete.append(f"view/all_stations_{hour}")
                 
-                # Clear the specific forecast for current hour
-                cache_instance.delete(f"forecast_{station}_{current_time.hour}")
-                cache_instance.delete(f"view//forecast_{station}_{current_time.hour}")
-                cache_instance.delete(f"view/forecast_{station}_{current_time.hour}")
+                # Delete all keys
+                deleted_count = 0
+                for key in cache_keys_to_delete:
+                    try:
+                        cache_instance.delete(key)
+                        deleted_count += 1
+                        print(f"   ✅ Deleted: {key}")
+                    except Exception as e:
+                        print(f"   ⚠️ Could not delete {key}: {e}")
                 
-                print(f"✅ Cleared all forecast caches for {station}")
+                # ========== METHOD 2: Use cache.clear() as fallback ==========
+                # This forces ALL cached data to be cleared (heavy but effective)
+                try:
+                    cache_instance.clear()
+                    print(f"✅ Performed full cache clear (fallback)")
+                except Exception as e:
+                    print(f"⚠️ Full cache clear failed: {e}")
+                
+                print(f"✅ Cleared {deleted_count} cache keys for {station}")
             else:
                 print("⚠️ Cache instance not found in app extensions")
                 
@@ -1052,7 +1076,6 @@ def get_broadcast(broadcast_id):
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
-
 @operator_bp.route('/api/operator/clear-override', methods=['POST'])
 def clear_override():
     try:
@@ -1082,58 +1105,59 @@ def clear_override():
             if target_key in current_app.config['overrides']:
                 del current_app.config['overrides'][target_key]
                 print(f"✅ Removed from app config: {target_key}")
-            # ALSO check for lowercase version
             lower_key = target_key.lower()
             if lower_key in current_app.config['overrides']:
                 del current_app.config['overrides'][lower_key]
                 print(f"✅ Removed from app config: {lower_key}")
         
-        # ========== 3. CLEAR CACHE ==========
+        # ========== 3. CLEAR CACHE USING CORRECT KEY FORMAT ==========
         try:
             cache_instance = current_app.extensions.get('cache')
             
             if cache_instance:
-                print(f"🗑️ Clearing cache for {station}...")
+                print(f"🗑️ Clearing all caches for {station}...")
                 
-                # Clear all cache for this station
-                keys_deleted = 0
+                # All possible cache keys
+                cache_keys_to_delete = [
+                    # V2 endpoint
+                    'live_map_v2',
+                    'view//live_map_v2',
+                    'view/live_map_v2',
+                    'cache//live_map_v2',
+                    
+                    # Operator
+                    'operator_station_status',
+                    'view//operator_station_status',
+                    'view/operator_station_status',
+                ]
+                
+                # Add all hourly caches
                 for hour in range(24):
-                    key_variations = [
+                    cache_keys_to_delete.extend([
                         f"forecast_{station}_{hour}",
-                        f"forecast_{station.lower()}_{hour}",
                         f"view//forecast_{station}_{hour}",
                         f"view/forecast_{station}_{hour}",
-                        f"forecast_{station}_{hour}_northbound",
-                        f"forecast_{station}_{hour}_southbound",
-                        f"forecast_{station}_{hour}_both",
-                        f"station_{station}_{hour}",
-                        f"live_map_{station}_{hour}",
-                        f"api/live-map/directions/v2_{station}_{hour}",
-                    ]
-                    
-                    for key in key_variations:
-                        try:
-                            cache_instance.delete(key)
-                            keys_deleted += 1
-                        except:
-                            pass
-                
-                # Clear "all stations" caches
-                for hour in range(24):
-                    all_keys = [
+                        f"forecast_{station.lower()}_{hour}",
                         f"all_stations_{hour}",
                         f"view//all_stations_{hour}",
                         f"view/all_stations_{hour}",
-                        f"live_map_all_{hour}",
-                    ]
-                    for key in all_keys:
-                        try:
-                            cache_instance.delete(key)
-                            keys_deleted += 1
-                        except:
-                            pass
+                    ])
                 
-                print(f"✅ Cleared {keys_deleted} cache keys for {station}")
+                # Delete all keys
+                for key in cache_keys_to_delete:
+                    try:
+                        cache_instance.delete(key)
+                    except:
+                        pass
+                
+                # Full cache clear as fallback
+                try:
+                    cache_instance.clear()
+                    print(f"✅ Full cache cleared")
+                except:
+                    pass
+                
+                print(f"✅ Cleared all caches for {station}")
             else:
                 print("⚠️ Cache instance not found")
                 

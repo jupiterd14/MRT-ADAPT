@@ -392,3 +392,98 @@ print("✅ model_loader.py loaded successfully!")
 print(f"✅ directional_models count: {len(directional_models)} (loaded on demand)")
 print(f"✅ directional_scalers count: {len(directional_scalers)} (loaded on demand)")
 print("=" * 50)
+
+# ==================================================
+# AUTO-LOAD MODELS AT STARTUP
+# ==================================================
+# At the bottom of model_loader.py, replace the auto-load section with:
+
+def auto_load_all_models(limit=None):
+    """Automatically load all models at startup, with optional limit"""
+    global directional_models, directional_scalers
+    
+    print("=" * 50)
+    print("🔄 Auto-loading all models...")
+    
+    correct_dir = "models_2022-2024_v8"
+    
+    if not os.path.exists(correct_dir):
+        print(f"⚠️ Models directory not found: {correct_dir}")
+        return 0
+    
+    files = os.listdir(correct_dir)
+    model_files = [f for f in files if f.endswith('.keras') and ('lstm_enhanced' in f or 'best' in f)]
+    
+    if not model_files:
+        print(f"⚠️ No model files found in {correct_dir}")
+        return 0
+    
+    # Limit if specified (for testing)
+    if limit:
+        model_files = model_files[:limit]
+    
+    print(f"📦 Loading {len(model_files)} models from {correct_dir}...")
+    
+    loaded = 0
+    failed = 0
+    
+    for f in model_files:
+        # Extract station and direction from filename
+        name = f.replace('_lstm_enhanced.keras', '').replace('_best.keras', '')
+        parts = name.split('_')
+        
+        if len(parts) >= 2:
+            station = ' '.join(parts[:-1])
+            direction = parts[-1]
+            
+            # Get the station file name
+            station_file = STATION_FILE_MAP.get(station, station)
+            model_key = f"{station_file}_{direction}"
+            
+            try:
+                # Load the model
+                model_path = os.path.join(correct_dir, f)
+                model = tf.keras.models.load_model(model_path, custom_objects={'rmse': rmse})
+                
+                # Store in global dictionary
+                directional_models[model_key] = model
+                
+                # Load scalers
+                feature_scaler_path = os.path.join(correct_dir, f'{name}_feature_scaler.pkl')
+                target_scaler_path = os.path.join(correct_dir, f'{name}_target_scaler.pkl')
+                
+                if os.path.exists(feature_scaler_path):
+                    with open(feature_scaler_path, 'rb') as fs:
+                        directional_scalers[f'{model_key}_feature'] = pickle.load(fs)
+                
+                if os.path.exists(target_scaler_path):
+                    with open(target_scaler_path, 'rb') as ts:
+                        directional_scalers[f'{model_key}_target'] = pickle.load(ts)
+                
+                loaded += 1
+                if loaded % 5 == 0:
+                    print(f"   Loaded {loaded}/{len(model_files)} models...")
+                    
+            except Exception as e:
+                failed += 1
+                print(f"   ⚠️ Could not load {model_key}: {e}")
+    
+    print(f"\n✅ Auto-loaded {loaded}/{len(model_files)} models")
+    if failed > 0:
+        print(f"   ⚠️ Failed to load {failed} models")
+    print(f"   directional_models now has: {len(directional_models)} models")
+    print("=" * 50)
+    
+    return len(directional_models)
+
+# ==================================================
+# NO AUTO-LOAD - Everything loads on demand
+# ==================================================
+print("=" * 50)
+print("✅ model_loader.py loaded - NO models loaded yet")
+print(f"✅ directional_models: {len(directional_models)} (empty - lazy loading)")
+print(f"✅ directional_scalers: {len(directional_scalers)} (empty - lazy loading)")
+print("=" * 50)
+
+# DO NOT auto-load here - let the app call when needed
+# auto_load_all_models() is available but NOT called
