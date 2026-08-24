@@ -1,19 +1,25 @@
 {
   "station": "North Ave",
   "direction": "northbound",
-  "total_samples": 30,
-  "timestamp": "2026-07-07T03:43:58.710002",
+  "total_samples": 31,
+  "timestamp": "2026-08-24T10:08:42.871770",
   "confusion_matrix": {
     "labels": [
       "Light",
       "Moderate",
-      "Heavy",
+      "Congested",
       "Severe"
     ],
     "matrix": [
       [
-        5,
         0,
+        16,
+        0,
+        0
+      ],
+      [
+        0,
+        15,
         0,
         0
       ],
@@ -28,67 +34,61 @@
         0,
         0,
         0
-      ],
-      [
-        0,
-        0,
-        0,
-        25
       ]
     ]
   },
-  "accuracy": 100.0,
-  "precision_weighted": 100.0,
-  "recall_weighted": 100.0,
-  "f1_weighted": 100.0,
+  "accuracy": 48.39,
+  "precision_weighted": 23.41,
+  "recall_weighted": 48.39,
+  "f1_weighted": 31.56,
   "regression_metrics": {
-    "mae": 1.15,
-    "rmse": 3.24,
-    "r2": 0.992,
-    "mape": 17.5
+    "mae": 13.25,
+    "rmse": 15.47,
+    "r2": -2.2219,
+    "mape": 273.98
   },
   "per_class_metrics": {
     "Light": {
-      "precision": 100.0,
-      "recall": 100.0,
-      "f1_score": 100.0,
-      "support": 5.0
-    },
-    "Moderate": {
       "precision": 0.0,
       "recall": 0.0,
       "f1_score": 0.0,
-      "support": 0.0
+      "support": 16.0
     },
-    "Heavy": {
+    "Moderate": {
+      "precision": 48.4,
+      "recall": 100.0,
+      "f1_score": 65.2,
+      "support": 15.0
+    },
+    "Congested": {
       "precision": 0.0,
       "recall": 0.0,
       "f1_score": 0.0,
       "support": 0.0
     },
     "Severe": {
-      "precision": 100.0,
-      "recall": 100.0,
-      "f1_score": 100.0,
-      "support": 25.0
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 0.0
     }
   },
   "category_distribution": {
     "Light": {
-      "actual": 5,
-      "predicted": 5
-    },
-    "Moderate": {
-      "actual": 0,
+      "actual": 16,
       "predicted": 0
     },
-    "Heavy": {
+    "Moderate": {
+      "actual": 15,
+      "predicted": 31
+    },
+    "Congested": {
       "actual": 0,
       "predicted": 0
     },
     "Severe": {
-      "actual": 25,
-      "predicted": 25
+      "actual": 0,
+      "predicted": 0
     }
   }
 }

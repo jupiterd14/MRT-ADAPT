@@ -2075,16 +2075,16 @@ async function fetchAlertCount() {
                 for (const [station, stationData] of Object.entries(data.northbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.northbound.severe.push(station);
-                    else if (congestion > 60) grouped.northbound.congested.push(station);
-                    else if (congestion > 30) grouped.northbound.moderate.push(station);
+                    else if (congestion > 50) grouped.northbound.congested.push(station);
+                    else if (congestion > 25) grouped.northbound.moderate.push(station);
                     else if (congestion > 0) grouped.northbound.light.push(station);
                 }
                 
                 for (const [station, stationData] of Object.entries(data.southbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.southbound.severe.push(station);
-                    else if (congestion > 60) grouped.southbound.congested.push(station);
-                    else if (congestion > 30) grouped.southbound.moderate.push(station);
+                    else if (congestion > 50) grouped.southbound.congested.push(station);
+                    else if (congestion > 25) grouped.southbound.moderate.push(station);
                     else if (congestion > 0) grouped.southbound.light.push(station);
                 }
                 
@@ -2265,8 +2265,8 @@ function filterAndDisplayReports() {
         filteredReports = filteredReports.filter(report => {
             let level = '';
             if (report.reported_congestion > 80) level = 'severe';
-            else if (report.reported_congestion > 60) level = 'congested';
-            else if (report.reported_congestion > 30) level = 'moderate';
+            else if (report.reported_congestion > 50) level = 'congested';
+            else if (report.reported_congestion > 25) level = 'moderate';
             else level = 'light';
             return activeFilters.congestionLevels.includes(level);
         });
@@ -2688,12 +2688,12 @@ function confirmSubmit() {
             levelColor = '#EF4444';
             bgColor = '#FEE2E2';
             borderColor = '#EF4444';
-        } else if (report.reported_congestion > 60) {
+        } else if (report.reported_congestion > 50) {
             levelText = 'Congested';
             levelColor = '#F97316';
             bgColor = '#FED7AA';
             borderColor = '#F97316';
-        } else if (report.reported_congestion > 30) {
+        } else if (report.reported_congestion > 25) {
             levelText = 'Moderate';
             levelColor = '#EAB308';
             bgColor = '#FEF9C3';

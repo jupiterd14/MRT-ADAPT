@@ -2,7 +2,7 @@
   "station": "North Ave",
   "direction": "northbound",
   "total_samples": 30,
-  "timestamp": "2026-07-04T02:26:11.840455",
+  "timestamp": "2026-08-24T04:48:48.510686",
   "confusion_matrix": {
     "labels": [
       "Light",
@@ -12,53 +12,53 @@
     ],
     "matrix": [
       [
-        3,
+        0,
         0,
         0,
         0
       ],
       [
-        14,
+        8,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        15,
         2,
-        0,
-        0
-      ],
-      [
-        0,
-        0,
-        0,
-        0
-      ],
-      [
-        0,
-        0,
         0,
         0
       ]
     ]
   },
-  "accuracy": 16.67,
-  "precision_weighted": 35.66,
-  "recall_weighted": 26.32,
-  "f1_weighted": 19.55,
+  "accuracy": 0.0,
+  "precision_weighted": 0.0,
+  "recall_weighted": 0.0,
+  "f1_weighted": 0.0,
   "regression_metrics": {
-    "mae": 34.95,
-    "rmse": 41.06,
-    "r2": -1.8248,
-    "mape": 57.81
+    "mae": 65.68,
+    "rmse": 70.54,
+    "r2": -6.6862,
+    "mape": 84.33
   },
   "per_class_metrics": {
     "Light": {
-      "precision": 12.5,
-      "recall": 100.0,
-      "f1_score": 22.2,
-      "support": 3.0
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 0.0
     },
     "Moderate": {
-      "precision": 40.0,
-      "recall": 12.5,
-      "f1_score": 19.0,
-      "support": 16.0
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 8.0
     },
     "Heavy": {
       "precision": 0.0,
@@ -70,24 +70,24 @@
       "precision": 0.0,
       "recall": 0.0,
       "f1_score": 0.0,
-      "support": 0.0
+      "support": 17.0
     }
   },
   "category_distribution": {
     "Light": {
-      "actual": 3,
-      "predicted": 24
+      "actual": 0,
+      "predicted": 26
     },
     "Moderate": {
-      "actual": 16,
-      "predicted": 5
+      "actual": 8,
+      "predicted": 4
     },
     "Heavy": {
       "actual": 0,
       "predicted": 0
     },
     "Severe": {
-      "actual": 0,
+      "actual": 17,
       "predicted": 0
     }
   }

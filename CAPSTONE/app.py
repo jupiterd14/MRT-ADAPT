@@ -395,32 +395,55 @@ app.register_blueprint(email_bp, url_prefix='/api/profile')
 def inject_now():
     return {'now': datetime.now()}
 
-# ============ LAZY LOADING - Only load models when needed ============
+# ============ TRUE LAZY LOADING - NOTHING LOADS AT STARTUP ============
 print("\n" + "="*50)
-print("MRT-3 PREDICTION SYSTEM - MODELS WILL LOAD ON FIRST REQUEST")
+print("🚀 MRT-3 PREDICTION SYSTEM - TRUE LAZY LOADING")
 print("="*50)
-print("⏳ Models will load on first request (not at startup)")
-print("💡 First request may take 10-30 seconds")
+print("⏳ NOTHING loads at startup!")
+print("💡 Models load ONLY on first prediction request")
+print("💡 First request may take 15-30 seconds")
+print("💡 After that, predictions are instant")
 print("="*50 + "\n")
 
 DIRECTIONAL_MODELS_PATH = 'models_2022-2024_v8'
 
-directional_models_cached = None
-directional_scalers_cached = None
+# Empty at startup - NOTHING loaded!
+directional_models_cached = {}
+directional_scalers_cached = {}
+_MODELS_LOADED = False
 historical_data = None
 
-def ensure_models_loaded():
-    global directional_models_cached, directional_scalers_cached, historical_data
+import threading
+
+# Add this lock at the module level (near the top of the file)
+_MODEL_LOAD_LOCK = threading.Lock()
+
+def ensure_models_loaded(station_name=None, direction=None):
+    """Load models ONLY on first request - TRUE lazy loading"""
+    global directional_models_cached, directional_scalers_cached, _MODELS_LOADED, historical_data
     
-    if directional_models_cached is not None:
+    # Already loaded? Return fast!
+    if _MODELS_LOADED and directional_models_cached:
         return
     
-    print("🔄 Loading models on-demand (first request)...")
-    print("⏳ This may take 10-30 seconds...")
+    print("\n" + "="*60)
+    print("🔄 FIRST REQUEST - LOADING MODELS NOW...")
+    print("⏳ This is the SLOW request (15-30s)")
+    print("⏳ Subsequent requests will be FAST")
+    print("="*60)
     
-    directional_models_cached, directional_scalers_cached = load_models_with_cache(STATIONS, DIRECTIONAL_MODELS_PATH)
+    import time
+    start = time.time()
+    
+    # Load models from cache or disk
+    directional_models_cached, directional_scalers_cached = load_models_with_cache(
+        STATIONS, DIRECTIONAL_MODELS_PATH
+    )
+    
+    # Load historical data
     historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
     
+    # Update services module
     import services
     services.directional_models = directional_models_cached
     services.directional_scalers = directional_scalers_cached
@@ -429,13 +452,31 @@ def ensure_models_loaded():
     services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
     services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
     
-    print(f"✓ System ready with {len(directional_models_cached)} directional models")
-    print(f"✓ Historical data loaded for {len(historical_data['historical_entry'])} stations")
-    
+    # Store in app config
     app.config['DIRECTIONAL_MODELS'] = directional_models_cached
     app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+    app.config['HISTORICAL_DATA'] = historical_data
+    
+    _MODELS_LOADED = True
+    elapsed = time.time() - start
+    
+    print("="*60)
+    print(f"✅ MODELS LOADED in {elapsed:.1f} seconds")
+    print(f"✅ {len(directional_models_cached)} directional models ready")
+    print(f"✅ Historical data for {len(historical_data['historical_entry'])} stations")
+    print("="*60 + "\n")
 
+# Register the main lazy loader
 app.config['ENSURE_MODELS_LOADED'] = ensure_models_loaded
+
+# ============ SINGLE MODEL LOADER (Just calls the lazy loader) ============
+def ensure_single_model_loaded(station_name, direction):
+    """Load models on first request - calls the lazy loader"""
+    # Just call the main lazy loader - it loads all models once
+    ensure_models_loaded()
+
+# Register this so api_predict.py can call it
+app.config['ENSURE_SINGLE_MODEL_LOADED'] = ensure_single_model_loaded
 
 # ============ LSTM MODELS - LAZY LOADING (ONLY FOR RETRAINING) ============
 print("\n" + "="*50)
@@ -466,16 +507,14 @@ def ensure_lstm_for_retraining():
         print("⚠️ LSTM models not loaded - retraining will be disabled")
         app.config['LSTM_PREDICTOR'] = None
 
-# ============ PRELOAD ALL MODELS ============
+# ============ PRELOAD ALL MODELS (Optional - for admin use) ============
 def preload_all_models():
     """
-    Preload ALL 26 models at startup or on first request.
-    Once loaded, they stay in memory and are reused.
-    This is the most efficient way to handle models.
+    Preload ALL 26 models - ONLY call this if you want to force-load.
+    Otherwise, models load on first request via ensure_models_loaded()
     """
     global directional_models_cached, directional_scalers_cached, _MODELS_LOADED
     
-    # Check if already loaded
     if _MODELS_LOADED and directional_models_cached is not None:
         print(f"✅ All models already loaded! ({len(directional_models_cached)}/26)")
         return directional_models_cached, directional_scalers_cached
@@ -484,14 +523,11 @@ def preload_all_models():
     print("🔄 PRELOADING ALL 26 MODELS...")
     print("="*60)
     
-    # Load models with cache
     directional_models_cached, directional_scalers_cached = load_models_with_cache(STATIONS, DIRECTIONAL_MODELS_PATH)
     
-    # Load historical data
     global historical_data
     historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
     
-    # Update services module
     import services
     services.directional_models = directional_models_cached
     services.directional_scalers = directional_scalers_cached
@@ -500,74 +536,26 @@ def preload_all_models():
     services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
     services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
     
-    # Store in app config
     app.config['DIRECTIONAL_MODELS'] = directional_models_cached
     app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
     app.config['HISTORICAL_DATA'] = historical_data
     
-    # ====== ADD THIS: Preload P95 and typical patterns from prediction API ======
     try:
-        # Import the prediction API blueprint's preload functions
         from routes.api_predict import preload_p95_cache, preload_typical_patterns
         print("\n📊 Preloading P95 cache and typical patterns...")
         preload_p95_cache()
         preload_typical_patterns()
-    except ImportError as e:
-        print(f"⚠️ Could not import prediction API preload functions: {e}")
     except Exception as e:
         print(f"⚠️ Error preloading P95/typical patterns: {e}")
-    # ========================================================================
+    
+    _MODELS_LOADED = True
     
     print("="*60)
     print(f"✅ All models loaded! ({len(directional_models_cached)}/26 models)")
     print(f"✅ Historical data loaded for {len(historical_data['historical_entry'])} stations")
     print("="*60 + "\n")
     
-    # 🔥 CRITICAL: Warm up all models for instant predictions
-    warmup_all_models()
-    
     return directional_models_cached, directional_scalers_cached
-def ensure_single_model_loaded(station_name, direction):
-    """Load a single model if not already loaded - NO LIMIT"""
-    global directional_models_cached, directional_scalers_cached
-    
-    # Initialize if None
-    if directional_models_cached is None:
-        directional_models_cached = {}
-        directional_scalers_cached = {}
-    
-    model_key = f"{station_name}_{direction}"
-    
-    # Check if already loaded
-    if model_key in directional_models_cached:
-        print(f"✅ Model {model_key} already loaded ({len(directional_models_cached)}/26)")
-        return
-    
-    print(f"🔄 Loading single model: {model_key} ({len(directional_models_cached)+1}/26)")
-    
-    try:
-        from services.model_loader import load_single_model
-        model, scalers = load_single_model(station_name, direction, DIRECTIONAL_MODELS_PATH)
-        
-        if model:
-            directional_models_cached[model_key] = model
-            directional_scalers_cached[f"{model_key}_feature"] = scalers.get('feature')
-            directional_scalers_cached[f"{model_key}_target"] = scalers.get('target')
-            print(f"✅ Loaded model {model_key} ({len(directional_models_cached)}/26)")
-            gc.collect()
-        else:
-            print(f"❌ Failed to load model for {model_key}")
-            
-    except Exception as e:
-        print(f"❌ Error loading {model_key}: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    app.config['DIRECTIONAL_MODELS'] = directional_models_cached
-    app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
-
-
-app.config['ENSURE_SINGLE_MODEL_LOADED'] = ensure_single_model_loaded
 
 @app.route('/debug/app-config')
 def debug_app_config():
@@ -718,7 +706,7 @@ with app.app_context():
     else:
         print(f"⚠️ Some CSV files missing: {[f for f in csv_files if not os.path.exists(os.path.join(data_dir, f))]}")
         print("🔄 Auto-importing CSV files from Google Drive...")
-        results = import_csv_files()  # ✅ CALL the import function!
+        #results = import_csv_files()  # ✅ CALL the import function!
         
         # Verify after import
         all_present_now = all(os.path.exists(os.path.join(data_dir, f)) for f in csv_files)
@@ -781,6 +769,7 @@ def raw_prediction(station_name, direction):
     from services import get_feature_sequence_for_station
     import numpy as np
     
+    # This will load models on first call
     ensure_single_model_loaded(station_name, direction)
     
     model_key = f"{station_name}_{direction}"
@@ -1182,42 +1171,19 @@ top_stats = snapshot.statistics('lineno')
 print("\n🔍 TOP 10 MEMORY USERS:")
 for stat in top_stats[:10]:
     print(stat)
-    
+
 # ============ MAIN ============
 if __name__ == '__main__':
     print("\n" + "="*50)
-    print("🚀 MRT-3 PREDICTION SYSTEM - FAST STARTUP WITH WARMUP")
+    print("🚀 MRT-3 PREDICTION SYSTEM - LAZY LOADING")
     print("="*50)
     
-    # ⭐ PRELOAD ALL MODELS AT STARTUP ⭐ (now automatically warms up)
-    print("\n🔄 PRELOADING ALL MODELS AT STARTUP...")
-    preload_all_models()  # This now calls warmup_all_models() automatically!
-    
-    print(f"✓ {len(directional_models_cached) if directional_models_cached else 0} directional models loaded")
-    if historical_data:
-        print(f"✓ {len(historical_data['historical_entry']) if historical_data else 0} stations with historical data")
-    else:
-        print("✓ Historical data loaded")
-    
-    lstm_predictor = app.config.get('LSTM_PREDICTOR')
-    if lstm_predictor:
-        print(f"✓ {len(lstm_predictor.models)} LSTM models loaded for enhanced predictions")
-    else:
-        print("⚠️ LSTM models not loaded - they will load when retraining is triggered")
-    
-    warmup_stats = app.config.get('WARMUP_STATS', {})
-    if warmup_stats:
-        print(f"✓ {warmup_stats.get('successful', 0)} models warmed up in {warmup_stats.get('duration_seconds', 0)}s")
-    
-    print("\n" + "="*50)
-    print("✅ SYSTEM READY - ALL MODELS PRELOADED AND WARMED UP")
-    print("💡 FIRST PREDICTION WILL BE INSTANT (<500ms)")
-    print("💡 To force fresh model loading: visit /debug/clear-cache")
-    print("\n🔄 To trigger weekly retraining: POST /admin/retrain")
-    print("\n🌐 Open http://localhost:5000")
+    print("\n⏳ Server starting in 2 seconds...")
+    print("💡 Models will load ONLY on first prediction request.")
+    print("💡 First request may take 15-20 seconds, then instant.")
     print("="*50 + "\n")
     
-    import os
+    
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
 

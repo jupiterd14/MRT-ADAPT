@@ -285,16 +285,24 @@ def travel_prediction():
         return jsonify({"error": str(e)}), 500
 
 
+def clear_prediction_caches():
+    """Clear all prediction-related caches for fresh results"""
+    from services.feature_engineering import _TYPICAL_PATTERN_CACHE, _BASELINE_FEATURES_CACHE
+    from routes.api_predict import TYPICAL_PATTERN_CACHE as PREDICT_TYPICAL_CACHE
+    
+    _TYPICAL_PATTERN_CACHE.clear()
+    _BASELINE_FEATURES_CACHE.clear()
+    PREDICT_TYPICAL_CACHE.clear()
+    
+    print("🗑️ Cleared all prediction caches")
+    
 from extensions import cache
-
 
 @api_other_bp.route('/live-map/directions/v2')
 @cache.cached(timeout=60, key_prefix='live_map_v2')
 def live_map_directions_v2():
-    """
-    Consistent with prediction API – uses percentile‑based congestion.
-    MATCHES api_predict.py behavior.
-    """
+    clear_prediction_caches()
+    """Consistent with prediction API – uses get_directional_prediction()"""
     try:
         # ========== GET DATE/TIME PARAMETERS ==========
         date_param = request.args.get('date')
@@ -315,7 +323,6 @@ def live_map_directions_v2():
         
         # ========== GET ACTIVE OVERRIDES ==========
         active_overrides = get_active_overrides()
-        print(f"🔍 Active overrides: {list(active_overrides.keys())}")
 
         stations_list = current_app.config.get('STATIONS', STATIONS)
         northbound = {}
@@ -329,24 +336,26 @@ def live_map_directions_v2():
             is_north_overridden = north_override_key in active_overrides
             is_south_overridden = south_override_key in active_overrides
 
-            # ----- Northbound -----
+            # ----- Northbound - USE get_directional_prediction() -----
             if is_north_overridden:
                 override = active_overrides[north_override_key]
                 north_pred = override.get('congestion', 50)
                 p95_north = get_p95_for_station(station, 'Northbound')
                 north_passengers = int((north_pred / 100) * p95_north)
             else:
+                # ========== FIX: Use the SAME function as api_predict ==========
                 north_pred = get_directional_prediction(station, 'Northbound', now)
                 p95_north = get_p95_for_station(station, 'Northbound')
                 north_passengers = int((north_pred / 100) * p95_north)
 
-            # ----- Southbound -----
+            # ----- Southbound - USE get_directional_prediction() -----
             if is_south_overridden:
                 override = active_overrides[south_override_key]
                 south_pred = override.get('congestion', 50)
                 p95_south = get_p95_for_station(station, 'Southbound')
                 south_passengers = int((south_pred / 100) * p95_south)
             else:
+                # ========== FIX: Use the SAME function as api_predict ==========
                 south_pred = get_directional_prediction(station, 'Southbound', now)
                 p95_south = get_p95_for_station(station, 'Southbound')
                 south_passengers = int((south_pred / 100) * p95_south)
@@ -371,7 +380,7 @@ def live_map_directions_v2():
                 "status": north_status,
                 "ridership": north_passengers,
                 "overridden": is_north_overridden,
-                "p95": round(p95_north, 0)  # Debug info
+                "p95": round(p95_north, 0)
             }
             southbound[station] = {
                 "congestion": round(south_pred, 1),
@@ -379,18 +388,18 @@ def live_map_directions_v2():
                 "status": south_status,
                 "ridership": south_passengers,
                 "overridden": is_south_overridden,
-                "p95": round(p95_south, 0)  # Debug info
+                "p95": round(p95_south, 0)
             }
 
         # Check if MRT is closed for display
         current_time = now.hour + now.minute / 60
-        is_closed = current_time < 4.5 or current_time >= 22.5
+        is_closed = current_time < 0 or current_time >= 24
         
         return jsonify({
             "northbound": northbound,
             "southbound": southbound,
             "timestamp": now.isoformat(),
-            "model_version": "percentile_based (p95)",
+            "model_version": "get_directional_prediction (with boost/cap)",
             "active_overrides": len(active_overrides),
             "requested_time": f"{date_param} {time_param}" if date_param and time_param else None,
             "is_operating": not is_closed,
@@ -402,8 +411,7 @@ def live_map_directions_v2():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-
+    
 @api_other_bp.route('/debug/data-inspection')
 def debug_data_inspection():
     """Inspect the actual data being loaded"""
@@ -873,10 +881,10 @@ def test_api():
         "stations": get_stations_from_config()
     })
 
-
 @api_other_bp.route('/alerts/count')
 def alerts_count():
-    """Get alert count - counts ALL congestion levels (Light, Moderate, Congested, Severe)"""
+    clear_prediction_caches()
+    """Get alert count - uses get_directional_prediction() for consistency"""
     try:
         stations_list = get_stations_from_config()
         severe_count = 0
@@ -886,46 +894,12 @@ def alerts_count():
         station_statuses = {}
         
         try:
-            from flask import current_app
-            from services.model_loader import directional_models, directional_scalers
-            from services import get_feature_sequence_for_station
-            import numpy as np
-            
             now = Config.get_current_time()
             
             for station in stations_list:
-                north_cong = 0
-                south_cong = 0
-                
-                try:
-                    model_key_north = f"{station}_Northbound"
-                    if model_key_north in directional_models:
-                        sequence = get_feature_sequence_for_station(station, 'Northbound', now)
-                        if sequence is not None and len(sequence) == 24:
-                            target_scaler = directional_scalers.get(f'{model_key_north}_target')
-                            if target_scaler:
-                                input_sequence = sequence.reshape(1, 24, -1)
-                                pred_scaled = directional_models[model_key_north].predict(input_sequence, verbose=0)
-                                north_cong, _ = _get_congestion_from_prediction(
-                                    pred_scaled, target_scaler, station, 'Northbound'
-                                )
-                except Exception as e:
-                    print(f"⚠️ Error getting northbound for {station}: {e}")
-                
-                try:
-                    model_key_south = f"{station}_Southbound"
-                    if model_key_south in directional_models:
-                        sequence = get_feature_sequence_for_station(station, 'Southbound', now)
-                        if sequence is not None and len(sequence) == 24:
-                            target_scaler = directional_scalers.get(f'{model_key_south}_target')
-                            if target_scaler:
-                                input_sequence = sequence.reshape(1, 24, -1)
-                                pred_scaled = directional_models[model_key_south].predict(input_sequence, verbose=0)
-                                south_cong, _ = _get_congestion_from_prediction(
-                                    pred_scaled, target_scaler, station, 'Southbound'
-                                )
-                except Exception as e:
-                    print(f"⚠️ Error getting southbound for {station}: {e}")
+                # ========== FIX: Use get_directional_prediction() ==========
+                north_cong = get_directional_prediction(station, 'Northbound', now)
+                south_cong = get_directional_prediction(station, 'Southbound', now)
                 
                 avg_cong = (north_cong + south_cong) / 2
                 
@@ -955,47 +929,8 @@ def alerts_count():
             print(f"🔔 Alert count (ALL congestion): {alert_count}")
             
         except Exception as e:
-            print(f"❌ Error using models: {e}")
-            import traceback
-            traceback.print_exc()
-            try:
-                from flask import current_app
-                with current_app.test_client() as client:
-                    response = client.get('/api/live-map/directions/v2')
-                    data = response.get_json()
-                    
-                    if data and 'northbound' in data and 'southbound' in data:
-                        for station in stations_list:
-                            north_cong = data['northbound'].get(station, {}).get('congestion', 0)
-                            south_cong = data['southbound'].get(station, {}).get('congestion', 0)
-                            avg_cong = (north_cong + south_cong) / 2
-                            
-                            if avg_cong > 80:
-                                severe_count += 1
-                                severity = 'severe'
-                            elif avg_cong > 50:
-                                congested_count += 1
-                                severity = 'congested'
-                            elif avg_cong > 25:
-                                moderate_count += 1
-                                severity = 'moderate'
-                            elif avg_cong > 0:
-                                light_count += 1
-                                severity = 'light'
-                            else:
-                                severity = 'none'
-                            
-                            station_statuses[station] = {
-                                'congestion': round(avg_cong, 1),
-                                'northbound': round(north_cong, 1),
-                                'southbound': round(south_cong, 1),
-                                'severity': severity
-                            }
-                    alert_count = severe_count + congested_count + moderate_count + light_count
-                    print(f"✅ Fallback breakdown - Severe: {severe_count}, Congested: {congested_count}, Moderate: {moderate_count}, Light: {light_count}")
-            except Exception as e2:
-                print(f"❌ Fallback also failed: {e2}")
-                alert_count = 0
+            print(f"❌ Error in alerts_count: {e}")
+            alert_count = 0
         
         total = severe_count + congested_count + moderate_count + light_count
         display = str(total) if total < 10 else "9+"
@@ -1018,8 +953,6 @@ def alerts_count():
         import traceback
         traceback.print_exc()
         return jsonify({"count": 0, "display": "0"})
-
-
 @api_other_bp.route('/alerts/list')
 def alerts_list():
     """Get list of active alerts"""

@@ -2233,15 +2233,15 @@ stations.forEach((s, i) => { stationIndex[s] = i; });
 // Status helpers
 function getWaitTime(congestion) {
     if (congestion > 80) return '15-20 min';
-    if (congestion > 60) return '10-15 min';
-    if (congestion > 30) return '5-10 min';
+    if (congestion > 50) return '10-15 min';
+    if (congestion > 25) return '5-10 min';
     return '2-5 min';
 }
 
 function getStatusText(congestion) {
     if (congestion > 80) return 'Severely Congested';
-    if (congestion > 60) return 'Congested';
-    if (congestion > 30) return 'Moderate';
+    if (congestion > 50) return 'Congested';
+    if (congestion > 25) return 'Moderate';
     return 'Light';
 }
 
@@ -2404,8 +2404,8 @@ async function fetchStationData() {
         const hour = nowTime.getHours();
         const minute = nowTime.getMinutes();
         const currentTime = hour + minute/60;
-        const OPERATING_START = 4.5;
-        const OPERATING_END = 22.5;
+           const OPERATING_START = 4.5;
+    const OPERATING_END = 22.5;
         const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
         
         const processedData = { northbound: {}, southbound: {} };
@@ -2762,9 +2762,9 @@ function getStatusMessage(stationName, congestion) {
     let messages;
     if (congestion > 80) {
         messages = severeAdvice;
-    } else if (congestion > 60) {
+    } else if (congestion > 50) {
         messages = congestedAdvice;
-    } else if (congestion > 30) {
+    } else if (congestion > 25) {
         messages = moderateAdvice;
     } else {
         messages = lightAdvice;
@@ -2795,8 +2795,8 @@ function getAlternativeStation(stationName) {
 
 function getStatusClass(congestion) {
     if (congestion > 80) return 'bg-severe';
-    if (congestion > 60) return 'bg-congested';
-    if (congestion > 30) return 'bg-mod';
+    if (congestion > 50) return 'bg-congested';
+    if (congestion > 25) return 'bg-mod';
     return 'bg-light';
 }
 
@@ -2928,9 +2928,8 @@ async function fetchAlertCount() {
         const hour = nowDate.getHours();
         const minutes = nowDate.getMinutes();
         const timeDecimal = hour + minutes / 60;
-        const OPERATING_START = 4.5;
-        const OPERATING_END = 22.5;
-        
+          const OPERATING_START = 4.5;
+    const OPERATING_END = 22.5;
         // ========== 1. Rush Hour Alert ==========
         if ((hour >= 7 && hour <= 9)) {
             allAlerts.push({ id: 'rush-morning-permanent' });
@@ -2945,9 +2944,9 @@ async function fetchAlertCount() {
             allAlerts.push({ id: 'advisory-pre-rush-permanent' });
         } else if (hour >= 10 && hour < 16) {
             allAlerts.push({ id: 'advisory-midday-permanent' });
-        } else if (hour >= 20 && hour < 22.5) {
+        } else if (hour >= 20 && hour < 24) {
             allAlerts.push({ id: 'advisory-late-evening-permanent' });
-        } else if (hour >= 22.5 || hour === 23) {
+        } else if (hour >= 24 || hour === 23) {
             allAlerts.push({ id: 'advisory-service-ended-permanent' });
         }
         
@@ -2987,16 +2986,16 @@ async function fetchAlertCount() {
                 for (const [station, stationData] of Object.entries(data.northbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.northbound.severe.push(station);
-                    else if (congestion > 60) grouped.northbound.congested.push(station);
-                    else if (congestion > 30) grouped.northbound.moderate.push(station);
+                    else if (congestion > 50) grouped.northbound.congested.push(station);
+                    else if (congestion > 25) grouped.northbound.moderate.push(station);
                     else if (congestion > 0) grouped.northbound.light.push(station);
                 }
                 
                 for (const [station, stationData] of Object.entries(data.southbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.southbound.severe.push(station);
-                    else if (congestion > 60) grouped.southbound.congested.push(station);
-                    else if (congestion > 30) grouped.southbound.moderate.push(station);
+                    else if (congestion > 50) grouped.southbound.congested.push(station);
+                    else if (congestion > 25) grouped.southbound.moderate.push(station);
                     else if (congestion > 0) grouped.southbound.light.push(station);
                 }
                 
@@ -3209,9 +3208,9 @@ function openModal(stationName) {
             colorClass = 'closed'; // New class for closed
         } else if (congValue > 80) {
             colorClass = 'severe';
-        } else if (congValue > 60) {
+        } else if (congValue > 50) {
             colorClass = 'congested';
-        } else if (congValue > 30) {
+        } else if (congValue > 25) {
             colorClass = 'moderate';
         } else {
             colorClass = 'light';

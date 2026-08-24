@@ -1843,8 +1843,8 @@ function showOverrideDetails(station, direction) {
     // Color the status based on level
     const statusEl = document.getElementById('overrideDetailsStatus');
     if (level > 80) statusEl.style.color = '#DC2626';
-    else if (level > 60) statusEl.style.color = '#EA580C';
-    else if (level > 30) statusEl.style.color = '#D97706';
+    else if (level > 50) statusEl.style.color = '#EA580C';
+    else if (level > 25) statusEl.style.color = '#D97706';
     else statusEl.style.color = '#16A34A';
     
     const operatorName = overrideInfo.operator || 'Unknown';
@@ -1959,8 +1959,8 @@ function getStationValue() {
 // ========== GET STATUS CLASS FROM CONGESTION ==========
 function getStatusClass(congestion) {
     if (congestion > 80) return 'status-severe';
-    if (congestion > 60) return 'status-congested';
-    if (congestion > 30) return 'status-moderate';
+    if (congestion > 50) return 'status-congested';
+    if (congestion > 25) return 'status-moderate';
     return 'status-light';
 }
 
@@ -1972,8 +1972,8 @@ function getStatusText(congestion) {
 
 
     if (congestion > 80) return 'SEVERE';
-    if (congestion > 60) return 'CONGESTED';
-    if (congestion > 30) return 'MODERATE';
+    if (congestion > 50) return 'CONGESTED';
+    if (congestion > 25) return 'MODERATE';
     if (hour < OPERATING_START || hour > OPERATING_END) {
         return 'CLOSED'; // Gray color for closed hours
     }
@@ -2004,32 +2004,40 @@ async function loadTestResults() {
     const direction = currentDirectionViewMP === 'northbound' ? 'Northbound' : 'Southbound';
     const tbody = document.getElementById('stationMetricsBodyMP');
     if (!tbody) return;
+    
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+    
     try {
-        const url = `/api/model/station-details?station=${station}&direction=${direction}`;
+        const url = `/api/model/station-details?station=${encodeURIComponent(station)}&direction=${encodeURIComponent(direction)}&_=${Date.now()}`;
         const response = await fetch(url);
         const result = await response.json();
+        
         if (result.success && result.data && result.data.length > 0) {
             let html = '';
             for (let row of result.data) {
                 let verdictClass = '';
                 const errorValue = row.absolute_error || row.error;
                 const verdict = row.verdict || (errorValue <= 5 ? 'EXCELLENT' : errorValue <= 10 ? 'GOOD' : errorValue <= 15 ? 'OKAY' : 'NEEDS_IMPROVEMENT');
+                
                 if (verdict === 'EXCELLENT') verdictClass = 'status-light';
                 else if (verdict === 'GOOD') verdictClass = 'status-moderate';
                 else if (verdict === 'OKAY') verdictClass = 'status-congested';
                 else verdictClass = 'status-severe';
+                
+                const predicted = row.predicted !== undefined && row.predicted !== null ? row.predicted : '--';
+                const actual = row.actual !== undefined && row.actual !== null ? row.actual : '--';
+                
                 html += `<tr>
                     <td style="font-size:12px;">${row.target_time || row.datetime || 'N/A'}</td>
-                    <td><strong>${row.predicted || row.prediction || '--'}%</strong></td>
-                    <td>${row.actual || '--'}%</td>
+                    <td><strong>${predicted}%</strong></td>
+                    <td>${actual}%</td>
                     <td>${errorValue || '--'}%</td>
                     <td><span class="${verdictClass}" style="padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; display:inline-block;">${verdict}</span></td>
                 </tr>`;
             }
             tbody.innerHTML = html;
         } else {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px;">No detailed test results found for ${station} (${direction}). Run auto-tests to generate data.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px;">No detailed test results found for ${station} (${direction}). Run auto-tests or upload data to generate results.</td></tr>`;
         }
     } catch (error) {
         console.error('Error loading test results:', error);
@@ -2346,7 +2354,7 @@ async function uploadTestData() {
     }
     
     // ============================================================
-    // SHOW LOADING OVERLAY (same as Run Tests)
+    // SHOW LOADING OVERLAY
     // ============================================================
     const loadingOverlay = document.getElementById('loadingOverlay');
     const loadingText = loadingOverlay.querySelector('span');
@@ -2384,16 +2392,42 @@ async function uploadTestData() {
             const summary = result.summary;
             showToast('✅', `Upload complete! ${summary.total_processed} predictions, Avg Error: ${summary.avg_absolute_error}%`);
             
-            // Refresh all data
+            // ============================================================
+            // FORCE REFRESH ALL DATA - THIS IS THE KEY PART
+            // ============================================================
+            
+            // Wait a moment for files to be written to disk
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // Force clear any cached data
+            if (predictionChart) {
+                predictionChart.destroy();
+                predictionChart = null;
+            }
+            
+            // Refresh ALL metrics
             await loadModelPerformanceMetrics();
+            
+            // Refresh the chart
             await loadPredictionChart();
+            
+            // Refresh the station details table for the CURRENT station
             await loadTestResults();
             
-            // Update the station selector if needed
+            // Force reload the station selector to show updated data
             const stationSel = document.getElementById('stationSelector');
-            if (stationSel && stationSel.value !== 'all') {
-                await loadTestResults();
+            if (stationSel) {
+                // Trigger change event to refresh
+                const currentValue = stationSel.value;
+                stationSel.value = currentValue;
+                // This will trigger the onchange event
+                if (stationSel.onchange) {
+                    stationSel.onchange();
+                }
             }
+            
+            // Show success message
+            showToast('✅', `Upload complete! ${summary.total_processed} predictions processed. Avg error: ${summary.avg_absolute_error}%`);
             
             setTimeout(() => { 
                 uploadProgress.style.display = 'none'; 
@@ -2752,9 +2786,12 @@ async function loadStationStatus() {
             };
         });
         
+        // ========== FIX: Sort stations properly for both directions ==========
         if (currentDirection === 'south') {
+            // Southbound: Reverse the order (Taft at top, North Ave at bottom)
             stationList.sort((a, b) => stationOrder.indexOf(b.name) - stationOrder.indexOf(a.name));
         } else {
+            // Northbound: Normal order (North Ave at top, Taft at bottom)
             stationList.sort((a, b) => stationOrder.indexOf(a.name) - stationOrder.indexOf(b.name));
         }
         
@@ -2776,10 +2813,10 @@ async function loadStationStatus() {
             } else if (statusUpper === 'SEVERE' || statusUpper === 'SEVERELY CONGESTED' || s.congestion > 80) {
                 statusClass = 'status-severe';
                 displayText = 'SEVERE';
-            } else if (statusUpper === 'CONGESTED' || s.congestion > 60) {
+            } else if (statusUpper === 'CONGESTED' || s.congestion > 50) {
                 statusClass = 'status-congested';
                 displayText = 'CONGESTED';
-            } else if (statusUpper === 'MODERATE' || s.congestion > 30) {
+            } else if (statusUpper === 'MODERATE' || s.congestion > 25) {
                 statusClass = 'status-moderate';
                 displayText = 'MODERATE';
             } else {
@@ -2796,8 +2833,8 @@ async function loadStationStatus() {
                 let statusColor = '#8B5CF6';
                 let bgColor = '#EDE9FE';
                 if (level > 80) { statusColor = '#DC2626'; bgColor = '#FEE2E2'; }
-                else if (level > 60) { statusColor = '#EA580C'; bgColor = '#FFEDD5'; }
-                else if (level > 30) { statusColor = '#D97706'; bgColor = '#FEF3C7'; }
+                else if (level > 50) { statusColor = '#EA580C'; bgColor = '#FFEDD5'; }
+                else if (level > 25) { statusColor = '#D97706'; bgColor = '#FEF3C7'; }
                 else { statusColor = '#16A34A'; bgColor = '#DCFCE7'; }
                 
                 overrideDisplay = `
@@ -3338,52 +3375,56 @@ if (downloadSampleLink) {
     downloadSampleLink.onclick = null;
 }
     // Auto‑tests button
-    const autoTestsBtn = document.getElementById('testUploadedCsvBtnMP');
-    if (autoTestsBtn) {
-        autoTestsBtn.onclick = async () => {
-            const loadingOverlay = document.getElementById('loadingOverlay');
-            const loadingText = loadingOverlay.querySelector('span');
-            const originalText = loadingText.innerText;
+   // Auto‑tests button
+const autoTestsBtn = document.getElementById('testUploadedCsvBtnMP');
+if (autoTestsBtn) {
+    autoTestsBtn.onclick = async () => {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = loadingOverlay.querySelector('span');
+        const originalText = loadingText.innerText;
+        
+        loadingText.innerText = 'Running auto-tests on 2025 data...';
+        loadingOverlay.classList.add('active');
+        
+        autoTestsBtn.disabled = true;
+        autoTestsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running Tests...';
+        
+        try {
+            const response = await fetch('/api/model/run-auto-tests?use_test_max=false', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
             
-            loadingText.innerText = 'Running auto-tests on 2025 data...';
-            loadingOverlay.classList.add('active');
-            
-            autoTestsBtn.disabled = true;
-            autoTestsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running Tests...';
-            
-            try {
-                const response = await fetch('/api/model/run-auto-tests?use_test_max=false', { 
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const result = await response.json();
+            if (result.success) {
+                showToast('✅', `Auto-tests completed! ${result.summary.total_tests_run} predictions generated. Avg error: ${result.summary.avg_absolute_error}%`);
                 
-                if (result.success) {
-                    showToast('✅', `Auto-tests completed! ${result.summary.total_tests_run} predictions generated. Avg error: ${result.summary.avg_absolute_error}%`);
-                    
-                    await loadModelPerformanceMetrics();
-                    await loadPredictionChart();
+                // Wait a moment for files to be written
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Refresh all data
+                await loadModelPerformanceMetrics();
+                await loadPredictionChart();
+                await loadTestResults();
+                
+                const stationSel = document.getElementById('stationSelector');
+                if (stationSel) {
                     await loadTestResults();
-                    
-                    const stationSel = document.getElementById('stationSelector');
-                    if (stationSel && stationSel.value !== 'all') {
-                        await loadTestResults();
-                    }
-                } else {
-                    showToast('❌', result.error || 'Auto-test failed');
                 }
-            } catch (error) {
-                console.error('Auto-test error:', error);
-                showToast('❌', 'Auto-test failed: ' + error.message);
-            } finally {
-                loadingOverlay.classList.remove('active');
-                loadingText.innerText = originalText;
-                autoTestsBtn.disabled = false;
-                autoTestsBtn.innerHTML = '<i class="fas fa-robot"></i> Run Tests';
+            } else {
+                showToast('❌', result.error || 'Auto-test failed');
             }
-        };
-    }
-
+        } catch (error) {
+            console.error('Auto-test error:', error);
+            showToast('❌', 'Auto-test failed: ' + error.message);
+        } finally {
+            loadingOverlay.classList.remove('active');
+            loadingText.innerText = originalText;
+            autoTestsBtn.disabled = false;
+            autoTestsBtn.innerHTML = '<i class="fas fa-robot"></i> Run Tests';
+        }
+    };
+}
     // Default manual test date
     const testDateTimeInput = document.getElementById('testDateTime');
     if (testDateTimeInput) {

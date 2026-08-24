@@ -12,7 +12,7 @@ from config import Config
 import numpy as np
 import math
 from constants import MRT3_PLATFORM_CAPACITY
-
+_P95_LOADING_IN_PROGRESS = set()
 api_predict_bp = Blueprint('api_predict', __name__)
 
 STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
@@ -96,22 +96,25 @@ def set_models(models, scalers):
     _scalers_cache = scalers
     
 def get_p95_percentile(station_name, direction):
-    """Lazy load P95 only when needed - uses memory cache, no CSV reload"""
+    """Lazy load P95 - with proper locking and no duplicates"""
+    import time
     key = f"{station_name}_{direction}"
     
-    # Check memory cache first - FAST!
+    # Fast path - already in cache
     if key in P95_CACHE:
         return P95_CACHE[key]
     
-    # Check if it's currently being computed (prevent duplicate work)
+    # Check if another thread/request is computing this
     if key in P95_CACHE_IN_PROGRESS:
-        import time
-        for _ in range(10):
+        # Wait for the other computation to finish
+        for _ in range(20):  # Wait up to 2 seconds
             time.sleep(0.1)
             if key in P95_CACHE:
                 return P95_CACHE[key]
-        return None
+        # Timeout - compute anyway
+        print(f"⏰ P95 computation timeout for {key}, forcing compute")
     
+    # Lock and compute
     P95_CACHE_IN_PROGRESS.add(key)
     
     try:
@@ -141,36 +144,28 @@ def get_p95_percentile(station_name, direction):
                 non_zero_ratio = len(non_zero_passengers) / len(passengers) * 100
                 print(f"   📊 Non-zero samples: {len(non_zero_passengers)} out of {len(passengers)} ({non_zero_ratio:.1f}%)")
                 
-                # ========== FLEXIBLE: Let data sparsity decide the percentile ==========
-                # NO HARDCODED STATION NAMES!
+                # Data-driven percentile selection
                 if non_zero_ratio < 3:
-                    # Extremely sparse - use P99.9
                     p95 = np.percentile(non_zero_passengers, 99.9)
                     print(f"   📊 Extremely sparse ({non_zero_ratio:.1f}%), using P99.9: {p95:.0f}")
                 elif non_zero_ratio < 5:
-                    # Very sparse - use P99.5
                     p95 = np.percentile(non_zero_passengers, 99.5)
                     print(f"   📊 Very sparse ({non_zero_ratio:.1f}%), using P99.5: {p95:.0f}")
                 elif non_zero_ratio < 10:
-                    # Sparse - use P99
                     p95 = np.percentile(non_zero_passengers, 99)
                     print(f"   📊 Sparse ({non_zero_ratio:.1f}%), using P99: {p95:.0f}")
                 elif non_zero_ratio < 20:
-                    # Moderate - use P98
                     p95 = np.percentile(non_zero_passengers, 98)
                     print(f"   📊 Moderate ({non_zero_ratio:.1f}%), using P98: {p95:.0f}")
                 else:
-                    # Dense data - use standard P95
                     p95 = np.percentile(non_zero_passengers, 95)
                     print(f"   📊 Dense data ({non_zero_ratio:.1f}%), using P95: {p95:.0f}")
                 
-                # ========== FLEXIBLE: Auto-adjust if P95 > Max ==========
+                # Auto-adjust if P95 > Max
                 max_val = non_zero_passengers.max()
                 if p95 > max_val * 0.95:
-                    # P95 is too close to max, use a higher percentile or cap
                     p95 = max_val * 0.92
                     print(f"   📊 P95 was too close to max, adjusted to 92% of max: {p95:.0f}")
-                
             else:
                 p95 = passengers.max()
                 print(f"   ⚠️ No non-zero values found, using max: {p95:.0f}")
@@ -178,7 +173,6 @@ def get_p95_percentile(station_name, direction):
             # Ensure P95 is at least reasonable
             capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
             min_p95 = capacity * 0.1
-            
             if p95 < min_p95:
                 print(f"   ⚠️ P95 too low ({p95:.0f}), setting to minimum: {min_p95:.0f}")
                 p95 = min_p95
@@ -213,7 +207,8 @@ def get_p95_percentile(station_name, direction):
     
 def get_typical_pattern_cached(station_name, direction, target_datetime, df=None):
     """Return typical congestion for the given hour, using a cached full-day pattern."""
-    key = f"{station_name}_{direction}"
+    target_dow = target_datetime.weekday()
+    key = f"{station_name}_{direction}_dow_{target_dow}"
     if key not in TYPICAL_PATTERN_CACHE:
         if df is None:
             from services.feature_engineering import get_station_dataframe_cached
@@ -276,12 +271,22 @@ def debug_last_24_hours(station_name, direction):
     })
   
 def ensure_models_loaded(station_name=None, direction=None):
-    """Ensure models are loaded - ONLY loads what's needed"""
-    ensure_fn = current_app.config.get('ENSURE_SINGLE_MODEL_LOADED')
+    """Ensure models are loaded - calls the lazy loader from app"""
+    ensure_fn = current_app.config.get('ENSURE_MODELS_LOADED')
     
     if not ensure_fn:
         print("⚠️ No ensure function found in app config")
         return
+    
+    # This will load models on first call, then return fast
+    ensure_fn()
+    
+    # Update local cache from app config
+    models = current_app.config.get('DIRECTIONAL_MODELS', {})
+    scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    
+    if models:
+        set_models(models, scalers)
     
     if station_name and direction:
         ensure_fn(station_name, direction)
@@ -330,6 +335,9 @@ def get_raw_prediction(station_name, direction, target_datetime):
         input_sequence = scaled_features.reshape(1, 24, -1)
         raw_scaled = directional_models[model_key].predict(input_sequence, verbose=0)[0][0]
         passenger_count = float(target_scaler.inverse_transform([[raw_scaled]])[0][0])
+        if passenger_count < 0:
+            print(f"⚠️ Negative passenger count detected for {station_name} {direction}: {passenger_count:.1f}, clamping to 0")
+            passenger_count = 0
         return passenger_count
     except Exception as e:
         print(f"⚠️ get_raw_prediction error: {e}")
@@ -722,10 +730,12 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
                 non_zero_ratio = len(non_zero) / len(df) * 100
                 target_hour = target_datetime.hour
                 
-                # ========== HOURLY-SPECIFIC CAP (CONGESTION-BASED) ==========
+                # ========== FIXED: SMARTER CAPPING ==========
+                # Only apply cap if we have enough historical data for this hour
                 hour_data = df[df.index.hour == target_hour]
                 hour_non_zero = hour_data[hour_data['TotalPassenger'] > 0]['TotalPassenger']
                 
+                # ========== FIX 1: Use higher percentile for sparse hours ==========
                 if len(hour_non_zero) > 30:
                     hour_congestion = (hour_non_zero / p95) * 100
                     hour_congestion = hour_congestion.clip(0, 100)
@@ -734,103 +744,152 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
                         hourly_cap_congestion = np.percentile(hour_congestion, 99.9)
                     else:
                         hourly_cap_congestion = np.percentile(hour_congestion, 99.5)
-                    if congestion > hourly_cap_congestion:
+                    
+                    # Only cap if congestion is WAY above historical max
+                    if congestion > hourly_cap_congestion * 1.2:
                         congestion = hourly_cap_congestion
                         print(f"🔧 Capped {station_name} {direction} at {target_hour:02d}:00 congestion cap ({hourly_cap_congestion:.1f}%)")
                 else:
+                    # ========== FIX 2: Less aggressive global cap ==========
                     global_p995_congestion = np.percentile(historical_congestion, 99.5)
-                    if 7 <= target_hour <= 9:
-                        hour_factor = 0.95
-                    elif 17 <= target_hour <= 19:
-                        hour_factor = 0.95
+                    
+                    # Use more generous factors
+                    if 7 <= target_hour <= 9 or 17 <= target_hour <= 19:
+                        hour_factor = 1.0  # No reduction for rush hours
                     elif 10 <= target_hour <= 16:
-                        hour_factor = 0.85
+                        hour_factor = 0.95
+                    elif 5 <= target_hour <= 6 or 20 <= target_hour <= 22:
+                        hour_factor = 0.85  # More generous for early/late
                     else:
-                        hour_factor = 0.7
+                        hour_factor = 0.8
+                    
                     hourly_cap_congestion = global_p995_congestion * hour_factor
-                    if congestion > hourly_cap_congestion:
+                    
+                    # Only cap if congestion is significantly above global cap
+                    if congestion > hourly_cap_congestion * 1.3:
                         congestion = hourly_cap_congestion
                         print(f"🔧 Capped {station_name} {direction} at {target_hour:02d}:00 adjusted cap ({hourly_cap_congestion:.1f}%)")
                 
                 # ============================================================
-                # ========== AGGRESSIVE BOOST LOGIC FOR NOTICEABLE SURGES ==========
+                # ========== DYNAMIC BOOST LOGIC - FULLY DATA-DRIVEN ==========
                 # ============================================================
-                # Get the typical congestion value for this hour from the pattern
-# Get the typical congestion value for this hour from the pattern
+                
+                # Get typical pattern
                 typical_hour_value = get_typical_pattern_cached(station_name, direction, target_datetime, df) or 20
-                # Determine a realistic minimum congestion based on hour, direction, and station type
                 is_terminal = station_name in ["North Ave", "Taft"]
-
-                # ========== AGGRESSIVE RUSH HOUR BOOST ==========
-                if 5 <= target_hour <= 6:
-                    # Early morning - moderate build-up
-                    if is_terminal and direction == 'Northbound':
-                        min_congestion = max(typical_hour_value * 0.6, 30)
-                    elif is_terminal:
-                        min_congestion = max(typical_hour_value * 0.5, 20)
-                    else:
-                        min_congestion = max(typical_hour_value * 0.5, 20)
-
-                elif 7 <= target_hour <= 9:
-                    # ========== MORNING RUSH - BIG SURGE! ==========
-                    if direction == 'Northbound':
-                        # Northbound morning rush - commuters heading to work
-                        if is_terminal:
-                            # Terminals have higher morning traffic
-                            min_congestion = max(typical_hour_value * 0.8, 65)  # 65% minimum!
-                        else:
-                            min_congestion = max(typical_hour_value * 0.7, 55)
-                    else:
-                        # Southbound morning rush - lighter (reverse commute)
-                        if is_terminal:
-                            min_congestion = max(typical_hour_value * 0.6, 45)
-                        else:
-                            min_congestion = max(typical_hour_value * 0.5, 35)
-
-                elif 10 <= target_hour <= 16:
-                    # ========== MIDDAY - DROP FROM RUSH ==========
-                    min_congestion = max(typical_hour_value * 0.5, 25 if is_terminal else 20)
-
-                elif 17 <= target_hour <= 19:
-                    # ========== EVENING RUSH - BIG SURGE! ==========
-                    if direction == 'Northbound':
-                        # Northbound evening rush - people heading home
-                        if is_terminal:
-                            min_congestion = max(typical_hour_value * 0.8, 65)  # 65% minimum!
-                        else:
-                            min_congestion = max(typical_hour_value * 0.7, 55)
-                    else:
-                        # Southbound evening rush - reverse commute
-                        if is_terminal:
-                            min_congestion = max(typical_hour_value * 0.7, 55)
-                        else:
-                            min_congestion = max(typical_hour_value * 0.6, 45)
-
-                elif 20 <= target_hour <= 22:
-                    # ========== LATE EVENING - DROP ==========
-                    min_congestion = max(typical_hour_value * 0.4, 20 if is_terminal else 15)
-
+                
+                # ========== Calculate historical statistics for this hour ==========
+                hour_historical_p75 = None
+                hour_historical_p50 = None
+                hour_historical_mean = None
+                
+                if len(hour_non_zero) > 10:
+                    hour_congestion_values = (hour_non_zero / p95) * 100
+                    hour_congestion_values = hour_congestion_values.clip(0, 100)
+                    hour_historical_p75 = np.percentile(hour_congestion_values, 75)
+                    hour_historical_p50 = np.percentile(hour_congestion_values, 50)
+                    hour_historical_mean = np.mean(hour_congestion_values)
+                
+                # ========== DATA-DRIVEN MINIMUM CONGESTION ==========
+                # Use the most reliable metric available
+                if hour_historical_p75 is not None:
+                    # Use P75 as the baseline (more conservative than P50)
+                    data_driven_min = hour_historical_p75 * 0.6
+                elif hour_historical_p50 is not None:
+                    # Fall back to P50 if P75 isn't available
+                    data_driven_min = hour_historical_p50 * 0.5
+                elif hour_historical_mean is not None:
+                    # Fall back to mean if no percentiles
+                    data_driven_min = hour_historical_mean * 0.4
                 else:
-                    # Late night
-                    min_congestion = max(typical_hour_value * 0.3, 15 if is_terminal else 10)
-
-                # Apply boost only if congestion is below this realistic minimum
-                if congestion < min_congestion:
+                    # If no historical data, use typical pattern
+                    data_driven_min = typical_hour_value * 0.4
+                
+                # ========== RUSH HOUR ADJUSTMENTS ==========
+                if 7 <= target_hour <= 9 or 17 <= target_hour <= 19:
+                    rush_multiplier = 1.2
+                else:
+                    rush_multiplier = 1.0
+                
+                # ========== TERMINAL STATION ADJUSTMENTS ==========
+                if is_terminal:
+                    terminal_multiplier = 1.3
+                else:
+                    terminal_multiplier = 1.0
+                
+                # ========== DIRECTIONAL ADJUSTMENTS ==========
+                if direction == 'Northbound' and (7 <= target_hour <= 9 or 17 <= target_hour <= 19):
+                    # Northbound rush hour is typically heavier
+                    direction_multiplier = 1.1
+                else:
+                    direction_multiplier = 1.0
+                
+                # ========== CALCULATE FINAL MINIMUM ==========
+                min_congestion = data_driven_min * rush_multiplier * terminal_multiplier * direction_multiplier
+                
+                # ========== SAFETY FLOOR ==========
+                # Ensure minimum is at least some reasonable value
+                absolute_floor = 10  # Never go below 10%
+                min_congestion = max(min_congestion, absolute_floor)
+                
+                # ========== SAFETY CEILING ==========
+                # Don't set minimum too high
+                min_congestion = min(min_congestion, 80)  # Never set minimum above 80%
+                
+                # ========== APPLY BOOST ==========
+                # Check if model is under-predicting
+                model_under_predicting = False
+                if hour_historical_p50 is not None:
+                    # Model is under-predicting if it's less than 50% of historical median
+                    if congestion < hour_historical_p50 * 0.5:
+                        model_under_predicting = True
+                else:
+                    # Fall back to typical pattern
+                    if congestion < typical_hour_value * 0.5:
+                        model_under_predicting = True
+                        
+                        
+                
+                if model_under_predicting and congestion < min_congestion:
+                    # Boost to the dynamic minimum
                     congestion = min_congestion
-                    print(f"🔧 Boosted {station_name} {direction} to {min_congestion:.1f}% (hour {target_hour:02d}:00, typical: {typical_hour_value:.1f}%)")
-                # ============================================================
+                    print(f"🔧 Dynamic boost {station_name} {direction} to {congestion:.1f}% "
+                          f"(hour {target_hour:02d}:00, typical: {typical_hour_value:.1f}%, "
+                          f"model was {congestion:.1f}%)")
+                elif congestion < min_congestion and not model_under_predicting:
+                    # Small adjustment if needed
+                    adjustment = min(congestion * 1.05, congestion + 2)  # Gentle 5% or +2%
+                    if adjustment > congestion:
+                        congestion = adjustment
+                        print(f"🔧 Gentle adjustment {station_name} {direction} to {congestion:.1f}% "
+                              f"(hour {target_hour:02d}:00)")
         
         # Apply correction factor (if any)
         factor = CORRECTION_FACTORS.get(model_key, 1.0)
         congestion = congestion * factor
         congestion = max(0, min(congestion, 100))
         
+        dow = target_datetime.weekday()  # Monday=0, Sunday=6
+
+        if dow >= 5:          # Saturday, Sunday
+            dow_factor = 0.7  # 30% lower on weekends
+        elif dow == 4:        # Friday
+            dow_factor = 1.1  # 10% higher on Fridays
+        elif dow == 0:        # Monday
+            dow_factor = 1.05 # 5% higher on Mondays
+        else:
+            dow_factor = 1.0  # Tuesday-Thursday
+
+        congestion = congestion * dow_factor
+        congestion = max(0, min(congestion, 100))
+
         return congestion
         
     except Exception as e:
         import traceback
         traceback.print_exc()
         return _get_operating_hours_fallback(target_datetime)
+    
 @api_predict_bp.route('/debug/simulate-all-stations-day')
 def debug_simulate_all_stations_day():
     """
@@ -845,7 +904,7 @@ def debug_simulate_all_stations_day():
     for hour in range(4, 24):
         results["hours"][f"{hour:02d}:00"] = {}
         test_time = datetime(2025, 6, 26, hour, 0, 0)
-        is_operating = 4.5 <= (hour + 0/60) < 22.5
+        is_operating = 0 <= (hour + 0/60) < 24
         
         if not is_operating:
             for station in STATIONS:
@@ -1252,7 +1311,7 @@ def debug_test_time(station_name, hour):
         "test_time": test_time.strftime("%Y-%m-%d %H:%M"),
         "hour": hour,
         "is_rush_hour": "YES" if (7 <= hour <= 9 or 17 <= hour <= 19) else "NO",
-        "is_operating": "YES" if (4.5 <= hour + 0/60 <= 22.5) else "NO",
+        "is_operating": "YES" if (0 <= hour + 0/60 <= 24) else "NO",
         "predictions": {}
     }
     
@@ -1303,7 +1362,7 @@ def simulate_day(station_name):
         
         # Check if operating
         time_decimal = hour + 0 / 60
-        is_operating = 4.5 <= time_decimal < 22.5
+        is_operating = 0 <= time_decimal < 24
         
         hour_data = {
             "hour": hour,
@@ -1950,6 +2009,12 @@ def is_override_active(override, target_time):
         return False
 @api_predict_bp.route('/directional-forecast/<station_name>')
 def directional_forecast(station_name):
+    
+    from services.feature_engineering import _TYPICAL_PATTERN_CACHE,  _BASELINE_FEATURES_CACHE
+    _TYPICAL_PATTERN_CACHE.clear()
+    _BASELINE_FEATURES_CACHE.clear()
+    TYPICAL_PATTERN_CACHE.clear()
+    
     name = station_name.replace('%20', ' ')
     
     date_param = request.args.get('date')
@@ -2742,7 +2807,7 @@ def simulate_all_stations_full_day():
         for hour in range(4, 24):  # 4 AM to 11 PM
             test_time = test_date.replace(hour=hour, minute=0, second=0, microsecond=0)
             time_decimal = hour + 0 / 60
-            is_operating = 4.5 <= time_decimal < 22.5
+            is_operating = 0 <= time_decimal < 24
             
             hour_data = {
                 "hour": hour,
@@ -2875,31 +2940,11 @@ def preload_p95_cache():
 
 # ========== PRELOAD TYPICAL PATTERNS ==========
 def preload_typical_patterns():
-    """Preload all typical patterns at startup so they're ready for requests."""
-    from services.feature_engineering import build_typical_day_pattern, get_station_dataframe_cached
-    import time
-    
-    start = time.time()
-    count = 0
-    total = len(STATIONS) * 2
-    
-    for station in STATIONS:
-        for direction in ['Northbound', 'Southbound']:
-            key = f"{station}_{direction}"
-            if key not in TYPICAL_PATTERN_CACHE:
-                df = get_station_dataframe_cached(station, direction)
-                if df is not None:
-                    # Use a reference time (hour doesn't matter, we build all 24)
-                    ref_time = datetime(2024, 1, 1, 12, 0, 0)
-                    typical_df = build_typical_day_pattern(df, ref_time, 24, station, direction)
-                    if typical_df is not None and len(typical_df) == 24:
-                        TYPICAL_PATTERN_CACHE[key] = typical_df['congestion'].tolist()
-                        count += 1
-    
-    print(f"✅ Preloaded {count}/{total} typical patterns in {time.time()-start:.2f}s")
-
-# Call it after preload_p95_cache()
-preload_p95_cache()
-preload_typical_patterns()  
+   print("⏭️ Skipping preload - patterns will build on demand")
+   return
+     
+  
+load_correction_factors()  
+#preload_typical_patterns()  
 
 # Call it right after load_correction_factors()
