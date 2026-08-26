@@ -303,14 +303,6 @@ def add_smart_operating_flags(df):
     time_decimal = df['time_decimal']
     df['is_morning_rush'] = ((time_decimal >= 7.0) & (time_decimal <= 9.0)).astype(np.int8)
     df['is_evening_rush'] = ((time_decimal >= 17.0) & (time_decimal <= 19.0)).astype(np.int8)
-    df['is_noon'] = ((time_decimal >= 12.0) & (time_decimal <= 13.0)).astype(np.int8)
-    df['is_pre_opening'] = ((time_decimal >= 4.5) & (time_decimal < 5.0)).astype(np.int8)
-    df['is_post_closing'] = ((time_decimal >= 22.5) & (time_decimal < 23.0)).astype(np.int8)
-    minutes_until = (23.0 - time_decimal) * 60
-    df['minutes_until_closing'] = minutes_until.clip(lower=0).astype(np.float32)
-    minutes_since = (time_decimal - 4.5) * 60
-    df['minutes_since_opening'] = minutes_since.clip(lower=0).astype(np.float32)
-    df['time_normalized'] = ((time_decimal - 4.5) / (23.0 - 4.5)).clip(0, 1)
     return df
 
 def smart_data_cleaner(df):
@@ -384,8 +376,8 @@ import numpy as np
 
 def calculate_commuter_congestion(passenger_count, station, direction):
     """
-    Calculate 0-100% congestion score based on historical percentile.
-    FIXED: Uses P95 for better spread and accuracy
+    Calculate 0-100% congestion score based on P95 percentile.
+    FIXED: Uses P95 instead of platform capacity to avoid 100% saturation
     """
     from services.feature_engineering import get_station_dataframe
     import numpy as np
@@ -393,6 +385,7 @@ def calculate_commuter_congestion(passenger_count, station, direction):
     hourly = get_station_dataframe(station, direction)
     
     if hourly is None or len(hourly) == 0:
+        # Fallback to capacity if no historical data
         from routes.api_other import MRT3_PLATFORM_CAPACITY
         capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
         return min((passenger_count / capacity) * 100, 100)
@@ -406,14 +399,23 @@ def calculate_commuter_congestion(passenger_count, station, direction):
         capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
         return min((passenger_count / capacity) * 100, 100)
     
-    # FIX: Use P95 instead of P85
+    # USE P95 INSTEAD OF PLATFORM CAPACITY
     p95 = np.percentile(historical_counts, 95)
     
-    # Scale to 0-100%
-    congestion = min((passenger_count / p95) * 100, 100)
+    # Prevent division by zero
+    if p95 <= 0:
+        from routes.api_other import MRT3_PLATFORM_CAPACITY
+        capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+        return min((passenger_count / capacity) * 100, 100)
+    
+    # Calculate congestion based on P95
+    congestion = (passenger_count / p95) * 100
+    
+    # Apply a softer cap (95% instead of 100% to avoid saturation)
+    congestion = min(congestion, 95)
     congestion = max(congestion, 0)
     
-    return congestion
+    return round(congestion, 1)
 
 # ============================================================
 # OPTIMIZED DATA LOADING WITH CHUNKING
@@ -653,12 +655,15 @@ def debug_analyze_scalers():
         
         feature_scaler = directional_scalers.get(f'{model_key}_feature')
         if feature_scaler is not None:
-            congestion_idx = -1
+            # Get feature names from training
+            from services.feature_engineering import FEATURE_COLS
+            
             result["analysis"]["feature_scaler"] = {
-                "congestion_feature_index": congestion_idx,
-                "congestion_data_min": float(feature_scaler.data_min_[congestion_idx]),
-                "congestion_data_max": float(feature_scaler.data_max_[congestion_idx]),
-                "interpretation": f"During training, congestion was scaled from {feature_scaler.data_min_[congestion_idx]*100:.0f}% to {feature_scaler.data_max_[congestion_idx]*100:.0f}%"
+                "feature_count": len(FEATURE_COLS),
+                "features": FEATURE_COLS,
+                "data_min": feature_scaler.data_min_.tolist(),
+                "data_max": feature_scaler.data_max_.tolist(),
+                "interpretation": f"Features are scaled using MinMaxScaler to [0,1] range"
             }
         else:
             result["analysis"]["feature_scaler"] = {"error": "Feature scaler not found"}
@@ -674,12 +679,13 @@ def debug_analyze_scalers():
         else:
             result["analysis"]["target_scaler"] = {"error": "Target scaler not found"}
         
-        # Get platform capacity
-        capacity = get_capacity(station)
-        result["analysis"]["platform_capacity"] = {
-            "value": capacity,
-            "source": "DOTr official data",
-            "note": f"Congestion = (passenger_count / {capacity:.0f}) * 100"
+        # Get P95 for this station-direction
+        from routes.api_predict import get_p95_percentile
+        p95 = get_p95_percentile(station, direction)
+        result["analysis"]["p95_percentile"] = {
+            "value": round(p95, 0),
+            "source": "Historical data (95th percentile)",
+            "note": f"Congestion = (passenger_count / {round(p95, 0)}) * 100"
         }
         
         return jsonify(result)
@@ -687,12 +693,12 @@ def debug_analyze_scalers():
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
-
 @model_perf_bp.route('/debug/trace-prediction/<station>/<direction>', methods=['GET'])
 def debug_trace_prediction(station, direction):
     """Trace the complete prediction flow from model to congestion"""
     try:
         from routes.api_predict import get_directional_prediction as api_prediction
+        from routes.api_predict import get_p95_percentile
         
         station = station.replace('%20', ' ')
         direction = direction.capitalize()
@@ -704,15 +710,15 @@ def debug_trace_prediction(station, direction):
         
         pred_congestion = api_prediction(station, direction, target_time)
         
-        # Get capacity
-        capacity = get_capacity(station)
+        # Get P95 (NOT capacity)
+        p95 = get_p95_percentile(station, direction)
         
         response = {
             "station": station,
             "direction": direction,
             "target_time": target_time.isoformat(),
             "model_key": model_key,
-            "platform_capacity": capacity,
+            "p95_percentile": round(p95, 0),
             "prediction_flow": {}
         }
         
@@ -722,22 +728,15 @@ def debug_trace_prediction(station, direction):
                 "data_max": float(target_scaler.data_max_[0]),
             }
         
-        if feature_scaler is not None:
-            congestion_idx = -1
-            response["feature_scaler_info"] = {
-                "congestion_data_min": float(feature_scaler.data_min_[congestion_idx]),
-                "congestion_data_max": float(feature_scaler.data_max_[congestion_idx]),
-            }
-        
         if pred_congestion is not None:
-            # Calculate passenger count from congestion
-            pred_passengers = (pred_congestion / 100) * capacity
+            # ✅ Calculate passenger count from congestion using P95
+            pred_passengers = (pred_congestion / 100) * p95
             
             response["prediction_flow"] = {
                 "step_1_model_output": f"{pred_congestion:.1f}%",
                 "step_2_passenger_count": f"{pred_passengers:.0f} passengers",
-                "step_3_congestion_formula": f"({pred_passengers:.0f} / {capacity:.0f}) * 100 = {pred_congestion:.1f}%",
-                "conclusion": "Model → inverse_transform → passenger count → congestion % (using platform capacity)"
+                "step_3_congestion_formula": f"({pred_passengers:.0f} / {p95:.0f}) * 100 = {pred_congestion:.1f}%",
+                "conclusion": "Model → inverse_transform → passenger count → congestion % (using P95 percentile)"
             }
         else:
             response["prediction_flow"] = {"error": "Prediction returned None"}
@@ -747,6 +746,68 @@ def debug_trace_prediction(station, direction):
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+    
+@model_perf_bp.route('/model/evaluation/summary', methods=['GET'])
+def get_evaluation_summary():
+    """Get a summary of model performance across all stations"""
+    try:
+        station = request.args.get('station', 'all')
+        direction = request.args.get('direction', 'both')
+        
+        if not os.path.exists('evaluation_results'):
+            return jsonify({"success": True, "data": {"message": "No evaluation data found"}})
+        
+        all_evals = []
+        for f in os.listdir('evaluation_results'):
+            if f.endswith('.json'):
+                try:
+                    with open(os.path.join('evaluation_results', f), 'r') as file:
+                        data = json.load(file)
+                        if station != 'all' and data.get('station') != station:
+                            continue
+                        if direction != 'both' and data.get('direction') != direction:
+                            continue
+                        all_evals.append(data)
+                except:
+                    continue
+        
+        if not all_evals:
+            return jsonify({"success": True, "data": {"message": "No evaluation data found"}})
+        
+        # Calculate averages
+        total_samples = sum(e.get('total_samples', 0) for e in all_evals)
+        avg_accuracy = np.mean([e.get('accuracy', 0) for e in all_evals])
+        avg_f1 = np.mean([e.get('f1_weighted', 0) for e in all_evals])
+        avg_mae = np.mean([e.get('regression_metrics', {}).get('mae', 0) for e in all_evals])
+        avg_r2 = np.mean([e.get('regression_metrics', {}).get('r2', 0) for e in all_evals])
+        
+        # Per station breakdown
+        per_station = {}
+        for e in all_evals:
+            key = f"{e.get('station', 'unknown')}_{e.get('direction', 'unknown')}"
+            per_station[key] = {
+                'accuracy': e.get('accuracy', 0),
+                'f1': e.get('f1_weighted', 0),
+                'mae': e.get('regression_metrics', {}).get('mae', 0),
+                'samples': e.get('total_samples', 0)
+            }
+        
+        return jsonify({
+            "success": True,
+            "data": {
+                "total_evaluations": len(all_evals),
+                "total_samples": total_samples,
+                "average_accuracy": round(avg_accuracy, 2),
+                "average_f1_score": round(avg_f1, 2),
+                "average_mae": round(avg_mae, 2),
+                "average_r2": round(avg_r2, 4),
+                "per_station": per_station,
+                "latest_evaluation": all_evals[-1] if all_evals else None
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @model_perf_bp.route('/debug/check-models', methods=['GET'])
 def debug_check_models():
@@ -1242,9 +1303,23 @@ def debug_test_preprocessing_on_sample():
         
         # Calculate congestion
         def calc_congestion_capacity(row):
-            capacity = MRT3_PLATFORM_CAPACITY.get(row['StationName'], 1000)
-            congestion = (row['TotalPassenger'] / capacity) * 100
-            return min(congestion, 100)
+            """Calculate congestion using P95 percentile (MATCHES api_predict.py)"""
+            station_name = row['StationName']
+            direction = row['direction']
+            passenger_count = row['TotalPassenger']
+            
+            # Get P95 from the same function used in predictions
+            from routes.api_predict import get_p95_percentile
+            p95 = get_p95_percentile(station_name, direction)
+            
+            if p95 <= 0:
+                # Fallback to capacity
+                capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+                congestion = (passenger_count / capacity) * 100
+            else:
+                congestion = (passenger_count / p95) * 100
+            
+            return round(min(congestion, 100), 1)
 
         grouped['actual_congestion'] = grouped.apply(calc_congestion_capacity, axis=1)
         
@@ -1562,18 +1637,29 @@ def run_auto_tests():
                 continue
             
             # ============================================================
-            # FIX: Calculate ACTUAL congestion using PLATFORM CAPACITY (MATCHES TRAINING)
-            # ============================================================
-            def calc_congestion_capacity(passenger_count, station):
-                """Calculate congestion using platform capacity - MATCHES TRAINING"""
-                cap = get_capacity(station)
-                congestion = (passenger_count / cap) * 100
-                return min(congestion, 100)
-            
+# FIX: Calculate ACTUAL congestion using P95 percentile (NEW)
+# ============================================================
+            def calc_congestion_p95(passenger_count, station_name, direction):
+                """Calculate congestion using P95 percentile - FIXED"""
+                from routes.api_predict import get_p95_percentile
+                
+                p95 = get_p95_percentile(station_name, direction)
+                
+                if p95 and p95 > 0:
+                    congestion = (passenger_count / p95) * 100
+                else:
+                    # Fallback to capacity if P95 not available
+                    cap = get_capacity(station_name)
+                    congestion = (passenger_count / cap) * 100
+                
+                # Cap at 95% to avoid saturation
+                return min(congestion, 95)
+
             hourly['actual_congestion'] = hourly.apply(
-                lambda row: calc_congestion_capacity(row['TotalPassenger'], station_name),
+                lambda row: calc_congestion_p95(row['TotalPassenger'], station_name, direction),
                 axis=1
             )
+          
             hourly = hourly.sort_values('hour_timestamp')
             
             available_indices = list(range(24, len(hourly)))
@@ -1750,12 +1836,21 @@ def preprocess_large_csv(filepath, max_rows=None):
             
             # Calculate congestion for each group
             def calc_congestion_capacity(row):
-                """Calculate congestion using platform capacity (MATCHES TRAINING)"""
+                """Calculate congestion using P95 percentile (MATCHES PREDICTION API)"""
                 station_name = row['StationName']
+                direction = row['direction']
                 passenger_count = row['TotalPassenger']
-                capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-                congestion = (passenger_count / capacity) * 100
-                return min(congestion, 100)
+                
+                from routes.api_predict import get_p95_percentile
+                p95 = get_p95_percentile(station_name, direction)
+                
+                if p95 <= 0:
+                    capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+                    congestion = (passenger_count / capacity) * 100
+                else:
+                    congestion = (passenger_count / p95) * 100
+                
+                return round(min(congestion, 100), 1)
 
             combined['actual_congestion'] = combined.apply(calc_congestion_capacity, axis=1)
             
@@ -1802,55 +1897,18 @@ def preprocess_large_csv(filepath, max_rows=None):
             return None
 @model_perf_bp.route('/model/upload/batch', methods=['POST'])
 def upload_batch_test():
-    """
-    Upload a CSV file and run batch predictions.
-    OPTIMIZED: Processes up to 780 samples maximum for speed.
-    AUTO-CLEANUP: Automatically archives old test results.
-    SKIPS NON-OPERATING HOURS (1 AM - 5 AM)
-    STRATIFIED SAMPLING: Ensures ALL hours are represented
-    FORCES MODEL LOADING: Ensures LSTM models are used instead of fallback
-    FIXED: Uses CAPACITY-BASED congestion (MATCHES TRAINING)
-    """
+    """Upload CSV and run batch predictions with proper hourly aggregation"""
     
-    from routes.api_predict import TYPICAL_PATTERN_CACHE, P95_CACHE
-    from services.feature_engineering import _TYPICAL_PATTERN_CACHE
-    from services.feature_engineering import _BASELINE_FEATURES_CACHE
-        
-    print("🗑️ Clearing prediction caches for fresh results...")
-    TYPICAL_PATTERN_CACHE.clear()
-    _TYPICAL_PATTERN_CACHE.clear()
-    _BASELINE_FEATURES_CACHE.clear() 
-    P95_CACHE.clear()
-        
     try:
-        # ============================================================
-        # AUTO-CLEANUP: Remove old test results before new upload
-        # ============================================================
-        import os, glob, shutil
-        
+        # Auto-cleanup old files
+        import glob, shutil
         backup_dir = 'test_results_backup_auto'
         os.makedirs(backup_dir, exist_ok=True)
         
-        # 1. Move old full_2025_test_* files to backup
         old_files = glob.glob('test_results/full_2025_test_*.csv')
         for f in old_files:
-            filename = os.path.basename(f)
-            shutil.move(f, os.path.join(backup_dir, filename))
-        if old_files:
-            print(f"🗑️ Archived {len(old_files)} old full_2025_test files")
+            shutil.move(f, os.path.join(backup_dir, os.path.basename(f)))
         
-        # 2. Keep only the last 3 upload_batch files
-        upload_files = sorted(glob.glob('test_results/upload_batch_*.csv'))
-        if len(upload_files) > 3:
-            for f in upload_files[:-3]:
-                filename = os.path.basename(f)
-                shutil.move(f, os.path.join(backup_dir, filename))
-            print(f"🗑️ Archived {len(upload_files) - 3} old upload files")
-        
-        print(f"✅ Cleanup complete! Old files backed up to {backup_dir}/")
-        # ============================================================
-        
-        # Check if file exists
         if 'file' not in request.files:
             return jsonify({'success': False, 'error': 'No file uploaded'}), 400
         
@@ -1861,49 +1919,78 @@ def upload_batch_test():
         if not allowed_file(file.filename):
             return jsonify({'success': False, 'error': 'Only CSV files are supported'}), 400
         
-        # Secure the filename and save
         filename = secure_filename(file.filename)
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         file.save(filepath)
         
         # ============================================================
-        # FORCE MODELS TO LOAD BEFORE PREDICTIONS
+        # FAST LOADING: Only read what's needed
         # ============================================================
+        MAX_ROWS_TO_READ = 50000  # Adjust: 50k = ~2-3 min, 100k = ~5 min
+        
+        # Load models
         from services.model_loader import directional_models, load_single_model, directional_scalers
         
         if len(directional_models) < 26:
-            print("📦 Loading all models before batch upload...")
+            print("📦 Loading models...")
             stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-                        "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-                        "Ayala Ave", "Magallanes", "Taft"]
+                       "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+                       "Ayala Ave", "Magallanes", "Taft"]
             directions = ["Northbound", "Southbound"]
             
-            loaded = 0
             for station in stations:
                 for direction in directions:
                     try:
-                        model, result = load_single_model(station, direction, 'models_2022-2024_v8')
+                        model, result = load_single_model(station, direction, 'models_2022-2024_v10')
                         if model is not None:
                             model_key = f"{station}_{direction}"
                             if model_key not in directional_models:
                                 directional_models[model_key] = model
-                            loaded += 1
                     except Exception as e:
                         print(f"   ⚠️ Could not load {station} {direction}: {e}")
+        
+        # Define P95-based congestion
+        def calc_congestion_p95(station_name, direction, passenger_count, hour=None):
+            from routes.api_predict import get_p95_percentile
+            from services.feature_engineering import get_station_dataframe
             
-            print(f"✅ Loaded {loaded}/26 models")
-            print(f"   directional_models now has: {len(directional_models)} models")
+            p95 = get_p95_percentile(station_name, direction)
+            
+            if p95 and p95 > 0:
+                congestion = (passenger_count / p95) * 100
+            else:
+                capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+                congestion = (passenger_count / capacity) * 100
+            
+            if hour is not None:
+                hourly = get_station_dataframe(station_name, direction)
+                if hourly is not None and len(hourly) > 0:
+                    hourly['hour'] = hourly.index.hour
+                    hour_data = hourly[hourly['hour'] == hour]['TotalPassenger'].values
+                    hour_data = hour_data[hour_data > 0]
+                    
+                    if len(hour_data) > 0:
+                        hour_p95 = np.percentile(hour_data, 95)
+                        if passenger_count > hour_p95:
+                            congestion = (passenger_count / hour_p95) * 100
+            
+            if hour is not None:
+                hour_caps = {
+                    0: 5, 1: 5, 2: 5, 3: 5, 4: 10, 5: 30,
+                    6: 95, 7: 98, 8: 95, 9: 90,
+                    10: 85, 11: 85, 12: 80, 13: 80, 14: 80, 15: 85, 16: 90,
+                    17: 95, 18: 95, 19: 90,
+                    20: 80, 21: 70, 22: 50, 23: 30
+                }
+                max_cap = hour_caps.get(hour, 90)
+            else:
+                max_cap = 95
+            
+            congestion = min(congestion, max_cap)
+            return round(congestion, 1)
         
-        # ============================================================
-        # SET MAX SAMPLES
-        # ============================================================
-        MAX_TOTAL_SAMPLES = 780
-        MIN_SAMPLES_PER_HOUR = 3
-        
+        # Read and preprocess data
         print(f"📊 Reading CSV: {filepath}")
-        print(f"📊 Max samples: {MAX_TOTAL_SAMPLES}")
-        
-        # Read a small sample first to check format
         sample_df = pd.read_csv(filepath, nrows=5)
         raw_mrt_columns = ['TotalPassenger', 'StationEntry', 'StationExit', 'Date', 'Time']
         is_raw_mrt = all(col in sample_df.columns for col in raw_mrt_columns)
@@ -1911,303 +1998,228 @@ def upload_batch_test():
         if is_raw_mrt:
             print("📊 Detected RAW MRT format - preprocessing...")
             
-            # Read in chunks and sample
-            chunk_size = 10000
-            all_grouped = []
-            total_rows = 0
-            chunks_processed = 0
-            max_chunks = 10
+            # Read limited rows
+            df = pd.read_csv(filepath, nrows=MAX_ROWS_TO_READ)
+            print(f"📊 Loaded {len(df):,} rows (limited to {MAX_ROWS_TO_READ:,} for speed)")
             
-            for chunk in pd.read_csv(filepath, chunksize=chunk_size):
-                chunks_processed += 1
-                total_rows += len(chunk)
-                
-                print(f"   Processing chunk {chunks_processed} ({len(chunk)} rows)...")
-                
-                # Parse dates - try multiple formats
-                try:
-                    chunk['datetime'] = pd.to_datetime(
-                        chunk['Date'] + ' ' + chunk['Time'], 
-                        errors='coerce'
-                    )
-                except:
-                    try:
-                        chunk['datetime'] = pd.to_datetime(
-                            chunk['Date'] + ' ' + chunk['Time'], 
-                            format='%m/%d/%Y %H:%M:%S', 
-                            errors='coerce'
-                        )
-                    except:
-                        chunk['datetime'] = pd.to_datetime(
-                            chunk['Date'] + ' ' + chunk['Time'], 
-                            format='%Y-%m-%d %H:%M:%S', 
-                            errors='coerce'
-                        )
-                
-                chunk = chunk.dropna(subset=['datetime'])
-                if len(chunk) == 0:
-                    continue
-                
-                # Infer direction
-                chunk['direction'] = chunk.apply(infer_direction_correct, axis=1)
-                chunk = chunk[chunk['direction'] != 'Unknown']
-                if len(chunk) == 0:
-                    continue
-                
-                # Map station
-                station_names = {
-                    1: "North Ave", 2: "Quezon Ave", 3: "Kamuning", 4: "Cubao",
-                    5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
-                    9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
-                }
-                chunk['StationName'] = chunk['StationExit'].map(station_names)
-                chunk = chunk.dropna(subset=['StationName'])
-                if len(chunk) == 0:
-                    continue
-                
-                # Group by hour
-                chunk['Hour'] = chunk['datetime'].dt.floor('h')
-                
-                # Aggregate
-                grouped = chunk.groupby(['StationName', 'direction', 'Hour']).agg({
-                    'TotalPassenger': 'sum',
-                    'datetime': 'first'
-                }).reset_index()
-                
-                all_grouped.append(grouped)
-                print(f"   Grouped: {len(grouped)} hourly records")
-                
-                # Stop if we have enough data OR too many chunks
-                if chunks_processed >= max_chunks:
-                    print(f"   Reached max chunks ({max_chunks}), stopping...")
-                    break
-                
-                # Stop if we have enough groups
-                if len(all_grouped) * 50 > MAX_TOTAL_SAMPLES:
-                    print(f"   Have enough data, stopping...")
-                    break
+            # Parse dates
+            df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce')
+            df = df.dropna(subset=['datetime'])
+            print(f"   After date parsing: {len(df):,} rows")
             
-            if all_grouped:
-                df = pd.concat(all_grouped, ignore_index=True)
-                print(f"✅ Combined: {len(df)} grouped records")
-                
-                # ============================================================
-                # FIX: Calculate ACTUAL congestion using PLATFORM CAPACITY (MATCHES TRAINING)
-                # ============================================================
-                def calc_congestion_capacity(row):
-                    """Calculate congestion using platform capacity - MATCHES TRAINING"""
-                    station_name = row['StationName']
-                    passenger_count = row['TotalPassenger']
-                    capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-                    congestion = (passenger_count / capacity) * 100
-                    return round(min(congestion, 100), 1)
-
-                df['actual_congestion'] = df.apply(calc_congestion_capacity, axis=1)
-                
-                # Format output
-                df = df[['StationName', 'direction', 'Hour', 'actual_congestion']].copy()
-                df.columns = ['station', 'direction', 'datetime', 'actual_congestion']
-                df['datetime'] = df['datetime'].dt.strftime('%Y-%m-%d %H:%M:%S')
-                df['actual_congestion'] = df['actual_congestion'].round(1)
-                
-                print(f"✅ Preprocessed: {len(df)} records")
-            else:
-                return jsonify({'success': False, 'error': 'No valid data in CSV'}), 400
-                
+            # Infer direction
+            df['direction'] = df.apply(infer_direction_correct, axis=1)
+            df = df[df['direction'] != 'Unknown']
+            print(f"   After direction filter: {len(df):,} rows")
+            
+            # Map station
+            station_names = {
+                1: "North Ave", 2: "Quezon Ave", 3: "Kamuning", 4: "Cubao",
+                5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
+                9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
+            }
+            df['StationName'] = df['StationExit'].map(station_names)
+            df = df.dropna(subset=['StationName'])
+            print(f"   After station mapping: {len(df):,} rows")
+            
+            # ============================================================
+            # CRITICAL: AGGREGATE BY HOUR (SUM all passenger counts)
+            # ============================================================
+            print("\n📊 AGGREGATING BY HOUR (summing passenger counts)...")
+            
+            # Create hourly timestamp (floor to hour)
+            df['Hour'] = df['datetime'].dt.floor('h')
+            
+            # Show sample of raw data before aggregation
+            print("\n📊 Sample of raw data (before aggregation):")
+            print(df[['StationName', 'direction', 'datetime', 'TotalPassenger']].head(10))
+            
+            # AGGREGATE: Sum TotalPassenger per station-direction-hour
+            # This combines all scattered passenger counts into hourly totals
+            grouped = df.groupby(['StationName', 'direction', 'Hour']).agg({
+                'TotalPassenger': 'sum',  # SUM all passengers in that hour
+                'datetime': 'first'       # Keep first timestamp for reference
+            }).reset_index()
+            
+            print(f"✅ After aggregation: {len(grouped):,} hourly records")
+            print("\n📊 Sample of aggregated data (after grouping):")
+            print(grouped[['StationName', 'direction', 'Hour', 'TotalPassenger']].head(10))
+            
+            # Calculate actual congestion using P95
+            print("\n📊 Calculating congestion percentages...")
+            grouped['actual_congestion'] = grouped.apply(
+                lambda row: calc_congestion_p95(
+                    row['StationName'], 
+                    row['direction'], 
+                    row['TotalPassenger'],  # This is now the HOURLY TOTAL
+                    row['Hour'].hour
+                ),
+                axis=1
+            )
+            
+            # Format output
+            df = grouped[['StationName', 'direction', 'Hour', 'actual_congestion']].copy()
+            df.columns = ['station', 'direction', 'datetime', 'actual_congestion']
+            df['datetime'] = df['datetime'].dt.strftime('%Y-%m-%d %H:%M:%S')
+            df['actual_congestion'] = df['actual_congestion'].round(1)
+            
+            print(f"\n✅ Final formatted data: {len(df):,} rows")
+            print("\n📊 Sample of final data:")
+            print(df.head(10))
+            
         else:
-            # Already formatted - read and validate
-            print("📊 Detected FORMATTED data...")
-            required = ['station', 'direction', 'datetime', 'actual_congestion']
-            
-            # Check if required columns exist (case insensitive)
-            df_cols_lower = [col.lower() for col in sample_df.columns]
-            missing = []
-            for req in required:
-                if req not in df_cols_lower:
-                    missing.append(req)
-            
-            if missing:
-                return jsonify({
-                    'success': False,
-                    'error': f'Missing required columns: {missing}. Found: {sample_df.columns.tolist()}',
-                    'required': required
-                }), 400
-            
-            # Read the file with correct column mapping (case insensitive)
-            df = pd.read_csv(filepath)
-            
-            # Rename columns to lowercase for consistency
+            # Already formatted - check if it needs aggregation
+            print("📊 Detected FORMATTED data - validating...")
+            df = pd.read_csv(filepath, nrows=MAX_ROWS_TO_READ)
             df.columns = [col.lower() for col in df.columns]
-            
-            # Ensure required columns exist
             df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
             df = df.dropna(subset=['datetime', 'actual_congestion', 'station', 'direction'])
-            print(f"✅ Read {len(df)} records")
+            
+            # Check if data is already aggregated
+            if 'total_passenger' in df.columns:
+                print("📊 Found TotalPassenger column - checking if aggregated...")
+                # If multiple rows per hour, aggregate
+                df['hour'] = df['datetime'].dt.floor('h')
+                if len(df) > df.groupby(['station', 'direction', 'hour']).size().max():
+                    print("📊 Data needs aggregation - grouping by hour...")
+                    grouped = df.groupby(['station', 'direction', 'hour']).agg({
+                        'total_passenger': 'sum',
+                        'actual_congestion': 'first'  # Use existing or recalculate
+                    }).reset_index()
+                    df = grouped
         
-        # ============================================================
-        # SKIP NON-OPERATING HOURS
-        # ============================================================
+        # Filter operating hours
         def is_operating_hour(dt):
-            """Check if datetime is within operating hours (4:30 AM - 10:30 PM)"""
             if isinstance(dt, str):
                 dt = pd.to_datetime(dt)
             hour = dt.hour + dt.minute / 60
-            OPERATING_START = 4.5
-            OPERATING_END = 22.5
-            return OPERATING_START <= hour <= OPERATING_END
+            return 4.5 <= hour <= 22.5
         
-        # FORCE datetime conversion
         df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
         df = df.dropna(subset=['datetime'])
         
-        # Filter out non-operating hours
         original_count = len(df)
         df = df[df['datetime'].apply(is_operating_hour)]
-        print(f"✅ Filtered out {original_count - len(df)} non-operating hour records")
-        print(f"✅ Remaining records: {len(df)} (operating hours only)")
+        print(f"\n✅ Kept {len(df):,} operating hour records (removed {original_count - len(df):,})")
         
-        # Add hour column for stratification
         df['hour'] = df['datetime'].dt.hour
         
         # ============================================================
-        # FIX: SKIP UNREALISTIC HOURS (5 AM and earlier)
+        # SHOW STATISTICS BEFORE SAMPLING
         # ============================================================
-        # Remove hours where data is unrealistic (1 AM - 5 AM)
-        unrealistic_hours = [0, 1, 2, 3, 4, 5]  # 12 AM - 5 AM
-        before_skip = len(df)
-        df = df[~df['hour'].isin(unrealistic_hours)]
-        skipped = before_skip - len(df)
-        if skipped > 0:
-            print(f"⚠️ Skipped {skipped} records from unrealistic hours {unrealistic_hours}")
-        
-        # Also skip 5 AM if it still has unrealistic congestion (> 40%)
-        if 5 in df['hour'].unique():
-            five_am_data = df[df['hour'] == 5]
-            if not five_am_data.empty:
-                avg_cong = five_am_data['actual_congestion'].mean()
-                if avg_cong > 40:
-                    before_skip_5am = len(df)
-                    df = df[df['hour'] != 5]
-                    print(f"⚠️ Skipped {before_skip_5am - len(df)} records from 5 AM (avg congestion {avg_cong:.1f}%)")
-        
-        print(f"✅ Records after skipping unrealistic hours: {len(df)}")
-        
-        # Clean up uploaded file
-        try:
-            os.remove(filepath)
-        except:
-            pass
-        
-        # If no data left after filtering
-        if len(df) == 0:
-            return jsonify({
-                'success': False, 
-                'error': 'No data found during operating hours (4:30 AM - 10:30 PM). Please check your CSV.'
-            }), 400
+        print("\n📊 HOURLY DISTRIBUTION (before sampling):")
+        print("-" * 60)
+        hour_stats = df.groupby('hour').agg({
+            'station': 'nunique',
+            'direction': 'nunique',
+            'actual_congestion': ['mean', 'min', 'max', 'count']
+        }).round(1)
+        print(hour_stats)
         
         # ============================================================
-        # STRATIFIED SAMPLING BY HOUR - ENSURES ALL HOURS ARE REPRESENTED
+        # FAST SAMPLING - COVERS ALL HOURS
         # ============================================================
-        hours = df['hour'].unique()
-        print(f"📊 Found {len(hours)} unique hours: {sorted(hours)}")
-        print(f"📊 Optimizing sample size (target: {MAX_TOTAL_SAMPLES})...")
-        print(f"📊 Minimum samples per hour: {MIN_SAMPLES_PER_HOUR}")
+        all_hours = list(range(5, 23))  # 5 AM to 10 PM
+        
+        # CONFIGURATION: Adjust for speed
+        SAMPLES_PER_HOUR = 3  # 3 per hour = ~54 total (very fast ~1-2 min)
+        # SAMPLES_PER_HOUR = 5   # 5 per hour = ~90 total (fast ~2-3 min)
+        # SAMPLES_PER_HOUR = 10  # 10 per hour = ~180 total (balanced ~4-5 min)
+        
+        print(f"\n📊 FAST SAMPLING: {SAMPLES_PER_HOUR} samples per hour")
+        print(f"   Hours: {all_hours[0]}:00 to {all_hours[-1]}:00 ({len(all_hours)} hours)")
+        print(f"   Estimated total: ~{len(all_hours) * SAMPLES_PER_HOUR} samples")
         
         sampled_dfs = []
-        total_sampled = 0
+        hours_with_data = []
         
-        # First pass: Ensure EVERY hour gets at least MIN_SAMPLES_PER_HOUR
-        print("\n📊 First pass - ensuring all hours have minimum samples:")
-        for hour in sorted(hours):
+        for hour in all_hours:
             hour_df = df[df['hour'] == hour]
             
-            # Get stations in this hour
-            stations = hour_df['station'].unique()
+            if len(hour_df) == 0:
+                continue
             
-            # Distribute samples across stations
-            samples_per_station = max(1, MIN_SAMPLES_PER_HOUR // len(stations))
+            hours_with_data.append(hour)
             
-            for station in stations:
-                station_df = hour_df[hour_df['station'] == station]
-                directions = station_df['direction'].unique()
-                samples_per_direction = max(1, samples_per_station // len(directions))
+            if len(hour_df) <= SAMPLES_PER_HOUR:
+                sampled = hour_df
+            else:
+                # Get samples from different station-direction pairs
+                station_dir_samples = []
+                pairs = hour_df.groupby(['station', 'direction']).size().reset_index(name='count')
                 
-                for direction in directions:
-                    group = station_df[station_df['direction'] == direction]
-                    sample_size = min(samples_per_direction, len(group))
+                for _, pair_row in pairs.iterrows():
+                    station = pair_row['station']
+                    direction = pair_row['direction']
+                    pair_df = hour_df[(hour_df['station'] == station) & (hour_df['direction'] == direction)]
                     
-                    if sample_size > 0 and total_sampled + sample_size <= MAX_TOTAL_SAMPLES:
-                        sampled = group.sample(n=sample_size, random_state=42)
-                        sampled_dfs.append(sampled)
-                        total_sampled += sample_size
-                        print(f"   Hour {hour:02d}:00 - {station} {direction}: {sample_size} samples")
+                    if len(pair_df) > 0:
+                        sampled_pair = pair_df.sample(n=1, random_state=42)
+                        station_dir_samples.append(sampled_pair)
+                
+                if station_dir_samples:
+                    combined = pd.concat(station_dir_samples, ignore_index=True)
+                    
+                    if len(combined) < SAMPLES_PER_HOUR and len(hour_df) > len(combined):
+                        already_sampled_indices = combined.index
+                        remaining = hour_df.drop(index=already_sampled_indices, errors='ignore')
+                        
+                        if len(remaining) > 0:
+                            extra_needed = min(SAMPLES_PER_HOUR - len(combined), len(remaining))
+                            extra = remaining.sample(n=extra_needed, random_state=42)
+                            combined = pd.concat([combined, extra], ignore_index=True)
+                    
+                    sampled = combined
+                else:
+                    sampled = hour_df.sample(n=min(SAMPLES_PER_HOUR, len(hour_df)), random_state=42)
             
-            if total_sampled >= MAX_TOTAL_SAMPLES:
-                break
+            sampled_dfs.append(sampled)
+            print(f"  Hour {hour:02d}:00 - {len(sampled)} samples")
         
-        # Second pass: Fill remaining with random samples from all remaining data
-        if total_sampled < MAX_TOTAL_SAMPLES and sampled_dfs:
-            remaining = MAX_TOTAL_SAMPLES - total_sampled
-            print(f"\n📊 Second pass - adding {remaining} extra samples...")
-            
-            sampled_combined = pd.concat(sampled_dfs, ignore_index=True)
-            remaining_df = df[~df.index.isin(sampled_combined.index)]
-            
-            if len(remaining_df) > 0:
-                extra_samples = remaining_df.sample(n=min(remaining, len(remaining_df)), random_state=42)
-                sampled_dfs.append(extra_samples)
-                total_sampled += len(extra_samples)
-                print(f"   Added {len(extra_samples)} extra samples")
-
         if not sampled_dfs:
             return jsonify({'success': False, 'error': 'No data to sample'}), 400
         
         df_sampled = pd.concat(sampled_dfs, ignore_index=True)
         
-        # Show hour distribution in final sample
-        print(f"\n✅ Final dataset: {len(df_sampled)} rows")
-        print("\n📊 Hour distribution in final sample:")
+        print(f"\n✅ FINAL SAMPLE: {len(df_sampled)} rows across {len(hours_with_data)} hours")
+        print(f"   Hours covered: {hours_with_data[0]}:00 to {hours_with_data[-1]}:00")
+        
+        # Show detailed hour distribution
+        print("\n📊 SAMPLED HOUR DISTRIBUTION:")
+        print("-" * 60)
         for hour in sorted(df_sampled['hour'].unique()):
             count = len(df_sampled[df_sampled['hour'] == hour])
             avg_cong = df_sampled[df_sampled['hour'] == hour]['actual_congestion'].mean()
-            print(f"  Hour {hour:02d}:00 - {count} rows, Avg Congestion: {avg_cong:.1f}%")
+            min_cong = df_sampled[df_sampled['hour'] == hour]['actual_congestion'].min()
+            max_cong = df_sampled[df_sampled['hour'] == hour]['actual_congestion'].max()
+            stations = df_sampled[df_sampled['hour'] == hour]['station'].nunique()
+            print(f"  Hour {hour:02d}:00 - {count:3} rows, {stations:2} stations, "
+                  f"Cong: {min_cong:5.1f}% - {max_cong:5.1f}% (avg: {avg_cong:5.1f}%)")
         
-        # ============================================================
-        # RUN PREDICTIONS - NOW WITH MODELS FORCED TO LOAD
-        # ============================================================
+        # Run predictions
         from routes.api_predict import get_directional_prediction as api_prediction
-        
         results = []
         errors = 0
-        total = len(df_sampled)
         
-        print(f"\n📊 Running {total} predictions...")
-        print(f"   Models loaded: {len(directional_models)}/26")
+        print(f"\n📊 Running {len(df_sampled)} predictions...")
         
-        # Process one by one
         for idx, row in df_sampled.iterrows():
             try:
                 station = str(row['station']).strip()
                 direction = str(row['direction']).strip().capitalize()
                 target_time = pd.to_datetime(row['datetime'])
                 actual_congestion = float(row['actual_congestion'])
+                hour = target_time.hour
                 
-                # Get prediction - models should now be loaded
-                try:
-                    pred_congestion = api_prediction(station, direction, target_time)
-                except Exception as e:
-                    print(f"   ⚠️ Prediction error for {station} {direction}: {e}")
-                    pred_congestion = None
+                pred_congestion = api_prediction(station, direction, target_time)
                 
                 if pred_congestion is None or pred_congestion < 0:
                     errors += 1
                     continue
                 
-                # Calculate errors
                 abs_error = abs(pred_congestion - actual_congestion)
                 pct_error = (abs_error / max(actual_congestion, 0.1)) * 100
                 
-                # Determine verdict
                 if abs_error <= 5:
                     verdict = 'EXCELLENT'
                 elif abs_error <= 10:
@@ -2221,7 +2233,7 @@ def upload_batch_test():
                     'station': station,
                     'direction': direction,
                     'target_time': target_time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'hour': target_time.hour,
+                    'hour': hour,
                     'predicted': round(pred_congestion, 1),
                     'actual': round(actual_congestion, 1),
                     'absolute_error': round(abs_error, 1),
@@ -2230,83 +2242,70 @@ def upload_batch_test():
                     'predicted_category': get_congestion_category(pred_congestion),
                     'actual_category': get_congestion_category(actual_congestion)
                 })
-                    
+                
+                # Progress indicator
+                if len(results) % 10 == 0:
+                    print(f"   Progress: {len(results)}/{len(df_sampled)} predictions")
+                
             except Exception as e:
                 errors += 1
-                if errors <= 5:
-                    print(f"   ⚠️ Error at row {idx}: {e}")
                 continue
-            
-            # Progress update every 50 rows
-            if (idx + 1) % 50 == 0:
-                print(f"   Progress: {idx + 1}/{total}, success: {len(results)}, errors: {errors}")
         
         if not results:
-            return jsonify({
-                'success': False,
-                'error': f'No valid predictions. {errors} errors out of {total}.'
-            }), 400
+            return jsonify({'success': False, 'error': f'No valid predictions. {errors} errors.'}), 400
         
-        # ============================================================
-        # SAVE RESULTS
-        # ============================================================
+        # Save results
         df_results = pd.DataFrame(results)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         os.makedirs('test_results', exist_ok=True)
         
-        # Save full results
         df_results.to_csv(f'test_results/upload_batch_{timestamp}.csv', index=False)
         
-        # Save per station-direction results
-        for (station, direction), group_df in df_results.groupby(['station', 'direction']):
-            group_df.to_csv(f"test_results/{station}_{direction}_results.csv", index=False)
-            print(f"   ✅ Saved {station}_{direction}_results.csv ({len(group_df)} rows)")
+        # Per-hour breakdown
+        per_hour = {}
+        for hour in sorted(df_results['hour'].unique()):
+            hour_data = df_results[df_results['hour'] == hour]
+            per_hour[hour] = {
+                'samples': len(hour_data),
+                'avg_predicted': round(hour_data['predicted'].mean(), 1),
+                'avg_actual': round(hour_data['actual'].mean(), 1),
+                'avg_error': round(hour_data['absolute_error'].mean(), 1),
+                'min_actual': round(hour_data['actual'].min(), 1),
+                'max_actual': round(hour_data['actual'].max(), 1)
+            }
         
-        # Calculate summary with per-hour breakdown
+        # Summary
         summary = {
             'total_processed': len(results),
             'errors': errors,
-            'total_rows': total,
             'avg_absolute_error': round(df_results['absolute_error'].mean(), 2),
             'avg_percentage_error': round(df_results['percentage_error'].mean(), 2),
             'excellent_count': len(df_results[df_results['verdict'] == 'EXCELLENT']),
             'good_count': len(df_results[df_results['verdict'] == 'GOOD']),
             'okay_count': len(df_results[df_results['verdict'] == 'OKAY']),
             'needs_improvement': len(df_results[df_results['verdict'] == 'NEEDS_IMPROVEMENT']),
-            'stations': df_results['station'].unique().tolist(),
-            'per_hour_performance': {}
+            'per_hour': per_hour,
+            'stations_tested': df_results['station'].unique().tolist(),
+            'hours_covered': sorted(df_results['hour'].unique())
         }
         
-        # Per-hour breakdown
-        for hour in sorted(df_results['hour'].unique()):
-            hour_data = df_results[df_results['hour'] == hour]
-            summary['per_hour_performance'][int(hour)] = {
-                'samples': len(hour_data),
-                'avg_error': round(hour_data['absolute_error'].mean(), 1),
-                'avg_predicted': round(hour_data['predicted'].mean(), 1),
-                'avg_actual': round(hour_data['actual'].mean(), 1)
-            }
-        
-        print(f"\n✅ Complete! {len(results)} predictions in {summary['avg_absolute_error']:.2f}% avg error")
-        print("\n📊 Performance by hour:")
-        for hour, perf in summary['per_hour_performance'].items():
-            print(f"  Hour {hour:02d}:00 - {perf['samples']} samples, Error: {perf['avg_error']:.1f}%, Pred: {perf['avg_predicted']:.1f}%, Actual: {perf['avg_actual']:.1f}%")
+        print("\n📊 PER HOUR PERFORMANCE:")
+        print("-" * 70)
+        print(f"{'Hour':>6} {'Samples':>8} {'Predicted':>10} {'Actual':>10} {'Error':>10}")
+        print("-" * 70)
+        for hour in sorted(per_hour.keys()):
+            h = per_hour[hour]
+            print(f"{hour:02d}:00 {h['samples']:>8} {h['avg_predicted']:>9.1f}% {h['avg_actual']:>9.1f}% {h['avg_error']:>9.1f}%")
         
         return jsonify({
             'success': True,
-            'message': f'Processed {len(results)} predictions across {len(summary["per_hour_performance"])} hours',
+            'message': f'Processed {len(results)} predictions across {len(per_hour)} hours',
             'summary': summary,
-            'results_preview': results[:20]
+            'results_preview': results[:30]
         })
         
     except Exception as e:
         import traceback
-        try:
-            if 'filepath' in locals() and os.path.exists(filepath):
-                os.remove(filepath)
-        except:
-            pass
-        
         return jsonify({
             'success': False,
             'error': str(e),

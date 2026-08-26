@@ -2,10 +2,11 @@ import os
 import gc
 
 # Reduce Python memory
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 os.environ['PYTHONHASHSEED'] = '0'
 os.environ['PYTHONMALLOC'] = 'malloc'
 
-# Limit TensorFlow memory
+# Limit TensorFlow memorya
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
@@ -88,40 +89,21 @@ def get_historical_cache_path():
 def load_models_with_cache(stations, models_path):
     global _MODELS_CACHE, _MODELS_LOADED
     
-    if _MODELS_LOADED:
-        print("✓ Using models from memory cache")
+    # If already in memory, return instantly
+    if _MODELS_LOADED and _MODELS_CACHE.get('directional_models'):
+        print("✓ Using models from RAM")
         return _MODELS_CACHE['directional_models'], _MODELS_CACHE['directional_scalers']
     
-    cache_file = get_models_cache_path()
-    
-    if os.path.exists(cache_file):
-        try:
-            print("📦 Loading models from disk cache (fast)...")
-            with open(cache_file, 'rb') as f:
-                _MODELS_CACHE = pickle.load(f)
-            _MODELS_LOADED = True
-            print(f"✓ Loaded {len(_MODELS_CACHE['directional_models'])} models from cache")
-            return _MODELS_CACHE['directional_models'], _MODELS_CACHE['directional_scalers']
-        except Exception as e:
-            print(f"Cache load failed: {e}, reloading from source...")
-    
-    print("🔄 Loading ALL 26 models from source (first time only - this may take a while)...")
+    # Load directly from .keras files (no pickle)
+    print("🔄 Loading models from .keras files...")
     directional_models, directional_scalers = load_directional_models(stations, models_path)
     
+    # Store in memory cache (not pickle)
     _MODELS_CACHE = {
         'directional_models': directional_models,
-        'directional_scalers': directional_scalers,
-        'loaded': True
+        'directional_scalers': directional_scalers
     }
     _MODELS_LOADED = True
-    
-    try:
-        with open(cache_file, 'wb') as f:
-            pickle.dump(_MODELS_CACHE, f)
-        print(f"✓ Models cached to {cache_file}")
-        print("  Next reload will be much faster!")
-    except Exception as e:
-        print(f"Cache save failed: {e}")
     
     return directional_models, directional_scalers
 
@@ -153,15 +135,15 @@ def load_historical_with_cache(stations, base_capacity):
 
 
 # ============ MODEL WARMUP (ELIMINATE COLD-START LATENCY) ============
+# ============ MODEL WARMUP (ELIMINATE COLD-START LATENCY) ============
 def warmup_all_models():
     """
     🔥 CRITICAL: Warms up all 26 models to eliminate cold-start latency.
-    This forces TensorFlow to build execution graphs at startup.
-    Without this, the first prediction takes 10-30 seconds!
+    Forces TensorFlow graph compilation at startup.
     """
     global directional_models_cached, _MODELS_LOADED, _WARMUP_COMPLETE
     
-    if not _MODELS_LOADED or directional_models_cached is None:
+    if not _MODELS_LOADED or not directional_models_cached:
         print("⚠️ Models not loaded yet! Call preload_all_models() first.")
         return False
     
@@ -172,38 +154,35 @@ def warmup_all_models():
     print("\n" + "="*60)
     print("🔥 WARMING UP ALL 26 MODELS (Building TensorFlow graphs)...")
     print("="*60)
-    print("⏳ This runs once at startup, making all predictions instant.")
-    print("⏳ Estimated time: 5-15 seconds depending on hardware...")
     
     import time
     import numpy as np
     start_time = time.time()
     
-    # Create dummy input matching your sequence shape
-    # (24 timesteps, 29 features - adjust if different)
-    dummy_input = np.zeros((1, 24, 29), dtype=np.float32)
-    
+    dummy_input = np.zeros((1, 24, 16), dtype=np.float32)
+
     successful = 0
     failed = 0
     total = len(directional_models_cached)
-    
+
     for idx, (model_key, model) in enumerate(directional_models_cached.items(), 1):
         try:
-            # This forces TensorFlow to compile the model graph
-            _ = model.predict(dummy_input, verbose=0)
+            # Fast tensor call
+            _ = model(dummy_input, training=False).numpy()
             successful += 1
-            
-            # Show progress
-            if idx % 5 == 0 or idx == total:
-                print(f"  ⏳ Warmup progress: {idx}/{total} models")
-                
-        except Exception as e:
-            failed += 1
-            print(f"  ⚠️ Failed to warmup {model_key}: {e}")
+        except Exception:
+            # Fallback call
+            try:
+                _ = model.predict(dummy_input, verbose=0)
+                successful += 1
+            except Exception as e2:
+                failed += 1
+                print(f"  ⚠️ Failed to warmup {model_key}: {e2}")
+        
+        if idx % 5 == 0 or idx == total:
+            print(f"  ⏳ Warmup progress: {idx}/{total} models")
     
     elapsed = time.time() - start_time
-    
-    # Force garbage collection to clean up temporary objects
     gc.collect()
     
     print("="*60)
@@ -213,7 +192,6 @@ def warmup_all_models():
         print(f"   ⚠️ {failed} models failed to warmup")
     print("="*60 + "\n")
     
-    # Store warmup stats in app config
     app.config['WARMUP_STATS'] = {
         'successful': successful,
         'failed': failed,
@@ -281,9 +259,17 @@ def import_csv_files():
 
 
 # ============ APP INITIALIZATION ============
+# ============ APP INITIALIZATION ============
 app = Flask(__name__, template_folder='html', static_folder='static')
 app.config.from_object(Config)
-cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
+
+# ✅ Configure cache properly
+app.config['CACHE_TYPE'] = 'SimpleCache'
+app.config['CACHE_DEFAULT_TIMEOUT'] = 300
+app.config['CACHE_THRESHOLD'] = 1000
+
+# Initialize cache
+cache.init_app(app)
 
 @app.route('/warmup')
 def warmup():
@@ -395,41 +381,39 @@ app.register_blueprint(email_bp, url_prefix='/api/profile')
 def inject_now():
     return {'now': datetime.now()}
 
-# ============ TRUE LAZY LOADING - NOTHING LOADS AT STARTUP ============
+# ============ PRELOAD MODELS AT STARTUP ============
 print("\n" + "="*50)
-print("🚀 MRT-3 PREDICTION SYSTEM - TRUE LAZY LOADING")
+print("🚀 MRT-3 PREDICTION SYSTEM - PRELOADING MODELS")
 print("="*50)
-print("⏳ NOTHING loads at startup!")
-print("💡 Models load ONLY on first prediction request")
-print("💡 First request may take 15-30 seconds")
-print("💡 After that, predictions are instant")
+print("⏳ Loading models at startup (this is the slow part)...")
+print("💡 This takes 15-30 seconds ONCE, then all predictions are instant")
+print("💡 Your professor will see FAST predictions on first click")
 print("="*50 + "\n")
 
-DIRECTIONAL_MODELS_PATH = 'models_2022-2024_v8'
+DIRECTIONAL_MODELS_PATH = 'models_2022-2024_v10'
 
-# Empty at startup - NOTHING loaded!
+# Global variables - will be loaded at startup
 directional_models_cached = {}
 directional_scalers_cached = {}
 _MODELS_LOADED = False
+_WARMUP_COMPLETE = False
 historical_data = None
 
 import threading
-
-# Add this lock at the module level (near the top of the file)
 _MODEL_LOAD_LOCK = threading.Lock()
 
 def ensure_models_loaded(station_name=None, direction=None):
-    """Load models ONLY on first request - TRUE lazy loading"""
+    """Ensure models are loaded - now just returns since we preload at startup"""
     global directional_models_cached, directional_scalers_cached, _MODELS_LOADED, historical_data
     
-    # Already loaded? Return fast!
+    # Should already be loaded from startup, but check just in case
     if _MODELS_LOADED and directional_models_cached:
         return
     
+    # Fallback: load if not loaded at startup (shouldn't happen)
     print("\n" + "="*60)
-    print("🔄 FIRST REQUEST - LOADING MODELS NOW...")
-    print("⏳ This is the SLOW request (15-30s)")
-    print("⏳ Subsequent requests will be FAST")
+    print("⚠️ FALLBACK: Loading models on first request...")
+    print("⏳ This should NOT happen if startup preload worked")
     print("="*60)
     
     import time
@@ -461,23 +445,85 @@ def ensure_models_loaded(station_name=None, direction=None):
     elapsed = time.time() - start
     
     print("="*60)
-    print(f"✅ MODELS LOADED in {elapsed:.1f} seconds")
+    print(f"✅ FALLBACK: MODELS LOADED in {elapsed:.1f} seconds")
     print(f"✅ {len(directional_models_cached)} directional models ready")
-    print(f"✅ Historical data for {len(historical_data['historical_entry'])} stations")
     print("="*60 + "\n")
 
-# Register the main lazy loader
+# Register the loader
 app.config['ENSURE_MODELS_LOADED'] = ensure_models_loaded
 
-# ============ SINGLE MODEL LOADER (Just calls the lazy loader) ============
+# ============ SINGLE MODEL LOADER ============
 def ensure_single_model_loaded(station_name, direction):
-    """Load models on first request - calls the lazy loader"""
-    # Just call the main lazy loader - it loads all models once
+    """Ensure models are loaded - calls the main loader"""
     ensure_models_loaded()
 
-# Register this so api_predict.py can call it
 app.config['ENSURE_SINGLE_MODEL_LOADED'] = ensure_single_model_loaded
 
+# ============ ACTUALLY LOAD MODELS AT STARTUP ============
+print("🔄 Starting model preload...")
+with app.app_context():
+    try:
+        # Load models at startup
+        directional_models_cached, directional_scalers_cached = load_models_with_cache(
+            STATIONS, DIRECTIONAL_MODELS_PATH
+        )
+        
+        # Load historical data
+        historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
+        
+        # Update services module
+        import services
+        services.directional_models = directional_models_cached
+        services.directional_scalers = directional_scalers_cached
+        services.historical_entry = historical_data.get('historical_entry', {})
+        services.historical_exit = historical_data.get('historical_exit', {})
+        services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
+        services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
+        
+        # Store in app config
+        app.config['DIRECTIONAL_MODELS'] = directional_models_cached
+        app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+        app.config['HISTORICAL_DATA'] = historical_data
+        
+        _MODELS_LOADED = True
+        
+        print(f"\n✅ MODELS LOADED at startup!")
+        print(f"   📊 {len(directional_models_cached)} directional models loaded")
+        print(f"   📊 {len(historical_data['historical_entry'])} stations historical data")
+        
+        # NOW WARM THEM UP FOR INSTANT PREDICTIONS
+        warmup_all_models()
+       
+      
+        # ✅ ADD THIS: Preload all station patterns (LOAD ALL 26 PARQUET FILES AND PATTERNS)
+        try:
+            from services.feature_engineering import preload_all_station_patterns
+            preload_all_station_patterns()
+            print("   📊 All station patterns preloaded")
+        except Exception as e:
+            print(f"   ⚠️ Pattern preload skipped: {e}")
+        
+        # ✅ Load correction factors
+        try:
+            from routes.api_predict import load_correction_factors
+            load_correction_factors()
+            print("   📊 Correction factors loaded")
+        except Exception as e:
+            print(f"   ⚠️ Correction factors load skipped: {e}")
+        
+        # ✅ Preload P95 cache from disk
+        try:
+            from routes.api_predict import preload_p95_cache
+            preload_p95_cache()
+            print("   📊 P95 cache preloaded from disk")
+        except Exception as e:
+            print(f"   ⚠️ P95 preload skipped: {e}")
+         
+    except Exception as e:
+        print(f"⚠️ Startup load failed: {e}")
+        print("   Models will load on first request instead (fallback)")
+        import traceback
+        traceback.print_exc()
 # ============ LSTM MODELS - LAZY LOADING (ONLY FOR RETRAINING) ============
 print("\n" + "="*50)
 print("LSTM MODELS - LAZY LOADING (Retraining Only)")
@@ -486,7 +532,7 @@ print("⏳ LSTM models will load only when retraining is triggered")
 print("💡 Visit /admin/retrain to trigger retraining")
 print("="*50 + "\n")
 
-LSTM_MODEL_PATH = 'models_2022-2024_v8'
+LSTM_MODEL_PATH = 'models_2022-2024_v10'
 lstm_predictor = None
 
 def ensure_lstm_for_retraining():
@@ -507,12 +553,8 @@ def ensure_lstm_for_retraining():
         print("⚠️ LSTM models not loaded - retraining will be disabled")
         app.config['LSTM_PREDICTOR'] = None
 
-# ============ PRELOAD ALL MODELS (Optional - for admin use) ============
 def preload_all_models():
-    """
-    Preload ALL 26 models - ONLY call this if you want to force-load.
-    Otherwise, models load on first request via ensure_models_loaded()
-    """
+    """Preload ALL 26 models - ONLY call this if you want to force-load."""
     global directional_models_cached, directional_scalers_cached, _MODELS_LOADED
     
     if _MODELS_LOADED and directional_models_cached is not None:
@@ -540,11 +582,21 @@ def preload_all_models():
     app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
     app.config['HISTORICAL_DATA'] = historical_data
     
+    # ✅ Add pattern preload here too
     try:
-        from routes.api_predict import preload_p95_cache, preload_typical_patterns
+        from services.feature_engineering import preload_all_station_patterns
+        preload_all_station_patterns()
+        print("   📊 All station patterns preloaded")
+    except Exception as e:
+        print(f"   ⚠️ Pattern preload skipped: {e}")
+    
+    try:
+        from routes.api_predict import preload_p95_cache, preload_typical_patterns, load_correction_factors
         print("\n📊 Preloading P95 cache and typical patterns...")
         preload_p95_cache()
         preload_typical_patterns()
+        load_correction_factors()
+        print("   📊 Correction factors loaded")
     except Exception as e:
         print(f"⚠️ Error preloading P95/typical patterns: {e}")
     
@@ -568,42 +620,35 @@ def debug_app_config():
     
 # ============ WRAPPER FUNCTIONS ============
 def get_directional_prediction_wrapper(station_name, direction, target_datetime=None):
-    # Try LSTM first (if loaded)
-    lstm_predictor = app.config.get('LSTM_PREDICTOR')
-    if lstm_predictor and hasattr(lstm_predictor, 'models') and len(lstm_predictor.models) > 0:
-        try:
-            from models import db
-            prediction = lstm_predictor.predict_congestion(station_name, direction, db.session)
-            if prediction is not None:
-                print(f"📊 Using LSTM for {station_name} {direction}: {prediction:.1f}%")
-                return prediction
-        except Exception as e:
-            print(f"⚠️ LSTM prediction failed: {e}, falling back...")
+    """
+    Wrapper that uses the main prediction API only.
+    This ensures consistency with the live map and all other endpoints.
+    """
+    from routes.api_predict import get_directional_prediction
+    return get_directional_prediction(station_name, direction, target_datetime)
+
     
-    return get_directional_prediction(
-        station_name, direction, target_datetime,
-        directional_models_cached, directional_scalers_cached,
-        get_feature_sequence_for_station
-    )
 
 def get_station_prediction_wrapper(station_name):
-    lstm_predictor = app.config.get('LSTM_PREDICTOR')
-    if lstm_predictor and hasattr(lstm_predictor, 'models') and len(lstm_predictor.models) > 0:
-        try:
-            from models import db
-            for direction in ['Northbound', 'Southbound']:
-                prediction = lstm_predictor.predict_congestion(station_name, direction, db.session)
-                if prediction is not None:
-                    print(f"📊 Using LSTM for {station_name}: {prediction:.1f}%")
-                    return prediction
-        except Exception as e:
-            print(f"⚠️ LSTM prediction failed: {e}, falling back...")
+    """
+    Wrapper that uses the main prediction API only.
+    """
+    from routes.api_predict import get_directional_prediction
+    from config import Config
     
-    return get_station_prediction(
-        station_name, None,
-        directional_models_cached, directional_scalers_cached,
-        get_feature_sequence_for_station
-    )
+    now = Config.get_current_time()
+    north = get_directional_prediction(station_name, 'Northbound', now)
+    south = get_directional_prediction(station_name, 'Southbound', now)
+    
+    if north is None and south is None:
+        return 50
+    
+    if north is None:
+        return south
+    if south is None:
+        return north
+    
+    return (north + south) / 2
 
 def log_activity_wrapper(user_id, user_type, user_email, action, details=None):
     return utils_log_activity(
@@ -706,7 +751,7 @@ with app.app_context():
     else:
         print(f"⚠️ Some CSV files missing: {[f for f in csv_files if not os.path.exists(os.path.join(data_dir, f))]}")
         print("🔄 Auto-importing CSV files from Google Drive...")
-        #results = import_csv_files()  # ✅ CALL the import function!
+        results = import_csv_files()  # ✅ CALL the import function!
         
         # Verify after import
         all_present_now = all(os.path.exists(os.path.join(data_dir, f)) for f in csv_files)
@@ -763,13 +808,12 @@ def debug_lstm_status():
         'model_path': lstm_predictor.model_path if hasattr(lstm_predictor, 'model_path') else None
     })
 
-# ============ DEBUG ROUTES ============
 @app.route('/debug/raw-prediction/<station_name>/<direction>')
 def raw_prediction(station_name, direction):
     from services import get_feature_sequence_for_station
+    from routes.api_predict import get_p95_percentile
     import numpy as np
     
-    # This will load models on first call
     ensure_single_model_loaded(station_name, direction)
     
     model_key = f"{station_name}_{direction}"
@@ -784,22 +828,31 @@ def raw_prediction(station_name, direction):
         if sequence is None:
             return jsonify({'error': 'Could not generate feature sequence'})
         
-        feature_scaler = directional_scalers_cached.get(f'{model_key}_feature')
+        # ✅ FIX: get_feature_sequence_for_station() already returns scaled features
+        # Do NOT transform again!
         target_scaler = directional_scalers_cached.get(f'{model_key}_target')
         
-        if not feature_scaler or not target_scaler:
-            return jsonify({'error': 'Scalers not found'})
+        if not target_scaler:
+            return jsonify({'error': 'Target scaler not found'})
         
-        scaled_sequence = feature_scaler.transform(sequence)
-        scaled_sequence = scaled_sequence.reshape(1, 24, -1)
+        # sequence is already scaled (24, 16)
+        scaled_sequence = sequence.reshape(1, 24, -1)
         
-        pred_scaled = directional_models_cached[model_key].predict(scaled_sequence, verbose=0)
-        pred_real = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
+        input_tensor = tf.convert_to_tensor(scaled_sequence, dtype=tf.float32)
+        pred_scaled = directional_models_cached[model_key](input_tensor, training=False).numpy()
+        pred_passengers = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
+        
+        # ✅ Get P95 for congestion
+        p95 = get_p95_percentile(station_name, direction)
+        pred_congestion = (pred_passengers / p95) * 100
+        pred_congestion = max(0, min(100, pred_congestion))
         
         return jsonify({
             'station': station_name,
             'direction': direction,
-            'prediction': round(pred_real, 1),
+            'predicted_passengers': round(pred_passengers, 1),
+            'predicted_congestion': round(pred_congestion, 1),
+            'p95_percentile': round(p95, 0),
             'sequence_shape': sequence.shape,
             'timestamp': now.isoformat(),
             'success': True
@@ -811,7 +864,6 @@ def raw_prediction(station_name, direction):
             'error': str(e),
             'traceback': traceback.format_exc()
         })
-
 @app.route('/debug/feature-sequence-test/<station>/<direction>')
 def test_feature_sequence(station, direction):
     from services.feature_engineering import get_feature_sequence_for_station
@@ -836,7 +888,6 @@ def test_feature_sequence(station, direction):
     }
     
     return jsonify(result)
-
 @app.route('/debug/test-real-model/<station_name>')
 def test_real_model(station_name):
     from services import get_feature_sequence_for_station
@@ -853,17 +904,17 @@ def test_real_model(station_name):
             try:
                 sequence = get_feature_sequence_for_station(station_name, direction, now)
                 
-                if sequence is not None and sequence.shape == (24, 29):
-                    feature_scaler = directional_scalers_cached.get(f'{model_key}_feature')
+                # ✅ FIX: V10 models use 24x16, not 29
+                if sequence is not None and sequence.shape == (24, 16):
                     target_scaler = directional_scalers_cached.get(f'{model_key}_target')
                     
-                    if feature_scaler and target_scaler:
-                        scaled_sequence = feature_scaler.transform(sequence)
-                        scaled_sequence = scaled_sequence.reshape(1, 24, -1)
+                    if target_scaler:
+                        # sequence is already scaled
+                        scaled_sequence = sequence.reshape(1, 24, -1)
                         
-                        pred_scaled = directional_models_cached[model_key].predict(scaled_sequence, verbose=0)
+                        input_tensor = tf.convert_to_tensor(scaled_sequence, dtype=tf.float32)
+                        pred_scaled = directional_models_cached[model_key](input_tensor, training=False).numpy()
                         pred_real = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
-                        
                         results[direction] = {
                             'prediction': round(pred_real, 1),
                             'model_key': model_key,
@@ -871,7 +922,7 @@ def test_real_model(station_name):
                             'using_real_model': True
                         }
                     else:
-                        results[direction] = {'error': 'Missing scaler'}
+                        results[direction] = {'error': 'Missing target scaler'}
                 else:
                     results[direction] = {'error': f'Invalid sequence shape: {sequence.shape if sequence is not None else None}'}
             except Exception as e:
@@ -926,7 +977,6 @@ def debug_clear_cache():
         "files": results,
         "message": "Restart the app or call /warmup to reload models from source"
     })
-
 @app.route('/debug/raw-model-output/<station_name>/<direction>')
 def debug_raw_model_output(station_name, direction):
     from services import get_feature_sequence_for_station
@@ -950,33 +1000,44 @@ def debug_raw_model_output(station_name, direction):
             sequence = get_feature_sequence_for_station(station_name, direction, now)
             
             if sequence is not None and len(sequence) == 24:
-                feature_scaler = directional_scalers_cached.get(f'{model_key}_feature')
                 target_scaler = directional_scalers_cached.get(f'{model_key}_target')
                 
-                if feature_scaler:
-                    scaled_sequence = feature_scaler.transform(sequence)
-                    input_sequence = scaled_sequence.reshape(1, 24, -1)
+                if target_scaler:
+                    # sequence is already scaled
+                    scaled_sequence = sequence.reshape(1, 24, -1)
                     
-                    pred_scaled = directional_models_cached[model_key].predict(input_sequence, verbose=0)
+                    input_tensor = tf.convert_to_tensor(scaled_sequence, dtype=tf.float32)
+                    pred_scaled = directional_models_cached[model_key](input_tensor, training=False).numpy()
                     result['raw_scaled_output'] = float(pred_scaled[0][0])
                     
-                    if target_scaler:
-                        pred_original = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
-                        result['after_inverse_transform'] = pred_original
+                    # ✅ FIX: Use StandardScaler inverse_transform
+                    pred_original = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
+                    result['after_inverse_transform'] = pred_original
+                    
+                    # ✅ FIX: StandardScaler uses mean_ and scale_, not data_min_/data_max_
+                    if hasattr(target_scaler, 'mean_') and hasattr(target_scaler, 'scale_'):
+                        result['target_scaler_type'] = 'StandardScaler'
+                        result['target_scaler_mean'] = float(target_scaler.mean_[0])
+                        result['target_scaler_scale'] = float(target_scaler.scale_[0])
                         
+                        # Manual calculation for verification
+                        calculated = pred_scaled[0][0] * target_scaler.scale_[0] + target_scaler.mean_[0]
+                        result['calculated_from_scaled'] = float(calculated)
+                    elif hasattr(target_scaler, 'data_min_') and hasattr(target_scaler, 'data_max_'):
+                        # Fallback for MinMaxScaler (backward compatibility)
+                        result['target_scaler_type'] = 'MinMaxScaler'
                         result['target_scaler_min'] = float(target_scaler.data_min_[0])
                         result['target_scaler_max'] = float(target_scaler.data_max_[0])
-                        result['target_scaler_range'] = result['target_scaler_max'] - result['target_scaler_min']
-                        
-                        calculated = pred_scaled[0][0] * (result['target_scaler_max'] - result['target_scaler_min']) + result['target_scaler_min']
+                        calculated = pred_scaled[0][0] * (target_scaler.data_max_[0] - target_scaler.data_min_[0]) + target_scaler.data_min_[0]
                         result['calculated_from_scaled'] = float(calculated)
                     else:
+                        result['warning'] = 'Unknown scaler type'
                         result['direct_model_output'] = float(pred_scaled[0][0])
                     
                     result['feature_sequence_shape'] = sequence.shape
-                    result['feature_scaler_exists'] = feature_scaler is not None
+                    result['feature_scaler_exists'] = True
                 else:
-                    result['error'] = 'No feature scaler found'
+                    result['error'] = 'No target scaler found'
             else:
                 result['error'] = f'Invalid sequence length: {len(sequence) if sequence is not None else None}'
         except Exception as e:
@@ -995,7 +1056,7 @@ def debug_list_models():
     import os
     import glob
     
-    model_dir = 'models_2022-2024_v8'
+    model_dir = 'models_2022-2024_v10'
     if not os.path.exists(model_dir):
         return jsonify({'error': f'Directory {model_dir} not found'})
     
@@ -1175,14 +1236,12 @@ for stat in top_stats[:10]:
 # ============ MAIN ============
 if __name__ == '__main__':
     print("\n" + "="*50)
-    print("🚀 MRT-3 PREDICTION SYSTEM - LAZY LOADING")
+    print("🚀 MRT-3 PREDICTION SYSTEM - STARTUP COMPLETE")
     print("="*50)
-    
-    print("\n⏳ Server starting in 2 seconds...")
-    print("💡 Models will load ONLY on first prediction request.")
-    print("💡 First request may take 15-20 seconds, then instant.")
+    print(f"✅ {len(directional_models_cached)} directional models loaded")
+    print(f"✅ Warmup: {'COMPLETE' if _WARMUP_COMPLETE else 'PENDING'}")
+    print("💡 All predictions will be INSTANT from the first click!")
     print("="*50 + "\n")
-    
     
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)

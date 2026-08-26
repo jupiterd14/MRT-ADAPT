@@ -1,9 +1,3 @@
-"""
-PREDICTION API - ML Model Endpoints Only
-Purpose: Raw congestion predictions from ML models
-Use for: Forecasts, batch predictions, route planning
-"""
-
 from flask import Blueprint, request, jsonify, current_app
 from extensions import cache
 from datetime import datetime, timedelta
@@ -12,7 +6,9 @@ from config import Config
 import numpy as np
 import math
 from constants import MRT3_PLATFORM_CAPACITY
-_P95_LOADING_IN_PROGRESS = set()
+import tensorflow as tf 
+
+
 api_predict_bp = Blueprint('api_predict', __name__)
 
 STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
@@ -21,54 +17,226 @@ STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
 
 import json
 import os
-import time
 import pickle
+# Add at the top with other imports
+import time
 
-# ========== P95 CACHE ==========
-P95_CACHE = {}          # Global cache: key = "station_direction" -> p95 value
+# ========== REQUEST-LEVEL CACHE ==========
+_REQUEST_CACHE = {}
+_REQUEST_CACHE_TTL = 10  # 10 seconds
+
+def get_cached_prediction(station_name, direction, target_datetime):
+    """Get prediction with request-level caching to prevent duplicate calls"""
+    if target_datetime is None:
+        target_datetime = Config.get_current_time()
+    
+    # Create cache key
+    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H%M')}"
+    
+    # Clean old cache entries
+    current_time = time.time()
+    for key in list(_REQUEST_CACHE.keys()):
+        if current_time - _REQUEST_CACHE[key]['timestamp'] > _REQUEST_CACHE_TTL:
+            del _REQUEST_CACHE[key]
+    
+    # Return cached value if exists
+    if cache_key in _REQUEST_CACHE:
+        return _REQUEST_CACHE[cache_key]['value']
+    
+    return None
+
+def set_cached_prediction(station_name, direction, target_datetime, value):
+    """Store prediction in request cache"""
+    if target_datetime is None:
+        target_datetime = Config.get_current_time()
+    
+    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H%M')}"
+    
+    _REQUEST_CACHE[cache_key] = {
+        'value': value,
+        'timestamp': time.time()
+    }
+
+# ========== P95 CACHE - USING APP CONFIG ==========
 P95_FILE = 'p95_percentiles.json'
-P95_CACHE_IN_PROGRESS = set()  # Track which P95s are being computed
-HISTORICAL_PEAKS = {}
-# ========== CORRECTION FACTORS ==========
-CORRECTION_FACTORS = {}
-TYPICAL_PATTERN_CACHE = {} 
 CORRECTION_FILE = 'correction_factors.pkl'
+
+def get_p95_cache():
+    """Get P95 cache from app config (persistent across requests)"""
+    if 'P95_CACHE' not in current_app.config:
+        current_app.config['P95_CACHE'] = {}
+    return current_app.config['P95_CACHE']
+
+def get_typical_pattern_cache():
+    """Get typical pattern cache from app config"""
+    if 'TYPICAL_PATTERN_CACHE' not in current_app.config:
+        current_app.config['TYPICAL_PATTERN_CACHE'] = {}
+    return current_app.config['TYPICAL_PATTERN_CACHE']
+
+_PENDING_CORRECTION_FACTORS = {}
+
+def get_correction_factors():
+    """Get correction factors from app config"""
+    try:
+        if 'CORRECTION_FACTORS' not in current_app.config:
+            # Check if we have pending factors
+            global _PENDING_CORRECTION_FACTORS
+            if _PENDING_CORRECTION_FACTORS:
+                current_app.config['CORRECTION_FACTORS'] = _PENDING_CORRECTION_FACTORS
+                _PENDING_CORRECTION_FACTORS = {}
+            else:
+                current_app.config['CORRECTION_FACTORS'] = {}
+        return current_app.config['CORRECTION_FACTORS']
+    except RuntimeError:
+        # Working outside of application context
+        return _PENDING_CORRECTION_FACTORS
+def get_p95_percentile(station_name, direction):
+    """Get P95 using app config cache (persistent across requests)"""
+    key = f"{station_name}_{direction}"
+    
+    # Get cache from app config
+    p95_cache = get_p95_cache()
+    
+    # Check if already cached
+    if key in p95_cache:
+        return p95_cache[key]
+    
+    # Compute P95
+    from services.feature_engineering import get_station_dataframe_cached
+    hourly = get_station_dataframe_cached(station_name, direction)
+    
+    if hourly is not None and len(hourly) > 0:
+        # ========== ✅ FIX: Use TotalPassenger directly, not congestion ==========
+        passengers = hourly['TotalPassenger'].values
+        non_zero = passengers[passengers > 0]
+        
+        if len(non_zero) > 0:
+            # Use the 95th percentile of passenger counts
+            p95 = np.percentile(non_zero, 95)
+            
+            # Ensure minimum value
+            p95 = max(p95, 100)  # At least 100 passengers
+            
+            # Cap at a reasonable maximum (e.g., 2x the 99th percentile)
+            p99 = np.percentile(non_zero, 99)
+            max_reasonable = p99 * 1.5
+            if p95 > max_reasonable:
+                p95 = max_reasonable
+        else:
+            p95 = 1000  # Fallback
+        
+        # Store in cache
+        p95_cache[key] = float(p95)
+        
+        # Save to disk
+        try:
+            if os.path.exists(P95_FILE):
+                with open(P95_FILE, 'r') as f:
+                    all_p95 = json.load(f)
+            else:
+                all_p95 = {}
+            all_p95[key] = float(p95)
+            with open(P95_FILE, 'w') as f:
+                json.dump(all_p95, f, indent=2)
+        except:
+            pass
+        
+        return p95_cache[key]
+    
+    # Fallback
+    fallback = 1000
+    p95_cache[key] = fallback
+    return fallback
+def safe_cache_key(prefix):
+    """Generate cache key safely handling None request"""
+    try:
+        from flask import request
+        if request is not None:
+            if hasattr(request, 'view_args') and request.view_args:
+                station = request.view_args.get('station_name', 'unknown')
+            else:
+                station = 'unknown'
+        else:
+            station = 'unknown'
+    except:
+        station = 'unknown'
+    
+    return f"{prefix}_{station}_{datetime.now().hour}_{datetime.now().minute // 5}"
+
+def get_typical_pattern_cached(station_name, direction, target_datetime, df=None):
+    """Get typical pattern using app config cache"""
+    target_dow = target_datetime.weekday()
+    key = f"{station_name}_{direction}_dow_{target_dow}"
+    
+    # Get cache from app config
+    typical_cache = get_typical_pattern_cache()
+    
+    if key not in typical_cache:
+        if df is None:
+            from services.feature_engineering import get_station_dataframe_cached
+            df = get_station_dataframe_cached(station_name, direction)
+        if df is None:
+            return None
+        
+        from services.feature_engineering import build_typical_day_pattern
+        typical_df = build_typical_day_pattern(df, target_datetime, 24, station_name, direction)
+        if typical_df is not None and len(typical_df) == 24:
+            typical_cache[key] = typical_df['congestion'].tolist()
+        else:
+            typical_cache[key] = None
+    
+    day_pattern = typical_cache.get(key)
+    if day_pattern is None:
+        return None
+    hour = target_datetime.hour
+    return day_pattern[hour] if 0 <= hour < 24 else None
+
+def load_correction_factors():
+    """Load correction factors into app config"""
+    correction_factors = get_correction_factors()
+    
+    if os.path.exists(CORRECTION_FILE):
+        try:
+            with open(CORRECTION_FILE, 'rb') as f:
+                factors = pickle.load(f)
+                correction_factors.update(factors)
+            print(f"✅ Loaded {len(factors)} correction factors into app config")
+        except Exception as e:
+            print(f"⚠️ Could not load correction factors: {e}")
+
+# Call at module load
+#load_correction_factors()
+
+# ========== PRELOAD P95 CACHE FROM DISK ==========
+def preload_p95_cache():
+    """Load all P95 values from disk into app config at startup."""
+    p95_cache = get_p95_cache()
+    if os.path.exists(P95_FILE):
+        try:
+            with open(P95_FILE, 'r') as f:
+                all_p95 = json.load(f)
+                p95_cache.update(all_p95)
+                print(f"✅ Preloaded {len(all_p95)} P95 values into app config")
+        except Exception as e:
+            print(f"⚠️ Could not preload P95 cache: {e}")
+
+# ========== PRELOAD TYPICAL PATTERNS ==========
+def preload_typical_patterns():
+    print("⏭️ Skipping preload - patterns will build on demand")
+    return
 
 # ========== MODEL CACHE ==========
 _models_cache = None
 _scalers_cache = None
 
-@api_predict_bp.route('/debug/loaded-models')
-def debug_loaded_models():
-    """Check which models are actually loaded"""
-    directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
-    directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
-    
-    loaded = {}
-    for station in STATIONS:
-        loaded[station] = {}
-        for direction in ['Northbound', 'Southbound']:
-            model_key = f"{station}_{direction}"
-            loaded[station][direction] = {
-                'model_loaded': model_key in directional_models,
-                'scaler_loaded': f'{model_key}_target' in directional_scalers
-            }
-    
-    return jsonify({
-        'total_models': len(directional_models),
-        'station_status': loaded,
-        'all_model_keys': list(directional_models.keys())
-    })
-    
 def get_models():
     """Get models from cache or app config"""
     global _models_cache, _scalers_cache
     
-    # Return cached if available
     if _models_cache is not None:
         return _models_cache, _scalers_cache
     
-    # Try to get from app config
+    # Get from app config only
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
     
@@ -77,16 +245,6 @@ def get_models():
         _scalers_cache = directional_scalers
         return _models_cache, _scalers_cache
     
-    # Try to import from app (fallback)
-    try:
-        from app import directional_models_cached, directional_scalers_cached
-        if directional_models_cached:
-            _models_cache = directional_models_cached
-            _scalers_cache = directional_scalers_cached
-            return _models_cache, _scalers_cache
-    except:
-        pass
-    
     return None, None
 
 def set_models(models, scalers):
@@ -94,156 +252,6 @@ def set_models(models, scalers):
     global _models_cache, _scalers_cache
     _models_cache = models
     _scalers_cache = scalers
-    
-def get_p95_percentile(station_name, direction):
-    """Lazy load P95 - with proper locking and no duplicates"""
-    import time
-    key = f"{station_name}_{direction}"
-    
-    # Fast path - already in cache
-    if key in P95_CACHE:
-        return P95_CACHE[key]
-    
-    # Check if another thread/request is computing this
-    if key in P95_CACHE_IN_PROGRESS:
-        # Wait for the other computation to finish
-        for _ in range(20):  # Wait up to 2 seconds
-            time.sleep(0.1)
-            if key in P95_CACHE:
-                return P95_CACHE[key]
-        # Timeout - compute anyway
-        print(f"⏰ P95 computation timeout for {key}, forcing compute")
-    
-    # Lock and compute
-    P95_CACHE_IN_PROGRESS.add(key)
-    
-    try:
-        # Check disk cache
-        if os.path.exists(P95_FILE):
-            try:
-                with open(P95_FILE, 'r') as f:
-                    all_p95 = json.load(f)
-                    if key in all_p95:
-                        P95_CACHE[key] = all_p95[key]
-                        print(f"📦 Loaded p95 for {key} from disk: {P95_CACHE[key]}")
-                        return P95_CACHE[key]
-            except Exception as e:
-                print(f"⚠️ Could not load p95 cache: {e}")
-        
-        print(f"📊 Computing p95 for {key} from data (first time only)...")
-        
-        from services.feature_engineering import get_station_dataframe_cached
-        
-        hourly = get_station_dataframe_cached(station_name, direction)
-        
-        if hourly is not None and len(hourly) > 0:
-            passengers = hourly['TotalPassenger'].values
-            non_zero_passengers = passengers[passengers > 0]
-            
-            if len(non_zero_passengers) > 0:
-                non_zero_ratio = len(non_zero_passengers) / len(passengers) * 100
-                print(f"   📊 Non-zero samples: {len(non_zero_passengers)} out of {len(passengers)} ({non_zero_ratio:.1f}%)")
-                
-                # Data-driven percentile selection
-                if non_zero_ratio < 3:
-                    p95 = np.percentile(non_zero_passengers, 99.9)
-                    print(f"   📊 Extremely sparse ({non_zero_ratio:.1f}%), using P99.9: {p95:.0f}")
-                elif non_zero_ratio < 5:
-                    p95 = np.percentile(non_zero_passengers, 99.5)
-                    print(f"   📊 Very sparse ({non_zero_ratio:.1f}%), using P99.5: {p95:.0f}")
-                elif non_zero_ratio < 10:
-                    p95 = np.percentile(non_zero_passengers, 99)
-                    print(f"   📊 Sparse ({non_zero_ratio:.1f}%), using P99: {p95:.0f}")
-                elif non_zero_ratio < 20:
-                    p95 = np.percentile(non_zero_passengers, 98)
-                    print(f"   📊 Moderate ({non_zero_ratio:.1f}%), using P98: {p95:.0f}")
-                else:
-                    p95 = np.percentile(non_zero_passengers, 95)
-                    print(f"   📊 Dense data ({non_zero_ratio:.1f}%), using P95: {p95:.0f}")
-                
-                # Auto-adjust if P95 > Max
-                max_val = non_zero_passengers.max()
-                if p95 > max_val * 0.95:
-                    p95 = max_val * 0.92
-                    print(f"   📊 P95 was too close to max, adjusted to 92% of max: {p95:.0f}")
-            else:
-                p95 = passengers.max()
-                print(f"   ⚠️ No non-zero values found, using max: {p95:.0f}")
-            
-            # Ensure P95 is at least reasonable
-            capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-            min_p95 = capacity * 0.1
-            if p95 < min_p95:
-                print(f"   ⚠️ P95 too low ({p95:.0f}), setting to minimum: {min_p95:.0f}")
-                p95 = min_p95
-            
-            P95_CACHE[key] = round(float(p95), 2)
-            print(f"✅ Computed p95 for {key}: {P95_CACHE[key]:.0f}")
-            
-            # Save to disk cache
-            try:
-                if os.path.exists(P95_FILE):
-                    with open(P95_FILE, 'r') as f:
-                        all_p95 = json.load(f)
-                else:
-                    all_p95 = {}
-                all_p95[key] = P95_CACHE[key]
-                with open(P95_FILE, 'w') as f:
-                    json.dump(all_p95, f, indent=2)
-                print(f"💾 Saved p95 for {key} to disk")
-            except Exception as e:
-                print(f"⚠️ Could not save p95: {e}")
-            
-            return P95_CACHE[key]
-        
-        # Fallback
-        fallback = MRT3_PLATFORM_CAPACITY.get(station_name, 1000) * 0.3
-        P95_CACHE[key] = fallback
-        print(f"⚠️ Using fallback p95 for {key}: {fallback:.0f}")
-        return fallback
-        
-    finally:
-        P95_CACHE_IN_PROGRESS.discard(key)
-    
-def get_typical_pattern_cached(station_name, direction, target_datetime, df=None):
-    """Return typical congestion for the given hour, using a cached full-day pattern."""
-    target_dow = target_datetime.weekday()
-    key = f"{station_name}_{direction}_dow_{target_dow}"
-    if key not in TYPICAL_PATTERN_CACHE:
-        if df is None:
-            from services.feature_engineering import get_station_dataframe_cached
-            df = get_station_dataframe_cached(station_name, direction)
-        if df is None:
-            return None
-        
-        # Build typical pattern for the whole day (24 hours)
-        from services.feature_engineering import build_typical_day_pattern
-        typical_df = build_typical_day_pattern(df, target_datetime, 24, station_name, direction)
-        if typical_df is not None and len(typical_df) == 24:
-            TYPICAL_PATTERN_CACHE[key] = typical_df['congestion'].tolist()
-        else:
-            TYPICAL_PATTERN_CACHE[key] = None
-
-    day_pattern = TYPICAL_PATTERN_CACHE.get(key)
-    if day_pattern is None:
-        return None
-    hour = target_datetime.hour
-    return day_pattern[hour] if 0 <= hour < 24 else None
-
-
-
-def load_correction_factors():
-    global CORRECTION_FACTORS
-    if os.path.exists(CORRECTION_FILE):
-        with open(CORRECTION_FILE, 'rb') as f:
-            CORRECTION_FACTORS = pickle.load(f)
-        print(f"✅ Loaded correction factors for {len(CORRECTION_FACTORS)} station-directions")
-    else:
-        print("⚠️ No correction factors found – using 1.0")
-
-# ✅ CALL IT HERE
-load_correction_factors()
-
 
 # Add this debug endpoint to see the last 24 hours
 @api_predict_bp.route('/debug/last-24-hours/<station_name>/<direction>')
@@ -296,21 +304,8 @@ def ensure_models_loaded(station_name=None, direction=None):
     else:
         ensure_fn("North Ave", "Northbound")
         ensure_fn("North Ave", "Southbound")
-    
-    # ✅ UPDATE THE CACHE after loading
-    try:
-        from app import directional_models_cached, directional_scalers_cached
-        if directional_models_cached:
-            set_models(directional_models_cached, directional_scalers_cached)
-    except:
-        # Fallback: get from config
-        models = current_app.config.get('DIRECTIONAL_MODELS', {})
-        scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
-        if models:
-            set_models(models, scalers)
-        
 def get_raw_prediction(station_name, direction, target_datetime):
-    """Returns the raw passenger count from the model (WITHOUT correction factor)."""
+    """Returns the raw passenger count from the model."""
     
     ensure_models_loaded(station_name, direction)
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
@@ -321,28 +316,28 @@ def get_raw_prediction(station_name, direction, target_datetime):
         return None
 
     try:
-        features = get_feature_sequence_for_station(station_name, direction, target_datetime)
-        if features is None:
+        # ✅ FIX: get_feature_sequence_for_station returns SCALED features
+        features_scaled = get_feature_sequence_for_station(station_name, direction, target_datetime)
+        if features_scaled is None:
             return None
 
-        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        # ✅ FIX: Get target scaler only
         target_scaler = directional_scalers.get(f'{model_key}_target')
-        if feature_scaler is None or target_scaler is None:
+        if target_scaler is None:
             return None
 
-        # ✅ SCALE FEATURES FIRST
-        scaled_features = feature_scaler.transform(features)
-        input_sequence = scaled_features.reshape(1, 24, -1)
+        # ✅ FIX: features_scaled is already scaled, just reshape
+        input_sequence = features_scaled.reshape(1, 24, -1)
         raw_scaled = directional_models[model_key].predict(input_sequence, verbose=0)[0][0]
         passenger_count = float(target_scaler.inverse_transform([[raw_scaled]])[0][0])
+        
         if passenger_count < 0:
-            print(f"⚠️ Negative passenger count detected for {station_name} {direction}: {passenger_count:.1f}, clamping to 0")
             passenger_count = 0
+            
         return passenger_count
     except Exception as e:
         print(f"⚠️ get_raw_prediction error: {e}")
         return None
-
 
 def compute_and_save_correction_factors(test_days=30, end_date=None):
     """
@@ -408,13 +403,19 @@ def compute_and_save_correction_factors(test_days=30, end_date=None):
     return factors
 
 # ========== LAZY LOAD HISTORICAL PEAKS - ONLY WHEN NEEDED ==========
+# Use app config for historical peaks too
 def get_historical_peak(station_name, direction):
     """Lazy load historical peak for just one station-direction"""
     key = f"{station_name}_{direction}"
     
+    # Get from app config
+    if 'HISTORICAL_PEAKS' not in current_app.config:
+        current_app.config['HISTORICAL_PEAKS'] = {}
+    historical_peaks = current_app.config['HISTORICAL_PEAKS']
+    
     # Check if already loaded
-    if key in HISTORICAL_PEAKS:
-        return HISTORICAL_PEAKS[key]
+    if key in historical_peaks:
+        return historical_peaks[key]
     
     # Compute just this one
     from services.feature_engineering import get_station_dataframe_cached  
@@ -424,14 +425,15 @@ def get_historical_peak(station_name, direction):
     if hourly is not None and len(hourly) > 0:
         passengers = hourly['TotalPassenger'].values
         peak_abs = float(passengers.max())
-        HISTORICAL_PEAKS[key] = {
+        historical_peaks[key] = {
             "peak": peak_abs,
             "absolute_max": peak_abs,
             "percentile": 100
         }
-        return HISTORICAL_PEAKS[key]
+        return historical_peaks[key]
     
     return None
+
 def get_active_overrides():
     """Get active overrides - uses Config time for expiry check"""
     overrides_file = 'overrides.json'
@@ -482,8 +484,8 @@ def debug_quick_check(station_name):
             
             # Last 24 hours
             last_24 = df.tail(24)
-            zero_count = int((last_24['TotalPassenger'] == 0).sum())  # Convert to int
-            zero_ratio = float(zero_count / 24)  # Convert to float
+            zero_count = int((last_24['TotalPassenger'] == 0).sum())
+            zero_ratio = float(zero_count / 24)
             
             # Historical averages (operating hours only)
             operating_df = df[(df.index.hour >= 5) & (df.index.hour < 23)]
@@ -494,9 +496,6 @@ def debug_quick_check(station_name):
                 p95 = get_p95_percentile(station, direction)
             except:
                 p95 = 0
-            
-            # Get prediction - don't call get_directional_prediction to avoid recursion
-            # Just show the P95 and data stats
             
             results[direction] = {
                 'last_24_hours': {
@@ -660,12 +659,19 @@ def debug_override_status():
         'current_time': Config.get_current_time().isoformat()
     })
 def get_directional_prediction(station_name, direction, target_datetime=None):
-    ensure_models_loaded(station_name, direction)
+    """Get directional prediction with request-level caching."""
     
     if target_datetime is None:
         target_datetime = Config.get_current_time()
     
-    # CHECK IF MRT IS CLOSED
+    # Check request cache first
+    cached = get_cached_prediction(station_name, direction, target_datetime)
+    if cached is not None:
+        return cached
+    
+    ensure_models_loaded(station_name, direction)
+    
+    # Check if MRT is closed
     hour = target_datetime.hour
     minute = target_datetime.minute
     current_time_decimal = hour + minute / 60
@@ -684,211 +690,201 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
     model_key = f"{station_name}_{direction}"
     
     if model_key not in directional_models:
-        print(f"⚠️ Model {model_key} not found!")
         return _get_operating_hours_fallback(target_datetime)
     
     try:
-        from services.feature_engineering import get_feature_sequence_for_station, get_station_dataframe_cached, build_typical_day_pattern
-        import numpy as np
+        from services.feature_engineering import get_feature_sequence_for_station
         
-        features = get_feature_sequence_for_station(station_name, direction, target_datetime)
-        if features is None:
+        # ✅ FIX: Get features (already scaled)
+        features_scaled = get_feature_sequence_for_station(station_name, direction, target_datetime)
+        if features_scaled is None:
             return _get_operating_hours_fallback(target_datetime)
         
-        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        # ✅ FIX: Get target scaler ONLY (feature scaling already done)
         target_scaler = directional_scalers.get(f'{model_key}_target')
-        
-        if feature_scaler is None or target_scaler is None:
+        if target_scaler is None:
             return _get_operating_hours_fallback(target_datetime)
         
-        scaled_features = feature_scaler.transform(features)
-        input_sequence = scaled_features.reshape(1, 24, -1)
+        # ✅ FIX: features_scaled is already scaled, just reshape
+        input_sequence = features_scaled.reshape(1, 24, -1)
+        input_tensor = tf.convert_to_tensor(input_sequence, dtype=tf.float32)
         
-        prediction_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
+        prediction_scaled = directional_models[model_key](input_tensor, training=False).numpy()
         raw_output = float(prediction_scaled[0][0])
         
         passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
         
-        # ========== GET P95 FOR THIS STATION-DIRECTION ==========
+        # Get P95
         p95 = get_p95_percentile(station_name, direction)
         if p95 <= 0:
             p95 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
         
-        # ========== CONVERT TO CONGESTION PERCENTAGE ==========
+        # Convert to congestion
         congestion = (passenger_count / p95) * 100
         congestion = max(0, min(congestion, 100))
         
-        # ========== DATA-DRIVEN CONSTRAINTS USING CONGESTION PERCENTAGE ==========
-        df = get_station_dataframe_cached(station_name, direction)
-        if df is not None:
-            non_zero = df[df['TotalPassenger'] > 0]['TotalPassenger']
-            if len(non_zero) > 0:
-                # Get historical congestion percentages
-                historical_congestion = (non_zero / p95) * 100
-                historical_congestion = historical_congestion.clip(0, 100)
-                
-                non_zero_ratio = len(non_zero) / len(df) * 100
-                target_hour = target_datetime.hour
-                
-                # ========== FIXED: SMARTER CAPPING ==========
-                # Only apply cap if we have enough historical data for this hour
-                hour_data = df[df.index.hour == target_hour]
-                hour_non_zero = hour_data[hour_data['TotalPassenger'] > 0]['TotalPassenger']
-                
-                # ========== FIX 1: Use higher percentile for sparse hours ==========
-                if len(hour_non_zero) > 30:
-                    hour_congestion = (hour_non_zero / p95) * 100
-                    hour_congestion = hour_congestion.clip(0, 100)
-                    # Use P99.9 for rush hours to allow higher peaks
-                    if 7 <= target_hour <= 9 or 17 <= target_hour <= 19:
-                        hourly_cap_congestion = np.percentile(hour_congestion, 99.9)
-                    else:
-                        hourly_cap_congestion = np.percentile(hour_congestion, 99.5)
-                    
-                    # Only cap if congestion is WAY above historical max
-                    if congestion > hourly_cap_congestion * 1.2:
-                        congestion = hourly_cap_congestion
-                        print(f"🔧 Capped {station_name} {direction} at {target_hour:02d}:00 congestion cap ({hourly_cap_congestion:.1f}%)")
-                else:
-                    # ========== FIX 2: Less aggressive global cap ==========
-                    global_p995_congestion = np.percentile(historical_congestion, 99.5)
-                    
-                    # Use more generous factors
-                    if 7 <= target_hour <= 9 or 17 <= target_hour <= 19:
-                        hour_factor = 1.0  # No reduction for rush hours
-                    elif 10 <= target_hour <= 16:
-                        hour_factor = 0.95
-                    elif 5 <= target_hour <= 6 or 20 <= target_hour <= 22:
-                        hour_factor = 0.85  # More generous for early/late
-                    else:
-                        hour_factor = 0.8
-                    
-                    hourly_cap_congestion = global_p995_congestion * hour_factor
-                    
-                    # Only cap if congestion is significantly above global cap
-                    if congestion > hourly_cap_congestion * 1.3:
-                        congestion = hourly_cap_congestion
-                        print(f"🔧 Capped {station_name} {direction} at {target_hour:02d}:00 adjusted cap ({hourly_cap_congestion:.1f}%)")
-                
-                # ============================================================
-                # ========== DYNAMIC BOOST LOGIC - FULLY DATA-DRIVEN ==========
-                # ============================================================
-                
-                # Get typical pattern
-                typical_hour_value = get_typical_pattern_cached(station_name, direction, target_datetime, df) or 20
-                is_terminal = station_name in ["North Ave", "Taft"]
-                
-                # ========== Calculate historical statistics for this hour ==========
-                hour_historical_p75 = None
-                hour_historical_p50 = None
-                hour_historical_mean = None
-                
-                if len(hour_non_zero) > 10:
-                    hour_congestion_values = (hour_non_zero / p95) * 100
-                    hour_congestion_values = hour_congestion_values.clip(0, 100)
-                    hour_historical_p75 = np.percentile(hour_congestion_values, 75)
-                    hour_historical_p50 = np.percentile(hour_congestion_values, 50)
-                    hour_historical_mean = np.mean(hour_congestion_values)
-                
-                # ========== DATA-DRIVEN MINIMUM CONGESTION ==========
-                # Use the most reliable metric available
-                if hour_historical_p75 is not None:
-                    # Use P75 as the baseline (more conservative than P50)
-                    data_driven_min = hour_historical_p75 * 0.6
-                elif hour_historical_p50 is not None:
-                    # Fall back to P50 if P75 isn't available
-                    data_driven_min = hour_historical_p50 * 0.5
-                elif hour_historical_mean is not None:
-                    # Fall back to mean if no percentiles
-                    data_driven_min = hour_historical_mean * 0.4
-                else:
-                    # If no historical data, use typical pattern
-                    data_driven_min = typical_hour_value * 0.4
-                
-                # ========== RUSH HOUR ADJUSTMENTS ==========
-                if 7 <= target_hour <= 9 or 17 <= target_hour <= 19:
-                    rush_multiplier = 1.2
-                else:
-                    rush_multiplier = 1.0
-                
-                # ========== TERMINAL STATION ADJUSTMENTS ==========
-                if is_terminal:
-                    terminal_multiplier = 1.3
-                else:
-                    terminal_multiplier = 1.0
-                
-                # ========== DIRECTIONAL ADJUSTMENTS ==========
-                if direction == 'Northbound' and (7 <= target_hour <= 9 or 17 <= target_hour <= 19):
-                    # Northbound rush hour is typically heavier
-                    direction_multiplier = 1.1
-                else:
-                    direction_multiplier = 1.0
-                
-                # ========== CALCULATE FINAL MINIMUM ==========
-                min_congestion = data_driven_min * rush_multiplier * terminal_multiplier * direction_multiplier
-                
-                # ========== SAFETY FLOOR ==========
-                # Ensure minimum is at least some reasonable value
-                absolute_floor = 10  # Never go below 10%
-                min_congestion = max(min_congestion, absolute_floor)
-                
-                # ========== SAFETY CEILING ==========
-                # Don't set minimum too high
-                min_congestion = min(min_congestion, 80)  # Never set minimum above 80%
-                
-                # ========== APPLY BOOST ==========
-                # Check if model is under-predicting
-                model_under_predicting = False
-                if hour_historical_p50 is not None:
-                    # Model is under-predicting if it's less than 50% of historical median
-                    if congestion < hour_historical_p50 * 0.5:
-                        model_under_predicting = True
-                else:
-                    # Fall back to typical pattern
-                    if congestion < typical_hour_value * 0.5:
-                        model_under_predicting = True
-                        
-                        
-                
-                if model_under_predicting and congestion < min_congestion:
-                    # Boost to the dynamic minimum
-                    congestion = min_congestion
-                    print(f"🔧 Dynamic boost {station_name} {direction} to {congestion:.1f}% "
-                          f"(hour {target_hour:02d}:00, typical: {typical_hour_value:.1f}%, "
-                          f"model was {congestion:.1f}%)")
-                elif congestion < min_congestion and not model_under_predicting:
-                    # Small adjustment if needed
-                    adjustment = min(congestion * 1.05, congestion + 2)  # Gentle 5% or +2%
-                    if adjustment > congestion:
-                        congestion = adjustment
-                        print(f"🔧 Gentle adjustment {station_name} {direction} to {congestion:.1f}% "
-                              f"(hour {target_hour:02d}:00)")
-        
-        # Apply correction factor (if any)
-        factor = CORRECTION_FACTORS.get(model_key, 1.0)
+        # Apply correction factor
+        correction_factors = get_correction_factors()
+        factor = correction_factors.get(model_key, 1.0)
         congestion = congestion * factor
         congestion = max(0, min(congestion, 100))
         
-        dow = target_datetime.weekday()  # Monday=0, Sunday=6
-
-        if dow >= 5:          # Saturday, Sunday
-            dow_factor = 0.7  # 30% lower on weekends
-        elif dow == 4:        # Friday
-            dow_factor = 1.1  # 10% higher on Fridays
-        elif dow == 0:        # Monday
-            dow_factor = 1.05 # 5% higher on Mondays
+        # Day of week adjustment
+        dow = target_datetime.weekday()
+        if dow >= 5:
+            dow_factor = 0.7
+        elif dow == 4:
+            dow_factor = 1.1
+        elif dow == 0:
+            dow_factor = 1.05
         else:
-            dow_factor = 1.0  # Tuesday-Thursday
-
+            dow_factor = 1.0
+        
         congestion = congestion * dow_factor
         congestion = max(0, min(congestion, 100))
-
+        
+        # Store in request cache
+        set_cached_prediction(station_name, direction, target_datetime, congestion)
+        
         return congestion
         
     except Exception as e:
         import traceback
         traceback.print_exc()
         return _get_operating_hours_fallback(target_datetime)
+    
+def get_fallback_directional_prediction(station_name, direction, target_datetime=None):
+    """Fallback prediction when models aren't available"""
+    from config import Config
+    target_datetime = target_datetime or Config.get_current_time()
+    hour = target_datetime.hour
+    
+    # Check operating hours
+    current_time = hour + target_datetime.minute / 60
+    if current_time < 4.5 or current_time >= 22.5:
+        return 0
+    
+    if 7 <= hour <= 9 or 17 <= hour <= 19:
+        return 65
+    elif 10 <= hour <= 16:
+        return 45
+    else:
+        return 25
+
+@api_predict_bp.route('/debug/verify-features/<station_name>/<direction>')
+def debug_verify_features(station_name, direction):
+    """Verify what features are being fed to the model."""
+    from services.feature_engineering import get_feature_sequence_for_station
+    
+    station = station_name.replace('%20', ' ')
+    now = Config.get_current_time()
+    
+    ensure_models_loaded(station, direction)
+    directional_models, directional_scalers = get_models()
+    
+    model_key = f"{station}_{direction}"
+    
+    result = {
+        "station": station,
+        "direction": direction,
+        "time": now.isoformat(),
+        "model_loaded": model_key in directional_models
+    }
+    
+    if model_key not in directional_models:
+        result["error"] = f"Model {model_key} not loaded"
+        return jsonify(result)
+    
+    try:
+        # Get features
+        features_scaled = get_feature_sequence_for_station(station, direction, now)
+        
+        if features_scaled is None:
+            result["error"] = "No features returned"
+            return jsonify(result)
+        
+        result["feature_stats"] = {
+            "shape": features_scaled.shape,
+            "min": float(features_scaled.min()),
+            "max": float(features_scaled.max()),
+            "mean": float(features_scaled.mean()),
+            "std": float(features_scaled.std()),
+            "sample_first_10": features_scaled[0, :10].tolist() if features_scaled.ndim > 1 else features_scaled[:10].tolist()
+        }
+        
+        # Check if features are already scaled (should be between ~-2 and 2 for StandardScaler)
+        feature_min = float(features_scaled.min())
+        feature_max = float(features_scaled.max())
+        
+        result["scaling_check"] = {
+            "likely_scaled": -3 < feature_min and feature_max < 3,
+            "explanation": "Features appear to be already scaled if min/max are within [-3, 3] range"
+        }
+        
+        # Try prediction
+        target_scaler = directional_scalers.get(f'{model_key}_target')
+        if target_scaler:
+            input_sequence = features_scaled.reshape(1, 24, -1)
+            input_tensor = tf.convert_to_tensor(input_sequence, dtype=tf.float32)
+            
+            prediction_scaled = directional_models[model_key](input_tensor, training=False).numpy()
+            raw_output = float(prediction_scaled[0][0])
+            
+            passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
+            
+            result["prediction"] = {
+                "raw_scaled_output": raw_output,
+                "passenger_count": passenger_count
+            }
+            
+    except Exception as e:
+        import traceback
+        result["error"] = str(e)
+        result["traceback"] = traceback.format_exc()
+    
+    return jsonify(result)
+
+def clamp_prediction_by_time(congestion, target_datetime):
+    """Clamp prediction based on time of day"""
+    from config import Config
+    target_datetime = target_datetime or Config.get_current_time()
+    hour = target_datetime.hour
+    
+    # If MRT is closed, return 0
+    current_time = hour + target_datetime.minute / 60
+    if current_time < 4.5 or current_time >= 22.5:
+        return 0
+    
+    # Clamp to reasonable ranges based on time
+    if 7 <= hour <= 9 or 17 <= hour <= 19:
+        return max(30, min(congestion, 100))
+    elif 10 <= hour <= 16:
+        return max(10, min(congestion, 80))
+    else:
+        return max(0, min(congestion, 60))
+
+def get_best_time_to_travel(station_name=None):
+    """Get the best time to travel recommendation"""
+    from config import Config
+    now = Config.get_current_time()
+    hour = now.hour
+    
+    if 7 <= hour <= 9:
+        return "10:00 AM - 3:00 PM (Avoid morning rush hour)"
+    elif 17 <= hour <= 20:
+        return "Before 5:00 PM or after 8:00 PM (Avoid evening rush hour)"
+    return "Now is a good time to travel!"
+
+def get_wait_time(congestion):
+    """Get wait time based on congestion percentage"""
+    if congestion > 80:
+        return "15-20 min"
+    elif congestion > 60:
+        return "10-15 min"
+    elif congestion > 30:
+        return "5-10 min"
+    else:
+        return "2-5 min"
     
 @api_predict_bp.route('/debug/simulate-all-stations-day')
 def debug_simulate_all_stations_day():
@@ -937,15 +933,15 @@ def debug_simulate_all_stations_day():
             }
     
     return jsonify(results)
-
 @api_predict_bp.route('/debug/pipeline-details/<station_name>')
 def debug_pipeline_details(station_name):
-    """Debug the entire prediction pipeline step by step with actual values - USING P95 PERCENTILE"""
+    """Debug the entire prediction pipeline step by step"""
     from services.feature_engineering import get_feature_sequence_for_station, get_station_dataframe
     
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    correction_factors = get_correction_factors()
     
     results = {
         "station": station,
@@ -963,104 +959,61 @@ def debug_pipeline_details(station_name):
             
         results["details"][direction] = {}
         target_scaler = directional_scalers.get(f'{model_key}_target')
-        feature_scaler = directional_scalers.get(f'{model_key}_feature')
         
-        # Get p95 using lazy loader
         p95 = get_p95_percentile(station, direction)
-        
-        # Get actual historical data for this station
-        hourly = get_station_dataframe(station, direction)
         
         for hour in test_hours:
             test_time = now.replace(hour=hour, minute=0, second=0, microsecond=0)
             
             try:
-                # STEP 1: Get raw features
-                features = get_feature_sequence_for_station(station, direction, test_time)
-                if features is None:
+                # ✅ FIX: Get scaled features directly
+                features_scaled = get_feature_sequence_for_station(station, direction, test_time)
+                if features_scaled is None:
                     continue
                 
-                # STEP 2: Check what's in the features BEFORE scaling
-                raw_congestion = features[:, -1].copy()
-                
-                # STEP 3: Check what the target scaler would do
+                # ✅ FIX: Show target scaler info (StandardScaler)
                 target_scaler_info = {}
                 if target_scaler:
-                    test_raw_values = [0, 100, 200, 500, 1000, 1500, 2000]
-                    test_scaled = []
-                    for val in test_raw_values:
-                        try:
-                            scaled = target_scaler.transform([[val]])[0][0]
-                            test_scaled.append(round(float(scaled), 4))
-                        except:
-                            test_scaled.append(None)
-                    
-                    target_scaler_info = {
-                        "data_min": float(target_scaler.data_min_[0]) if hasattr(target_scaler, 'data_min_') else None,
-                        "data_max": float(target_scaler.data_max_[0]) if hasattr(target_scaler, 'data_max_') else None,
-                        "test_conversions": {
-                            f"{val}": test_scaled[i] 
-                            for i, val in enumerate(test_raw_values)
+                    if hasattr(target_scaler, 'mean_') and hasattr(target_scaler, 'scale_'):
+                        target_scaler_info = {
+                            "type": "StandardScaler",
+                            "mean": float(target_scaler.mean_[0]),
+                            "scale": float(target_scaler.scale_[0])
                         }
+                    elif hasattr(target_scaler, 'data_min_') and hasattr(target_scaler, 'data_max_'):
+                        target_scaler_info = {
+                            "type": "MinMaxScaler",
+                            "data_min": float(target_scaler.data_min_[0]),
+                            "data_max": float(target_scaler.data_max_[0])
+                        }
+                
+                # ✅ FIX: Make prediction
+                input_sequence = features_scaled.reshape(1, 24, -1)
+                pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
+                raw_output = float(pred_scaled[0][0])
+                
+                passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
+                factor = correction_factors.get(model_key, 1.0)
+                passenger_count = passenger_count * factor
+                
+                congestion = (passenger_count / p95) * 100
+                congestion = max(0, min(congestion, 100))
+                
+                results["details"][direction][f"{hour}:00"] = {
+                    "target_scaler": target_scaler_info,
+                    "p95_percentile": round(float(p95), 2),
+                    "correction_factor": round(float(factor), 3),
+                    "model_output": {
+                        "raw_scaled": round(raw_output, 4),
+                        "inverse_transformed_passengers": round(passenger_count, 0),
+                        "congestion_percentage": round(congestion, 1)
                     }
-                
-                # STEP 4: Get the actual historical passenger counts for this time
-                historical_passengers = None
-                if hourly is not None:
-                    historical = hourly[hourly.index.hour == hour]
-                    if len(historical) > 0:
-                        historical_passengers = {
-                            "mean": float(historical['TotalPassenger'].mean()),
-                            "median": float(historical['TotalPassenger'].median()),
-                            "max": float(historical['TotalPassenger'].max()),
-                            "min": float(historical['TotalPassenger'].min()),
-                            "sample_count": len(historical)
-                        }
-                
-                # STEP 5: Make the prediction
-                feature_scaler_obj = directional_scalers.get(f'{model_key}_feature')
-                target_scaler_obj = directional_scalers.get(f'{model_key}_target')
-                
-                if feature_scaler_obj and target_scaler_obj:
-                    scaled_features = feature_scaler_obj.transform(features)
-                    input_sequence = scaled_features.reshape(1, 24, -1)
-                    
-                    pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
-                    raw_output = float(pred_scaled[0][0])
-                    
-                    passenger_count = float(target_scaler_obj.inverse_transform([[raw_output]])[0][0])
-                    
-                    # Apply correction factor (matches main function)
-                    factor = CORRECTION_FACTORS.get(model_key, 1.0)
-                    passenger_count = passenger_count * factor
-                    
-                    # ========== USE P95 PERCENTILE (MATCHES MAIN FUNCTION) ==========
-                    congestion = (passenger_count / p95) * 100
-                    congestion = max(0, min(congestion, 100))
-                    
-                    results["details"][direction][f"{hour}:00"] = {
-                        "raw_congestion_in_features": {
-                            "min": float(raw_congestion.min()),
-                            "max": float(raw_congestion.max()),
-                            "mean": float(raw_congestion.mean()),
-                            "sample": raw_congestion[:5].tolist()
-                        },
-                        "target_scaler": target_scaler_info,
-                        "historical_passengers": historical_passengers,
-                        "p95_percentile": round(float(p95), 2),
-                        "correction_factor": round(float(factor), 3),
-                        "model_output": {
-                            "raw_scaled": round(raw_output, 4),
-                            "inverse_transformed_passengers": round(passenger_count, 0),
-                            "congestion_percentage": round(congestion, 1)
-                        }
-                    }
+                }
                 
             except Exception as e:
                 results["details"][direction][f"{hour}:00"] = {"error": str(e)}
     
     return jsonify(results)
-
 @api_predict_bp.route('/debug/check-raw-output/<station_name>')
 def debug_check_raw_output(station_name):
     """Check raw model output and what it means - USING P95 PERCENTILE"""
@@ -1069,6 +1022,7 @@ def debug_check_raw_output(station_name):
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    correction_factors = get_correction_factors()
     
     results = []
     now = Config.get_current_time()
@@ -1079,36 +1033,45 @@ def debug_check_raw_output(station_name):
             continue
             
         target_scaler = directional_scalers.get(f'{model_key}_target')
-        feature_scaler = directional_scalers.get(f'{model_key}_feature')
         
-        # Get p95 using lazy loader
         p95 = get_p95_percentile(station, direction)
-        
-        # Get correction factor
-        factor = CORRECTION_FACTORS.get(model_key, 1.0)
+        factor = correction_factors.get(model_key, 1.0)
         
         test_time = now
         
         try:
-            features = get_feature_sequence_for_station(station, direction, test_time)
-            if features is not None:
-                scaled_features = feature_scaler.transform(features)
-                input_sequence = scaled_features.reshape(1, 24, -1)
-                
+            # ✅ FIX: get_feature_sequence_for_station returns SCALED features
+            features_scaled = get_feature_sequence_for_station(station, direction, test_time)
+            if features_scaled is not None:
+                input_sequence = features_scaled.reshape(1, 24, -1)
                 pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
                 raw_output = float(pred_scaled[0][0])
                 
                 passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
-                passenger_count = passenger_count * factor  # Apply correction
+                passenger_count = passenger_count * factor
                 
-                # ========== USE P95 PERCENTILE ==========
                 congestion = (passenger_count / p95) * 100
                 congestion = max(0, min(congestion, 100))
+                
+                # ✅ FIX: Show StandardScaler attributes
+                scaler_info = {}
+                if hasattr(target_scaler, 'mean_') and hasattr(target_scaler, 'scale_'):
+                    scaler_info = {
+                        "type": "StandardScaler",
+                        "mean": float(target_scaler.mean_[0]),
+                        "scale": float(target_scaler.scale_[0])
+                    }
+                elif hasattr(target_scaler, 'data_min_') and hasattr(target_scaler, 'data_max_'):
+                    scaler_info = {
+                        "type": "MinMaxScaler",
+                        "data_min": float(target_scaler.data_min_[0]),
+                        "data_max": float(target_scaler.data_max_[0])
+                    }
                 
                 results.append({
                     "direction": direction,
                     "raw_model_output": round(raw_output, 4),
-                    "target_scaler_max": float(target_scaler.data_max_[0]) if target_scaler else None,
+                    "scaler_info": scaler_info,
                     "p95_percentile": round(float(p95), 2),
                     "correction_factor": round(float(factor), 3),
                     "passenger_count": round(passenger_count, 0),
@@ -1124,7 +1087,7 @@ def debug_check_raw_output(station_name):
         "station": station,
         "time": now.isoformat(),
         "results": results
-    })  
+    })
     
 @api_predict_bp.route('/debug/raw-values/<station_name>/<direction>')
 def debug_raw_values(station_name, direction):
@@ -1136,6 +1099,7 @@ def debug_raw_values(station_name, direction):
     
     ensure_models_loaded(station, direction)
     directional_models, directional_scalers = get_models()
+    correction_factors = get_correction_factors()
     
     model_key = f"{station}_{direction}"
     
@@ -1144,7 +1108,6 @@ def debug_raw_values(station_name, direction):
         'direction': direction,
         'time': now.isoformat(),
         'model_loaded': model_key in directional_models if directional_models else False,
-        'models_available': list(directional_models.keys())[:5] if directional_models else []
     }
     
     if not directional_models or model_key not in directional_models:
@@ -1152,24 +1115,22 @@ def debug_raw_values(station_name, direction):
         return jsonify(result)
     
     try:
-        # Get features
-        features = get_feature_sequence_for_station(station, direction, now)
+        # ✅ FIX: get_feature_sequence_for_station returns SCALED features
+        features_scaled = get_feature_sequence_for_station(station, direction, now)
         
-        if features is None:
+        if features_scaled is None:
             result['error'] = 'No features returned'
             return jsonify(result)
         
-        # Get scalers
-        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        # ✅ FIX: Get target scaler ONLY (features are already scaled)
         target_scaler = directional_scalers.get(f'{model_key}_target')
         
-        if feature_scaler is None or target_scaler is None:
-            result['error'] = 'Missing scaler'
+        if target_scaler is None:
+            result['error'] = 'Missing target scaler'
             return jsonify(result)
         
-        # Scale features
-        scaled_features = feature_scaler.transform(features)
-        input_sequence = scaled_features.reshape(1, 24, -1)
+        # ✅ FIX: features_scaled is already scaled, just reshape
+        input_sequence = features_scaled.reshape(1, 24, -1)
         
         # Get prediction
         pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
@@ -1190,15 +1151,20 @@ def debug_raw_values(station_name, direction):
         result['congestion_clamped'] = max(0, min(congestion, 100))
         
         # Correction factor
-        factor = CORRECTION_FACTORS.get(model_key, 1.0)
+        factor = correction_factors.get(model_key, 1.0)
         result['correction_factor'] = factor
         result['passenger_count_corrected'] = passenger_count * factor
         
         # Show feature sample
-        result['feature_sample'] = features[0, :10].tolist()
+        result['feature_sample'] = features_scaled[0, :10].tolist()
         
-        # Target scaler info
-        if hasattr(target_scaler, 'data_min_') and hasattr(target_scaler, 'data_max_'):
+        # ✅ FIX: Target scaler info (StandardScaler)
+        if hasattr(target_scaler, 'mean_') and hasattr(target_scaler, 'scale_'):
+            result['target_scaler_type'] = 'StandardScaler'
+            result['target_scaler_mean'] = float(target_scaler.mean_[0])
+            result['target_scaler_scale'] = float(target_scaler.scale_[0])
+        elif hasattr(target_scaler, 'data_min_') and hasattr(target_scaler, 'data_max_'):
+            result['target_scaler_type'] = 'MinMaxScaler'
             result['target_scaler_min'] = float(target_scaler.data_min_[0])
             result['target_scaler_max'] = float(target_scaler.data_max_[0])
         
@@ -1219,8 +1185,8 @@ def debug_raw_prediction(station_name, direction):
     
     ensure_models_loaded(station, direction)
     
-    # Get models from cache
     directional_models, directional_scalers = get_models()
+    correction_factors = get_correction_factors()
     
     model_key = f"{station}_{direction}"
     
@@ -1229,7 +1195,6 @@ def debug_raw_prediction(station_name, direction):
         'direction': direction,
         'time': now.isoformat(),
         'model_loaded': model_key in directional_models if directional_models else False,
-        'models_available': list(directional_models.keys())[:5] if directional_models else []
     }
     
     if not directional_models or model_key not in directional_models:
@@ -1237,28 +1202,25 @@ def debug_raw_prediction(station_name, direction):
         return jsonify(result)
     
     try:
-        # Get features
-        features = get_feature_sequence_for_station(station, direction, now)
-        result['features_shape'] = features.shape if features is not None else None
+        # ✅ FIX: get_feature_sequence_for_station returns SCALED features
+        features_scaled = get_feature_sequence_for_station(station, direction, now)
+        result['features_shape'] = features_scaled.shape if features_scaled is not None else None
         
-        if features is None:
+        if features_scaled is None:
             result['error'] = 'No features returned'
             return jsonify(result)
         
-        # Get scalers
-        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        # ✅ FIX: Get target scaler ONLY (features are already scaled)
         target_scaler = directional_scalers.get(f'{model_key}_target')
         
-        result['has_feature_scaler'] = feature_scaler is not None
         result['has_target_scaler'] = target_scaler is not None
         
-        if feature_scaler is None or target_scaler is None:
-            result['error'] = 'Missing scaler'
+        if target_scaler is None:
+            result['error'] = 'Missing target scaler'
             return jsonify(result)
         
-        # Scale features
-        scaled_features = feature_scaler.transform(features)
-        input_sequence = scaled_features.reshape(1, 24, -1)
+        # ✅ FIX: features_scaled is already scaled, just reshape
+        input_sequence = features_scaled.reshape(1, 24, -1)
         
         # Get prediction
         pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
@@ -1279,12 +1241,18 @@ def debug_raw_prediction(station_name, direction):
         result['congestion'] = congestion
         
         # Correction factor
-        factor = CORRECTION_FACTORS.get(model_key, 1.0)
+        factor = correction_factors.get(model_key, 1.0)
         result['correction_factor'] = factor
         result['passenger_count_corrected'] = passenger_count * factor
         
+        # ✅ FIX: Show scaler info (StandardScaler)
+        if hasattr(target_scaler, 'mean_') and hasattr(target_scaler, 'scale_'):
+            result['target_scaler_type'] = 'StandardScaler'
+            result['target_scaler_mean'] = float(target_scaler.mean_[0])
+            result['target_scaler_scale'] = float(target_scaler.scale_[0])
+        
         # Show feature sample
-        result['feature_sample'] = features[0, :10].tolist()
+        result['feature_sample'] = features_scaled[0, :10].tolist()
         
     except Exception as e:
         import traceback
@@ -1357,7 +1325,7 @@ def simulate_day(station_name):
             return "LIGHT"
     
     # Test every hour from 4 AM to 11 PM (operating hours)
-    for hour in range(4, 24):  # 4 AM to 11 PM
+    for hour in range(4, 24):
         test_time = test_date.replace(hour=hour, minute=0, second=0, microsecond=0)
         
         # Check if operating
@@ -1478,12 +1446,14 @@ def simulate_day(station_name):
         }
     
     return jsonify(results)
+
 def _get_directional_prediction_with_details(station_name, direction, target_datetime):
     """Helper function that returns both congestion and passenger count"""
     
     ensure_models_loaded(station_name, direction)
     
     directional_models, directional_scalers = get_models()
+    correction_factors = get_correction_factors()
     
     model_key = f"{station_name}_{direction}"
     
@@ -1500,20 +1470,21 @@ def _get_directional_prediction_with_details(station_name, direction, target_dat
         from services.feature_engineering import get_feature_sequence_for_station
         import numpy as np
         
-        features = get_feature_sequence_for_station(station_name, direction, target_datetime)
-        if features is None:
+        # ✅ FIX: get_feature_sequence_for_station NOW returns SCALED features
+        features_scaled = get_feature_sequence_for_station(station_name, direction, target_datetime)
+        if features_scaled is None:
             return result
         
-        feature_scaler = directional_scalers.get(f'{model_key}_feature')
+        # ✅ FIX: Get target scaler only
         target_scaler = directional_scalers.get(f'{model_key}_target')
         
-        if feature_scaler is None or target_scaler is None:
+        if target_scaler is None:
             return result
         
-        scaled_features = feature_scaler.transform(features)
-        input_sequence = scaled_features.reshape(1, 24, -1)
-        
-        prediction_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
+        # ✅ FIX: features_scaled is already scaled, just reshape
+        input_sequence = features_scaled.reshape(1, 24, -1)
+        input_tensor = tf.convert_to_tensor(input_sequence, dtype=tf.float32)
+        prediction_scaled = directional_models[model_key](input_tensor, training=False).numpy()
         raw_output = float(prediction_scaled[0][0])
         
         passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
@@ -1527,55 +1498,8 @@ def _get_directional_prediction_with_details(station_name, direction, target_dat
         congestion = (passenger_count / p95) * 100
         congestion = max(0, min(congestion, 100))
         
-        # Apply constraints (use the same logic as get_directional_prediction)
-        df = get_station_dataframe_cached(station_name, direction)
-        if df is not None:
-            non_zero = df[df['TotalPassenger'] > 0]['TotalPassenger']
-            if len(non_zero) > 0:
-                historical_congestion = (non_zero / p95) * 100
-                historical_congestion = historical_congestion.clip(0, 100)
-                non_zero_ratio = len(non_zero) / len(df) * 100
-                
-                # Hourly cap
-                target_hour = target_datetime.hour
-                hour_data = df[df.index.hour == target_hour]
-                hour_non_zero = hour_data[hour_data['TotalPassenger'] > 0]['TotalPassenger']
-                
-                if len(hour_non_zero) > 30:
-                    hour_congestion = (hour_non_zero / p95) * 100
-                    hour_congestion = hour_congestion.clip(0, 100)
-                    hourly_cap_congestion = np.percentile(hour_congestion, 99.5)
-                    if congestion > hourly_cap_congestion:
-                        congestion = hourly_cap_congestion
-                else:
-                    global_p995_congestion = np.percentile(historical_congestion, 99.5)
-                    if 7 <= target_hour <= 9 or 17 <= target_hour <= 19:
-                        hour_factor = 0.95
-                    elif 10 <= target_hour <= 16:
-                        hour_factor = 0.85
-                    else:
-                        hour_factor = 0.7
-                    hourly_cap_congestion = global_p995_congestion * hour_factor
-                    if congestion > hourly_cap_congestion:
-                        congestion = hourly_cap_congestion
-                
-                # Boost logic
-                historical_p75_congestion = np.percentile(historical_congestion, 75)
-
-                if non_zero_ratio < 3:
-                    min_congestion = max(historical_p75_congestion * 0.4, 25)
-                elif non_zero_ratio < 5:
-                    min_congestion = max(historical_p75_congestion * 0.3, 20)
-                elif non_zero_ratio < 10:
-                    min_congestion = max(historical_p75_congestion * 0.2, 15)
-                else:
-                    min_congestion = max(historical_p75_congestion * 0.1, 10)
-
-                if congestion < min_congestion:
-                    congestion = min_congestion
-        
         # Apply correction factor
-        factor = CORRECTION_FACTORS.get(model_key, 1.0)
+        factor = correction_factors.get(model_key, 1.0)
         congestion = congestion * factor
         congestion = max(0, min(congestion, 100))
         
@@ -1613,40 +1537,32 @@ def debug_feature_scaler(station_name, direction):
         return jsonify(result)
     
     try:
-        # Get features
-        features = get_feature_sequence_for_station(station, direction, now)
-        result['features_shape'] = features.shape if features is not None else None
+        # ✅ FIX: get_feature_sequence_for_station returns SCALED features
+        features_scaled = get_feature_sequence_for_station(station, direction, now)
+        result['features_shape'] = features_scaled.shape if features_scaled is not None else None
         
-        if features is None:
+        if features_scaled is None:
             result['error'] = 'No features returned'
             return jsonify(result)
         
-        # Show raw features
-        result['raw_features_sample'] = features[0, :10].tolist()
-        result['raw_features_min'] = float(features.min())
-        result['raw_features_max'] = float(features.max())
-        result['raw_features_mean'] = float(features.mean())
+        # ✅ FIX: Show the scaled features directly
+        result['scaled_features_sample'] = features_scaled[0, :10].tolist()
+        result['scaled_features_min'] = float(features_scaled.min())
+        result['scaled_features_max'] = float(features_scaled.max())
+        result['scaled_features_mean'] = float(features_scaled.mean())
         
-        # Get feature scaler
+        # Show feature scaler parameters (MinMaxScaler)
         feature_scaler = directional_scalers.get(f'{model_key}_feature')
         result['has_feature_scaler'] = feature_scaler is not None
         
         if feature_scaler:
-            # Transform features
-            scaled_features = feature_scaler.transform(features)
-            result['scaled_features_sample'] = scaled_features[0, :10].tolist()
-            result['scaled_features_min'] = float(scaled_features.min())
-            result['scaled_features_max'] = float(scaled_features.max())
-            result['scaled_features_mean'] = float(scaled_features.mean())
-            
-            # Check scaler parameters
             if hasattr(feature_scaler, 'data_min_'):
                 result['scaler_data_min'] = feature_scaler.data_min_.tolist()[:10]
             if hasattr(feature_scaler, 'data_max_'):
                 result['scaler_data_max'] = feature_scaler.data_max_.tolist()[:10]
             if hasattr(feature_scaler, 'scale_'):
                 result['scaler_scale'] = feature_scaler.scale_.tolist()[:10]
-        
+                
     except Exception as e:
         import traceback
         result['error'] = str(e)
@@ -1663,7 +1579,7 @@ def debug_target_scaler_file(station_name, direction):
     station = station_name.replace('%20', ' ')
     model_key = f"{station}_{direction}"
     
-    model_folder = 'models_2022-2024_v8'
+    model_folder = 'models_2022-2024_v10'
     target_scaler_path = os.path.join(model_folder, f'{model_key}_target_scaler.pkl')
     
     result = {
@@ -1747,8 +1663,7 @@ def debug_raw_model_test(station_name):
                 continue
             
             # Scale features
-            scaled_features = feature_scaler.transform(features)
-            input_sequence = scaled_features.reshape(1, 24, -1)
+            input_sequence = features.reshape(1, 24, -1)
             
             # Get prediction
             pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
@@ -1864,10 +1779,9 @@ def debug_check_data_availability():
         }
     
     return jsonify(result)
-
 @api_predict_bp.route('/debug/target-scaler-test/<station_name>')
 def debug_target_scaler_test(station_name):
-    """Test what the target scaler does"""
+    """Test what the target scaler does - StandardScaler version"""
     station = station_name.replace('%20', ' ')
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
     
@@ -1878,23 +1792,35 @@ def debug_target_scaler_test(station_name):
         target_scaler = directional_scalers.get(f'{model_key}_target')
         
         if target_scaler:
-            test_values = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+            test_values = [-2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
             
-            results[direction] = {
-                "scaler_type": str(type(target_scaler)),
-                "data_min": float(target_scaler.data_min_[0]) if hasattr(target_scaler, 'data_min_') else None,
-                "data_max": float(target_scaler.data_max_[0]) if hasattr(target_scaler, 'data_max_') else None,
-                "scale": float(target_scaler.scale_[0]) if hasattr(target_scaler, 'scale_') else None,
-                "conversions": {
-                    f"input_{v:.1f}": float(target_scaler.inverse_transform(np.array([[v]]))[0][0])
-                    for v in test_values
+            # ✅ FIX: StandardScaler uses mean_ and scale_
+            if hasattr(target_scaler, 'mean_') and hasattr(target_scaler, 'scale_'):
+                results[direction] = {
+                    "scaler_type": "StandardScaler",
+                    "mean": float(target_scaler.mean_[0]),
+                    "scale": float(target_scaler.scale_[0]),
+                    "conversions": {
+                        f"input_{v:.1f}": float(target_scaler.inverse_transform(np.array([[v]]))[0][0])
+                        for v in test_values
+                    }
                 }
-            }
+            elif hasattr(target_scaler, 'data_min_') and hasattr(target_scaler, 'data_max_'):
+                results[direction] = {
+                    "scaler_type": "MinMaxScaler",
+                    "data_min": float(target_scaler.data_min_[0]),
+                    "data_max": float(target_scaler.data_max_[0]),
+                    "conversions": {
+                        f"input_{v:.1f}": float(target_scaler.inverse_transform(np.array([[v]]))[0][0])
+                        for v in test_values
+                    }
+                }
+            else:
+                results[direction] = {"error": "Unknown scaler type"}
         else:
             results[direction] = {"error": "Target scaler not found"}
     
     return jsonify(results)
-
 @api_predict_bp.route('/debug/passenger-prediction/<station_name>')
 def debug_passenger_prediction(station_name):
     """Debug raw passenger predictions vs p95-based congestion - USING P95 PERCENTILE"""
@@ -1903,6 +1829,7 @@ def debug_passenger_prediction(station_name):
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    correction_factors = get_correction_factors()
     
     results = {}
     test_times = [8, 12, 18, 21]
@@ -1921,8 +1848,7 @@ def debug_passenger_prediction(station_name):
                 feature_scaler = directional_scalers.get(f'{model_key}_feature')
                 target_scaler = directional_scalers.get(f'{model_key}_target')
                 
-                scaled_features = feature_scaler.transform(features)
-                input_sequence = scaled_features.reshape(1, 24, -1)
+                input_sequence = features.reshape(1, 24, -1)
                 
                 raw_output = directional_models[model_key].predict(input_sequence, verbose=0)
                 raw_value = float(raw_output[0][0])
@@ -1930,7 +1856,7 @@ def debug_passenger_prediction(station_name):
                 passenger_count = float(target_scaler.inverse_transform([[raw_value]])[0][0])
                 
                 # Apply correction factor
-                factor = CORRECTION_FACTORS.get(model_key, 1.0)
+                factor = correction_factors.get(model_key, 1.0)
                 passenger_count = passenger_count * factor
                 
                 # ========== USE P95 PERCENTILE ==========
@@ -2007,13 +1933,12 @@ def is_override_active(override, target_time):
     except Exception as e:
         print(f"⚠️ Error in is_override_active: {e}")
         return False
+
 @api_predict_bp.route('/directional-forecast/<station_name>')
 def directional_forecast(station_name):
     
     from services.feature_engineering import _TYPICAL_PATTERN_CACHE,  _BASELINE_FEATURES_CACHE
-    _TYPICAL_PATTERN_CACHE.clear()
-    _BASELINE_FEATURES_CACHE.clear()
-    TYPICAL_PATTERN_CACHE.clear()
+    
     
     name = station_name.replace('%20', ' ')
     
@@ -2081,7 +2006,6 @@ def directional_forecast(station_name):
         # Use model predictions if no active override for this hour
         if north_cong is None:
             north_cong = get_directional_prediction(name, 'Northbound', target_time)
-            # If get_directional_prediction returns None, set to 0
             if north_cong is None:
                 north_cong = 0
                 
@@ -2124,6 +2048,7 @@ def directional_forecast(station_name):
         },
         "forecasts": forecasts
     })
+
 @api_predict_bp.route('/debug-only')
 def test():
    directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
@@ -2132,8 +2057,6 @@ def test():
        'model_keys': list(directional_models.keys()),
        'config_keys': list(current_app.config.keys())[:20]
    })
-
-
 
 @api_predict_bp.route('/directional-forecast/all')
 @cache.cached(
@@ -2168,7 +2091,6 @@ def directional_forecast_all():
         import gc
         gc.collect()
     
-    
     return jsonify(result)
 
 @api_predict_bp.route('/debug-model-output/<station_name>')
@@ -2179,6 +2101,7 @@ def debug_model_output(station_name):
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    correction_factors = get_correction_factors()
     
     results = {}
     
@@ -2198,17 +2121,15 @@ def debug_model_output(station_name):
                 feature_scaler = directional_scalers.get(f'{model_key}_feature')
                 target_scaler = directional_scalers.get(f'{model_key}_target')
                 
-                scaled_features = feature_scaler.transform(features)
-                input_sequence = scaled_features.reshape(1, 24, -1)
+                input_sequence = features.reshape(1, 24, -1)
                 
                 raw_output = directional_models[model_key].predict(input_sequence, verbose=0)
                 raw_value = float(raw_output[0][0])
                 
-                # FIX: Define passenger_count before using it
                 passenger_count = float(target_scaler.inverse_transform([[raw_value]])[0][0])
                 
                 # Apply correction factor
-                factor = CORRECTION_FACTORS.get(model_key, 1.0)
+                factor = correction_factors.get(model_key, 1.0)
                 passenger_count = passenger_count * factor
                 
                 p95 = get_p95_percentile(station, direction)
@@ -2246,12 +2167,12 @@ def model_evaluation():
 
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
+    correction_factors = get_correction_factors()
 
     model_key = f"{station}_{direction}"
     if model_key not in directional_models:
         return jsonify({"error": f"Model {model_key} not found"})
 
-    # ---------- USE LAZY LOADED P95 ----------
     p95 = get_p95_percentile(station, direction)
     print(f"🔍 Using p95 = {p95:.0f} for {station} {direction}")
 
@@ -2276,30 +2197,29 @@ def model_evaluation():
 
     for timestamp in test_data.index:
         actual_passengers = test_data.loc[timestamp, 'TotalPassenger']
-        # Actual congestion based on p95
         actual_congestion = (actual_passengers / p95) * 100
         actual_congestion = min(actual_congestion, 100)
 
         try:
-            features = get_feature_sequence_for_station(station, direction, timestamp)
-            if features is None:
+            # ✅ FIX: get_feature_sequence_for_station returns SCALED features
+            features_scaled = get_feature_sequence_for_station(station, direction, timestamp)
+            if features_scaled is None:
                 continue
 
-            feature_scaler = directional_scalers.get(f'{model_key}_feature')
-            target_scaler_obj = directional_scalers.get(f'{model_key}_target')
+            target_scaler = directional_scalers.get(f'{model_key}_target')
+            if target_scaler is None:
+                continue
 
-            scaled_features = feature_scaler.transform(features)
-            input_sequence = scaled_features.reshape(1, 24, -1)
+            # ✅ FIX: features_scaled is already scaled, just reshape
+            input_sequence = features_scaled.reshape(1, 24, -1)
 
             pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
             raw_value = float(pred_scaled[0][0])
 
-            passenger_count = float(target_scaler_obj.inverse_transform([[raw_value]])[0][0])
-            # Apply correction factor (if any)
-            factor = CORRECTION_FACTORS.get(model_key, 1.0)
+            passenger_count = float(target_scaler.inverse_transform([[raw_value]])[0][0])
+            factor = correction_factors.get(model_key, 1.0)
             passenger_count = passenger_count * factor
 
-            # Predicted congestion based on p95
             predicted_congestion = (passenger_count / p95) * 100
             predicted_congestion = min(predicted_congestion, 100)
 
@@ -2386,9 +2306,6 @@ def confusion_matrix_endpoint():
     station = request.args.get('station', 'North Ave')
     direction = request.args.get('direction', 'Northbound')
     
-    # Need to calculate cm first - this is a placeholder
-    # In practice, you'd call model_evaluation or load from cache
-    
     # Placeholder response
     return jsonify({
         "image": None,
@@ -2424,7 +2341,7 @@ def test_rush_hour():
 
 @api_predict_bp.route('/debug/scalers/<station_name>')
 def debug_scalers(station_name):
-    """Debug target scaler parameters"""
+    """Debug target scaler parameters - StandardScaler version"""
     station = station_name.replace('%20', ' ')
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
     
@@ -2437,18 +2354,31 @@ def debug_scalers(station_name):
             test_values = [0.0, 0.25, 0.5, 0.75, 1.0]
             inverse_values = target_scaler.inverse_transform(np.array(test_values).reshape(-1, 1))
             
-            results[direction] = {
-                "scaler_exists": True,
-                "scaler_type": "MinMaxScaler",
-                "min": float(target_scaler.min_[0]) if hasattr(target_scaler, 'min_') else None,
-                "scale": float(target_scaler.scale_[0]) if hasattr(target_scaler, 'scale_') else None,
-                "data_min": float(target_scaler.data_min_[0]) if hasattr(target_scaler, 'data_min_') else None,
-                "data_max": float(target_scaler.data_max_[0]) if hasattr(target_scaler, 'data_max_') else None,
-                "test_conversion": {
-                    f"input_{v}": float(inverse_values[i][0]) 
-                    for i, v in enumerate(test_values)
+            # ✅ FIX: Check scaler type
+            if hasattr(target_scaler, 'mean_') and hasattr(target_scaler, 'scale_'):
+                results[direction] = {
+                    "scaler_exists": True,
+                    "scaler_type": "StandardScaler",
+                    "mean": float(target_scaler.mean_[0]),
+                    "scale": float(target_scaler.scale_[0]),
+                    "test_conversion": {
+                        f"input_{v}": float(inverse_values[i][0]) 
+                        for i, v in enumerate(test_values)
+                    }
                 }
-            }
+            elif hasattr(target_scaler, 'data_min_') and hasattr(target_scaler, 'data_max_'):
+                results[direction] = {
+                    "scaler_exists": True,
+                    "scaler_type": "MinMaxScaler",
+                    "data_min": float(target_scaler.data_min_[0]),
+                    "data_max": float(target_scaler.data_max_[0]),
+                    "test_conversion": {
+                        f"input_{v}": float(inverse_values[i][0]) 
+                        for i, v in enumerate(test_values)
+                    }
+                }
+            else:
+                results[direction] = {"scaler_exists": True, "scaler_type": "Unknown"}
         else:
             results[direction] = {"scaler_exists": False}
     
@@ -2625,7 +2555,7 @@ def debug_check_scaler_values():
 @api_predict_bp.route('/predict/<station_name>')
 @cache.cached(
     timeout=300,
-    key_prefix=lambda: f"predict_{request.view_args['station_name']}_{datetime.now().hour}_{datetime.now().minute // 5}"
+    key_prefix=lambda: safe_cache_key('predict')
 )
 def predict_congestion(station_name):
     """Get current snapshot congestion metrics for a single station"""
@@ -2663,7 +2593,7 @@ def predict_congestion(station_name):
 @api_predict_bp.route('/predict-direction/<station_name>')
 @cache.cached(
     timeout=300,
-    key_prefix=lambda: f"pred_dir_{request.view_args['station_name']}_{datetime.now().hour}_{datetime.now().minute // 5}"
+    key_prefix=lambda: safe_cache_key('pred_dir')
 )
 def predict_direction(station_name):
     name = station_name.replace('%20', ' ')
@@ -2785,7 +2715,6 @@ def simulate_all_stations_full_day():
     """
     from datetime import datetime, timedelta
     
-    # Use a specific date (or today)
     test_date = Config.get_current_time().replace(hour=0, minute=0, second=0, microsecond=0)
     
     results = {
@@ -2804,7 +2733,7 @@ def simulate_all_stations_full_day():
         peak_hour = None
         peak_congestion = 0
         
-        for hour in range(4, 24):  # 4 AM to 11 PM
+        for hour in range(4, 24):
             test_time = test_date.replace(hour=hour, minute=0, second=0, microsecond=0)
             time_decimal = hour + 0 / 60
             is_operating = 0 <= time_decimal < 24
@@ -2824,7 +2753,6 @@ def simulate_all_stations_full_day():
                     north_cong = get_directional_prediction(station, 'Northbound', test_time)
                     south_cong = get_directional_prediction(station, 'Southbound', test_time)
                     
-                    # Handle None values
                     north_cong = north_cong if north_cong is not None else 0
                     south_cong = south_cong if south_cong is not None else 0
                     
@@ -2855,14 +2783,12 @@ def simulate_all_stations_full_day():
             
             station_data.append(hour_data)
         
-        # Calculate averages (only operating hours)
         operating_hours = [h for h in station_data if h["is_operating"] and h["avg"] > 0]
         if operating_hours:
             avg_cong = sum(h["avg"] for h in operating_hours) / len(operating_hours)
             avg_north = sum(h["northbound"] for h in operating_hours) / len(operating_hours)
             avg_south = sum(h["southbound"] for h in operating_hours) / len(operating_hours)
             
-            # Count statuses
             status_counts = {
                 "SEVERE": sum(1 for h in operating_hours if h["status"] == "SEVERE"),
                 "CONGESTED": sum(1 for h in operating_hours if h["status"] == "CONGESTED"),
@@ -2886,10 +2812,7 @@ def simulate_all_stations_full_day():
         
         results["stations"][station] = station_data
     
-    # Overall summary
     total_avg = sum(s["avg_congestion"] for s in station_summaries.values()) / len(station_summaries)
-    
-    # Find busiest station
     busiest = max(station_summaries.items(), key=lambda x: x[1]["peak_congestion"])
     
     results["summary"] = {
@@ -2902,7 +2825,6 @@ def simulate_all_stations_full_day():
     }
     
     return jsonify(results)
-
 
 @api_predict_bp.route('/admin/generate-factors', methods=['POST'])
 def generate_factors():
@@ -2925,26 +2847,30 @@ def generate_factors():
             "traceback": traceback.format_exc()
         }), 500
         
-# ========== PRELOAD P95 CACHE FROM DISK ==========
-def preload_p95_cache():
-    """Load all P95 values from disk into memory at startup."""
-    global P95_CACHE
-    if os.path.exists(P95_FILE):
-        try:
-            with open(P95_FILE, 'r') as f:
-                all_p95 = json.load(f)
-                P95_CACHE.update(all_p95)
-                print(f"✅ Preloaded {len(P95_CACHE)} P95 values from disk")
-        except Exception as e:
-            print(f"⚠️ Could not preload P95 cache: {e}")
-
-# ========== PRELOAD TYPICAL PATTERNS ==========
-def preload_typical_patterns():
-   print("⏭️ Skipping preload - patterns will build on demand")
-   return
-     
-  
-load_correction_factors()  
-#preload_typical_patterns()  
-
-# Call it right after load_correction_factors()
+@api_predict_bp.route('/debug/feature-alignment/<station_name>/<direction>')
+def debug_feature_alignment(station_name, direction):
+    from services.feature_engineering import get_feature_sequence_for_station
+    import pickle
+    
+    station = station_name.replace('%20', ' ')
+    now = Config.get_current_time()
+    
+    # Get features from API
+    features = get_feature_sequence_for_station(station, direction, now)
+    
+    # Load training feature scaler
+    model_key = f"{station}_{direction}"
+    scaler_path = f'models_2022-2024_v10/{model_key}_feature_scaler.pkl'
+    
+    with open(scaler_path, 'rb') as f:
+        train_scaler = pickle.load(f)
+    
+    # Get raw features (need to implement this)
+    # raw_features = get_raw_features_for_station(station, direction, now)
+    
+    return jsonify({
+        'scaled_from_api': features[0, :10].tolist(),
+        'train_scaler_min': train_scaler.data_min_.tolist()[:10],
+        'train_scaler_max': train_scaler.data_max_.tolist()[:10],
+        'feature_columns': 'check against training'
+    })

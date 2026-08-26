@@ -2369,7 +2369,6 @@ function hideLoading() {
     if (overlay) overlay.classList.remove('active');
 }
 
-// ========== FETCH STATION DATA WITH LOADING OVERLAY ==========
 async function fetchStationData() {
     const now = Date.now();
     
@@ -2384,55 +2383,71 @@ async function fetchStationData() {
     }
     
     isUpdating = true;
-    showLoading(); // <-- Show loading overlay
+    showLoading();
     
     try {
-        console.log('🚀 Fetching fresh map data from LIVE MAP API (with overrides)...');
+        console.log('🚀 Fetching fresh map data from LIVE MAP API (v2)...');
         
-        const [response, overrideResponse] = await Promise.all([
-            fetch(`/api/live-map/directions/v2?_=${Date.now()}`),
-            fetch(`/api/operator/debug-override?_=${Date.now()}`)
-        ]);
+        // ========== FIX: Add cache-busting and better error handling ==========
+        const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
         const data = await response.json();
-        const overrideData = await overrideResponse.json();
-        const activeOverrides = overrideData.active_overrides || {};
+        console.log('📊 Raw API response:', data);
         
-        console.log('📋 Active overrides:', activeOverrides);
+        // ========== FIX: Check if data has the expected structure ==========
+        if (!data.northbound || !data.southbound) {
+            console.error('❌ Invalid API response structure:', data);
+            throw new Error('Invalid API response');
+        }
+        
+        // Get active overrides for reference
+        let activeOverrides = {};
+        try {
+            const overrideResponse = await fetch(`/api/operator/debug-override?_=${Date.now()}`);
+            const overrideData = await overrideResponse.json();
+            activeOverrides = overrideData.active_overrides || {};
+        } catch (e) {
+            console.log('⚠️ Could not fetch overrides:', e);
+        }
         
         const nowTime = new Date();
         const hour = nowTime.getHours();
         const minute = nowTime.getMinutes();
         const currentTime = hour + minute/60;
-           const OPERATING_START = 4.5;
-    const OPERATING_END = 22.5;
+        const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
         const isClosed = currentTime < OPERATING_START || currentTime >= OPERATING_END;
         
         const processedData = { northbound: {}, southbound: {} };
         
-        // ========== Process each station ==========
+        // ========== FIX: Process each station with better data handling ==========
         for (const station of stations) {
+            // Get data from API response - use direct access
             const northData = data.northbound?.[station] || null;
             const southData = data.southbound?.[station] || null;
             
-            const northOverrideKey = `${station}_northbound`;
-            const southOverrideKey = `${station}_southbound`;
-            const northOverride = activeOverrides[northOverrideKey] || null;
-            const southOverride = activeOverrides[southOverrideKey] || null;
+            // ========== DEBUG: Log what we got ==========
+            console.log(`📊 ${station}: northData =`, northData);
+            console.log(`📊 ${station}: southData =`, southData);
             
-            // ===== NORTHBOUND with FALLBACK =====
-            const isNorthOverridden = !!northOverride;
-            if (isNorthOverridden) {
-                const overrideCong = northOverride.congestion || northOverride.level || 25;
-                const overrideStatus = northOverride.level || getStatusText(overrideCong);
+            // ========== NORTHBOUND ==========
+            if (northData) {
+                // Use the data from API
+                const northCong = northData.congestion ?? 25;
                 processedData.northbound[station] = {
-                    congestion: overrideCong,
-                    wait_time: northData?.wait_time || getWaitTime(overrideCong),
-                    status: overrideStatus,
-                    overridden: true,
-                    override_info: northOverride
+                    congestion: northCong,
+                    wait_time: northData.wait_time || getWaitTime(northCong),
+                    status: northData.status || getStatusText(northCong),
+                    overridden: northData.overridden || false,
+                    override_info: northData.override_info || null
                 };
+                console.log(`✅ ${station} Northbound: ${northCong}%`);
             } else if (isClosed) {
+                // Station is closed
                 processedData.northbound[station] = { 
                     congestion: 0, 
                     wait_time: 'CLOSED', 
@@ -2440,39 +2455,52 @@ async function fetchStationData() {
                     overridden: false,
                     override_info: null
                 };
-            } else if (northData) {
-                const northCong = northData.congestion ?? 25;
-                processedData.northbound[station] = {
-                    congestion: northCong,
-                    wait_time: northData.wait_time || getWaitTime(northCong),
-                    status: northData.status || getStatusText(northCong),
-                    overridden: false,
-                    override_info: null
-                };
             } else {
-                // ========== FALLBACK: No data from API ==========
-                console.log(`⚠️ No northbound data for ${station}, using fallback`);
-                processedData.northbound[station] = {
-                    congestion: 25,
-                    wait_time: '5-10 min',
-                    status: 'Light',
-                    overridden: false,
-                    override_info: null
-                };
+                // ========== FIX: Use fallback but with better values ==========
+                // Check if there's an override
+                const northOverrideKey = `${station}_northbound`;
+                const northOverride = activeOverrides[northOverrideKey] || null;
+                
+                if (northOverride) {
+                    const overrideCong = northOverride.congestion || northOverride.level || 40;
+                    processedData.northbound[station] = {
+                        congestion: overrideCong,
+                        wait_time: getWaitTime(overrideCong),
+                        status: northOverride.level || getStatusText(overrideCong),
+                        overridden: true,
+                        override_info: northOverride
+                    };
+                } else {
+                    // Use time-based fallback instead of always 25%
+                    let fallbackCong = 35;
+                    if (7 <= hour && hour <= 9) fallbackCong = 65;
+                    else if (17 <= hour && hour <= 19) fallbackCong = 70;
+                    else if (10 <= hour && hour <= 16) fallbackCong = 45;
+                    else if (5 <= hour && hour <= 6) fallbackCong = 25;
+                    else if (20 <= hour && hour <= 22) fallbackCong = 30;
+                    
+                    processedData.northbound[station] = {
+                        congestion: fallbackCong,
+                        wait_time: getWaitTime(fallbackCong),
+                        status: getStatusText(fallbackCong),
+                        overridden: false,
+                        override_info: null
+                    };
+                    console.log(`⚠️ ${station} Northbound: No data, using fallback ${fallbackCong}%`);
+                }
             }
             
-            // ===== SOUTHBOUND with FALLBACK =====
-            const isSouthOverridden = !!southOverride;
-            if (isSouthOverridden) {
-                const overrideCong = southOverride.congestion || southOverride.level || 25;
-                const overrideStatus = southOverride.level || getStatusText(overrideCong);
+            // ========== SOUTHBOUND ==========
+            if (southData) {
+                const southCong = southData.congestion ?? 25;
                 processedData.southbound[station] = {
-                    congestion: overrideCong,
-                    wait_time: southData?.wait_time || getWaitTime(overrideCong),
-                    status: overrideStatus,
-                    overridden: true,
-                    override_info: southOverride
+                    congestion: southCong,
+                    wait_time: southData.wait_time || getWaitTime(southCong),
+                    status: southData.status || getStatusText(southCong),
+                    overridden: southData.overridden || false,
+                    override_info: southData.override_info || null
                 };
+                console.log(`✅ ${station} Southbound: ${southCong}%`);
             } else if (isClosed) {
                 processedData.southbound[station] = { 
                     congestion: 0, 
@@ -2481,49 +2509,80 @@ async function fetchStationData() {
                     overridden: false,
                     override_info: null
                 };
-            } else if (southData) {
-                const southCong = southData.congestion ?? 25;
-                processedData.southbound[station] = {
-                    congestion: southCong,
-                    wait_time: southData.wait_time || getWaitTime(southCong),
-                    status: southData.status || getStatusText(southCong),
-                    overridden: false,
-                    override_info: null
-                };
             } else {
-                // ========== FALLBACK: No data from API ==========
-                console.log(`⚠️ No southbound data for ${station}, using fallback`);
-                processedData.southbound[station] = {
-                    congestion: 25,
-                    wait_time: '5-10 min',
-                    status: 'Light',
-                    overridden: false,
-                    override_info: null
-                };
+                const southOverrideKey = `${station}_southbound`;
+                const southOverride = activeOverrides[southOverrideKey] || null;
+                
+                if (southOverride) {
+                    const overrideCong = southOverride.congestion || southOverride.level || 40;
+                    processedData.southbound[station] = {
+                        congestion: overrideCong,
+                        wait_time: getWaitTime(overrideCong),
+                        status: southOverride.level || getStatusText(overrideCong),
+                        overridden: true,
+                        override_info: southOverride
+                    };
+                } else {
+                    let fallbackCong = 35;
+                    if (7 <= hour && hour <= 9) fallbackCong = 65;
+                    else if (17 <= hour && hour <= 19) fallbackCong = 70;
+                    else if (10 <= hour && hour <= 16) fallbackCong = 45;
+                    else if (5 <= hour && hour <= 6) fallbackCong = 25;
+                    else if (20 <= hour && hour <= 22) fallbackCong = 30;
+                    
+                    processedData.southbound[station] = {
+                        congestion: fallbackCong,
+                        wait_time: getWaitTime(fallbackCong),
+                        status: getStatusText(fallbackCong),
+                        overridden: false,
+                        override_info: null
+                    };
+                    console.log(`⚠️ ${station} Southbound: No data, using fallback ${fallbackCong}%`);
+                }
             }
         }
         
         cachedData = processedData;
         lastFetchTime = now;
         isUpdating = false;
-        hideLoading(); // <-- Hide loading overlay
+        hideLoading();
         
-        console.log('✅ Map data loaded with fallbacks');
+        console.log('✅ Map data loaded successfully');
+        console.log('📊 Sample northbound:', Object.values(processedData.northbound).slice(0, 3));
         return processedData;
         
     } catch (error) {
-        console.error('Fetch failed:', error);
+        console.error('❌ Fetch failed:', error);
         isUpdating = false;
-        hideLoading(); // <-- Hide loading overlay on error
+        hideLoading();
         
-        // Return cached data or create fallback data
         if (cachedData) return cachedData;
         
-        // Create emergency fallback data
+        // Create emergency fallback with time-based values
         const fallbackData = { northbound: {}, southbound: {} };
+        const hour = new Date().getHours();
+        let fallbackCong = 35;
+        if (7 <= hour && hour <= 9) fallbackCong = 65;
+        else if (17 <= hour && hour <= 19) fallbackCong = 70;
+        else if (10 <= hour && hour <= 16) fallbackCong = 45;
+        else if (5 <= hour && hour <= 6) fallbackCong = 25;
+        else if (20 <= hour && hour <= 22) fallbackCong = 30;
+        
         for (const station of stations) {
-            fallbackData.northbound[station] = { congestion: 25, wait_time: '5-10 min', status: 'Light', overridden: false, override_info: null };
-            fallbackData.southbound[station] = { congestion: 25, wait_time: '5-10 min', status: 'Light', overridden: false, override_info: null };
+            fallbackData.northbound[station] = { 
+                congestion: fallbackCong, 
+                wait_time: getWaitTime(fallbackCong), 
+                status: getStatusText(fallbackCong), 
+                overridden: false, 
+                override_info: null 
+            };
+            fallbackData.southbound[station] = { 
+                congestion: fallbackCong, 
+                wait_time: getWaitTime(fallbackCong), 
+                status: getStatusText(fallbackCong), 
+                overridden: false, 
+                override_info: null 
+            };
         }
         return fallbackData;
     }
@@ -2928,8 +2987,8 @@ async function fetchAlertCount() {
         const hour = nowDate.getHours();
         const minutes = nowDate.getMinutes();
         const timeDecimal = hour + minutes / 60;
-          const OPERATING_START = 4.5;
-    const OPERATING_END = 22.5;
+             const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
         // ========== 1. Rush Hour Alert ==========
         if ((hour >= 7 && hour <= 9)) {
             allAlerts.push({ id: 'rush-morning-permanent' });

@@ -3,6 +3,7 @@ from models import User, Report, Broadcast, ActivityLog, db
 from datetime import datetime, timedelta
 import secrets, string, json, os
 from .auth import log_activity
+from routes.api_predict import get_directional_prediction
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -349,6 +350,7 @@ def dashboard_stats():
     try:
         from flask import current_app
         from datetime import datetime, timedelta
+        from routes.api_predict import get_directional_prediction  # ✅ Add this import
         
         print("\n" + "="*50)
         print("📊 FETCHING DASHBOARD STATS")
@@ -387,19 +389,16 @@ def dashboard_stats():
                 print(f"   ⚠️ Live map API returned status {live_response.status_code}")
         except Exception as e:
             print(f"   ⚠️ Could not fetch live map data: {e}")
-            # Fallback: use the prediction function from config
-            get_directional = current_app.config.get('GET_DIRECTIONAL_PREDICTION')
-            if get_directional:
-                now = datetime.now()
-                for station in STATIONS:
-                    try:
-                        # FIX: get_directional takes (station, direction, datetime)
-                        north = get_directional(station, 'Northbound', now)
-                        south = get_directional(station, 'Southbound', now)
-                        if max(north, south) > 80:
-                            severe_count += 1
-                    except Exception as e2:
-                        print(f"   ⚠️ Error getting prediction for {station}: {e2}")
+            # ✅ FIX: Use the same import as station_status()
+            now = datetime.now()
+            for station in STATIONS:
+                try:
+                    north = get_directional_prediction(station, 'Northbound', now)
+                    south = get_directional_prediction(station, 'Southbound', now)
+                    if max(north or 0, south or 0) > 80:
+                        severe_count += 1
+                except Exception as e2:
+                    print(f"   ⚠️ Error getting prediction for {station}: {e2}")
         
         print(f"   Final Severe Count: {severe_count}")
         print("="*50)
@@ -416,7 +415,6 @@ def dashboard_stats():
         print(f"❌ Error in dashboard_stats: {e}")
         traceback.print_exc()
         
-        # Return error response with details
         return jsonify({
             'total_reports': 0,
             'severe_count': 0,

@@ -49,76 +49,34 @@ STATION_FILE_MAP = {
 def rmse(y_true, y_pred):
     return tf.sqrt(tf.reduce_mean(tf.square(y_true - y_pred)))
 
-def debug_prediction(station, direction, features):
-    """Debug why predictions are stuck at 38%"""
-    model_key = f"{station}_{direction}"
-    
-    print(f"\n{'='*50}")
-    print(f"DEBUG: {model_key}")
-    print(f"{'='*50}")
-    
-    # 1. Check if model exists
-    print(f"1. Model in directional_models: {model_key in directional_models}")
-    if model_key not in directional_models:
-        print(f"   Available models: {list(directional_models.keys())[:5]}...")
-        return None
-    
-    # 2. Check scalers
-    feature_key = f'{model_key}_feature'
-    target_key = f'{model_key}_target'
-    
-    print(f"2. Feature scaler exists: {feature_key in directional_scalers}")
-    print(f"3. Target scaler exists: {target_key in directional_scalers}")
-    
-    if feature_key not in directional_scalers:
-        print(f"   Available scalers: {list(directional_scalers.keys())[:5]}...")
-        return None
-    
-    # 4. Get the actual model and scaler
-    model = directional_models[model_key]
-    feature_scaler = directional_scalers[feature_key]
-    target_scaler = directional_scalers.get(target_key)
-    
-    # 5. Check input features BEFORE scaling
-    print(f"\n4. Input features shape: {features.shape}")
-    print(f"   First row, first 5 values: {features[0, :5]}")
-    print(f"   Min/Max values in features: {features.min():.3f} / {features.max():.3f}")
-    
-    # 6. Scale features
-    features_scaled = feature_scaler.transform(features)
-    print(f"\n5. After scaling:")
-    print(f"   First row, first 5 values: {features_scaled[0, :5]}")
-    print(f"   Min/Max scaled: {features_scaled.min():.3f} / {features_scaled.max():.3f}")
-    
-    # 7. Check if scaling worked
-    if features_scaled.max() > 5 or features_scaled.min() < -5:
-        print(f"   ⚠️ WARNING: Scaling seems off! Range too large")
-    
-    # 8. Make prediction
-    print(f"\n6. Making prediction...")
-    pred_scaled = model.predict(features_scaled, verbose=0)
-    print(f"   Raw model output: {pred_scaled[0]}")
-    print(f"   Shape: {pred_scaled.shape}")
-    
-    # 9. Inverse transform
-    if target_scaler is not None:
-        print(f"\n7. Using target scaler to inverse transform...")
-        pred_congestion = target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))
-        pred_congestion = pred_congestion[0][0]
-        print(f"   After inverse transform: {pred_congestion}")
-    else:
-        print(f"\n7. No target scaler! Converting directly...")
-        pred_congestion = pred_scaled[0][0] * 100
-        print(f"   Raw output * 100: {pred_congestion}")
-    
-    # 10. Clip to valid range
-    pred_congestion = max(0, min(100, pred_congestion))
-    
-    print(f"\n8. FINAL PREDICTION: {pred_congestion:.1f}%")
-    
-    return pred_congestion
 
-def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_v8'):
+# ============================================================
+# HELPER: Get Model File Path (Supports Multiple Suffixes)
+# ============================================================
+def get_model_file_path(model_path, model_key):
+    """
+    Get the correct model file path, checking all possible suffixes.
+    Supports: _lstm_v10_plus.keras, _lstm_enhanced.keras, _best.keras
+    """
+    suffixes = ['_lstm_v10_plus.keras', '_lstm_enhanced.keras', '_best.keras']
+    for suffix in suffixes:
+        path = os.path.join(model_path, f'{model_key}{suffix}')
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def get_scaler_paths(model_path, model_key):
+    """Get feature and target scaler paths for a model"""
+    feature_path = os.path.join(model_path, f'{model_key}_feature_scaler.pkl')
+    target_path = os.path.join(model_path, f'{model_key}_target_scaler.pkl')
+    return feature_path, target_path
+
+
+# ============================================================
+# LOAD ALL MODELS
+# ============================================================
+def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_v10'):
     """
     Load ALL directional models - USE WITH CAUTION!
     This loads all 26 models and uses ~300MB memory.
@@ -129,14 +87,6 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
     directional_models = {}
     directional_scalers = {}
     
-    station_map = {
-        "North Avenue": "North Ave",
-        "Quezon Avenue": "Quezon Ave",
-        "Shaw Boulevard": "Shaw Blvd",
-        "Ayala Avenue": "Ayala Ave",
-        "Boni Avenue": "Boni Ave",
-    }
-    
     print(f"📂 Loading models from: {DIRECTIONAL_MODELS_PATH}")
     
     # Check if directory exists
@@ -145,29 +95,28 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
         print(f"   Current working directory: {os.getcwd()}")
         return directional_models, directional_scalers
     
+    # First, check what model files exist
+    all_files = os.listdir(DIRECTIONAL_MODELS_PATH)
+    model_files = [f for f in all_files if f.endswith('.keras')]
+    print(f"📋 Found {len(model_files)} .keras files in directory")
+    
+    loaded_count = 0
+    failed_count = 0
+    
     for station in STATIONS:
         for direction in ['Northbound', 'Southbound']:
-            
             station_file = STATION_FILE_MAP.get(station, station)
             model_key = f"{station_file}_{direction}"
             
-            # Try both naming conventions
-            model_path_v1 = os.path.join(DIRECTIONAL_MODELS_PATH, f'{model_key}_lstm_enhanced.keras')
-            model_path_v2 = os.path.join(DIRECTIONAL_MODELS_PATH, f'{model_key}_best.keras')
-            
-            # Use whichever exists
-            model_path = None
-            if os.path.exists(model_path_v1):
-                model_path = model_path_v1
-            elif os.path.exists(model_path_v2):
-                model_path = model_path_v2
+            # ✅ FIX: Use the helper to find the model file
+            model_path = get_model_file_path(DIRECTIONAL_MODELS_PATH, model_key)
             
             if model_path is None:
                 print(f"  ⚠️ No model file for {model_key}")
+                failed_count += 1
                 continue
             
-            feature_scaler_path = os.path.join(DIRECTIONAL_MODELS_PATH, f'{model_key}_feature_scaler.pkl')
-            target_scaler_path = os.path.join(DIRECTIONAL_MODELS_PATH, f'{model_key}_target_scaler.pkl')
+            feature_scaler_path, target_scaler_path = get_scaler_paths(DIRECTIONAL_MODELS_PATH, model_key)
             
             try:
                 print(f"  Loading {model_key}...")
@@ -189,17 +138,19 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
                         directional_scalers[f'{model_key}_target'] = pickle.load(f)
                 else:
                     print(f"    ⚠️ Target scaler not found: {target_scaler_path}")
-                    print(f"    Will use fallback: multiply by 100")
                 
-                # Force garbage collection after each model
+                loaded_count += 1
                 gc.collect()
                 
             except Exception as e:
+                failed_count += 1
                 print(f"  ❌ Error loading {model_key}: {e}")
                 import traceback
                 traceback.print_exc()
     
-    print(f"\n✅ Loaded {len(directional_models)} directional models")
+    print(f"\n✅ Loaded {loaded_count} directional models")
+    if failed_count > 0:
+        print(f"   ⚠️ Failed to load {failed_count} models")
     print(f"✅ Loaded {len(directional_scalers)} scalers")
     
     # Show target scaler info
@@ -213,6 +164,54 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
     
     return directional_models, directional_scalers
 
+
+# ============================================================
+# LOAD SINGLE MODEL (Memory Efficient)
+# ============================================================
+def load_single_model(station, direction, model_path='models_2022-2024_v10'):
+    """
+    Load a SINGLE model for one station-direction (memory efficient)
+    This is the recommended way to load models.
+    Only ~20-30MB per model.
+    """
+    station_file = STATION_FILE_MAP.get(station, station)
+    model_key = f"{station_file}_{direction}"
+    result = {'model': None, 'feature': None, 'target': None}
+    
+    # ✅ FIX: Use the helper to find the model file
+    model_file = get_model_file_path(model_path, model_key)
+    
+    if model_file is None:
+        print(f"⚠️ No model file for {model_key}")
+        return None, result
+    
+    try:
+        # Load the model
+        model = tf.keras.models.load_model(model_file, custom_objects={'rmse': rmse})
+        result['model'] = model
+        
+        # Load feature scaler
+        feature_scaler_path, target_scaler_path = get_scaler_paths(model_path, model_key)
+        
+        if os.path.exists(feature_scaler_path):
+            with open(feature_scaler_path, 'rb') as f:
+                result['feature'] = pickle.load(f)
+        
+        if os.path.exists(target_scaler_path):
+            with open(target_scaler_path, 'rb') as f:
+                result['target'] = pickle.load(f)
+        
+        print(f"✅ Loaded single model: {model_key}")
+        return model, result
+        
+    except Exception as e:
+        print(f"❌ Error loading {model_key}: {e}")
+        return None, result
+
+
+# ============================================================
+# LOAD HISTORICAL DATA
+# ============================================================
 def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY, 
                                historical_cache='historical_data_cache_2023_2024.pkl'):
     """Load historical data - USE WITH CAUTION! This loads data into memory."""
@@ -262,54 +261,10 @@ def load_real_historical_data(STATIONS, STATION_BASE_CAPACITY,
         'direction_counts': direction_counts
     }
 
-def load_single_model(station, direction, model_path='models_2022-2024_v8'):
-    """
-    Load a SINGLE model for one station-direction (memory efficient)
-    This is the recommended way to load models.
-    Only ~20-30MB per model.
-    """
-    station_file = STATION_FILE_MAP.get(station, station)
-    model_key = f"{station_file}_{direction}"
-    result = {'model': None, 'feature': None, 'target': None}
-    
-    # Try both naming conventions
-    model_path_v1 = os.path.join(model_path, f'{model_key}_lstm_enhanced.keras')
-    model_path_v2 = os.path.join(model_path, f'{model_key}_best.keras')
-    
-    model_file = None
-    if os.path.exists(model_path_v1):
-        model_file = model_path_v1
-    elif os.path.exists(model_path_v2):
-        model_file = model_path_v2
-    
-    if model_file is None:
-        print(f"⚠️ No model file for {model_key}")
-        return None, result
-    
-    try:
-        # Load the model
-        model = tf.keras.models.load_model(model_file, custom_objects={'rmse': rmse})
-        result['model'] = model
-        
-        # Load feature scaler
-        feature_scaler_path = os.path.join(model_path, f'{model_key}_feature_scaler.pkl')
-        target_scaler_path = os.path.join(model_path, f'{model_key}_target_scaler.pkl')
-        
-        if os.path.exists(feature_scaler_path):
-            with open(feature_scaler_path, 'rb') as f:
-                result['feature'] = pickle.load(f)
-        
-        if os.path.exists(target_scaler_path):
-            with open(target_scaler_path, 'rb') as f:
-                result['target'] = pickle.load(f)
-        
-        print(f"✅ Loaded single model: {model_key}")
-        return model, result
-        
-    except Exception as e:
-        print(f"❌ Error loading {model_key}: {e}")
-        return None, result
 
+# ============================================================
+# UNLOAD MODEL (Free Memory)
+# ============================================================
 def unload_model(model_key):
     """Unload a model to free memory"""
     global directional_models, directional_scalers
@@ -324,8 +279,11 @@ def unload_model(model_key):
             del directional_scalers[key]
     
     gc.collect()
-    tf.keras.backend.clear_session()
 
+
+# ============================================================
+# SYNTHETIC HISTORICAL DATA (Fallback)
+# ============================================================
 def _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY):
     """Generate synthetic historical data (fallback)"""
     global historical_entry, historical_exit, hourly_avg_entry, hourly_avg_exit, direction_counts
@@ -372,32 +330,54 @@ def _generate_synthetic_historical_data(STATIONS, STATION_BASE_CAPACITY):
     direction_counts = {'northbound': 4500000, 'southbound': 3800000}
     print("Generated synthetic historical data")
 
-STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-            "Ayala Ave", "Magallanes", "Taft"]
 
-# ==================================================
-# NO AUTO-LOADING - Everything loads on demand
-# ==================================================
-print("=" * 50)
-print("⚠️ AUTO-LOADING DISABLED - Models load on first request")
-print("=" * 50)
+# ============================================================
+# FAST PREDICTION (Direct Tensor Execution)
+# ============================================================
+def debug_prediction(station, direction, features):
+    """
+    Fast prediction using direct tensor execution.
+    Features must already be prepared and scaled.
+    """
+    station_file = STATION_FILE_MAP.get(station, station)
+    model_key = f"{station_file}_{direction}"
+    
+    if model_key not in directional_models:
+        print(f"⚠️ Model {model_key} not loaded")
+        return None
+    
+    feature_key = f'{model_key}_feature'
+    target_key = f'{model_key}_target'
+    
+    model = directional_models[model_key]
+    feature_scaler = directional_scalers.get(feature_key)
+    target_scaler = directional_scalers.get(target_key)
+    
+    if feature_scaler is None:
+        print(f"⚠️ Feature scaler missing")
+        return None
+    
+    # Scale
+    features_scaled = feature_scaler.transform(features)
+    scaled_sequence = features_scaled.reshape(1, 24, -1)
+    
+    # FAST: Direct tensor call instead of model.predict()
+    input_tensor = tf.convert_to_tensor(scaled_sequence, dtype=tf.float32)
+    pred_scaled = model(input_tensor, training=False).numpy()
+    
+    # Inverse transform
+    if target_scaler is not None:
+        pred_congestion = target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))
+        pred_congestion = pred_congestion[0][0]
+    else:
+        pred_congestion = pred_scaled[0][0] * 100
+    
+    return max(0, min(100, float(pred_congestion)))
 
-print("\n" + "="*50)
-print("✅ Using original target scalers from model files (passenger counts)")
-print("="*50)
 
-print("=" * 50)
-print("✅ model_loader.py loaded successfully!")
-print(f"✅ directional_models count: {len(directional_models)} (loaded on demand)")
-print(f"✅ directional_scalers count: {len(directional_scalers)} (loaded on demand)")
-print("=" * 50)
-
-# ==================================================
-# AUTO-LOAD MODELS AT STARTUP
-# ==================================================
-# At the bottom of model_loader.py, replace the auto-load section with:
-
+# ============================================================
+# AUTO-LOAD ALL MODELS AT STARTUP
+# ============================================================
 def auto_load_all_models(limit=None):
     """Automatically load all models at startup, with optional limit"""
     global directional_models, directional_scalers
@@ -405,20 +385,20 @@ def auto_load_all_models(limit=None):
     print("=" * 50)
     print("🔄 Auto-loading all models...")
     
-    correct_dir = "models_2022-2024_v8"
+    correct_dir = "models_2022-2024_v10"
     
     if not os.path.exists(correct_dir):
         print(f"⚠️ Models directory not found: {correct_dir}")
         return 0
     
     files = os.listdir(correct_dir)
-    model_files = [f for f in files if f.endswith('.keras') and ('lstm_enhanced' in f or 'best' in f)]
+    # ✅ FIX: Look for ALL .keras files (including _v10_plus)
+    model_files = [f for f in files if f.endswith('.keras')]
     
     if not model_files:
         print(f"⚠️ No model files found in {correct_dir}")
         return 0
     
-    # Limit if specified (for testing)
     if limit:
         model_files = model_files[:limit]
     
@@ -428,24 +408,21 @@ def auto_load_all_models(limit=None):
     failed = 0
     
     for f in model_files:
-        # Extract station and direction from filename
-        name = f.replace('_lstm_enhanced.keras', '').replace('_best.keras', '')
+        # ✅ FIX: Handle all filename patterns
+        name = f.replace('_lstm_v10_plus.keras', '').replace('_lstm_enhanced.keras', '').replace('_best.keras', '')
         parts = name.split('_')
         
         if len(parts) >= 2:
             station = ' '.join(parts[:-1])
             direction = parts[-1]
             
-            # Get the station file name
             station_file = STATION_FILE_MAP.get(station, station)
             model_key = f"{station_file}_{direction}"
             
             try:
-                # Load the model
                 model_path = os.path.join(correct_dir, f)
                 model = tf.keras.models.load_model(model_path, custom_objects={'rmse': rmse})
                 
-                # Store in global dictionary
                 directional_models[model_key] = model
                 
                 # Load scalers
@@ -476,13 +453,26 @@ def auto_load_all_models(limit=None):
     
     return len(directional_models)
 
-# ==================================================
-# NO AUTO-LOAD - Everything loads on demand
-# ==================================================
+
+# ============================================================
+# STATIONS LIST
+# ============================================================
+STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
+            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+            "Ayala Ave", "Magallanes", "Taft"]
+
+
+# ============================================================
+# MODULE LOADED MESSAGE
+# ============================================================
+print("\n" + "="*50)
+print("✅ Using original target scalers from model files (passenger counts)")
+print("="*50)
+
 print("=" * 50)
-print("✅ model_loader.py loaded - NO models loaded yet")
-print(f"✅ directional_models: {len(directional_models)} (empty - lazy loading)")
-print(f"✅ directional_scalers: {len(directional_scalers)} (empty - lazy loading)")
+print("✅ model_loader.py loaded successfully!")
+print(f"✅ directional_models count: {len(directional_models)} (loaded on demand)")
+print(f"✅ directional_scalers count: {len(directional_scalers)} (loaded on demand)")
 print("=" * 50)
 
 # DO NOT auto-load here - let the app call when needed
