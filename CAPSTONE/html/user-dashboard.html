@@ -3427,7 +3427,7 @@ function setDirection(direction) {
 
 // ========== CONGESTION HELPER ==========
 function getCongestionLevel(percentage) {
-    const OPERATING_START = 4.5;
+      const OPERATING_START = 4.5;
     const OPERATING_END = 22.5;
 
     const now = new Date();
@@ -3590,7 +3590,7 @@ function updateStationStatusUI(data) {
     const currentTime = currentHour + (currentMinute / 60);
     
     // Operating hours: 4:30 AM (4.5) to 10:30 PM (22.5)
-    const OPERATING_START = 4.5;
+       const OPERATING_START = 4.5;
     const OPERATING_END = 22.5;
     
     // Check if MRT is operating
@@ -3700,7 +3700,7 @@ function updateTrainScheduleUI(data) {
         const currentMinute = now.getMinutes();
         const currentTime = currentHour + (currentMinute / 60);
         const OPERATING_START = 4.5;
-        const OPERATING_END = 22.5;
+    const OPERATING_END = 22.5;
         const isOperating = (currentTime >= OPERATING_START && currentTime < OPERATING_END);
         
         if (!isOperating) {

@@ -56,9 +56,9 @@ def get_active_overrides():
     """Get active overrides from file with expiry check"""
     overrides = load_overrides()
     
-    # Use datetime.now() for consistency
-    now = datetime.now()
-    now_timestamp = now.timestamp()
+    # ✅ Use Config time for consistency
+    config_time = Config.get_current_time()
+    now_timestamp = config_time.timestamp()
     
     # Filter out expired overrides
     active_overrides = {}
@@ -72,10 +72,10 @@ def get_active_overrides():
     print(f"📄 Active overrides: {active_overrides}")
     return active_overrides
 
-def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name):
+def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name, direction='southbound'):
     """
-    Convert model prediction to congestion percentage.
-    MATCHES api_other.py implementation for consistency.
+    Convert model prediction to congestion percentage using P95.
+    MATCHES api_predict.py and api_other.py behavior.
     """
     raw_value = float(pred_scaled[0][0]) if hasattr(pred_scaled, '__getitem__') else float(pred_scaled)
     
@@ -92,17 +92,20 @@ def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name):
         capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
         passenger_count = raw_value * capacity * 1.5
     
-    # ========== FIX: Cap passenger_count at 0 ==========
     passenger_count = max(0, passenger_count)
     
-    # Get station capacity
-    capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+    # ========== FIX: Use P95 instead of capacity ==========
+    try:
+        from routes.api_predict import get_p95_percentile
+        p95 = get_p95_percentile(station_name, direction)
+    except Exception as e:
+        print(f"⚠️ Could not get P95 for {station_name} {direction}: {e}")
+        # Fallback to capacity-based calculation
+        capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        p95 = capacity * 0.8  # Reasonable fallback
     
-    # Cap at station capacity for congestion percentage
-    capped_passengers = min(passenger_count, capacity)
-    
-    # Calculate congestion percentage (0-100%)
-    congestion = (capped_passengers / capacity * 100)
+    # Calculate congestion percentage using P95 (0-100%)
+    congestion = (passenger_count / p95) * 100
     congestion = max(0, min(congestion, 100))
     
     return congestion, passenger_count

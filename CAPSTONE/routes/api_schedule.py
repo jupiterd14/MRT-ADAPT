@@ -79,7 +79,7 @@ WEEKEND_LAST_NB = {
 }
 
 # ========== HEADWAY SCHEDULES ==========
-# Format: (start_time, end_time, min_headway_seconds, max_headway_seconds, description)
+# Format: (start_time, end_time, min_headway_seconds, max_headway_seconds, period, description)
 WEEKDAY_HEADWAY = [
     (time(4, 30), time(7, 0), 7*60, 4*60, "Morning", "7-4 minutes"),
     (time(7, 1), time(9, 0), 210, 210, "AM Peak", "3.5 minutes"),
@@ -99,17 +99,21 @@ SUNDAY_HEADWAY = [
     (time(4, 30), time(22, 40), 6.5*60, 7*60, "Sunday/Holiday", "6.5-7 minutes"),
 ]
 
+
 def is_weekend() -> bool:
+    """Check if today is weekend (Saturday or Sunday)"""
     return datetime.now().weekday() >= 5
 
+
 def is_sunday() -> bool:
+    """Check if today is Sunday"""
     return datetime.now().weekday() == 6
 
-def get_station_opening_hours(station: str, direction: str) -> Tuple[time, time]:
+
+def get_station_opening_hours(station: str, direction: str) -> Tuple[Optional[time], Optional[time]]:
     """Returns (opening_time, last_train_time) for a station and direction"""
     now = datetime.now()
     weekend = is_weekend()
-    sunday = is_sunday()
     
     if direction == "southbound":
         opening = WEEKEND_OPENING_SB.get(station) if weekend else WEEKDAY_OPENING_SB.get(station)
@@ -120,6 +124,7 @@ def get_station_opening_hours(station: str, direction: str) -> Tuple[time, time]
     
     return opening, last
 
+
 def get_current_headway() -> Dict:
     """Get current headway based on time of day"""
     now = datetime.now()
@@ -129,6 +134,7 @@ def get_current_headway() -> Dict:
     if current_time < time(4, 30) or current_time >= time(23, 40):
         return {"is_operating": False, "headway_avg": 0, "description": "Station closed"}
     
+    # Select schedule based on day type
     if is_sunday():
         schedule = SUNDAY_HEADWAY
     elif is_weekend():
@@ -139,7 +145,7 @@ def get_current_headway() -> Dict:
     for start, end, min_h, max_h, period, desc in schedule:
         if start <= current_time < end:
             return {
-                "is_operating": True,  # ADD THIS - important!
+                "is_operating": True,
                 "headway_min": int(min_h // 60),
                 "headway_max": int(max_h // 60),
                 "headway_avg": int((min_h + max_h) // 120),
@@ -148,24 +154,14 @@ def get_current_headway() -> Dict:
                 "is_peak": "Peak" in period
             }
     
-    # Default fallback - operating with normal headway
+    # Fallback - should never reach here
     return {
         "is_operating": True,
         "headway_avg": 5,
         "description": "Normal operations"
     }
-    
-@api_schedule_bp.route('/schedule/test')
-def test_schedule():
-    """Test endpoint to verify schedule API is working"""
-    now = datetime.now()
-    test_station = "North Ave"
-    result = calculate_next_trains(test_station, now)
-    return jsonify({
-        "status": "ok",
-        "timestamp": now.isoformat(),
-        "test_result": result
-    })
+
+
 def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
     """Calculate next train arrival times for a station"""
     if target_time is None:
@@ -297,9 +293,85 @@ def calculate_next_trains(station: str, target_time: datetime = None) -> Dict:
     
     return result
 
+
+# ============================================================
+# ROUTES
+# ============================================================
+
+@api_schedule_bp.route('/schedule/test')
+def test_schedule():
+    """Test endpoint to verify schedule API is working"""
+    now = datetime.now()
+    test_station = "North Ave"
+    result = calculate_next_trains(test_station, now)
+    return jsonify({
+        "status": "ok",
+        "timestamp": now.isoformat(),
+        "test_result": result
+    })
+
+
+@api_schedule_bp.route('/schedule/headway')
+def get_headway_route():
+    """Get current headway information"""
+    headway = get_current_headway()
+    return jsonify(headway)
+
+
+@api_schedule_bp.route('/schedule/next-trains/<station_name>')
+def get_next_trains_route(station_name):
+    """Get next train arrival times for a station"""
+    name = station_name.replace('%20', ' ')
+    result = calculate_next_trains(name)
+    
+    return jsonify({
+        "station": result.get("station"),
+        "is_operating": result.get("is_operating", True),
+        "is_closed": result.get("is_closed", False),
+        "headway": result.get("headway", 5),
+        "headway_description": result.get("headway_description", ""),
+        "period": result.get("period", ""),
+        "southbound": {
+            "available": result.get("southbound", {}).get("available", True),
+            "minutes": result.get("southbound", {}).get("minutes"),
+            "last_train": result.get("southbound", {}).get("last_train"),
+            "origin": result.get("southbound", {}).get("origin", "North Ave")
+        },
+        "northbound": {
+            "available": result.get("northbound", {}).get("available", True),
+            "minutes": result.get("northbound", {}).get("minutes"),
+            "last_train": result.get("northbound", {}).get("last_train"),
+            "origin": result.get("northbound", {}).get("origin", "Taft")
+        }
+    })
+
+
+@api_schedule_bp.route('/schedule/station-info/<station_name>')
+def station_info_route(station_name):
+    """Get station opening hours and last train times"""
+    name = station_name.replace('%20', ' ')
+    weekend = is_weekend()
+    
+    sb_open, sb_last = get_station_opening_hours(name, "southbound")
+    nb_open, nb_last = get_station_opening_hours(name, "northbound")
+    
+    return jsonify({
+        "station": name,
+        "date_type": "Weekend" if weekend else "Weekday",
+        "southbound": {
+            "entrance_opens": sb_open.strftime("%I:%M %p") if sb_open else None,
+            "last_train": sb_last.strftime("%I:%M %p") if sb_last else "Terminal"
+        },
+        "northbound": {
+            "entrance_opens": nb_open.strftime("%I:%M %p") if nb_open else None,
+            "last_train": nb_last.strftime("%I:%M %p") if nb_last else "Terminal"
+        }
+    })
+
+
 @api_schedule_bp.route('/schedule/test-time/<station_name>/<int:hour>/<int:minute>')
 def test_time_schedule(station_name, hour, minute):
-    """Test schedule at a specific time"""
+    """Test schedule at a specific time (debugging)"""
     name = station_name.replace('%20', ' ')
     
     # Create a mock time
@@ -325,10 +397,11 @@ def test_time_schedule(station_name, hour, minute):
         },
         "note": "This is a test with a simulated time"
     })
-    
+
+
 @api_schedule_bp.route('/schedule/compare')
 def compare_stations():
-    """Compare wait times at different stations"""
+    """Compare wait times at different stations (debugging)"""
     now = datetime.now()
     results = {}
     
@@ -345,17 +418,14 @@ def compare_stations():
         "current_time": now.strftime("%I:%M:%S %p"),
         "stations": results
     })
-    
+
+
 @api_schedule_bp.route('/schedule/debug/<station_name>')
 def debug_schedule(station_name):
-    """See how time affects the calculation"""
+    """Debug how schedule changes over time (debugging)"""
     name = station_name.replace('%20', ' ')
     
     results = {}
-    
-    # Test at different times on the same day
-    base_date = datetime.now().date()
-    
     test_times = [
         ("Now", datetime.now()),
         ("+1 min", datetime.now() + timedelta(minutes=1)),
@@ -378,57 +448,83 @@ def debug_schedule(station_name):
         "current_time": datetime.now().strftime("%I:%M:%S %p"),
         "scenarios": results
     })
-    
-# ========== ROUTES ==========
 
-@api_schedule_bp.route('/schedule/headway')
-def get_headway_route():
-    headway = get_current_headway()
-    return jsonify(headway)
-@api_schedule_bp.route('/schedule/next-trains/<station_name>')
-def get_next_trains_route(station_name):
-    name = station_name.replace('%20', ' ')
-    result = calculate_next_trains(name)
+
+# ============================================================
+# COMBINED SCHEDULE + CONGESTION ENDPOINT
+# ============================================================
+
+@api_schedule_bp.route('/schedule/with-congestion/<station_name>')
+def schedule_with_congestion(station_name):
+    """
+    Get both schedule and congestion prediction for a station.
+    Combines train arrival times with AI congestion predictions.
+    """
+    from routes.api_predict import get_directional_prediction
+    from config import Config
     
-    # Ensure consistent field names
-    return jsonify({
-        "station": result.get("station"),
-        "is_operating": result.get("is_operating", True),
-        "is_closed": result.get("is_closed", False),
-        "headway": result.get("headway", 5),
-        "headway_description": result.get("headway_description", ""),
-        "period": result.get("period", ""),
-        "northbound": {
-            "available": result.get("northbound", {}).get("available", True),
-            "minutes": result.get("northbound", {}).get("minutes"),
-            "last_train": result.get("northbound", {}).get("last_train"),
-            "origin": result.get("northbound", {}).get("origin", "Taft")
-        },
-        "southbound": {
-            "available": result.get("southbound", {}).get("available", True),
-            "minutes": result.get("southbound", {}).get("minutes"),
-            "last_train": result.get("southbound", {}).get("last_train"),
-            "origin": result.get("southbound", {}).get("origin", "North Ave")
-        }
-    })
-@api_schedule_bp.route('/schedule/station-info/<station_name>')
-def station_info_route(station_name):
     name = station_name.replace('%20', ' ')
-    now = datetime.now()
-    weekend = is_weekend()
+    now = Config.get_current_time()
     
-    sb_open, sb_last = get_station_opening_hours(name, "southbound")
-    nb_open, nb_last = get_station_opening_hours(name, "northbound")
+    # Get schedule
+    schedule = calculate_next_trains(name, now)
+    
+    # Get congestion predictions
+    north_cong = get_directional_prediction(name, 'Northbound', now)
+    south_cong = get_directional_prediction(name, 'Southbound', now)
+    
+    def get_congestion_status(cong):
+        if cong is None:
+            return "Unknown"
+        elif cong > 80:
+            return "Severe"
+        elif cong > 50:
+            return "Congested"
+        elif cong > 25:
+            return "Moderate"
+        else:
+            return "Light"
     
     return jsonify({
         "station": name,
-        "date_type": "Weekend" if weekend else "Weekday",
-        "southbound": {
-            "entrance_opens": sb_open.strftime("%I:%M %p") if sb_open else None,
-            "last_train": sb_last.strftime("%I:%M %p") if sb_last else "Terminal"
-        },
-        "northbound": {
-            "entrance_opens": nb_open.strftime("%I:%M %p") if nb_open else None,
-            "last_train": nb_last.strftime("%I:%M %p") if nb_last else "Terminal"
+        "timestamp": now.isoformat(),
+        "schedule": {
+            "is_operating": schedule.get("is_operating", True),
+            "headway": schedule.get("headway", 5),
+            "headway_description": schedule.get("headway_description", ""),
+            "period": schedule.get("period", ""),
+            "southbound": {
+                "next_train_minutes": schedule["southbound"]["minutes"],
+                "origin": schedule["southbound"]["origin"],
+                "available": schedule["southbound"]["available"],
+                "congestion": round(south_cong, 1) if south_cong is not None else None,
+                "status": get_congestion_status(south_cong)
+            },
+            "northbound": {
+                "next_train_minutes": schedule["northbound"]["minutes"],
+                "origin": schedule["northbound"]["origin"],
+                "available": schedule["northbound"]["available"],
+                "congestion": round(north_cong, 1) if north_cong is not None else None,
+                "status": get_congestion_status(north_cong)
+            }
         }
     })
+
+
+@api_schedule_bp.route('/schedule/debug-headway')
+def debug_headway():
+    """Debug current headway calculation"""
+    now = datetime.now()
+    headway = get_current_headway()
+    
+    return jsonify({
+        "current_time": now.strftime("%I:%M:%S %p"),
+        "weekday": now.strftime("%A"),
+        "weekday_number": now.weekday(),
+        "is_weekend": is_weekend(),
+        "is_sunday": is_sunday(),
+        "headway": headway
+    })
+
+
+print("✅ api_schedule.py loaded successfully!")

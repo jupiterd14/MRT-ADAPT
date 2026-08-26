@@ -459,7 +459,7 @@ def report_congestion():
                     file.save(file_path)
 
                     # Store the path for URL access - this should match your route URL
-                    photo_paths.append(f"/uploads/reports/{safe_filename}")
+                    photo_paths.append(f"static/uploads/reports/{safe_filename}")
         else:
             # Try JSON data
             try:
