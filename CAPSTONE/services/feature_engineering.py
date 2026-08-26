@@ -282,8 +282,10 @@ def get_station_dataframe(station_name, direction):
     combined['month'] = combined.index.month
     
     # ========== CALCULATE CONGESTION ==========
+    # ========== CALCULATE CONGESTION ==========
     capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
     percentage = (combined['TotalPassenger'] / capacity * 100).clip(0, 100)
+ 
     combined['congestion'] = percentage
     combined['congestion_percentage'] = percentage
     combined['raw_passengers'] = combined['TotalPassenger']
@@ -304,75 +306,110 @@ def get_station_dataframe(station_name, direction):
 def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=None, direction=None):
     """
     Builds and caches typical day patterns with disk persistence
-    FIXED: Uses P95 for congestion calculation, not capacity
+    FIXED: Sequence ends at target - 1 hour (matches training alignment)
     """
-    target_dow = target_datetime.weekday()
-    cache_key = f"{station_name}_{direction}_dow_{target_dow}"
-    
-    # Check in-memory cache first
-    if cache_key in _TYPICAL_PATTERN_CACHE:
-        return _TYPICAL_PATTERN_CACHE[cache_key].copy()
-    
     # ========== Get P95 for congestion denominator ==========
-    # Import here to avoid circular imports
     try:
         from routes.api_predict import get_p95_percentile
         p95 = get_p95_percentile(station_name, direction)
     except:
-        # Fallback to capacity if P95 not available
         p95 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
     
     if p95 is None or p95 <= 0:
         p95 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
     
-    # ========== Build typical passenger counts directly ==========
-    hourly_passengers = []
+    # ============================================================
+    # BUILD ACTUAL 24-HOUR TIMELINE
+    # ENDS AT target - 1 hour (matches training alignment)
+    # ============================================================
     
-    for hour in range(24):
-        hour_data = df[(df.index.hour == hour) & (df.index.weekday == target_dow)] if df is not None else []
+    # CRITICAL FIX: End at target - 1 hour
+    end_time = target_datetime.replace(
+        minute=0,
+        second=0,
+        microsecond=0
+    ) - timedelta(hours=1)
+    
+    start_time = end_time - timedelta(hours=seq_length - 1)
+    
+    index = pd.date_range(
+        start=start_time,
+        end=end_time,
+        freq='h'
+    )
+    
+    # ============================================================
+    # Cache the FULL 24-hour profile per station/direction
+    # ============================================================
+    cache_key = f"{station_name}_{direction}_{end_time.strftime('%Y%m%d')}"
+    
+    # Check if we have the full 24-hour profile cached for this date
+    if cache_key in _TYPICAL_PATTERN_CACHE:
+        hourly_passengers = _TYPICAL_PATTERN_CACHE[cache_key].copy()
+    else:
+        # Build typical passenger counts for ALL 24 hours
+        hourly_passengers = []
+        
+        for hour in range(24):
+            hour_data = df[(df.index.hour == hour)] if df is not None else []
+            
+            if len(hour_data) > 0:
+                values = hour_data['TotalPassenger'].dropna()
+                
+                if len(values) > 0:
+                    typical_passenger = float(values.median())
+                else:
+                    typical_passenger = get_synthetic_congestion(hour) / 100.0 * p95
+            else:
+                typical_passenger = get_synthetic_congestion(hour) / 100.0 * p95
+            
+            if np.isnan(typical_passenger) or typical_passenger < 0:
+                typical_passenger = get_synthetic_congestion(hour) / 100.0 * p95
+            
+            hourly_passengers.append(typical_passenger)
+        
+        # Cache the FULL 24-hour profile
+        _TYPICAL_PATTERN_CACHE[cache_key] = hourly_passengers.copy()
+    
+    # ============================================================
+    # BUILD SEQUENCE FOR THIS SPECIFIC TARGET HOUR
+    # ============================================================
+    
+    typical_passengers = []
+    
+    for timestamp in index:
+        hour = timestamp.hour
+        dow = timestamp.weekday()
+        
+        # Get data for this specific hour and day of week
+        hour_data = df[
+            (df.index.hour == hour) &
+            (df.index.weekday == dow)
+        ]
         
         if len(hour_data) > 0:
-            # Get TotalPassenger values directly
             values = hour_data['TotalPassenger'].dropna()
             
             if len(values) > 0:
-                typical_passenger = float(values.median())
+                passenger = float(values.median())
             else:
-                # No valid data - use synthetic fallback
-                typical_passenger = get_synthetic_congestion(hour) / 100.0 * p95
+                passenger = get_synthetic_congestion(hour) / 100.0 * p95
         else:
-            # No data - use synthetic fallback
-            typical_passenger = get_synthetic_congestion(hour) / 100.0 * p95
+            # Fallback: same hour regardless of weekday
+            fallback = df[df.index.hour == hour]['TotalPassenger'].dropna()
+            if len(fallback) > 0:
+                passenger = float(fallback.median())
+            else:
+                passenger = get_synthetic_congestion(hour) / 100.0 * p95
         
-        # Ensure we never have NaN or negative
-        if np.isnan(typical_passenger) or typical_passenger < 0:
-            typical_passenger = get_synthetic_congestion(hour) / 100.0 * p95
+        if np.isnan(passenger) or passenger < 0:
+            passenger = get_synthetic_congestion(hour) / 100.0 * p95
         
-        hourly_passengers.append(typical_passenger)
-    
-    # ========== Build the 24-hour sequence ==========
-    target_hour = target_datetime.hour
-    
-    typical_data = []
-    for i in range(seq_length):
-        hour = (target_hour - seq_length + 1 + i) % 24
-        typical_data.append(hourly_passengers[hour])
-    
-    # ========== Create timestamps ==========
-    base_date = target_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
-    start_hour = (target_hour - seq_length + 1) % 24
-    
-    index = []
-    current_time = base_date + timedelta(hours=start_hour)
-    for i in range(seq_length):
-        index.append(current_time)
-        current_time += timedelta(hours=1)
+        typical_passengers.append(passenger)
     
     # ========== Create DataFrame ==========
     typical_df = pd.DataFrame(index=index)
-    
-    # Add TotalPassenger (directly from typical passenger counts)
-    typical_df['TotalPassenger'] = typical_data
+    typical_df['TotalPassenger'] = typical_passengers
     
     # ========== Calculate congestion using P95 ==========
     typical_df['congestion'] = (typical_df['TotalPassenger'] / p95 * 100).clip(0, 100)
@@ -408,14 +445,16 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
     typical_df['is_payday'] = typical_df.index.day.isin([15, 30, 31]).astype(np.int8)
     typical_df['is_weekend'] = (weekdays >= 5).astype(np.int8)
     typical_df['is_friday'] = (weekdays == 4).astype(np.int8)
-    typical_df['is_rush_hour'] = ((hours >= 7) & (hours <= 9)) | ((hours >= 17) & (hours <= 19)).astype(np.int8)
-    typical_df['is_special_event'] = 0
     
+    # FIX: Proper parentheses for is_rush_hour
+    typical_df['is_rush_hour'] = (
+        ((hours >= 7) & (hours <= 9)) |
+        ((hours >= 17) & (hours <= 19))
+    ).astype(np.int8)
+    
+    typical_df['is_special_event'] = 0
     typical_df['is_maintenance_record'] = 0
     typical_df['is_extended_hours'] = 0
-    
-    # Store in memory cache
-    _TYPICAL_PATTERN_CACHE[cache_key] = typical_df.copy()
     
     return typical_df
 def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
@@ -429,31 +468,22 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
     latest_date = df.index.max()
     
     if target_datetime > latest_date:
-        print(f"📊 Future date {target_datetime} - using typical pattern + recent trend")
+        print(f"📊 Future date {target_datetime} - using typical pattern")
         
-        recent_df = df.tail(168)
         typical_df = build_typical_day_pattern(df, target_datetime, seq_length, station_name, direction)
         
         if typical_df is not None:
-            # ========== ✅ FIX: USE THE TYPICAL PATTERN AS-IS ==========
             lookback_df = typical_df.copy()
             
-            # Apply trend adjustment if needed
-            target_hour = target_datetime.hour
-            recent_avg = recent_df[recent_df.index.hour == target_hour]['TotalPassenger'].mean() if len(recent_df) > 0 else None
-            typical_value = lookback_df[lookback_df.index.hour == target_hour]['TotalPassenger'].iloc[0] if len(lookback_df) > 0 else None
+            # ========== ✅ FIX: Use P95 for congestion, not capacity ==========
+            from routes.api_predict import get_p95_percentile
+            p95 = get_p95_percentile(station_name, direction)
+            if p95 > 0:
+                lookback_df['congestion'] = (lookback_df['TotalPassenger'] / p95 * 100).clip(0, 100)
+            else:
+                capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+                lookback_df['congestion'] = (lookback_df['TotalPassenger'] / capacity * 100).clip(0, 100)
             
-            if recent_avg is not None and typical_value is not None and typical_value > 0:
-                trend_factor = recent_avg / typical_value
-                trend_factor = max(0.5, min(2.0, trend_factor))
-                lookback_df['TotalPassenger'] = lookback_df['TotalPassenger'] * trend_factor
-                print(f"📊 Applied trend factor: {trend_factor:.2f}")
-            
-            # ========== ✅ FIX: DON'T RECALCULATE FEATURES ==========
-            # The typical_df already has ALL features correctly calculated
-            # Just update the passenger-dependent columns
-            capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-            lookback_df['congestion'] = (lookback_df['TotalPassenger'] / capacity * 100).clip(0, 100)
             lookback_df['congestion_percentage'] = lookback_df['congestion']
             lookback_df['raw_passengers'] = lookback_df['TotalPassenger']
             
@@ -505,6 +535,7 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
     else:
         print(f"⚠️ No feature scaler found for {station_name}_{direction}")
         return feature_values
+    
 def get_baseline_features(target_datetime, seq_length=24):
     """Baseline features with CORRECT column mapping"""
     cache_key = f"{target_datetime.strftime('%Y%m%d')}_{target_datetime.weekday()}_{seq_length}"
