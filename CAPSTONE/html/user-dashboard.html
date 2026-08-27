@@ -3063,7 +3063,7 @@ let updateInterval = null;
 let currentDirection = 'north';
 let cachedData = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 600000; // 10 minutes cache (600,000 ms)
+const CACHE_DURATION = 300000 ; // 10 minutes cache (600,000 ms)
 let isRefreshing = false; // Prevent concurrent refreshes
 let cachedAlertCount = null;
 let cachedAlertCountTime = 0;
@@ -3311,67 +3311,73 @@ function findNearestStation(userLat, userLng) {
     return { station: nearestStation, distance: shortestDistance };
 }
 
-// ========== CACHED API CALL ==========
 async function fetchAllData() {
-    // If already refreshing, wait
     if (isRefreshing) {
-        console.log('⏳ Refresh already in progress, waiting...');
+        console.log('⏳ Refresh in progress...');
         return cachedData;
     }
     
-    // Check cache
-    if (isCacheValid()) {
-        console.log('📦 Using cached data (expires in ' + Math.round(getCacheTimeRemaining()/1000) + 's)');
+    // Check cache (10 minutes)
+    if (cachedData && (Date.now() - lastFetchTime) < CACHE_DURATION) {
+        console.log('📦 Using cached data');
         return cachedData;
     }
     
     isRefreshing = true;
-    console.log('🌐 Fetching fresh data for station:', currentStation);
+    console.log('🌐 Fetching fresh data...');
     
     try {
-        // Show loading indicator
         const loadingOverlay = document.getElementById('loadingOverlay');
         if (loadingOverlay) loadingOverlay.classList.add('active');
         
-        // Parallel API calls
-        const [forecastData, scheduleData, alertData] = await Promise.all([
-            fetch(`/api/directional-forecast/${encodeURIComponent(currentStation)}`).then(res => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.json();
-            }),
-            fetch(`/api/schedule/next-trains/${encodeURIComponent(currentStation)}`).then(res => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.json();
-            }),
-            fetch('/api/alerts/count').then(res => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.json();
-            }).catch(() => ({ count: 0 }))
+        const startTime = performance.now();
+        
+        // ========== FETCH ALL DATA IN PARALLEL ==========
+        const [forecastData, scheduleData, mapData] = await Promise.all([
+            // 6-hour forecast for the chart
+            fetch(`/api/directional-forecast/${encodeURIComponent(currentStation)}`).then(r => r.json()),
+            
+            // Train schedule
+            fetch(`/api/schedule/next-trains/${encodeURIComponent(currentStation)}`).then(r => r.json()),
+            
+            // Live map data (for current congestion + alerts)
+            fetch('/api/live-map/directions/v3').then(r => r.json())
         ]);
-
-        if (forecastData) {
-              console.log("Here:", forecastData);
+        
+        // ========== CALCULATE ALERT COUNT FROM MAP DATA ==========
+        let alertCount = 0;
+        if (mapData && mapData.northbound && mapData.southbound) {
+            const allStations = new Set([
+                ...Object.keys(mapData.northbound || {}),
+                ...Object.keys(mapData.southbound || {})
+            ]);
+            
+            for (const station of allStations) {
+                const northCong = mapData.northbound?.[station]?.congestion || 0;
+                const southCong = mapData.southbound?.[station]?.congestion || 0;
+                const maxCong = Math.max(northCong, southCong);
+                
+                if (maxCong > 80) alertCount++;
+                else if (maxCong > 50) alertCount++;
+            }
         }
         
-      
-        console.log('✅ Data fetched successfully');
+        const elapsed = (performance.now() - startTime).toFixed(0);
+        console.log(`✅ Data fetched in ${elapsed}ms (Forecast: ${forecastData ? 'OK' : 'FAIL'}, Schedule: ${scheduleData ? 'OK' : 'FAIL'}, Map: ${mapData ? 'OK' : 'FAIL'})`);
         
         cachedData = { 
             forecastData, 
-            scheduleData, 
-            alertData,
+            scheduleData,
+            mapData,
+            alertCount,
             timestamp: Date.now()
         };
         lastFetchTime = Date.now();
-        
-        // Update last updated time display
-        updateLastUpdatedTime();
         
         return cachedData;
         
     } catch (error) {
         console.error('❌ Error fetching data:', error);
-        // If we have stale cache, return it
         if (cachedData) {
             console.log('⚠️ Using stale cached data');
             return cachedData;
@@ -3383,7 +3389,6 @@ async function fetchAllData() {
         if (loadingOverlay) loadingOverlay.classList.remove('active');
     }
 }
-
 // ========== UPDATE LAST UPDATED TIME ==========
 function updateLastUpdatedTime() {
     const timeElement = document.getElementById('lastUpdatedTime');
@@ -3782,6 +3787,9 @@ function updateBestTimeUI(data) {
     `;
 }
 // ========== UPDATE ALERT FUNCTIONS ==========
+// You can replace fetchAlertCount() with this simple version:
+
+
 async function fetchAlertCount() {
     const now = Date.now();
     
@@ -3804,8 +3812,8 @@ async function fetchAlertCount() {
         const hour = nowDate.getHours();
         const minutes = nowDate.getMinutes();
         const timeDecimal = hour + minutes / 60;
-          const OPERATING_START = 4.5;
-    const OPERATING_END = 22.5;
+        const OPERATING_START = 4.5;
+        const OPERATING_END = 22.5;
         
         // ========== 1. Rush Hour Alert ==========
         if ((hour >= 7 && hour <= 9)) {
@@ -3821,9 +3829,9 @@ async function fetchAlertCount() {
             allAlerts.push({ id: 'advisory-pre-rush-permanent' });
         } else if (hour >= 10 && hour < 16) {
             allAlerts.push({ id: 'advisory-midday-permanent' });
-        } else if (hour >= 20 && hour < 24) {
+        } else if (hour >= 20 && hour < 22.5) {
             allAlerts.push({ id: 'advisory-late-evening-permanent' });
-        } else if (hour >= 24 || hour === 23) {
+        } else if (hour >= 22.5 || hour === 23) {
             allAlerts.push({ id: 'advisory-service-ended-permanent' });
         }
         
@@ -3851,7 +3859,7 @@ async function fetchAlertCount() {
         
         // ========== 6. Congestion alerts from live map ==========
         try {
-            const response = await fetch('/api/live-map/directions/v2');
+            const response = await fetch('/api/live-map/directions/v3');
             const data = await response.json();
             
             if (data && data.northbound && data.southbound) {
@@ -3860,7 +3868,6 @@ async function fetchAlertCount() {
                     southbound: { severe: [], congested: [], moderate: [], light: [] }
                 };
                 
-                // Process northbound
                 for (const [station, stationData] of Object.entries(data.northbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.northbound.severe.push(station);
@@ -3869,7 +3876,6 @@ async function fetchAlertCount() {
                     else if (congestion > 0) grouped.northbound.light.push(station);
                 }
                 
-                // Process southbound
                 for (const [station, stationData] of Object.entries(data.southbound)) {
                     const congestion = stationData.congestion || 0;
                     if (congestion > 80) grouped.southbound.severe.push(station);
@@ -3878,7 +3884,6 @@ async function fetchAlertCount() {
                     else if (congestion > 0) grouped.southbound.light.push(station);
                 }
                 
-                // Push alerts for each group that has stations
                 if (grouped.northbound.severe.length > 0) allAlerts.push({ id: 'north-severe-permanent' });
                 if (grouped.northbound.congested.length > 0) allAlerts.push({ id: 'north-congested-permanent' });
                 if (grouped.northbound.moderate.length > 0) allAlerts.push({ id: 'north-moderate-permanent' });
@@ -3906,7 +3911,7 @@ async function fetchAlertCount() {
             console.log('Could not fetch broadcasts:', e);
         }
         
-        // ========== COUNT ALL UNREAD ALERTS (not just congestion) ==========
+        // ========== COUNT ALL UNREAD ALERTS ==========
         let unreadCount = 0;
         for (const alert of allAlerts) {
             if (!readAlerts.has(alert.id)) {
@@ -3918,8 +3923,7 @@ async function fetchAlertCount() {
         cachedAlertCount = unreadCount;
         cachedAlertCountTime = now;
         
-        console.log('📊 Dashboard - Total unread alerts:', unreadCount);
-        console.log('📊 Dashboard - All alerts count:', allAlerts.length);
+        console.log('📊 Dashboard - Unread alerts:', unreadCount);
         return unreadCount;
         
     } catch (error) {
@@ -3927,13 +3931,12 @@ async function fetchAlertCount() {
         return 0;
     }
 }
-
 function updateAlertBadgeUI(count) {
     const badge = document.getElementById('alertBadge');
     const sidebarBadge = document.getElementById('sidebarAlertCount');
     const mobileBadge = document.getElementById('mobileAlertBadge');
     
-    // Bell badge: Show 9+ for counts > 9
+    // Bell badgea: Show 9+ for counts > 9
     const bellDisplayValue = count > 9 ? '9+' : count;
     
     if (badge) {

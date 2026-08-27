@@ -459,7 +459,7 @@ def calculate_commuter_congestion(passenger_count, station, direction):
     congestion = (passenger_count / p95) * 100
     
     # Apply a softer cap (95% instead of 100% to avoid saturation)
-    congestion = min(congestion, 95)
+    congestion = min(congestion, 100)
     congestion = max(congestion, 0)
     
     return round(congestion, 1)
@@ -1700,7 +1700,7 @@ def run_auto_tests():
                     congestion = (passenger_count / cap) * 100
                 
                 # Cap at 95% to avoid saturation
-                return min(congestion, 95)
+                return min(congestion, 100)
 
             hourly['actual_congestion'] = hourly.apply(
                 lambda row: calc_congestion_p95(row['TotalPassenger'], station_name, direction),
@@ -2016,7 +2016,7 @@ def upload_batch_test():
                 capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
                 congestion = (passenger_count / capacity) * 100
             
-            congestion = min(congestion, 95)
+            congestion = min(congestion, 100)
             return round(congestion, 1)
         
         # Read and preprocess data

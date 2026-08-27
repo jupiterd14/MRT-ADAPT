@@ -2389,7 +2389,7 @@ async function fetchStationData() {
         console.log('🚀 Fetching fresh map data from LIVE MAP API (v2)...');
         
         // ========== FIX: Add cache-busting and better error handling ==========
-        const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
+        const response = await fetch(`/api/live-map/directions/v3?_=${Date.now()}`);
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -3033,7 +3033,7 @@ async function fetchAlertCount() {
         
         // ========== 6. Congestion alerts from live map ==========
         try {
-            const response = await fetch('/api/live-map/directions/v2');
+            const response = await fetch('/api/live-map/directions/v3');
             const data = await response.json();
             
             if (data && data.northbound && data.southbound) {

@@ -1172,7 +1172,7 @@ async function getCongestionAlerts() {
             return alerts;
         }
         
-        const response = await fetch('/api/live-map/directions/v2');
+        const response = await fetch('/api/live-map/directions/v3');
         if (!response.ok) throw new Error('Failed to fetch congestion data');
         const data = await response.json();
         

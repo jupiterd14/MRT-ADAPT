@@ -3093,7 +3093,7 @@ async function fetchAlertCount() {
         // ========== 6. Congestion alerts from live map ==========
         try {
             console.log('  🔄 Fetching congestion alerts from API...');
-            const response = await fetch('/api/live-map/directions/v2');
+            const response = await fetch('/api/live-map/directions/v3');
             const data = await response.json();
             
             let congestionAlertCount = 0;

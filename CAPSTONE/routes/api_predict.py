@@ -12,7 +12,7 @@ import tensorflow as tf
 api_predict_bp = Blueprint('api_predict', __name__)
 
 STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
+            "Ortigas", "Shaw Blvd", "Boni Ave", "Guaadalupe", "Buendia", 
             "Ayala Ave", "Magallanes", "Taft"]
 
 import json
@@ -23,7 +23,7 @@ import time
 
 # ========== REQUEST-LEVEL CACHE ==========
 _REQUEST_CACHE = {}
-_REQUEST_CACHE_TTL = 10  # 10 seconds
+_REQUEST_CACHE_TTL = 300  # 10 seconds
 
 def get_cached_prediction(station_name, direction, target_datetime):
     """Get prediction with request-level caching to prevent duplicate calls"""
@@ -31,7 +31,7 @@ def get_cached_prediction(station_name, direction, target_datetime):
         target_datetime = Config.get_current_time()
     
     # Create cache key
-    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H%M')}"
+    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H')}_{target_datetime.minute // 5}"
     
     # Clean old cache entries
     current_time = time.time()
@@ -50,7 +50,7 @@ def set_cached_prediction(station_name, direction, target_datetime, value):
     if target_datetime is None:
         target_datetime = Config.get_current_time()
     
-    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H%M')}"
+    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H')}_{target_datetime.minute // 5}"
     
     _REQUEST_CACHE[cache_key] = {
         'value': value,
@@ -67,11 +67,7 @@ def get_p95_cache():
         current_app.config['P95_CACHE'] = {}
     return current_app.config['P95_CACHE']
 
-def get_typical_pattern_cache():
-    """Get typical pattern cache from app config"""
-    if 'TYPICAL_PATTERN_CACHE' not in current_app.config:
-        current_app.config['TYPICAL_PATTERN_CACHE'] = {}
-    return current_app.config['TYPICAL_PATTERN_CACHE']
+
 
 _PENDING_CORRECTION_FACTORS = {}
 
@@ -163,34 +159,6 @@ def safe_cache_key(prefix):
     
     return f"{prefix}_{station}_{datetime.now().hour}_{datetime.now().minute // 5}"
 
-def get_typical_pattern_cached(station_name, direction, target_datetime, df=None):
-    """Get typical pattern using app config cache"""
-    target_dow = target_datetime.weekday()
-    key = f"{station_name}_{direction}_dow_{target_dow}"
-    
-    # Get cache from app config
-    typical_cache = get_typical_pattern_cache()
-    
-    if key not in typical_cache:
-        if df is None:
-            from services.feature_engineering import get_station_dataframe_cached
-            df = get_station_dataframe_cached(station_name, direction)
-        if df is None:
-            return None
-        
-        from services.feature_engineering import build_typical_day_pattern
-        typical_df = build_typical_day_pattern(df, target_datetime, 24, station_name, direction)
-        if typical_df is not None and len(typical_df) == 24:
-            typical_cache[key] = typical_df['congestion'].tolist()
-        else:
-            typical_cache[key] = None
-    
-    day_pattern = typical_cache.get(key)
-    if day_pattern is None:
-        return None
-    hour = target_datetime.hour
-    return day_pattern[hour] if 0 <= hour < 24 else None
-
 def load_correction_factors():
     """Load correction factors into app config"""
     correction_factors = get_correction_factors()
@@ -222,8 +190,24 @@ def preload_p95_cache():
 
 # ========== PRELOAD TYPICAL PATTERNS ==========
 def preload_typical_patterns():
-    print("⏭️ Skipping preload - patterns will build on demand")
-    return
+    """Pre-compute typical patterns for all station-direction pairs to avoid cold-start overhead."""
+    from services.feature_engineering import get_typical_pattern
+    from flask import current_app
+
+    stations = current_app.config.get('STATIONS', STATIONS)
+    directions = ['Northbound', 'Southbound']
+
+    print("🔄 Preloading typical patterns for all stations...")
+    for station in stations:
+        for direction in directions:
+            try:
+                # This function builds and caches the typical pattern internally
+                pattern = get_typical_pattern(station, direction)
+                if pattern is not None:
+                    print(f"✅ Preloaded {station} {direction} (length {len(pattern)})")
+            except Exception as e:
+                print(f"⚠️ Failed to preload {station} {direction}: {e}")
+    print("✅ Typical patterns preloaded.")
 
 # ========== MODEL CACHE ==========
 _models_cache = None
@@ -317,7 +301,8 @@ def get_raw_prediction(station_name, direction, target_datetime):
 
     try:
         # ✅ FIX: get_feature_sequence_for_station returns SCALED features
-        features_scaled = get_feature_sequence_for_station(station_name, direction, target_datetime)
+        from services.feature_engineering import get_scaled_feature_sequence
+        features_scaled = get_scaled_feature_sequence(station_name, direction, target_datetime)
         if features_scaled is None:
             return None
 
@@ -693,19 +678,20 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
         return _get_operating_hours_fallback(target_datetime)
     
     try:
-        from services.feature_engineering import get_feature_sequence_for_station
+        # ========== ✅ FIX: Use get_scaled_feature_sequence directly ==========
+        # This returns ALREADY SCALED features - DO NOT apply feature scaler again!
+        from services.feature_engineering import get_scaled_feature_sequence
+        features_scaled = get_scaled_feature_sequence(station_name, direction, target_datetime)
         
-        # ✅ FIX: Get features (already scaled)
-        features_scaled = get_feature_sequence_for_station(station_name, direction, target_datetime)
         if features_scaled is None:
             return _get_operating_hours_fallback(target_datetime)
         
-        # ✅ FIX: Get target scaler ONLY (feature scaling already done)
+        # ========== ✅ FIX: Get target scaler ONLY ==========
         target_scaler = directional_scalers.get(f'{model_key}_target')
         if target_scaler is None:
             return _get_operating_hours_fallback(target_datetime)
         
-        # ✅ FIX: features_scaled is already scaled, just reshape
+        # ========== ✅ FIX: features_scaled is already scaled ==========
         input_sequence = features_scaled.reshape(1, 24, -1)
         input_tensor = tf.convert_to_tensor(input_sequence, dtype=tf.float32)
         
@@ -770,11 +756,11 @@ def get_fallback_directional_prediction(station_name, direction, target_datetime
         return 45
     else:
         return 25
-
 @api_predict_bp.route('/debug/verify-features/<station_name>/<direction>')
 def debug_verify_features(station_name, direction):
     """Verify what features are being fed to the model."""
-    from services.feature_engineering import get_feature_sequence_for_station
+    # ✅ FIX: Use get_scaled_feature_sequence
+    from services.feature_engineering import get_scaled_feature_sequence
     
     station = station_name.replace('%20', ' ')
     now = Config.get_current_time()
@@ -796,8 +782,8 @@ def debug_verify_features(station_name, direction):
         return jsonify(result)
     
     try:
-        # Get features
-        features_scaled = get_feature_sequence_for_station(station, direction, now)
+        # ✅ FIX: Already-scaled features
+        features_scaled = get_scaled_feature_sequence(station, direction, now)
         
         if features_scaled is None:
             result["error"] = "No features returned"
@@ -936,7 +922,7 @@ def debug_simulate_all_stations_day():
 @api_predict_bp.route('/debug/pipeline-details/<station_name>')
 def debug_pipeline_details(station_name):
     """Debug the entire prediction pipeline step by step"""
-    from services.feature_engineering import get_feature_sequence_for_station, get_station_dataframe
+    from services.feature_engineering import get_scaled_feature_sequence
     
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
@@ -1017,7 +1003,8 @@ def debug_pipeline_details(station_name):
 @api_predict_bp.route('/debug/check-raw-output/<station_name>')
 def debug_check_raw_output(station_name):
     """Check raw model output and what it means - USING P95 PERCENTILE"""
-    from services.feature_engineering import get_feature_sequence_for_station
+    # ✅ FIX: Use get_scaled_feature_sequence
+    from services.feature_engineering import get_scaled_feature_sequence
     
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
@@ -1037,11 +1024,9 @@ def debug_check_raw_output(station_name):
         p95 = get_p95_percentile(station, direction)
         factor = correction_factors.get(model_key, 1.0)
         
-        test_time = now
-        
         try:
-            # ✅ FIX: get_feature_sequence_for_station returns SCALED features
-            features_scaled = get_feature_sequence_for_station(station, direction, test_time)
+            # ✅ FIX: Already-scaled features
+            features_scaled = get_scaled_feature_sequence(station, direction, now)
             if features_scaled is not None:
                 input_sequence = features_scaled.reshape(1, 24, -1)
                 pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
@@ -1053,7 +1038,6 @@ def debug_check_raw_output(station_name):
                 congestion = (passenger_count / p95) * 100
                 congestion = max(0, min(congestion, 100))
                 
-                # ✅ FIX: Show StandardScaler attributes
                 scaler_info = {}
                 if hasattr(target_scaler, 'mean_') and hasattr(target_scaler, 'scale_'):
                     scaler_info = {
@@ -1092,7 +1076,7 @@ def debug_check_raw_output(station_name):
 @api_predict_bp.route('/debug/raw-values/<station_name>/<direction>')
 def debug_raw_values(station_name, direction):
     """Debug raw model output values"""
-    from services.feature_engineering import get_feature_sequence_for_station
+    from services.feature_engineering import get_scaled_feature_sequence
     
     station = station_name.replace('%20', ' ')
     now = Config.get_current_time()
@@ -1467,21 +1451,19 @@ def _get_directional_prediction_with_details(station_name, direction, target_dat
         return result
     
     try:
-        from services.feature_engineering import get_feature_sequence_for_station
-        import numpy as np
+        # ========== ✅ FIX: Use get_scaled_feature_sequence ==========
+        from services.feature_engineering import get_scaled_feature_sequence
+        features_scaled = get_scaled_feature_sequence(station_name, direction, target_datetime)
         
-        # ✅ FIX: get_feature_sequence_for_station NOW returns SCALED features
-        features_scaled = get_feature_sequence_for_station(station_name, direction, target_datetime)
         if features_scaled is None:
             return result
         
-        # ✅ FIX: Get target scaler only
+        # ========== ✅ FIX: Get target scaler ONLY ==========
         target_scaler = directional_scalers.get(f'{model_key}_target')
-        
         if target_scaler is None:
             return result
         
-        # ✅ FIX: features_scaled is already scaled, just reshape
+        # ========== ✅ FIX: features_scaled is already scaled ==========
         input_sequence = features_scaled.reshape(1, 24, -1)
         input_tensor = tf.convert_to_tensor(input_sequence, dtype=tf.float32)
         prediction_scaled = directional_models[model_key](input_tensor, training=False).numpy()
@@ -1628,11 +1610,11 @@ def get_station_prediction(station_name):
     return (north + south) / 2
 
 # ========== MAIN PREDICTION ENDPOINTS ==========
-
 @api_predict_bp.route('/debug/raw-model-test/<station_name>')
 def debug_raw_model_test(station_name):
     """Test raw model prediction without any fallback"""
-    from services.feature_engineering import get_feature_sequence_for_station
+    # ✅ FIX: Use get_scaled_feature_sequence instead
+    from services.feature_engineering import get_scaled_feature_sequence
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
     directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
@@ -1648,22 +1630,21 @@ def debug_raw_model_test(station_name):
             continue
         
         try:
-            # Get features
-            features = get_feature_sequence_for_station(station, direction, now)
-            if features is None:
+            # ✅ FIX: Get already-scaled features directly
+            features_scaled = get_scaled_feature_sequence(station, direction, now)
+            if features_scaled is None:
                 results[direction] = {"error": "No features returned"}
                 continue
             
-            # Get scalers
-            feature_scaler = directional_scalers.get(f'{model_key}_feature')
+            # ✅ FIX: Only get target scaler (features already scaled)
             target_scaler = directional_scalers.get(f'{model_key}_target')
             
-            if feature_scaler is None or target_scaler is None:
-                results[direction] = {"error": "Missing scaler"}
+            if target_scaler is None:
+                results[direction] = {"error": "Missing target scaler"}
                 continue
             
-            # Scale features
-            input_sequence = features.reshape(1, 24, -1)
+            # ✅ FIX: features_scaled is already scaled, just reshape
+            input_sequence = features_scaled.reshape(1, 24, -1)
             
             # Get prediction
             pred_scaled = directional_models[model_key].predict(input_sequence, verbose=0)
@@ -1675,8 +1656,12 @@ def debug_raw_model_test(station_name):
             results[direction] = {
                 "raw_scaled_output": raw_output,
                 "passenger_count": passenger_count,
-                "feature_shape": features.shape,
-                "features_sample": features[0, :5].tolist()
+                "feature_shape": features_scaled.shape,
+                "features_sample": features_scaled[0, :5].tolist(),
+                "target_scaler": {
+                    "mean": float(target_scaler.mean_[0]) if hasattr(target_scaler, 'mean_') else None,
+                    "scale": float(target_scaler.scale_[0]) if hasattr(target_scaler, 'scale_') else None
+                }
             }
             
         except Exception as e:
@@ -1691,7 +1676,6 @@ def debug_raw_model_test(station_name):
         "time": now.isoformat(),
         "results": results
     })
-    
     
 @api_predict_bp.route('/debug/raw-csv-data/<station_name>')
 def debug_raw_csv_data(station_name):
@@ -1823,8 +1807,9 @@ def debug_target_scaler_test(station_name):
     return jsonify(results)
 @api_predict_bp.route('/debug/passenger-prediction/<station_name>')
 def debug_passenger_prediction(station_name):
-    """Debug raw passenger predictions vs p95-based congestion - USING P95 PERCENTILE"""
-    from services.feature_engineering import get_feature_sequence_for_station
+    """Debug raw passenger predictions vs p95-based congestion"""
+    # ✅ FIX: Use get_scaled_feature_sequence
+    from services.feature_engineering import get_scaled_feature_sequence
     
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
@@ -1844,11 +1829,11 @@ def debug_passenger_prediction(station_name):
                 continue
             
             try:
-                features = get_feature_sequence_for_station(station, direction, test_time)
-                feature_scaler = directional_scalers.get(f'{model_key}_feature')
+                # ✅ FIX: Already-scaled features
+                features_scaled = get_scaled_feature_sequence(station, direction, test_time)
                 target_scaler = directional_scalers.get(f'{model_key}_target')
                 
-                input_sequence = features.reshape(1, 24, -1)
+                input_sequence = features_scaled.reshape(1, 24, -1)
                 
                 raw_output = directional_models[model_key].predict(input_sequence, verbose=0)
                 raw_value = float(raw_output[0][0])
@@ -1859,7 +1844,6 @@ def debug_passenger_prediction(station_name):
                 factor = correction_factors.get(model_key, 1.0)
                 passenger_count = passenger_count * factor
                 
-                # ========== USE P95 PERCENTILE ==========
                 p95 = get_p95_percentile(station, direction)
                 
                 congestion = (passenger_count / p95) * 100
@@ -1871,7 +1855,6 @@ def debug_passenger_prediction(station_name):
                     "correction_factor": round(float(factor), 3),
                     "predicted_passengers": round(passenger_count, 0),
                     "congestion_percentage": round(congestion, 1),
-                    "lookback_data_points": len(features),
                     "time_of_day": "Rush" if (7 <= hour <= 9 or 17 <= hour <= 19) else "Normal"
                 }
                 
@@ -1879,7 +1862,6 @@ def debug_passenger_prediction(station_name):
                 results[f"{hour}:00_{direction}"] = {"error": str(e)}
     
     return jsonify(results)
-
 from config import Config
 def is_override_active(override, target_time):
     """
@@ -2092,11 +2074,11 @@ def directional_forecast_all():
         gc.collect()
     
     return jsonify(result)
-
 @api_predict_bp.route('/debug-model-output/<station_name>')
 def debug_model_output(station_name):
     """Check raw model output for different times - FIXED with capacity"""
-    from services.feature_engineering import get_feature_sequence_for_station
+    # ✅ FIX: Use get_scaled_feature_sequence
+    from services.feature_engineering import get_scaled_feature_sequence
     
     station = station_name.replace('%20', ' ')
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
@@ -2104,7 +2086,6 @@ def debug_model_output(station_name):
     correction_factors = get_correction_factors()
     
     results = {}
-    
     test_times = [8, 12, 18, 21]
     
     for hour in test_times:
@@ -2117,11 +2098,11 @@ def debug_model_output(station_name):
                 continue
             
             try:
-                features = get_feature_sequence_for_station(station, direction, test_time)
-                feature_scaler = directional_scalers.get(f'{model_key}_feature')
+                # ✅ FIX: Already-scaled features
+                features_scaled = get_scaled_feature_sequence(station, direction, test_time)
                 target_scaler = directional_scalers.get(f'{model_key}_target')
                 
-                input_sequence = features.reshape(1, 24, -1)
+                input_sequence = features_scaled.reshape(1, 24, -1)
                 
                 raw_output = directional_models[model_key].predict(input_sequence, verbose=0)
                 raw_value = float(raw_output[0][0])
