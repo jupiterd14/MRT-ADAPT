@@ -95,51 +95,47 @@ def load_overrides():
     return {}
 
 def get_active_overrides():
-    """Get active overrides - filters out expired ones"""
-    from flask import current_app
+    """Get active overrides from file with expiry check – always reload from file."""
     import time
-    
-    # 1. Check in-memory config first
-    overrides = current_app.config.get('overrides', {})
-    
-    # 2. If config is empty, load from file
-    if not overrides:
-        overrides_file = 'overrides.json'
-        if os.path.exists(overrides_file):
-            try:
-                with open(overrides_file, 'r') as f:
-                    overrides = json.load(f)
-                if overrides:
-                    current_app.config['overrides'] = overrides
-            except Exception as e:
-                print(f"Error loading overrides: {e}")
-                return {}
-    
-    # ========== FILTER OUT EXPIRED OVERRIDES ==========
+    from flask import current_app
+
+    overrides_file = 'overrides.json'
+    overrides = {}
+
+    # Always load from file to ensure freshness
+    if os.path.exists(overrides_file):
+        try:
+            with open(overrides_file, 'r') as f:
+                overrides = json.load(f)
+        except Exception as e:
+            print(f"Error loading overrides: {e}")
+            return {}
+
+    # Filter out expired overrides
     now = time.time()
     active_overrides = {}
     expired_keys = []
-    
     for key, override in overrides.items():
         expiry = override.get('expiry')
         if expiry is None or expiry > now:
             active_overrides[key] = override
         else:
             expired_keys.append(key)
-            print(f"⏰ api_other.py: Override expired: {key}")
-    
-    # If any expired, update the cache
+
+    # Remove expired entries from file
     if expired_keys:
-        current_app.config['overrides'] = active_overrides
-        
-        if active_overrides:
-            try:
-                with open(OVERRIDES_FILE, 'w') as f:
-                    json.dump(active_overrides, f, indent=2)
-                print(f"🗑️ Removed {len(expired_keys)} expired overrides from file")
-            except Exception as e:
-                print(f"Error saving cleaned overrides: {e}")
-    
+        for key in expired_keys:
+            del overrides[key]
+        try:
+            with open(overrides_file, 'w') as f:
+                json.dump(overrides, f, indent=2)
+            print(f"🗑️ Removed {len(expired_keys)} expired overrides from file")
+        except Exception as e:
+            print(f"Error saving cleaned overrides: {e}")
+
+    # Update app config for other uses
+    current_app.config['overrides'] = active_overrides
+
     return active_overrides
 
 
@@ -1128,7 +1124,98 @@ def debug_check_lookback_data():
         },
         "sample_lookback": lookback_data.head(3).to_dict() if len(lookback_data) > 0 else None
     })
+@api_other_bp.route('/live-map/directions/v3')
+@cache.cached(
+    timeout=300,
+    key_prefix=lambda: f"live_map_v3_{datetime.now().strftime('%Y%m%d%H')}"
+)
+def live_map_directions_v3():
+    """Fast cached version - reuses directional_forecast/all cache and applies overrides."""
+    try:
+        from routes.api_predict import directional_forecast_all
 
+        # Get base predictions (cached)
+        result = directional_forecast_all()
+        data = result.get_json()
+
+        # Get active overrides
+        active_overrides = get_active_overrides()
+
+        # Convert from the /all format to the live-map format
+        northbound = {}
+        southbound = {}
+        stations = current_app.config.get('STATIONS', STATIONS)
+
+        for station in stations:
+            north = data['northbound'].get(station, {})
+            south = data['southbound'].get(station, {})
+
+            north_cong = north.get('congestion', 0)
+            south_cong = south.get('congestion', 0)
+
+            # Check for overrides
+            north_override_key = f"{station}_northbound"
+            south_override_key = f"{station}_southbound"
+
+            is_north_overridden = north_override_key in active_overrides
+            is_south_overridden = south_override_key in active_overrides
+
+            north_override_info = None
+            south_override_info = None
+
+            if is_north_overridden:
+                north_override_info = active_overrides[north_override_key]
+                north_cong = north_override_info.get('congestion', north_cong)
+            if is_south_overridden:
+                south_override_info = active_overrides[south_override_key]
+                south_cong = south_override_info.get('congestion', south_cong)
+
+            def get_status(cong):
+                if cong > 80:
+                    return "SEVERE", "15-20 min"
+                elif cong > 50:
+                    return "CONGESTED", "10-15 min"
+                elif cong > 25:
+                    return "MODERATE", "5-10 min"
+                else:
+                    return "LIGHT", "2-5 min"
+
+            north_status, north_wait = get_status(north_cong)
+            south_status, south_wait = get_status(south_cong)
+
+            p95_north = get_p95_for_station(station, 'Northbound')
+            p95_south = get_p95_for_station(station, 'Southbound')
+
+            northbound[station] = {
+                "congestion": north_cong,
+                "wait_time": north_wait,
+                "status": north_status,
+                "ridership": int((north_cong / 100) * p95_north) if p95_north else 0,
+                "overridden": is_north_overridden,
+                "override_info": north_override_info,   # ADDED
+                "p95": round(p95_north, 0) if p95_north else 0
+            }
+            southbound[station] = {
+                "congestion": south_cong,
+                "wait_time": south_wait,
+                "status": south_status,
+                "ridership": int((south_cong / 100) * p95_south) if p95_south else 0,
+                "overridden": is_south_overridden,
+                "override_info": south_override_info,   # ADDED
+                "p95": round(p95_south, 0) if p95_south else 0
+            }
+
+        return jsonify({
+            "northbound": northbound,
+            "southbound": southbound,
+            "timestamp": Config.get_current_time().isoformat(),
+            "cached": True,
+            "source": "directional_forecast/all cache"
+        })
+
+    except Exception as e:
+        print(f"❌ Error in live_map_directions_v3: {e}")
+        return jsonify({"error": str(e)}), 500
 @api_other_bp.route('/live-map/directions/v2')
 @cache.cached(timeout=300, key_prefix='live_map_v2')
 def live_map_directions_v2():

@@ -506,12 +506,12 @@ def debug_override():
     })
 
 def get_operator_stations(user_id):
-    """Get list of stations assigned to an operator"""
     user = User.query.get(user_id)
     if not user:
         return []
     
-    if user.access_level == 'line_wide':
+    # Admin or line_wide → full access
+    if user.role == 'admin' or user.access_level == 'line_wide':
         return STATIONS
     elif user.access_level == 'zone':
         zones = {
@@ -867,6 +867,7 @@ def override_congestion():
                     except Exception as e:
                         print(f"   ⚠️ Could not delete {key}: {e}")
                 
+                # Clear v3 cache explicitly
                 # ========== METHOD 2: Use cache.clear() as fallback ==========
                 # This forces ALL cached data to be cleared (heavy but effective)
                 try:
@@ -888,6 +889,9 @@ def override_congestion():
         
         log_activity(operator_id, 'operator', operator_email, 'override_congestion',
                     f'Overrode {station} ({direction}) to {level} ({congestion_value}%)')
+        
+        # Clear v3 cache explicitly
+        clear_v3_cache()
         
         return jsonify({'success': True, 'message': f'{station} ({direction}) set to {level}'})
     except Exception as e:
@@ -1079,6 +1083,17 @@ def get_broadcast(broadcast_id):
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
+    
+def clear_v3_cache():
+    """Clear all live_map_v3 cache keys (for all hours)"""
+    cache_instance = current_app.extensions.get('cache')
+    if cache_instance:
+        for h in range(24):
+            key = f"live_map_v3_{datetime.now().replace(hour=h, minute=0).strftime('%Y%m%d%H')}"
+            cache_instance.delete(key)
+        # Also delete the current hour key (just in case)
+        cache_instance.delete(f"live_map_v3_{datetime.now().strftime('%Y%m%d%H')}")
+        print(" Cleared live_map_v3 cache keys")
 @operator_bp.route('/api/operator/clear-override', methods=['POST'])
 def clear_override():
     try:
@@ -1177,6 +1192,9 @@ def clear_override():
             'clear_override', f'Cleared override for {station} ({direction})'
         )
         
+        # ========== 6. CLEAR V3 CACHE ==========
+        clear_v3_cache()
+                
         return jsonify({
             'success': True, 
             'message': f'Override cleared successfully for {station} ({direction})',

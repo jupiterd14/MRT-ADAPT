@@ -2063,7 +2063,7 @@ async function fetchAlertCount() {
         
         // ========== 6. Congestion alerts from live map ==========
         try {
-            const response = await fetch('/api/live-map/directions/v2');
+            const response = await fetch('/api/live-map/directions/v3');
             const data = await response.json();
             
             if (data && data.northbound && data.southbound) {

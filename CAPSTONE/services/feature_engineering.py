@@ -30,6 +30,11 @@ _FEATURE_SCALER_CACHE = {}    # Cache for feature scalers
 _TARGET_SCALER_CACHE = {}     # Cache for target scalers
 _BASELINE_FEATURES_CACHE = {} # Cache for baseline features
 _TYPICAL_PATTERN_CACHE = {}   # Cache for pre-calculated typical day patterns
+_TYPICAL_PROFILE_CACHE = {}   # Cache for day-of-week passenger profiles
+_SCALED_SEQUENCE_CACHE = {}   # Key: station_direction_dow_hour -> scaled array
+
+# ========== IMPORT CONSTANTS (avoid duplication) ==========
+from constants import MRT3_PLATFORM_CAPACITY
 
 # Station numbers
 STATION_NUMBERS = {
@@ -39,8 +44,7 @@ STATION_NUMBERS = {
     "Taft": 13
 }
 
-
-# In feature_engineering.py, update FEATURE_COLS to match training
+# FEATURE_COLS must match the training order
 FEATURE_COLS = [
     'TotalPassenger',
     'hour', 'weekday', 'month',
@@ -48,13 +52,6 @@ FEATURE_COLS = [
     'is_operating_hour', 'is_morning_rush', 'is_evening_rush',
     'is_holiday', 'is_christmas_season', 'is_payday'
 ]
-MRT3_PLATFORM_CAPACITY = {
-    "North Ave": 1142, "Quezon Ave": 1195, "Kamuning": 1364, "Cubao": 1747,
-    "Santolan": 1306, "Ortigas": 1331, "Shaw Blvd": 1619, "Boni Ave": 1417,
-    "Guadalupe": 1301, "Buendia": 1645, "Ayala Ave": 1222, "Magallanes": 1202,
-    "Taft": 720
-}
-
 
 # ========== HOLIDAYS (match training) ==========
 HOLIDAYS = [
@@ -74,10 +71,20 @@ def is_holiday(date):
     """Check if a date is a Philippine holiday (matches training)"""
     return date.strftime('%Y-%m-%d') in HOLIDAYS
 
+def is_christmas_season(date):
+    month_day = date.strftime('%m-%d')
+    return (month_day >= '12-15') or (month_day <= '01-05')
+
+def is_payday(date):
+    return date.day in [15, 30, 31]
+
+def is_friday(date):
+    return date.weekday() == 4
+
+
 # ============================================================
 # HELPER / SCALER FUNCTIONS
 # ============================================================
-
 
 def get_synthetic_congestion(hour):
     """Generate synthetic congestion for a given hour (0-23)"""
@@ -101,7 +108,7 @@ def get_synthetic_congestion(hour):
         return 25.0 - (hour - 22) * 10.0
     else:
         return 10.0
-    
+
 def get_feature_scaler(station_name, direction):
     cache_key = f"{station_name}_{direction}"
     if cache_key in _FEATURE_SCALER_CACHE:
@@ -186,13 +193,13 @@ def get_station_dataframe_cached(station_name, direction):
             _STATION_DATA_CACHE[cache_key] = df
     
     return df
-@timer
+
 def get_station_dataframe(station_name, direction):
     """
     Memory-optimized - streams CSV files and only keeps the needed data
-    FIXED: Directional filtering matches training
+    CORRECTED directional filtering
     """
-    print(f"📊 Loading real data for {station_name}_{direction} from CSV (streaming mode)...")
+    print(f"📊 Loading real data for {station_name}_{direction} from CSV...")
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(script_dir, 'data (2022-2024)')
@@ -213,10 +220,8 @@ def get_station_dataframe(station_name, direction):
     for csv_file in csv_files:
         filepath = os.path.join(data_dir, csv_file)
         if not os.path.exists(filepath):
-            print(f"   ⚠️ File not found: {filepath}")
             continue
             
-        print(f"   📄 Processing: {csv_file}")
         try:
             needed_columns = ['StationEntry', 'StationExit', 'Date', 'Time', 'TotalPassenger']
             
@@ -225,7 +230,7 @@ def get_station_dataframe(station_name, direction):
                                     usecols=needed_columns,
                                     dtype={'StationEntry': 'int16', 'StationExit': 'int16', 'TotalPassenger': 'float32'}):
                 
-                # ========== DIRECTIONAL FILTERING - MATCHES TRAINING ==========
+                # ========== CORRECT DIRECTIONAL FILTERING ==========
                 if direction == 'Northbound':
                     if is_north_terminal:
                         # North Ave: passengers EXIT (end of line)
@@ -234,8 +239,8 @@ def get_station_dataframe(station_name, direction):
                         # Taft: passengers ENTER to go north
                         filtered = chunk[chunk['StationEntry'] == station_num]
                     else:
-                        # All other stations: passengers EXIT to go north
-                        filtered = chunk[chunk['StationExit'] == station_num]  # ← FIXED
+                        # All other stations: passengers ENTER to go north
+                        filtered = chunk[chunk['StationEntry'] == station_num]
                 else:  # Southbound
                     if is_north_terminal:
                         # North Ave: passengers ENTER to go south
@@ -244,8 +249,8 @@ def get_station_dataframe(station_name, direction):
                         # Taft: passengers EXIT (end of line)
                         filtered = chunk[chunk['StationExit'] == station_num]
                     else:
-                        # All other stations: passengers ENTER to go south
-                        filtered = chunk[chunk['StationEntry'] == station_num]  # ← CORRECT
+                        # All other stations: passengers EXIT to go south
+                        filtered = chunk[chunk['StationExit'] == station_num]
                 
                 if len(filtered) > 0:
                     all_filtered.append(filtered)
@@ -258,14 +263,12 @@ def get_station_dataframe(station_name, direction):
             continue
     
     if not all_filtered:
-        print(f"⚠️ No real data found for {station_name}_{direction}")
         return None
     
-    print(f"   🔄 Combining {len(all_filtered)} chunks...")
     combined = pd.concat(all_filtered)
     del all_filtered
     gc.collect()
-    
+        
     # ========== Create datetime index ==========
     print(f"   📅 Creating datetime index...")
     combined['datetime'] = pd.to_datetime(combined['Date'] + ' ' + combined['Time'])
@@ -298,7 +301,6 @@ def get_station_dataframe(station_name, direction):
     combined['month'] = combined.index.month
     
     # ========== CALCULATE CONGESTION ==========
-    # ========== CALCULATE CONGESTION ==========
     capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
     percentage = (combined['TotalPassenger'] / capacity * 100).clip(0, 100)
  
@@ -312,26 +314,121 @@ def get_station_dataframe(station_name, direction):
     combined['is_payday'] = combined.index.day.isin([15, 30, 31]).astype(np.int8)
     combined['is_friday'] = (combined.index.weekday == 4).astype(np.int8)
     combined['is_rush_hour'] = ((combined['hour'].between(7, 9)) | (combined['hour'].between(17, 19))).astype(np.int8)
-    combined['is_holiday'] = np.array([is_holiday(d) for d in combined.index], dtype=np.int8)  # ← FIXED
+    combined['is_holiday'] = np.array([is_holiday(d) for d in combined.index], dtype=np.int8)
     combined['is_special_event'] = 0
     
     return combined
-#==========================================
+
+# ============================================================
 # TYPICAL PATTERN BUILDING WITH DISK PERSISTENCE
 # ============================================================
-@timer
+
+def build_typical_day_pattern_fast(station_name, direction, target_datetime, seq_length=24):
+    """
+    SUPER FAST version - uses day-of-week pattern cache
+    No Pandas filtering, no median calculation during requests!
+    """
+    dow = target_datetime.weekday()
+    cache_key = f"{station_name}_{direction}_{dow}"
+    
+    # Check if we have this day's pattern cached
+    if cache_key in _TYPICAL_PROFILE_CACHE:
+        hourly_passengers = _TYPICAL_PROFILE_CACHE[cache_key]
+    else:
+        # Build it once and cache it (should happen at startup)
+        df = get_station_dataframe_cached(station_name, direction)
+        if df is None:
+            return get_baseline_features(target_datetime, seq_length)
+        
+        # Build the 24-hour profile for this day of week
+        from routes.api_predict import get_p95_percentile
+        p95 = get_p95_percentile(station_name, direction)
+        hourly_passengers = []
+        
+        for hour in range(24):
+            # Get data for this specific hour AND day of week
+            hour_data = df[
+                (df.index.hour == hour) & 
+                (df.index.weekday == dow)
+            ]
+            
+            if len(hour_data) > 0:
+                passenger = float(hour_data['TotalPassenger'].median())
+            else:
+                # Fallback: same hour regardless of day
+                fallback = df[df.index.hour == hour]
+                if len(fallback) > 0:
+                    passenger = float(fallback['TotalPassenger'].median())
+                else:
+                    passenger = get_synthetic_congestion(hour) / 100.0 * p95
+            
+            hourly_passengers.append(passenger)
+        
+        # Cache it for next time
+        _TYPICAL_PROFILE_CACHE[cache_key] = hourly_passengers
+    
+    # ============================================================
+    # BUILD THE 24-HOUR SEQUENCE (FAST - no Pandas filtering!)
+    # ============================================================
+    
+    # Calculate the 24-hour window ending at target - 1 hour
+    end_time = target_datetime.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+    start_time = end_time - timedelta(hours=seq_length - 1)
+    
+    # Build sequence using the cached profile
+    typical_passengers = []
+    for i in range(seq_length):
+        timestamp = start_time + timedelta(hours=i)
+        hour = timestamp.hour
+        typical_passengers.append(hourly_passengers[hour])
+    
+    # Create DataFrame (minimal overhead)
+    index = pd.date_range(start=start_time, end=end_time, freq='h')
+    typical_df = pd.DataFrame(index=index)
+    typical_df['TotalPassenger'] = typical_passengers
+    
+    # Calculate congestion using cached P95
+    from routes.api_predict import get_p95_percentile
+    p95 = get_p95_percentile(station_name, direction)
+    typical_df['congestion'] = (typical_df['TotalPassenger'] / p95 * 100).clip(0, 100)
+    typical_df['congestion_percentage'] = typical_df['congestion']
+    typical_df['raw_passengers'] = typical_df['TotalPassenger']
+    
+    # ========== Add all features (fast vectorized operations) ==========
+    hours = typical_df.index.hour
+    weekdays = typical_df.index.weekday
+    months = typical_df.index.month
+    
+    typical_df['hour'] = hours
+    typical_df['weekday'] = weekdays
+    typical_df['month'] = months
+    
+    typical_df['hour_sin'] = np.sin(2 * np.pi * hours / 24)
+    typical_df['hour_cos'] = np.cos(2 * np.pi * hours / 24)
+    typical_df['dow_sin'] = np.sin(2 * np.pi * weekdays / 7)
+    typical_df['dow_cos'] = np.cos(2 * np.pi * weekdays / 7)
+    typical_df['month_sin'] = np.sin(2 * np.pi * (months - 1) / 12)
+    typical_df['month_cos'] = np.cos(2 * np.pi * (months - 1) / 12)
+    
+    typical_df['is_operating_hour'] = ((hours >= 5) & (hours < 23)).astype(np.int8)
+    typical_df['is_morning_rush'] = ((hours >= 7) & (hours <= 9)).astype(np.int8)
+    typical_df['is_evening_rush'] = ((hours >= 17) & (hours <= 19)).astype(np.int8)
+    
+    typical_df['is_holiday'] = np.array([is_holiday(d) for d in typical_df.index], dtype=np.int8)
+    typical_df['is_christmas_season'] = np.array([is_christmas_season(d) for d in typical_df.index], dtype=np.int8)
+    typical_df['is_payday'] = typical_df.index.day.isin([15, 30, 31]).astype(np.int8)
+    typical_df['is_weekend'] = (weekdays >= 5).astype(np.int8)
+    
+    return typical_df
+
 def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=None, direction=None):
     """
     Builds and caches typical day patterns with disk persistence
     FIXED: Sequence ends at target - 1 hour (matches training alignment)
     """
-    # ========== Get P95 for congestion denominator ==========
-    try:
-        from routes.api_predict import get_p95_percentile
-        p95 = get_p95_percentile(station_name, direction)
-    except:
-        p95 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-    
+    # ========== Get P95 ==========
+    from routes.api_predict import get_p95_percentile
+    p95 = get_p95_percentile(station_name, direction)
     if p95 is None or p95 <= 0:
         p95 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
     
@@ -340,7 +437,6 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
     # ENDS AT target - 1 hour (matches training alignment)
     # ============================================================
     
-    # CRITICAL FIX: End at target - 1 hour
     end_time = target_datetime.replace(
         minute=0,
         second=0,
@@ -360,19 +456,16 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
     # ============================================================
     cache_key = f"{station_name}_{direction}_{end_time.strftime('%Y%m%d')}"
     
-    # Check if we have the full 24-hour profile cached for this date
     if cache_key in _TYPICAL_PATTERN_CACHE:
         hourly_passengers = _TYPICAL_PATTERN_CACHE[cache_key].copy()
     else:
         # Build typical passenger counts for ALL 24 hours
         hourly_passengers = []
-        
         for hour in range(24):
             hour_data = df[(df.index.hour == hour)] if df is not None else []
             
             if len(hour_data) > 0:
                 values = hour_data['TotalPassenger'].dropna()
-                
                 if len(values) > 0:
                     typical_passenger = float(values.median())
                 else:
@@ -385,7 +478,6 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
             
             hourly_passengers.append(typical_passenger)
         
-        # Cache the FULL 24-hour profile
         _TYPICAL_PATTERN_CACHE[cache_key] = hourly_passengers.copy()
     
     # ============================================================
@@ -393,7 +485,6 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
     # ============================================================
     
     typical_passengers = []
-    
     for timestamp in index:
         hour = timestamp.hour
         dow = timestamp.weekday()
@@ -406,7 +497,6 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
         
         if len(hour_data) > 0:
             values = hour_data['TotalPassenger'].dropna()
-            
             if len(values) > 0:
                 passenger = float(values.median())
             else:
@@ -463,7 +553,6 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
     typical_df['is_weekend'] = (weekdays >= 5).astype(np.int8)
     typical_df['is_friday'] = (weekdays == 4).astype(np.int8)
     
-    # FIX: Proper parentheses for is_rush_hour
     typical_df['is_rush_hour'] = (
         ((hours >= 7) & (hours <= 9)) |
         ((hours >= 17) & (hours <= 19))
@@ -474,9 +563,50 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
     typical_df['is_extended_hours'] = 0
     
     return typical_df
-@timer
+
+# ============================================================
+# SCALED FEATURE SEQUENCE (CACHED)
+# ============================================================
+def get_scaled_feature_sequence(station_name, direction, target_datetime, seq_length=24):
+    """Returns already-scaled feature sequence - ZERO computation during requests!"""
+    
+    # Round to hour for caching
+    hour_key = target_datetime.replace(minute=0, second=0, microsecond=0)
+    dow = target_datetime.weekday()
+    cache_key = f"{station_name}_{direction}_{dow}_{hour_key.strftime('%Y%m%d%H')}_{seq_length}"
+    
+    if cache_key in _SCALED_SEQUENCE_CACHE:
+        print(f"⚡ Cache hit for {station_name}_{direction} at {hour_key}")
+        return _SCALED_SEQUENCE_CACHE[cache_key].copy()
+    
+    # Build the sequence using fast pattern
+    typical_df = build_typical_day_pattern_fast(station_name, direction, target_datetime, seq_length)
+    
+    if typical_df is None:
+        return get_baseline_features(target_datetime, seq_length)
+    
+    # Extract features
+    feature_values = typical_df[FEATURE_COLS].values.astype(np.float32)
+    
+    # Scale using the feature scaler (once, at build time)
+    feature_scaler = get_feature_scaler(station_name, direction)
+    if feature_scaler is not None:
+        try:
+            scaled = feature_scaler.transform(feature_values).astype(np.float32)
+        except Exception as e:
+            print(f"⚠️ Scaling failed: {e}")
+            scaled = feature_values
+    else:
+        scaled = feature_values
+    
+    _SCALED_SEQUENCE_CACHE[cache_key] = scaled.copy()
+    return scaled
+
+# ============================================================
+# FEATURE SEQUENCE FOR STATION (HISTORICAL + SCALED)
+# ============================================================
 def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
-    """Retrieve feature sequence for the target time"""
+    """Retrieve feature sequence for the target time - uses actual data when available."""
     
     df = get_station_dataframe_cached(station_name, direction)
     
@@ -487,27 +617,8 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
     
     if target_datetime > latest_date:
         print(f"📊 Future date {target_datetime} - using typical pattern")
-        
-        typical_df = build_typical_day_pattern(df, target_datetime, seq_length, station_name, direction)
-        
-        if typical_df is not None:
-            lookback_df = typical_df.copy()
-            
-            # ========== ✅ FIX: Use P95 for congestion, not capacity ==========
-            from routes.api_predict import get_p95_percentile
-            p95 = get_p95_percentile(station_name, direction)
-            if p95 > 0:
-                lookback_df['congestion'] = (lookback_df['TotalPassenger'] / p95 * 100).clip(0, 100)
-            else:
-                capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-                lookback_df['congestion'] = (lookback_df['TotalPassenger'] / capacity * 100).clip(0, 100)
-            
-            lookback_df['congestion_percentage'] = lookback_df['congestion']
-            lookback_df['raw_passengers'] = lookback_df['TotalPassenger']
-            
-            print(f"📊 Using typical pattern for {target_datetime} (Day {target_datetime.weekday()})")
-        else:
-            return get_baseline_features(target_datetime, seq_length)
+        # Use fast typical pattern for future dates (already scaled and cached)
+        return get_scaled_feature_sequence(station_name, direction, target_datetime, seq_length)
     else:
         # Historical dates - use actual data
         mask = df.index < target_datetime
@@ -515,7 +626,7 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
             lookback_df = df[mask].tail(seq_length).copy()
         else:
             print(f"📊 Not enough data for {target_datetime}, using typical pattern")
-            lookback_df = build_typical_day_pattern(df, target_datetime, seq_length, station_name, direction)
+            return get_scaled_feature_sequence(station_name, direction, target_datetime, seq_length)
     
     # ========== Ensure all FEATURE_COLS exist ==========
     for col in FEATURE_COLS:
@@ -553,13 +664,15 @@ def get_feature_sequence_for_station(station_name, direction, target_datetime, s
     else:
         print(f"⚠️ No feature scaler found for {station_name}_{direction}")
         return feature_values
-    
+
+# ============================================================
+# BASELINE FEATURES (FALLBACK)
+# ============================================================
 def get_baseline_features(target_datetime, seq_length=24):
-    """Baseline features with CORRECT column mapping"""
+    """Baseline features with CORRECT column mapping and holiday awareness."""
     cache_key = f"{target_datetime.strftime('%Y%m%d')}_{target_datetime.weekday()}_{seq_length}"
     
     if cache_key not in _BASELINE_FEATURES_CACHE:
-        # Initialize with zeros - shape (seq_length, len(FEATURE_COLS))
         default_features = np.zeros((seq_length, len(FEATURE_COLS)), dtype=np.float32)
         
         for i in range(seq_length):
@@ -568,15 +681,7 @@ def get_baseline_features(target_datetime, seq_length=24):
             dow = loop_time.weekday()
             month = loop_time.month
             
-            # ========== ✅ FIX: Correct column mapping ==========
-            # FEATURE_COLS order:
-            # 0: TotalPassenger, 1: hour, 2: weekday, 3: month,
-            # 4: hour_sin, 5: hour_cos, 6: dow_sin, 7: dow_cos,
-            # 8: month_sin, 9: month_cos,
-            # 10: is_operating_hour, 11: is_morning_rush, 12: is_evening_rush,
-            # 13: is_holiday, 14: is_christmas_season, 15: is_payday
-            
-            # Calculate congestion-based passenger estimate
+            # Estimate congestion
             if dow >= 5:  # Weekend
                 if 10 <= h_val <= 16:
                     congestion = 25
@@ -592,53 +697,49 @@ def get_baseline_features(target_datetime, seq_length=24):
                 else:
                     congestion = 10
             
-            # Fill in all features
+            # Fill all features (order must match FEATURE_COLS)
             default_features[i, 0] = congestion * 10  # TotalPassenger estimate
-            default_features[i, 1] = h_val  # hour
-            default_features[i, 2] = dow  # weekday
-            default_features[i, 3] = month  # month
-            default_features[i, 4] = np.sin(2 * np.pi * h_val / 24)  # hour_sin
-            default_features[i, 5] = np.cos(2 * np.pi * h_val / 24)  # hour_cos
-            default_features[i, 6] = np.sin(2 * np.pi * dow / 7)  # dow_sin
-            default_features[i, 7] = np.cos(2 * np.pi * dow / 7)  # dow_cos
-            default_features[i, 8] = np.sin(2 * np.pi * (month - 1) / 12)  # month_sin
-            default_features[i, 9] = np.cos(2 * np.pi * (month - 1) / 12)  # month_cos
+            default_features[i, 1] = h_val
+            default_features[i, 2] = dow
+            default_features[i, 3] = month
+            default_features[i, 4] = np.sin(2 * np.pi * h_val / 24)
+            default_features[i, 5] = np.cos(2 * np.pi * h_val / 24)
+            default_features[i, 6] = np.sin(2 * np.pi * dow / 7)
+            default_features[i, 7] = np.cos(2 * np.pi * dow / 7)
+            default_features[i, 8] = np.sin(2 * np.pi * (month - 1) / 12)
+            default_features[i, 9] = np.cos(2 * np.pi * (month - 1) / 12)
             
-            # Operating hours (4.5 to 23.0)
             time_decimal = h_val
-            default_features[i, 10] = 1 if (4.5 <= time_decimal < 23.0) else 0  # is_operating_hour
-            default_features[i, 11] = 1 if (7.0 <= time_decimal <= 9.0) else 0  # is_morning_rush
-            default_features[i, 12] = 1 if (17.0 <= time_decimal <= 19.0) else 0  # is_evening_rush
+            default_features[i, 10] = 1 if (4.5 <= time_decimal < 23.0) else 0
+            default_features[i, 11] = 1 if (7.0 <= time_decimal <= 9.0) else 0
+            default_features[i, 12] = 1 if (17.0 <= time_decimal <= 19.0) else 0
             
-            default_features[i, 13] = 0  # is_holiday (default)
-            default_features[i, 14] = 1 if is_christmas_season(loop_time) else 0  # is_christmas_season
-            default_features[i, 15] = 1 if loop_time.day in [15, 30, 31] else 0  # is_payday
+            default_features[i, 13] = 1 if is_holiday(loop_time) else 0
+            default_features[i, 14] = 1 if is_christmas_season(loop_time) else 0
+            default_features[i, 15] = 1 if loop_time.day in [15, 30, 31] else 0
             
         _BASELINE_FEATURES_CACHE[cache_key] = default_features
         
     return _BASELINE_FEATURES_CACHE[cache_key].copy()
 
+# ============================================================
+# PREDICTION HELPER (USES TARGET SCALER)
+# ============================================================
 def predict_congestion_with_model(station_name, direction, feature_sequence, model):
     """
     Helper function to make predictions using the trained model
     Handles scaling and inverse transformation
     """
-    # Get target scaler
     target_scaler = get_target_scaler(station_name, direction)
     
     if target_scaler is None:
         print(f"⚠️ No target scaler found for {station_name}_{direction}")
         return None
     
-    # Ensure feature_sequence has the right shape
     if len(feature_sequence.shape) == 2:
-        # Add batch dimension if needed
         feature_sequence = feature_sequence.reshape(1, feature_sequence.shape[0], feature_sequence.shape[1])
     
-    # Make prediction
     pred_scaled = model.predict(feature_sequence, verbose=0)
-    
-    # Inverse transform to get actual passenger counts
     pred_passengers = target_scaler.inverse_transform(pred_scaled)
     
     return pred_passengers
@@ -646,47 +747,37 @@ def predict_congestion_with_model(station_name, direction, feature_sequence, mod
 # ============================================================
 # PRELOAD / WARMUP ALL PATTERNS (CALL ONCE AT STARTUP)
 # ============================================================
-
 def preload_all_station_patterns():
     """
-    Preloads all 26 Parquet files and computes patterns for all Days of Week (0-6)
-    so ZERO file access or calculation logs occur during runtime.
+    Preloads all 7 day-of-week patterns (NOT calendar dates!)
+    This runs ONCE at startup.
     """
-    print("\n🚀 Preloading all Parquet datasets & typical day patterns into RAM...")
-    now = datetime.now()
+    print("\n🚀 Preloading all day-of-week typical patterns...")
     
     stations = list(STATION_NUMBERS.keys())
-    total_stations = len(stations)
-    total_directions = 2
-    total_dows = 7
+    directions = ['Northbound', 'Southbound']
     
-    print(f"   📊 Loading {total_stations} stations × {total_directions} directions × {total_dows} day patterns...")
-    
+    # Preload P95 values (populates _P95_LOCAL_CACHE)
     for station in stations:
-        for direction in ['Northbound', 'Southbound']:
-            # Load the dataframe first
-            df = get_station_dataframe_cached(station, direction)
-            if df is not None:
-                # Pre-build all 7 day-of-week patterns
-                for dow in range(7):
-                    # Create a sample datetime for this day of week
-                    # Find the next occurrence of this day of week
-                    days_ahead = (dow - now.weekday()) % 7
-                    sample_dt = now + timedelta(days=days_ahead)
-                    build_typical_day_pattern(df, sample_dt, 24, station, direction)
-            
-            # Force garbage collection periodically
-            gc.collect()
+        for direction in directions:
+            from routes.api_predict import get_p95_percentile
+            get_p95_percentile(station, direction)
     
-    print(f"✅ All station patterns preloaded into RAM successfully!")
-    print(f"   📦 {len(_STATION_DATA_CACHE)} station DataFrames cached")
-    print(f"   📊 {len(_TYPICAL_PATTERN_CACHE)} typical patterns cached")
-    print("   💡 Zero disk reads will occur during live map requests!\n")
+    # Build ALL 7 day-of-week patterns
+    for station in stations:
+        for direction in directions:
+            for dow in range(7):
+                days_ahead = (dow - datetime.now().weekday()) % 7
+                sample_dt = datetime.now() + timedelta(days=days_ahead)
+                sample_dt = sample_dt.replace(hour=12, minute=0, second=0, microsecond=0)
+                build_typical_day_pattern_fast(station, direction, sample_dt)
+    
+    print(f"✅ Preloaded {len(_TYPICAL_PROFILE_CACHE)} day-of-week patterns")
+    print(f"   Expected: {len(stations)} × 2 directions × 7 days = 182")
 
 # ============================================================
 # TIME & FEATURE UTILITIES
 # ============================================================
-
 def add_cyclical_time_features(df):
     if not isinstance(df, pd.DataFrame):
         df = pd.DataFrame(df)
@@ -712,9 +803,7 @@ def add_smart_operating_flags(df):
     time_decimal = df.index.hour + df.index.minute / 60
     df['is_morning_rush'] = ((time_decimal >= 7.0) & (time_decimal <= 9.0)).astype(np.int8)
     df['is_evening_rush'] = ((time_decimal >= 17.0) & (time_decimal <= 19.0)).astype(np.int8)
-    
     return df
-
 
 def smart_data_cleaner(df):
     if not isinstance(df, pd.DataFrame):
@@ -725,25 +814,17 @@ def smart_data_cleaner(df):
     df['is_extended_hours'] = ((time_decimal >= 22.0) & (time_decimal < 23.0) & (passenger_count >= 10)).astype(np.int8)
     return df
 
-def is_christmas_season(date):
-    month_day = date.strftime('%m-%d')
-    return (month_day >= '12-15') or (month_day <= '01-05')
-
 # ============================================================
 # LEGACY / COMPATIBILITY FUNCTIONS
 # ============================================================
-
 def load_data_fast():
-    """Legacy function - now uses on-demand loading"""
     print("📊 Using memory-optimized data loading (no full data cache)")
     return None
 
 def load_data():
-    """Legacy function - now uses fast loading"""
     return load_data_fast()
 
 def categorize_congestion(congestion_value, capacity=None, station_name=None):
-    """Categorize congestion into 4 levels"""
     if capacity is not None and capacity > 0:
         percentage = (congestion_value / capacity) * 100
     elif station_name is not None:
@@ -761,11 +842,7 @@ def categorize_congestion(congestion_value, capacity=None, station_name=None):
     else:
         return 3
 
-# Add this function to services/feature_engineering.py
-# Place it near the end of the file, before the print statement
-
 def infer_direction(row):
-    """Infer direction from station entry/exit numbers"""
     entry = row['StationEntry']
     exit_st = row['StationExit']
     if entry < exit_st:
@@ -774,21 +851,12 @@ def infer_direction(row):
         return 'Northbound'
     else:
         return 'Unknown'
-    
-def is_payday(date):
-    """Check if a date is a payday (15th, 30th, or 31st)"""
-    return date.day in [15, 30, 31]
-
-def is_friday(date):
-    """Check if a date is a Friday"""
-    return date.weekday() == 4
 
 def get_congestion_category_name(category):
     names = {0: "Light", 1: "Moderate", 2: "Congested", 3: "Severely Congested"}
     return names.get(category, "Unknown")
 
 def get_hourly_window_from_csv(station_name, direction, target_datetime, seq_length=24):
-    """Legacy function - now uses get_station_dataframe_cached"""
     df = get_station_dataframe_cached(station_name, direction)
     if df is None:
         return None

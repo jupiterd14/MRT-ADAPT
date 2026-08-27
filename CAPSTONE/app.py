@@ -44,9 +44,14 @@ from models.activity_log import ActivityLog
 from models.saved_route import SavedRoute
 from models.station_data import StationData
 
-# ✅ KEEP LSTM IMPORT (needed for retraining)
-from services.lstm_integration import MRT3LSTMPredictor, init_lstm_predictor, schedule_weekly_retraining
-
+from services.lstm_integration import (
+    MRT3LSTMPredictor,
+    init_lstm_predictor,
+    schedule_weekly_retraining,
+    register_admin_retrain,
+    retrain_and_reload,
+    update_global_models
+)
 from utils import (
     STATIONS, STATION_BASE_CAPACITY, STATION_COORDINATES,
     get_operator_stations, get_station_list, get_capacity,
@@ -134,7 +139,6 @@ def load_historical_with_cache(stations, base_capacity):
     return historical_data
 
 
-# ============ MODEL WARMUP (ELIMINATE COLD-START LATENCY) ============
 # ============ MODEL WARMUP (ELIMINATE COLD-START LATENCY) ============
 def warmup_all_models():
     """
@@ -259,7 +263,6 @@ def import_csv_files():
 
 
 # ============ APP INITIALIZATION ============
-# ============ APP INITIALIZATION ============
 app = Flask(__name__, template_folder='html', static_folder='static')
 app.config.from_object(Config)
 
@@ -376,19 +379,14 @@ app.register_blueprint(api_reports_bp, url_prefix='/api')
 app.register_blueprint(api_other_bp, url_prefix='/api')
 app.register_blueprint(model_perf_bp, url_prefix='/api')
 app.register_blueprint(email_bp, url_prefix='/api/profile')
+register_admin_retrain(app)
 
 @app.context_processor
 def inject_now():
     return {'now': datetime.now()}
 
 # ============ PRELOAD MODELS AT STARTUP ============
-print("\n" + "="*50)
-print("🚀 MRT-3 PREDICTION SYSTEM - PRELOADING MODELS")
-print("="*50)
-print("⏳ Loading models at startup (this is the slow part)...")
-print("💡 This takes 15-30 seconds ONCE, then all predictions are instant")
-print("💡 Your professor will see FAST predictions on first click")
-print("="*50 + "\n")
+# (The actual loading block is moved to the end of the file, after all route definitions)
 
 DIRECTIONAL_MODELS_PATH = 'models_2022-2024_v10'
 
@@ -459,99 +457,26 @@ def ensure_single_model_loaded(station_name, direction):
 
 app.config['ENSURE_SINGLE_MODEL_LOADED'] = ensure_single_model_loaded
 
-# ============ ACTUALLY LOAD MODELS AT STARTUP ============
-print("🔄 Starting model preload...")
-with app.app_context():
-    try:
-        # Load models at startup
-        directional_models_cached, directional_scalers_cached = load_models_with_cache(
-            STATIONS, DIRECTIONAL_MODELS_PATH
-        )
-        
-        # Load historical data
-        historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
-        
-        # Update services module
-        import services
-        services.directional_models = directional_models_cached
-        services.directional_scalers = directional_scalers_cached
-        services.historical_entry = historical_data.get('historical_entry', {})
-        services.historical_exit = historical_data.get('historical_exit', {})
-        services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
-        services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
-        
-        # Store in app config
-        app.config['DIRECTIONAL_MODELS'] = directional_models_cached
-        app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
-        app.config['HISTORICAL_DATA'] = historical_data
-        
-        _MODELS_LOADED = True
-        
-        print(f"\n✅ MODELS LOADED at startup!")
-        print(f"   📊 {len(directional_models_cached)} directional models loaded")
-        print(f"   📊 {len(historical_data['historical_entry'])} stations historical data")
-        
-        # NOW WARM THEM UP FOR INSTANT PREDICTIONS
-        warmup_all_models()
-       
-      
-        # ✅ ADD THIS: Preload all station patterns (LOAD ALL 26 PARQUET FILES AND PATTERNS)
+def warm_cache(app):
+    """Pre‑warm the live‑map cache by making an internal request."""
+    with app.test_client() as client:
         try:
-            from services.feature_engineering import preload_all_station_patterns
-            preload_all_station_patterns()
-            print("   📊 All station patterns preloaded")
+            # v2 has a fixed cache key -> perfect for warming
+            response = client.get('/api/live-map/directions/v2')
+            if response.status_code == 200:
+                print("✅ Live‑map cache warmed successfully.")
+            else:
+                print(f"⚠️ Cache warming failed with status {response.status_code}")
         except Exception as e:
-            print(f"   ⚠️ Pattern preload skipped: {e}")
-        
-        # ✅ Load correction factors
-        try:
-            from routes.api_predict import load_correction_factors
-            load_correction_factors()
-            print("   📊 Correction factors loaded")
-        except Exception as e:
-            print(f"   ⚠️ Correction factors load skipped: {e}")
-        
-        # ✅ Preload P95 cache from disk
-        try:
-            from routes.api_predict import preload_p95_cache
-            preload_p95_cache()
-            print("   📊 P95 cache preloaded from disk")
-        except Exception as e:
-            print(f"   ⚠️ P95 preload skipped: {e}")
-         
-    except Exception as e:
-        print(f"⚠️ Startup load failed: {e}")
-        print("   Models will load on first request instead (fallback)")
-        import traceback
-        traceback.print_exc()
-# ============ LSTM MODELS - LAZY LOADING (ONLY FOR RETRAINING) ============
-print("\n" + "="*50)
-print("LSTM MODELS - LAZY LOADING (Retraining Only)")
-print("="*50)
+            print(f"⚠️ Cache warming error: {e}")
+
+
 print("⏳ LSTM models will load only when retraining is triggered")
 print("💡 Visit /admin/retrain to trigger retraining")
-print("="*50 + "\n")
+
 
 LSTM_MODEL_PATH = 'models_2022-2024_v10'
-lstm_predictor = None
 
-def ensure_lstm_for_retraining():
-    """Load LSTM models ONLY when retraining is triggered"""
-    global lstm_predictor
-    
-    if lstm_predictor is not None:
-        return
-    
-    print("🔄 Loading LSTM models for retraining...")
-    lstm_predictor = MRT3LSTMPredictor(model_path=LSTM_MODEL_PATH)
-    
-    if lstm_predictor.load_models():
-        print(f"✅ LSTM models loaded successfully!")
-        print(f"   📊 Loaded {len(lstm_predictor.models)} station-direction models")
-        app.config['LSTM_PREDICTOR'] = lstm_predictor
-    else:
-        print("⚠️ LSTM models not loaded - retraining will be disabled")
-        app.config['LSTM_PREDICTOR'] = None
 
 def preload_all_models():
     """Preload ALL 26 models - ONLY call this if you want to force-load."""
@@ -760,33 +685,6 @@ with app.app_context():
         else:
             print("⚠️ Some CSV files still missing!")
     # ===========================================
-
-# ============ ADMIN RETRAINING ENDPOINT ============
-@app.route('/admin/retrain', methods=['POST'])
-def admin_retrain():
-    """Manually trigger weekly retraining - loads LSTM models temporarily"""
-    try:
-        print("🔄 Starting weekly retraining...")
-        
-        # Load LSTM models only when retraining
-        ensure_lstm_for_retraining()
-        
-        lstm_predictor = app.config.get('LSTM_PREDICTOR')
-        if not lstm_predictor:
-            return jsonify({"status": "failed", "error": "LSTM models not loaded"}), 400
-        
-        # Start retraining in background
-        try:
-            schedule_weekly_retraining(app)
-            return jsonify({
-                "status": "success",
-                "message": "Weekly retraining started! LSTM models loaded."
-            })
-        except Exception as e:
-            return jsonify({"status": "failed", "error": str(e)}), 500
-            
-    except Exception as e:
-        return jsonify({"status": "failed", "error": str(e)}), 500
 
 # ============ LSTM STATUS DEBUG ROUTE ============
 @app.route('/debug/lstm-status')
@@ -1220,6 +1118,94 @@ def admin_import_csvs():
         'data_directory': data_dir
     })
 
+# ================================================================
+#  🔥 MODEL LOADING AND CACHE WARMING – MOVED TO THE END
+#  (after all route definitions so that @app.route decorators
+#   are processed before any request is made)
+# ================================================================
+print("\n" + "="*50)
+print("🚀 MRT-3 PREDICTION SYSTEM - PRELOADING MODELS")
+print("="*50)
+print("⏳ Loading models at startup (this is the slow part)...")
+print("💡 This takes 15-30 seconds ONCE, then all predictions are instant")
+print("💡 Your professor will see FAST predictions on first click")
+print("="*50 + "\n")
+
+print("🔄 Starting model preload...")
+with app.app_context():
+    try:
+        # Load models at startup
+        directional_models_cached, directional_scalers_cached = load_models_with_cache(
+            STATIONS, DIRECTIONAL_MODELS_PATH
+        )
+        
+        # Load historical data
+        historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
+        
+        # Update services module
+        import services
+        services.directional_models = directional_models_cached
+        services.directional_scalers = directional_scalers_cached
+        services.historical_entry = historical_data.get('historical_entry', {})
+        services.historical_exit = historical_data.get('historical_exit', {})
+        services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
+        services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
+        
+        # Store in app config
+        app.config['DIRECTIONAL_MODELS'] = directional_models_cached
+        app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+        app.config['HISTORICAL_DATA'] = historical_data
+        
+        _MODELS_LOADED = True
+        
+        print(f"\n✅ MODELS LOADED at startup!")
+        print(f"   📊 {len(directional_models_cached)} directional models loaded")
+        print(f"   📊 {len(historical_data['historical_entry'])} stations historical data")
+        
+        # NOW WARM THEM UP FOR INSTANT PREDICTIONS
+        warmup_all_models()
+        
+        warm_cache(app)
+        print("🔄 Pre‑warming all station forecasts...")
+        with app.test_client() as client:
+            for station in STATIONS:
+                try:
+                    client.get(f'/api/directional-forecast/{station}')
+                    print(f"   ✅ Warmed forecast for {station}")
+                except Exception as e:
+                    print(f"   ⚠️ Failed to warm {station}: {e}")
+        print("✅ All station forecasts warmed.")
+       
+      
+        # ✅ ADD THIS: Preload all station patterns (LOAD ALL 26 PARQUET FILES AND PATTERNS)
+        try:
+            from services.feature_engineering import preload_all_station_patterns
+            preload_all_station_patterns()
+            print("   📊 All station patterns preloaded")
+        except Exception as e:
+            print(f"   ⚠️ Pattern preload skipped: {e}")
+        
+        # ✅ Load correction factors
+        try:
+            from routes.api_predict import load_correction_factors
+            load_correction_factors()
+            print("   📊 Correction factors loaded")
+        except Exception as e:
+            print(f"   ⚠️ Correction factors load skipped: {e}")
+        
+        # ✅ Preload P95 cache from disk
+        try:
+            from routes.api_predict import preload_p95_cache
+            preload_p95_cache()
+            print("   📊 P95 cache preloaded from disk")
+        except Exception as e:
+            print(f"   ⚠️ P95 preload skipped: {e}")
+         
+    except Exception as e:
+        print(f"⚠️ Startup load failed: {e}")
+        print("   Models will load on first request instead (fallback)")
+        import traceback
+        traceback.print_exc()
 
 # ========== MEMORY TRACING ==========
 import tracemalloc
