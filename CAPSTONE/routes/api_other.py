@@ -1130,7 +1130,7 @@ def debug_check_lookback_data():
     })
 
 @api_other_bp.route('/live-map/directions/v2')
-@cache.cached(timeout=60, key_prefix='live_map_v2')
+@cache.cached(timeout=300, key_prefix='live_map_v2')
 def live_map_directions_v2():
     """Consistent with prediction API – uses get_directional_prediction_wrapper()"""
     try:
