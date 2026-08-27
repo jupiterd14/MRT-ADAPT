@@ -9,6 +9,21 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
+import time
+from functools import wraps
+
+# ========== TIMING DECORATOR ==========
+def timer(func):
+    """Decorator to measure function execution time"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        elapsed = time.time() - start
+        print(f"⏱️ {func.__name__}: {elapsed:.3f}s")
+        return result
+    return wrapper
+
 # ========== GLOBAL RAM CACHES ==========
 _STATION_DATA_CACHE = {}      # Holds all loaded station Parquet DataFrames in RAM
 _FEATURE_SCALER_CACHE = {}    # Cache for feature scalers
@@ -171,6 +186,7 @@ def get_station_dataframe_cached(station_name, direction):
             _STATION_DATA_CACHE[cache_key] = df
     
     return df
+@timer
 def get_station_dataframe(station_name, direction):
     """
     Memory-optimized - streams CSV files and only keeps the needed data
@@ -303,6 +319,7 @@ def get_station_dataframe(station_name, direction):
 #==========================================
 # TYPICAL PATTERN BUILDING WITH DISK PERSISTENCE
 # ============================================================
+@timer
 def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=None, direction=None):
     """
     Builds and caches typical day patterns with disk persistence
@@ -457,6 +474,7 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
     typical_df['is_extended_hours'] = 0
     
     return typical_df
+@timer
 def get_feature_sequence_for_station(station_name, direction, target_datetime, seq_length=24):
     """Retrieve feature sequence for the target time"""
     
