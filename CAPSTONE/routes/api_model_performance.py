@@ -1334,7 +1334,27 @@ def debug_test_preprocessing_on_sample():
             5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
             9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
         }
-        df['StationName'] = df['StationExit'].map(station_names)
+       # Define the fixed mapping function
+        def get_station_name_fixed(row):
+            station_names = {
+                1: "North Ave", 2: "Quezon Ave", 3: "Kamuning", 4: "Cubao",
+                5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
+                9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
+            }
+            
+            entry = row['StationEntry']
+            exit_station = row['StationExit']
+            
+            # For terminals, check both Entry and Exit
+            if entry == 13 or exit_station == 13:
+                return "Taft"
+            if entry == 1 or exit_station == 1:
+                return "North Ave"
+            
+            # For other stations, use Exit
+            return station_names.get(exit_station)
+
+        df['StationName'] = df.apply(get_station_name_fixed, axis=1)
         df = df.dropna(subset=['StationName'])
         
         # Group by hour
@@ -1552,7 +1572,27 @@ def run_auto_tests():
             5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
             9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
         }
-        df['StationName'] = df['StationExit'].map(station_names)
+        # Define the fixed mapping function
+        def get_station_name_fixed(row):
+            station_names = {
+                1: "North Ave", 2: "Quezon Ave", 3: "Kamuning", 4: "Cubao",
+                5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
+                9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
+            }
+            
+            entry = row['StationEntry']
+            exit_station = row['StationExit']
+            
+            # For terminals, check both Entry and Exit
+            if entry == 13 or exit_station == 13:
+                return "Taft"
+            if entry == 1 or exit_station == 1:
+                return "North Ave"
+            
+            # For other stations, use Exit
+            return station_names.get(exit_station)
+
+        df['StationName'] = df.apply(get_station_name_fixed, axis=1)
         
         # Infer direction
         df['direction'] = df.apply(infer_direction_correct, axis=1)
@@ -1651,7 +1691,7 @@ def run_auto_tests():
             station_df = get_station_data_for_direction(df, station_num, direction)
             station_df = station_df[station_df['direction'] == direction]
             
-            if len(station_df) < 100:
+            if len(station_df) < 5:
                 continue
             
             station_df['hour_timestamp'] = station_df['datetime'].dt.floor('h')
@@ -1680,7 +1720,7 @@ def run_auto_tests():
             
             hourly = station_df.groupby('hour_timestamp').agg(agg_dict_filtered).reset_index()
             
-            if len(hourly) < 25:
+            if len(hourly) < 3:
                 continue
             
             # ============================================================
@@ -1985,7 +2025,7 @@ def upload_batch_test():
         # Load models
         from services.model_loader import directional_models, load_single_model, directional_scalers
         
-        if len(directional_models) < 26:
+        if len(directional_models) <= 26:
             print("📦 Loading models...")
             stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
                        "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
@@ -2047,7 +2087,27 @@ def upload_batch_test():
                 5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
                 9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
             }
-            df['StationName'] = df['StationExit'].map(station_names)
+            # Define the fixed mapping function
+            def get_station_name_fixed(row):
+                station_names = {
+                    1: "North Ave", 2: "Quezon Ave", 3: "Kamuning", 4: "Cubao",
+                    5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
+                    9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
+                }
+                
+                entry = row['StationEntry']
+                exit_station = row['StationExit']
+                
+                # For terminals, check both Entry and Exit
+                if entry == 13 or exit_station == 13:
+                    return "Taft"
+                if entry == 1 or exit_station == 1:
+                    return "North Ave"
+                
+                # For other stations, use Exit
+                return station_names.get(exit_station)
+
+            df['StationName'] = df.apply(get_station_name_fixed, axis=1)
             df = df.dropna(subset=['StationName'])
             print(f"   After station mapping: {len(df):,} rows")
             
