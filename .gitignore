@@ -1,6 +1,10 @@
-venv/ 
-.venv/ 
-*.csv 
-__pycache__/ 
-*.dll 
-*.pyc 
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.csv
+
+*.parquet
+
+.env
+./env

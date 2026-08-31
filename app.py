@@ -1,4 +1,11 @@
+from dotenv import load_dotenv
+load_dotenv()
 import os
+print("=" * 50)
+print("🔍 ENVIRONMENT VARIABLES CHECK:")
+print(f"GOOGLE_CLIENT_ID: {os.getenv('GOOGLE_CLIENT_ID', 'NOT FOUND')[:20]}...")
+print(f"GOOGLE_CLIENT_SECRET: {'FOUND' if os.getenv('GOOGLE_CLIENT_SECRET') else 'NOT FOUND'}")
+print("=" * 50)
 import gc
 
 # Reduce Python memory
@@ -24,14 +31,14 @@ print("✅ Extreme memory optimization applied!")
 
 from flask import Flask, session, flash, redirect, url_for, jsonify, request
 from extensions import cache
-from dotenv import load_dotenv
+
 import warnings
 from authlib.integrations.flask_client import OAuth
 import pickle
 import tempfile
 from datetime import datetime, timedelta
 
-load_dotenv()
+
 warnings.filterwarnings('ignore')
 
 from config import Config
@@ -337,10 +344,11 @@ google = oauth.register(
     client_id=app.config.get('GOOGLE_CLIENT_ID'),
     client_secret=app.config.get('GOOGLE_CLIENT_SECRET'),
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    client_kwargs={'scope': 'openid email profile'}
+    client_kwargs={'scope': 'openid email profile'},
 )
 
 app.config['GOOGLE_CLIENT'] = google
+
 
 @app.route('/uploads/reports/<filename>')
 def serve_upload(filename):
@@ -516,14 +524,14 @@ def preload_all_models():
         print(f"   ⚠️ Pattern preload skipped: {e}")
     
     try:
-        from routes.api_predict import preload_p95_cache, preload_typical_patterns, load_correction_factors
-        print("\n📊 Preloading P95 cache and typical patterns...")
-        preload_p95_cache()
+        from routes.api_predict import preload_p90_cache, preload_typical_patterns, load_correction_factors  # Changed from P95
+        print("\n📊 Preloading P90 cache and typical patterns...")
+        preload_p90_cache()  # Changed from P95
         preload_typical_patterns()
         load_correction_factors()
         print("   📊 Correction factors loaded")
     except Exception as e:
-        print(f"⚠️ Error preloading P95/typical patterns: {e}")
+        print(f"⚠️ Error preloading P90/typical patterns: {e}")  # Changed from P95
     
     _MODELS_LOADED = True
     
@@ -709,7 +717,7 @@ def debug_lstm_status():
 @app.route('/debug/raw-prediction/<station_name>/<direction>')
 def raw_prediction(station_name, direction):
     from services import get_feature_sequence_for_station
-    from routes.api_predict import get_p95_percentile
+    from routes.api_predict import get_p90_percentile  # Changed from P95
     import numpy as np
     
     ensure_single_model_loaded(station_name, direction)
@@ -740,9 +748,9 @@ def raw_prediction(station_name, direction):
         pred_scaled = directional_models_cached[model_key](input_tensor, training=False).numpy()
         pred_passengers = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
         
-        # ✅ Get P95 for congestion
-        p95 = get_p95_percentile(station_name, direction)
-        pred_congestion = (pred_passengers / p95) * 100
+        # ✅ Get P90 for congestion (changed from P95)
+        p90 = get_p90_percentile(station_name, direction)
+        pred_congestion = (pred_passengers / p90) * 100
         pred_congestion = max(0, min(100, pred_congestion))
         
         return jsonify({
@@ -750,7 +758,7 @@ def raw_prediction(station_name, direction):
             'direction': direction,
             'predicted_passengers': round(pred_passengers, 1),
             'predicted_congestion': round(pred_congestion, 1),
-            'p95_percentile': round(p95, 0),
+            'p90_percentile': round(p90, 0),  # Changed from P95
             'sequence_shape': sequence.shape,
             'timestamp': now.isoformat(),
             'success': True
@@ -1193,13 +1201,13 @@ with app.app_context():
         except Exception as e:
             print(f"   ⚠️ Correction factors load skipped: {e}")
         
-        # ✅ Preload P95 cache from disk
+        # ✅ Preload P90 cache from disk (changed from P95)
         try:
-            from routes.api_predict import preload_p95_cache
-            preload_p95_cache()
-            print("   📊 P95 cache preloaded from disk")
+            from routes.api_predict import preload_p90_cache  # Changed from P95
+            preload_p90_cache()  # Changed from P95
+            print("   📊 P90 cache preloaded from disk")  # Changed from P95
         except Exception as e:
-            print(f"   ⚠️ P95 preload skipped: {e}")
+            print(f"   ⚠️ P90 preload skipped: {e}")  # Changed from P95
          
     except Exception as e:
         print(f"⚠️ Startup load failed: {e}")
