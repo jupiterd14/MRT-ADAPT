@@ -24,6 +24,9 @@ import time
 # ========== REQUEST-LEVEL CACHE ==========
 _REQUEST_CACHE = {}
 _REQUEST_CACHE_TTL = 300  # 10 seconds
+_P90_CACHE = {}  # Add this global variable
+_P90_FILE = 'p90_percentiles.json'
+_PENDING_CORRECTION_FACTORS = {}
 
 def get_cached_prediction(station_name, direction, target_datetime):
     """Get prediction with request-level caching to prevent duplicate calls"""

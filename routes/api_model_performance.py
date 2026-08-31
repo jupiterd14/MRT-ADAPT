@@ -32,7 +32,10 @@ from services.model_loader import directional_models, directional_scalers
 from routes.api_other import MRT3_PLATFORM_CAPACITY
 
 model_perf_bp = Blueprint('model_performance', __name__)
+# Add this right after detecting the station column and before reading the full file
 
+
+        
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'csv'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -2043,6 +2046,15 @@ def upload_batch_test():
                     except Exception as e:
                         print(f"   ⚠️ Could not load {station} {direction}: {e}")
         
+        # ============================================================
+        # STATION NUMBER TO NAME MAPPING (INSIDE THE FUNCTION)
+        # ============================================================
+        station_number_map = {
+            1: "North Ave", 2: "Quezon Ave", 3: "Kamuning", 4: "Cubao",
+            5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
+            9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
+        }
+        
         # Define P90-based congestion (changed from P95)
         def calc_congestion_p90(station_name, direction, passenger_count, hour=None):
             """Calculate congestion using P90 - FIXED: Uses cached P90 only"""
@@ -2074,42 +2086,67 @@ def upload_batch_test():
             else:
                 print(f"📊 Loaded {len(df):,} rows (limited to {MAX_ROWS_TO_READ:,} for speed)")
             
+            # Parse datetime
             df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce')
             df = df.dropna(subset=['datetime'])
             print(f"   After date parsing: {len(df):,} rows")
             
-            df['direction'] = df.apply(infer_direction_correct, axis=1)
+            # Infer direction using entry/exit comparison
+            def infer_dir(row):
+                entry = row['StationEntry']
+                exit_station = row['StationExit']
+                if entry < exit_station:
+                    return 'Southbound'
+                elif entry > exit_station:
+                    return 'Northbound'
+                else:
+                    return 'Unknown'
+            
+            df['direction'] = df.apply(infer_dir, axis=1)
             df = df[df['direction'] != 'Unknown']
             print(f"   After direction filter: {len(df):,} rows")
             
-            station_names = {
-                1: "North Ave", 2: "Quezon Ave", 3: "Kamuning", 4: "Cubao",
-                5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
-                9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
-            }
-            # Define the fixed mapping function
+            # ========== STATION MAPPING - FIXED VERSION ==========
+            # Check if the station column contains numeric values (1-13)
+            # Use StationExit for station mapping (more reliable)
+            
             def get_station_name_fixed(row):
-                station_names = {
-                    1: "North Ave", 2: "Quezon Ave", 3: "Kamuning", 4: "Cubao",
-                    5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
-                    9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
-                }
-                
                 entry = row['StationEntry']
                 exit_station = row['StationExit']
                 
-                # For terminals, check both Entry and Exit
-                if entry == 13 or exit_station == 13:
-                    return "Taft"
+                # For terminal stations (North Ave = 1, Taft = 13)
                 if entry == 1 or exit_station == 1:
                     return "North Ave"
+                if entry == 13 or exit_station == 13:
+                    return "Taft"
                 
-                # For other stations, use Exit
-                return station_names.get(exit_station)
-
+                # For other stations, use StationExit
+                return station_number_map.get(exit_station)
+            
             df['StationName'] = df.apply(get_station_name_fixed, axis=1)
+            
+            # Check if mapping worked
+            mapped_count = df['StationName'].notna().sum()
+            print(f"   Mapped {mapped_count:,} rows to station names")
+            
+            # Show station distribution
+            print(f"\n📊 Station distribution:")
+            station_counts = df['StationName'].value_counts()
+            for station, count in station_counts.items():
+                print(f"   {station}: {count:,} rows")
+            
             df = df.dropna(subset=['StationName'])
             print(f"   After station mapping: {len(df):,} rows")
+            
+            # If no data after mapping, check what went wrong
+            if len(df) == 0:
+                print("\n❌ ERROR: No rows after station mapping!")
+                print("   StationEntry values:", df['StationEntry'].unique())
+                print("   StationExit values:", df['StationExit'].unique())
+                return jsonify({
+                    'success': False, 
+                    'error': 'No data after station mapping. Check station numbers.'
+                }), 400
             
             print("\n📊 AGGREGATING BY HOUR (summing passenger counts)...")
             
