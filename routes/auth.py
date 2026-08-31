@@ -68,6 +68,7 @@ def check_session_validity():
         'auth.google_authorize', 
         'auth.signup',
         'auth.check_session',
+        'auth.operator_signup',
         'static',
         'public.home',
         'public.live_map',
@@ -296,6 +297,45 @@ def google_login():
     # ✅ Pass the redirect_uri explicitly
     return google.authorize_redirect(redirect_uri, **client_kwargs)
 
+@auth_bp.route('/login/google/operator')
+@no_cache
+def google_operator_login():
+    """Initiate Google OAuth login with operator context"""
+    from flask import current_app, request
+    
+    # Get invitation parameters
+    email = request.args.get('email')
+    station = request.args.get('station')
+    
+    # Store in session for later use
+    if email and station:
+        session['invite_email'] = email
+        session['invite_station'] = station
+    
+    # Clear any existing session before starting new OAuth flow
+    session.clear()
+    
+    # Re-store the invitation data
+    if email and station:
+        session['invite_email'] = email
+        session['invite_station'] = station
+        session['is_operator_signup'] = True
+    
+    google = current_app.config.get('GOOGLE_CLIENT')
+    
+    if google is None:
+        flash('Google authentication is not configured.', 'error')
+        return redirect(url_for('auth.login'))
+    
+    redirect_uri = url_for('auth.google_authorize', _external=True)
+    
+    client_kwargs = {
+        'scope': 'openid email profile',
+        'prompt': 'select_account'
+    }
+    
+    return google.authorize_redirect(redirect_uri, **client_kwargs)
+
 @auth_bp.route('/login/google/authorize')
 @no_cache
 def google_authorize():
@@ -420,7 +460,6 @@ def debug_oauth_config():
             'http://localhost:5000/login/google/callback'
         ]
     })
-    
 @auth_bp.route('/operator-signup', methods=['POST'])
 @no_cache
 def operator_signup():
@@ -433,22 +472,47 @@ def operator_signup():
         name = request.form.get('name')
         station = request.form.get('station')
         
+        # Validation
+        if not email:
+            return jsonify({'success': False, 'error': 'Email is required'}), 400
+        
+        if not new_password or len(new_password) < 8:
+            return jsonify({'success': False, 'error': 'Password must be at least 8 characters'}), 400
+        
         if new_password != confirm_password:
             return jsonify({'success': False, 'error': 'Passwords do not match'}), 400
         
+        # Find the operator
         operator = User.query.filter_by(username=email, role='operator').first()
         
-        if not operator or not operator.verify_password(temp_password):
-            return jsonify({'success': False, 'error': 'Invalid invitation'}), 401
+        if not operator:
+            return jsonify({'success': False, 'error': 'Invalid invitation - user not found'}), 401
         
+        # Check temporary password
+        if not operator.verify_password(temp_password):
+            return jsonify({'success': False, 'error': 'Invalid invitation - wrong temporary password'}), 401
+        
+        # Update operator
         operator.password = new_password
         operator.is_active = True
         
+        # Set station if provided
         if station and station != 'All Stations':
             operator.favorite_station = station
         
+        # Update name if provided (you might need to add a name field to User model)
+        if name:
+            # If you have a name field, set it here
+            # operator.name = name
+            pass
+        
         db.session.commit()
         
+        # Log the activity
+        log_activity(operator.id, 'operator', operator.username, 'signup_complete', 
+                    f'Operator account activated from invitation')
+        
+        # Set session
         session.clear()
         session.permanent = True
         session['user_id'] = operator.id
@@ -459,8 +523,14 @@ def operator_signup():
         operator.last_login = datetime.now()
         db.session.commit()
         
-        return jsonify({'success': True, 'redirect': '/operator-dashboard'})
+        return jsonify({
+            'success': True, 
+            'redirect': '/operator-dashboard',
+            'message': 'Account created successfully!'
+        })
         
     except Exception as e:
         print(f"❌ Error in operator signup: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500

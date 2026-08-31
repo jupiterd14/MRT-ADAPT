@@ -2087,8 +2087,47 @@ nav {
 </div>
     </div>
 
-    <script>
+   <script>
 let stations = [];
+
+// ========== PERFORMANCE OPTIMIZATION - CACHING ==========
+// Cache for station congestion data
+const stationCongestionCache = {};
+const CONGESTION_CACHE_DURATION = 60000; // 1 minute cache
+
+// Debounce function to prevent excessive API calls
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Get cached congestion data
+function getCachedCongestion(station, date, time) {
+    const key = `${station}_${date}_${time}`;
+    if (stationCongestionCache[key]) {
+        const age = Date.now() - stationCongestionCache[key].timestamp;
+        if (age < CONGESTION_CACHE_DURATION) {
+            return stationCongestionCache[key].data;
+        }
+    }
+    return null;
+}
+
+// Set cached congestion data
+function setCachedCongestion(station, date, time, data) {
+    const key = `${station}_${date}_${time}`;
+    stationCongestionCache[key] = {
+        data: data,
+        timestamp: Date.now()
+    };
+}
 
 // ========== TIME-BASED ADVISORY GENERATOR ==========
 function getTimeBasedAdvisory(hour, fromStation, toStation, congestion, travelTime) {
@@ -2338,11 +2377,16 @@ try {
     stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
 }
 
-// ========== MAIN DOM CONTENT LOADED ==========
+// ========== MAIN DOM CONTENT LOADED - OPTIMIZED ==========
 document.addEventListener('DOMContentLoaded', function() {
     cleanOldReadAlerts();
     updateDateTime();
-    checkAlertCount();
+    
+    // Don't check alerts immediately - lazy load after 3 seconds
+    setTimeout(() => {
+        checkAlertCount();
+    }, 3000);
+    
     setInterval(updateDateTime, 1000);
     setInterval(checkAlertCount, 60000);
     
@@ -2352,14 +2396,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update time period when hour changes
     document.getElementById('hourSelect')?.addEventListener('change', updateTimePeriod);
     
-    // Set up station event listeners
+    // Set up station event listeners with debouncing
     const fromSelect = document.getElementById('fromStation');
     const toSelect = document.getElementById('toStation');
     
-    fromSelect?.addEventListener('change', updateStationCongestion);
-    toSelect?.addEventListener('change', updateStationCongestion);
+    const debouncedUpdate = debounce(updateStationCongestion, 300);
+    fromSelect?.addEventListener('change', debouncedUpdate);
+    toSelect?.addEventListener('change', debouncedUpdate);
     
-    updateStationCongestion();
+    // Don't call updateStationCongestion on load - let user trigger it
+    // updateStationCongestion(); // REMOVED - prevents 2 API calls on load
+    
     adjustMobileTextSizes();
 });
 
@@ -2426,7 +2473,7 @@ function swapStations() {
     showToast('Stations swapped');
 }
 
-// ========== UPDATE STATION CONGESTION ==========
+// ========== UPDATE STATION CONGESTION - WITH CACHING ==========
 async function updateStationCongestion() {
     const fromStation = document.getElementById('fromStation').value;
     const toStation = document.getElementById('toStation').value;
@@ -2434,43 +2481,63 @@ async function updateStationCongestion() {
     
     console.log(`FROM: ${fromStation}, TO: ${toStation}, Date: ${dateTime.date}, Time: ${dateTime.time}`);
     
-    try {
-        const response = await fetch(`/api/directional-forecast/${encodeURIComponent(fromStation)}?date=${dateTime.date}&time=${dateTime.time}`);
-        const data = await response.json();
-        console.log('FROM forecast:', data);
-    } catch(e) {
-        console.log('Error fetching from congestion:', e);
+    // Check cache first
+    const fromCached = getCachedCongestion(fromStation, dateTime.date, dateTime.time);
+    const toCached = getCachedCongestion(toStation, dateTime.date, dateTime.time);
+    
+    if (fromCached && toCached) {
+        console.log('📦 Using cached congestion data');
+        return;
     }
     
-    try {
-        const response = await fetch(`/api/directional-forecast/${encodeURIComponent(toStation)}?date=${dateTime.date}&time=${dateTime.time}`);
-        const data = await response.json();
-        console.log('TO forecast:', data);
-    } catch(e) {
-        console.log('Error fetching to congestion:', e);
+    const promises = [];
+    if (!fromCached) {
+        promises.push(
+            fetch(`/api/directional-forecast/${encodeURIComponent(fromStation)}?date=${dateTime.date}&time=${dateTime.time}`)
+                .then(res => res.json())
+                .then(data => {
+                    setCachedCongestion(fromStation, dateTime.date, dateTime.time, data);
+                    console.log('FROM forecast:', data);
+                    return data;
+                })
+                .catch(e => console.log('Error fetching from congestion:', e))
+        );
+    }
+    
+    if (!toCached) {
+        promises.push(
+            fetch(`/api/directional-forecast/${encodeURIComponent(toStation)}?date=${dateTime.date}&time=${dateTime.time}`)
+                .then(res => res.json())
+                .then(data => {
+                    setCachedCongestion(toStation, dateTime.date, dateTime.time, data);
+                    console.log('TO forecast:', data);
+                    return data;
+                })
+                .catch(e => console.log('Error fetching to congestion:', e))
+        );
+    }
+    
+    if (promises.length > 0) {
+        await Promise.all(promises);
     }
 }
-// ========== POPULATE CUSTOM DATE/TIME SELECTS (WITH PAST DATE DISABLED) ==========
-// ========== POPULATE CUSTOM DATE/TIME SELECTS (WITH PAST DATES DISABLED) ==========
+
+// ========== POPULATE CUSTOM DATE/TIME SELECTS ==========
 function populateDateTimeSelects() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
     const currentDay = now.getDate();
     
-    // ========== YEARS (Only current year and future years) ==========
+    // ========== YEARS (2025 only) ==========
     const yearSelect = document.getElementById('yearSelect');
     if (yearSelect) {
         yearSelect.innerHTML = '';
-        // Show current year and next 2 years
-        for (let year = 2025; year <= 2027; year++) {
-            const option = document.createElement('option');
-            option.value = year;
-            option.textContent = year;
-          
-            yearSelect.appendChild(option);
-        }
-        yearSelect.value = currentYear;
+        const option = document.createElement('option');
+        option.value = 2025;
+        option.textContent = 2025;
+        yearSelect.appendChild(option);
+        yearSelect.value = 2025;
     }
     
     // ========== MONTHS ==========
@@ -2485,7 +2552,6 @@ function populateDateTimeSelects() {
             option.value = monthNum;
             option.textContent = month;
             
-            // Disable past months if current year is selected
             const selectedYear = parseInt(yearSelect?.value || currentYear);
             if (selectedYear === currentYear && monthNum < currentMonth) {
                 option.disabled = true;
@@ -2497,7 +2563,7 @@ function populateDateTimeSelects() {
         monthSelect.value = currentMonth;
     }
     
-    // ========== DAYS (Dynamic based on selected month/year) ==========
+    // ========== DAYS ==========
     updateDays();
     
     // ========== HOURS (4 AM to 11 PM) ==========
@@ -2511,7 +2577,6 @@ function populateDateTimeSelects() {
             option.textContent = displayHour;
             hourSelect.appendChild(option);
         }
-        // Set current hour + 1
         let currentHour = now.getHours() + 1;
         if (currentHour > 23) currentHour = 23;
         hourSelect.value = String(Math.min(currentHour, 23)).padStart(2, '0');
@@ -2541,7 +2606,6 @@ function populateDateTimeSelects() {
     // ========== Add event listeners for dynamic days ==========
     monthSelect?.addEventListener('change', function() {
         updateDays();
-        // Also update time period when month changes (keep current time)
     });
     
     yearSelect?.addEventListener('change', function() {
@@ -2551,7 +2615,7 @@ function populateDateTimeSelects() {
     updateTimePeriod();
 }
 
-// ========== UPDATE DAYS BASED ON SELECTED MONTH/YEAR ==========
+// ========== UPDATE DAYS ==========
 function updateDays() {
     const monthSelect = document.getElementById('monthSelect');
     const yearSelect = document.getElementById('yearSelect');
@@ -2566,7 +2630,6 @@ function updateDays() {
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
     
-    // Get number of days in selected month
     const daysInMonth = new Date(year, month, 0).getDate();
     
     daySelect.innerHTML = '';
@@ -2576,7 +2639,6 @@ function updateDays() {
         option.value = dayStr;
         option.textContent = i;
         
-        // Disable past days if current month/year
         if (year === currentYear && month === currentMonth && i < currentDay) {
             option.disabled = true;
             option.style.color = '#94A3B8';
@@ -2585,53 +2647,13 @@ function updateDays() {
         daySelect.appendChild(option);
     }
     
-    // Set selected day
     if (year === currentYear && month === currentMonth) {
         daySelect.value = String(currentDay).padStart(2, '0');
     } else {
-        daySelect.value = '01'; // First day of future months
+        daySelect.value = '01';
     }
 }
 
-// ========== UPDATE DAYS BASED ON SELECTED MONTH/YEAR ==========
-function updateDays() {
-    const monthSelect = document.getElementById('monthSelect');
-    const yearSelect = document.getElementById('yearSelect');
-    const daySelect = document.getElementById('daySelect');
-    
-    if (!monthSelect || !yearSelect || !daySelect) return;
-    
-    const month = parseInt(monthSelect.value);
-    const year = parseInt(yearSelect.value);
-    const now = new Date();
-    const currentDay = now.getDate();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    
-    // Get number of days in selected month
-    const daysInMonth = new Date(year, month, 0).getDate();
-    
-    daySelect.innerHTML = '';
-    for (let i = 1; i <= daysInMonth; i++) {
-        const option = document.createElement('option');
-        option.value = String(i).padStart(2, '0');
-        option.textContent = i;
-        
-        // Disable past days if current month/year
-        if (year === currentYear && month === currentMonth && i < currentDay) {
-            option.disabled = true;
-            option.style.color = '#94A3B8';
-        }
-        daySelect.appendChild(option);
-    }
-    
-    // Set selected day
-    if (year === currentYear && month === currentMonth) {
-        daySelect.value = String(currentDay).padStart(2, '0');
-    } else {
-        daySelect.value = '01'; // First day of future months
-    }
-}
 // ========== GET FORMATTED DATE/TIME ==========
 function getFormattedDateTime() {
     const month = document.getElementById('monthSelect')?.value || '1';
@@ -2641,7 +2663,6 @@ function getFormattedDateTime() {
     const minute = document.getElementById('minuteSelect')?.value || '00';
     const ampm = document.getElementById('ampmSelect')?.value || 'AM';
     
-    // Convert 12-hour to 24-hour if needed
     let hour24 = parseInt(hour);
     if (ampm === 'PM' && hour24 < 12) hour24 += 12;
     if (ampm === 'AM' && hour24 === 12) hour24 = 0;
@@ -2818,7 +2839,7 @@ window.addEventListener('resize', function() {
     window._resizeTimer = setTimeout(adjustMobileTextSizes, 200);
 });
 
-// ========== GENERATE ADVISORIES WITH FORECAST (FIXED FOR MOBILE) ==========
+// ========== GENERATE ADVISORIES WITH FORECAST ==========
 function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData, date, time, hour) {
     const container = document.getElementById('advisoriesContainer');
     container.innerHTML = '';
@@ -2981,6 +3002,7 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     container.appendChild(advisory2);
     container.appendChild(advisory3);
 }
+
 // ========== SYNC MOBILE ALERT BADGE ==========
 function syncMobileAlertBadge() {
     const desktopBadge = document.getElementById('alertBadge');
@@ -3004,12 +3026,11 @@ function getPreviousStation(station) {
     return stationsList[1];
 }
 
-// ========== FETCH ALERT COUNT ==========
+// ========== FETCH ALERT COUNT - WITH CACHING ==========
 let cachedAlertCount = null;
 let cachedAlertCountTime = 0;
 const ALERT_CACHE_DURATION = 30000;
-// ========== FIXED: fetchAlertCount() FOR TRAVEL PLAN PAGE ==========
-// ========== FIXED: fetchAlertCount() FOR TRAVEL PLAN PAGE ==========
+
 async function fetchAlertCount() {
     const now = Date.now();
     
@@ -3019,7 +3040,6 @@ async function fetchAlertCount() {
     }
     
     try {
-        // Get read status from localStorage
         let readAlerts = new Set();
         const saved = localStorage.getItem('readAlerts');
         if (saved) {
@@ -3034,69 +3054,52 @@ async function fetchAlertCount() {
         const OPERATING_START = 4.5;
         const OPERATING_END = 22.5;
         
-        console.log('🔍 Travel Plan - Fetching all alerts at hour:', hour);
-        
         // ========== 1. Rush Hour Alert ==========
         if ((hour >= 7 && hour <= 9)) {
             allAlerts.push({ id: 'rush-morning-permanent' });
-            console.log('  ✅ Added morning rush alert');
         } else if ((hour >= 17 && hour <= 19)) {
             allAlerts.push({ id: 'rush-evening-permanent' });
-            console.log('  ✅ Added evening rush alert');
         }
         
         // ========== 2. Advisory Alert ==========
         if (hour >= 0 && hour < 5) {
             allAlerts.push({ id: 'advisory-early-morning-permanent' });
-            console.log('  ✅ Added early morning advisory');
         } else if (hour >= 5 && hour < 7) {
             allAlerts.push({ id: 'advisory-pre-rush-permanent' });
-            console.log('  ✅ Added pre-rush advisory');
         } else if (hour >= 10 && hour < 16) {
             allAlerts.push({ id: 'advisory-midday-permanent' });
-            console.log('  ✅ Added midday advisory');
         } else if (hour >= 20 && hour < 22.5) {
             allAlerts.push({ id: 'advisory-late-evening-permanent' });
-            console.log('  ✅ Added late evening advisory');
         } else if (hour >= 22.5 || hour === 23) {
             allAlerts.push({ id: 'advisory-service-ended-permanent' });
-            console.log('  ✅ Added service ended advisory');
         }
         
         // ========== 3. Congestion Advisory ==========
         if (hour >= 21 || hour < 5) {
             allAlerts.push({ id: 'congestion-advisory-offpeak-permanent' });
-            console.log('  ✅ Added offpeak congestion advisory');
         } else if (hour >= 14 && hour < 17) {
             allAlerts.push({ id: 'congestion-advisory-midafternoon-permanent' });
-            console.log('  ✅ Added midafternoon congestion advisory');
         }
         
         // ========== 4. Service Notices ==========
         const isWeekend = nowDate.getDay() === 0 || nowDate.getDay() === 6;
         if (isWeekend) {
             allAlerts.push({ id: 'service-weekend-permanent' });
-            console.log('  ✅ Added weekend service notice');
         }
         if (hour >= 23 || hour <= 3) {
             allAlerts.push({ id: 'service-maintenance-night-permanent' });
-            console.log('  ✅ Added maintenance notice');
         }
         
         // ========== 5. Check if MRT is closed ==========
         const isClosed = timeDecimal < OPERATING_START || timeDecimal >= OPERATING_END;
         if (isClosed) {
             allAlerts.push({ id: 'service-closed-permanent' });
-            console.log('  ✅ Added service closed alert');
         }
         
         // ========== 6. Congestion alerts from live map ==========
         try {
-            console.log('  🔄 Fetching congestion alerts from API...');
             const response = await fetch('/api/live-map/directions/v3');
             const data = await response.json();
-            
-            let congestionAlertCount = 0;
             
             if (data && data.northbound && data.southbound) {
                 const grouped = {
@@ -3120,61 +3123,31 @@ async function fetchAlertCount() {
                     else if (congestion > 0) grouped.southbound.light.push(station);
                 }
                 
-                if (grouped.northbound.severe.length > 0) {
-                    allAlerts.push({ id: 'north-severe-permanent' });
-                    congestionAlertCount++;
-                }
-                if (grouped.northbound.congested.length > 0) {
-                    allAlerts.push({ id: 'north-congested-permanent' });
-                    congestionAlertCount++;
-                }
-                if (grouped.northbound.moderate.length > 0) {
-                    allAlerts.push({ id: 'north-moderate-permanent' });
-                    congestionAlertCount++;
-                }
-                if (grouped.northbound.light.length > 0) {
-                    allAlerts.push({ id: 'north-light-permanent' });
-                    congestionAlertCount++;
-                }
+                if (grouped.northbound.severe.length > 0) allAlerts.push({ id: 'north-severe-permanent' });
+                if (grouped.northbound.congested.length > 0) allAlerts.push({ id: 'north-congested-permanent' });
+                if (grouped.northbound.moderate.length > 0) allAlerts.push({ id: 'north-moderate-permanent' });
+                if (grouped.northbound.light.length > 0) allAlerts.push({ id: 'north-light-permanent' });
                 
-                if (grouped.southbound.severe.length > 0) {
-                    allAlerts.push({ id: 'south-severe-permanent' });
-                    congestionAlertCount++;
-                }
-                if (grouped.southbound.congested.length > 0) {
-                    allAlerts.push({ id: 'south-congested-permanent' });
-                    congestionAlertCount++;
-                }
-                if (grouped.southbound.moderate.length > 0) {
-                    allAlerts.push({ id: 'south-moderate-permanent' });
-                    congestionAlertCount++;
-                }
-                if (grouped.southbound.light.length > 0) {
-                    allAlerts.push({ id: 'south-light-permanent' });
-                    congestionAlertCount++;
-                }
-                
-                console.log(`  ✅ Added ${congestionAlertCount} congestion alerts`);
+                if (grouped.southbound.severe.length > 0) allAlerts.push({ id: 'south-severe-permanent' });
+                if (grouped.southbound.congested.length > 0) allAlerts.push({ id: 'south-congested-permanent' });
+                if (grouped.southbound.moderate.length > 0) allAlerts.push({ id: 'south-moderate-permanent' });
+                if (grouped.southbound.light.length > 0) allAlerts.push({ id: 'south-light-permanent' });
             }
         } catch (e) {
-            console.log('  ❌ Could not fetch congestion alerts:', e);
+            console.log('Could not fetch congestion alerts:', e);
         }
         
         // ========== 7. Broadcasts ==========
         try {
-            console.log('  🔄 Fetching broadcasts...');
             const broadcastResponse = await fetch('/api/broadcasts/public');
             const broadcastData = await broadcastResponse.json();
             if (broadcastData.success && broadcastData.broadcasts) {
-                let broadcastCount = 0;
                 broadcastData.broadcasts.forEach(b => {
                     allAlerts.push({ id: `broadcast-${b.id}` });
-                    broadcastCount++;
                 });
-                console.log(`  ✅ Added ${broadcastCount} broadcasts`);
             }
         } catch (e) {
-            console.log('  ❌ Could not fetch broadcasts:', e);
+            console.log('Could not fetch broadcasts:', e);
         }
         
         // ========== COUNT ALL UNREAD ALERTS ==========
@@ -3185,18 +3158,9 @@ async function fetchAlertCount() {
             }
         }
         
-        // Cache the result
         cachedAlertCount = unreadCount;
         cachedAlertCountTime = now;
         
-        // Store in sessionStorage for persistence
-        try {
-            sessionStorage.setItem('alertCount', unreadCount.toString());
-        } catch (e) {}
-        
-        console.log('📊 Travel Plan - ALL alerts count:', allAlerts.length);
-        console.log('📊 Travel Plan - UNREAD alerts count:', unreadCount);
-        console.log('📊 Travel Plan - Read alerts in localStorage:', readAlerts.size);
         return unreadCount;
         
     } catch (error) {
@@ -3204,10 +3168,10 @@ async function fetchAlertCount() {
         return 0;
     }
 }
+
 async function checkAlertCount() {
     const alertCount = await fetchAlertCount();
     
-    // Header badge
     const badge = document.getElementById('alertBadge');
     if (badge) {
         if (alertCount > 0) {
@@ -3221,7 +3185,6 @@ async function checkAlertCount() {
         }
     }
     
-    // Sidebar badge
     const sidebarBadge = document.getElementById('sidebarAlertCount');
     if (sidebarBadge) {
         if (alertCount > 0) {
@@ -3232,9 +3195,9 @@ async function checkAlertCount() {
         }
     }
     
-    // Sync mobile badge
     syncMobileAlertBadge();
 }
+
 // ========== SHOW TOAST ==========
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
@@ -3257,9 +3220,7 @@ function showToast(message, type = 'success') {
 
 // ========== ULTRA COMPACT MOBILE DROPDOWNS ==========
 function applyUltraCompactMobile() {
-    // Only apply on mobile devices
     if (window.innerWidth <= 768) {
-        // Station dropdowns - even smaller
         document.querySelectorAll('.station-dropdown').forEach(el => {
             el.style.height = '28px';
             el.style.fontSize = '10px';
@@ -3268,14 +3229,12 @@ function applyUltraCompactMobile() {
             el.style.borderRadius = '6px';
         });
         
-        // Date/time inputs
         document.querySelectorAll('.custom-date-input, .custom-time-input').forEach(el => {
             el.style.height = '28px';
             el.style.padding = '1px 4px';
             el.style.borderRadius = '6px';
         });
         
-        // Selects inside
         document.querySelectorAll('.custom-select').forEach(el => {
             el.style.fontSize = '9px';
             el.style.padding = '1px 1px';
@@ -3283,7 +3242,6 @@ function applyUltraCompactMobile() {
             el.style.height = '22px';
         });
         
-        // Buttons
         document.querySelectorAll('.btn-plan').forEach(el => {
             el.style.height = '30px';
             el.style.fontSize = '10px';
@@ -3298,7 +3256,6 @@ function applyUltraCompactMobile() {
             el.style.fontSize = '11px';
         });
         
-        // Swap icon
         document.querySelectorAll('.swap-icon').forEach(el => {
             el.style.width = '24px';
             el.style.height = '24px';
@@ -3310,17 +3267,15 @@ function applyUltraCompactMobile() {
     }
 }
 
-// Call it when page loads and on resize
 document.addEventListener('DOMContentLoaded', function() {
     applyUltraCompactMobile();
 });
 
 window.addEventListener('resize', function() {
-    // Re-apply on resize (in case user rotates phone)
     applyUltraCompactMobile();
 });
 
-// Override any old functions - force the new one to be used
+// Override any old functions
 window.getCongestionAlerts = fetchAlertCount;
 window.getCongestionAlertsOnly = fetchAlertCount;
 window.fetchAlertCount = fetchAlertCount;
@@ -3329,6 +3284,6 @@ window.fetchAlertCount = fetchAlertCount;
 setTimeout(() => {
     checkAlertCount();
 }, 1000);
-    </script>
+</script>
 </body>
 </html>

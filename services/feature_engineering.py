@@ -320,7 +320,7 @@ def get_station_dataframe(station_name, direction):
     return combined
 
 # ============================================================
-# TYPICAL PATTERN BUILDING WITH DISK PERSISTENCE
+# TYPICAL PATTERN BUILDING WITH DISK PERSaISTENCE
 # ============================================================
 
 def build_typical_day_pattern_fast(station_name, direction, target_datetime, seq_length=24):
@@ -353,12 +353,12 @@ def build_typical_day_pattern_fast(station_name, direction, target_datetime, seq
             ]
             
             if len(hour_data) > 0:
-                passenger = float(hour_data['TotalPassenger'].median())
+                passenger = float(hour_data['TotalPassenger'].quantile(0.90))
             else:
                 # Fallback: same hour regardless of day
                 fallback = df[df.index.hour == hour]
                 if len(fallback) > 0:
-                    passenger = float(fallback['TotalPassenger'].median())
+                    passenger = float(fallback['TotalPassenger'].quantile(0.90))
                 else:
                     passenger = get_synthetic_congestion(hour) / 100.0 * p90  # Changed from P95
             
@@ -498,14 +498,14 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
         if len(hour_data) > 0:
             values = hour_data['TotalPassenger'].dropna()
             if len(values) > 0:
-                passenger = float(values.median())
+                passenger = float(values.quantile(0.90))
             else:
                 passenger = get_synthetic_congestion(hour) / 100.0 * p90  # Changed from P95
         else:
             # Fallback: same hour regardless of weekday
             fallback = df[df.index.hour == hour]['TotalPassenger'].dropna()
             if len(fallback) > 0:
-                passenger = float(fallback.median())
+                passenger = float(fallback.quantile(0.90))
             else:
                 passenger = get_synthetic_congestion(hour) / 100.0 * p90  # Changed from P95
         

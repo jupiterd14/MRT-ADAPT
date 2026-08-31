@@ -536,61 +536,82 @@
         });
 
         document.getElementById('signupForm').onsubmit = function(e) {
-            e.preventDefault(); 
+    e.preventDefault(); 
 
-            const name = document.getElementById('name').value.trim();
-            const pass = document.getElementById('password').value;
-            const confirm = document.getElementById('confirm_password').value;
+    const name = document.getElementById('name').value.trim();
+    const pass = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm_password').value;
+    
+    // Validation
+    if (!name || name.length < 2) {
+        document.getElementById('errorTitle').innerText = "Invalid Name";
+        document.getElementById('errorMessage').innerText = "Please enter your full name.";
+        document.getElementById('errorModal').style.display = 'flex';
+        return;
+    }
+
+    if (pass.length < 8) {
+        document.getElementById('errorTitle').innerText = "Weak Password";
+        document.getElementById('errorMessage').innerText = "Password must be at least 8 characters.";
+        document.getElementById('errorModal').style.display = 'flex';
+        return;
+    }
+
+    if (pass !== confirm) {
+        document.getElementById('errorTitle').innerText = "Password Mismatch";
+        document.getElementById('errorMessage').innerText = "Passwords do not match.";
+        document.getElementById('errorModal').style.display = 'flex';
+        return;
+    }
+
+    // Disable button and show loading
+    const btn = document.getElementById('registerBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> CREATING ACCOUNT...';
+
+    const formData = new FormData(this);
+    
+    fetch('/operator-signup', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => {
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            // If not JSON, something went wrong
+            throw new Error('Server error: ' + response.status + ' ' + response.statusText);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Show success modal
+            document.getElementById('successModal').style.display = 'flex';
             
-            if (!name || name.length < 2) {
-                document.getElementById('errorTitle').innerText = "Invalid Name";
-                document.getElementById('errorMessage').innerText = "Please enter your full name.";
-                document.getElementById('errorModal').style.display = 'flex';
-                return;
-            }
-
-            if (pass.length < 8) {
-                document.getElementById('errorTitle').innerText = "Weak Password";
-                document.getElementById('errorMessage').innerText = "Password must be at least 8 characters.";
-                document.getElementById('errorModal').style.display = 'flex';
-                return;
-            }
-
-            if (pass !== confirm) {
-                document.getElementById('errorTitle').innerText = "Password Mismatch";
-                document.getElementById('errorMessage').innerText = "Passwords do not match.";
-                document.getElementById('errorModal').style.display = 'flex';
-                return;
-            }
-
-            const formData = new FormData(this);
-            fetch('/operator-signup', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => { throw new Error(err.error || 'Server error'); });
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('successModal').style.display = 'flex';
-                    setTimeout(() => {
-                        window.location.href = data.redirect || '/operator-dashboard';
-                    }, 2000);
-                } else {
-                    throw new Error(data.error || 'Signup failed');
-                }
-            })
-            .catch(error => {
-                console.error('Signup error:', error);
-                document.getElementById('errorTitle').innerText = "Signup Failed";
-                document.getElementById('errorMessage').innerText = error.message;
-                document.getElementById('errorModal').style.display = 'flex';
-            });
-        };
+            // Redirect after delay
+            setTimeout(() => {
+                window.location.href = data.redirect || '/operator-dashboard';
+            }, 2000);
+        } else {
+            throw new Error(data.error || 'Signup failed');
+        }
+    })
+    .catch(error => {
+        console.error('Signup error:', error);
+        document.getElementById('errorTitle').innerText = "Signup Failed";
+        document.getElementById('errorMessage').innerText = error.message;
+        document.getElementById('errorModal').style.display = 'flex';
+    })
+    .finally(() => {
+        // Reset button
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-user-check"></i> CREATE ACCOUNT';
+    });
+};
 
         window.onclick = (event) => {
             ['errorModal', 'successModal'].forEach(id => {
