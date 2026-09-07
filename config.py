@@ -1,6 +1,7 @@
 # config.py
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,4 +23,4 @@ class Config:
         now = datetime.now()
         # Keep real month, day, hour, minute, second
         # Only change the year to 2025 to match your dataset
-        return now.replace(year=2025)
+        return datetime.now(ZoneInfo('Asia/Manila')).replace(year=2025)

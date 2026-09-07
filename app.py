@@ -1,12 +1,17 @@
 from dotenv import load_dotenv
 load_dotenv()
 import os
+from zoneinfo import ZoneInfo
 print("=" * 50)
 print("🔍 ENVIRONMENT VARIABLES CHECK:")
 print(f"GOOGLE_CLIENT_ID: {os.getenv('GOOGLE_CLIENT_ID', 'NOT FOUND')[:20]}...")
 print(f"GOOGLE_CLIENT_SECRET: {'FOUND' if os.getenv('GOOGLE_CLIENT_SECRET') else 'NOT FOUND'}")
 print("=" * 50)
 import gc
+import time
+os.environ['TZ'] = 'Asia/Manila'
+time.tzset()
+print(f"✅ Timezone set to: {time.tzname}")
 
 os.environ['TF_XLA_FLAGS'] = '--tf_xla_auto_jit=2'
 # Reduce Python memory
@@ -392,9 +397,10 @@ app.register_blueprint(model_perf_bp, url_prefix='/api')
 app.register_blueprint(email_bp, url_prefix='/api/profile')
 register_admin_retrain(app)
 
+
 @app.context_processor
 def inject_now():
-    return {'now': datetime.now()}
+    return {'now': datetime.now(ZoneInfo('Asia/Manila'))}
 
 # ============ PRELOAD MODELS AT STARTUP ============
 # (The actual loading block is moved to the end of the file, after all route definitions)
