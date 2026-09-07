@@ -17,6 +17,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import schedule
 from flask import current_app
+from flask import jsonify
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -283,6 +284,40 @@ def build_lstm_model(input_shape):
     )
     return model
 
+
+def rebuild_prediction_cache(app=None):
+    """
+    Recompute all predictions using the currently loaded models
+    and save them to cache/ directory.
+    Optionally updates the in-memory caches if an app context is available.
+    """
+    from routes.api_predict import precompute_all_predictions, _PREDICTION_CACHE, _P90_CACHE
+    from services.feature_engineering import preload_all_data, precompute_all_scaled_sequences
+    import pickle
+    import os
+
+    # Ensure all data/patterns are preloaded (if not already)
+    preload_all_data()
+    precompute_all_scaled_sequences()
+
+    # Recompute predictions
+    precompute_all_predictions()
+
+    # Save cache files
+    cache_dir = 'cache'
+    os.makedirs(cache_dir, exist_ok=True)
+    with open(os.path.join(cache_dir, 'cached_predictions.pkl'), 'wb') as f:
+        pickle.dump(dict(_PREDICTION_CACHE), f)
+    with open(os.path.join(cache_dir, 'p90_cache.pkl'), 'wb') as f:
+        pickle.dump(dict(_P90_CACHE), f)
+
+    # Also update app.config P90_CACHE if we are in an app context
+    if app:
+        app.config['P90_CACHE'] = dict(_P90_CACHE)
+
+    print(f"✅ Rebuilt prediction cache: {len(_PREDICTION_CACHE)} predictions, {len(_P90_CACHE)} P90 values")
+    
+    
 def prepare_report_data(days_back=30, min_reports=50):
     """
     Fetch reports from the database, aggregate by station-direction-hour,
@@ -483,36 +518,49 @@ def train_lstm_on_reports():
 # ================================================================
 #  Retraining Pipeline (Report‑Based)
 # ================================================================
+def retrain_and_reload(app=None):
+    """Full retraining pipeline: train models, load them, then rebuild cache."""
+    logger.info("🔄 Starting retraining pipeline...")
 
-def retrain_and_reload():
-    """
-    Full retraining pipeline using user reports:
-      1. Train models on report data.
-      2. Load the new models.
-      3. Update global model dictionaries.
-    """
-    logger.info("🔄 Starting report‑based retraining pipeline...")
-
-    # Step 1: Train on reports
+    # 1. Train on reports
     new_model_folder = train_lstm_on_reports()
     if not new_model_folder:
         logger.error("❌ Retraining failed – no models generated.")
         return False
 
-    # Step 2: Load the new models into a predictor
+    # 2. Load the new models
     predictor = MRT3LSTMPredictor(model_path_pattern=f"{new_model_folder}/")
     predictor.model_path = new_model_folder
     if not predictor.load_models():
-        logger.error("❌ Failed to load the new models.")
+        logger.error("❌ Failed to load new models.")
         return False
 
-    # Step 3: Update global models
-    if update_global_models(predictor):
-        logger.info(f"✅ Models reloaded from {new_model_folder} and global dictionaries updated.")
-        return True
-    else:
+    # 3. Update global models (so that precompute_all_predictions uses them)
+    if not update_global_models(predictor):
         logger.error("❌ Failed to update global models.")
         return False
+
+    # 4. Rebuild the prediction cache using the new models
+    rebuild_prediction_cache(app)
+
+    # 5. (Optional) Hot‑update the running app's caches
+    if app:
+        with app.app_context():
+            from routes.api_predict import _PREDICTION_CACHE, _P90_CACHE
+            # The rebuild function already updated them, but if we want to ensure
+            # the in-memory caches are up‑to‑date, we can reload from disk:
+            import pickle
+            with open('cache/cached_predictions.pkl', 'rb') as f:
+                _PREDICTION_CACHE.clear()
+                _PREDICTION_CACHE.update(pickle.load(f))
+            with open('cache/p90_cache.pkl', 'rb') as f:
+                _P90_CACHE.clear()
+                _P90_CACHE.update(pickle.load(f))
+            # Also update app.config
+            app.config['P90_CACHE'] = dict(_P90_CACHE)
+
+    logger.info(f"✅ Retraining complete. Cache rebuilt from {new_model_folder}.")
+    return True
 
 
 # ================================================================
@@ -534,7 +582,7 @@ def schedule_weekly_retraining(app):
     """Schedule retraining every Sunday at 3 AM."""
     def weekly_job():
         with app.app_context():
-            retrain_and_reload()
+            retrain_and_reload(app)
 
     schedule.every().sunday.at("03:00").do(weekly_job)
     logger.info("📅 Weekly retraining scheduled for Sunday 3:00 AM")
@@ -553,16 +601,14 @@ def register_admin_retrain(app):
     """Adds an endpoint to manually trigger retraining."""
     @app.route('/admin/retrain', methods=['POST'])
     def admin_retrain():
-        from flask import jsonify
         try:
-            success = retrain_and_reload()
+            success = retrain_and_reload(app=current_app._get_current_object())
             return jsonify({
                 'success': success,
-                'message': 'Retraining completed' if success else 'Retraining failed'
+                'message': 'Retraining completed and cache rebuilt' if success else 'Retraining failed'
             }), 200 if success else 500
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
-
 
 def init_lstm_predictor(app):
     """Lazy‑load the predictor on startup (no‑op)."""

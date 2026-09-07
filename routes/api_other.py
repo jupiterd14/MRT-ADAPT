@@ -1127,46 +1127,35 @@ def debug_check_lookback_data():
     })
 @api_other_bp.route('/live-map/directions/v3')
 def live_map_directions_v3():
-    """Fast cached version - reuses directional_forecast/all cache and applies overrides."""
     try:
-        from routes.api_predict import directional_forecast_all
-
-        # Get base predictions (cached)
-        result = directional_forecast_all()
-        data = result.get_json()
-
+        from routes.api_predict import get_all_stations_predictions
+        
+        # Get raw predictions (no JSON serialization here)
+        data = get_all_stations_predictions()
+        
         # Get active overrides
         active_overrides = get_active_overrides()
-
-        # Convert from the /all format to the live-map format
+        
+        # Convert to live-map format (apply overrides)
         northbound = {}
         southbound = {}
         stations = current_app.config.get('STATIONS', STATIONS)
-
+        
         for station in stations:
             north = data['northbound'].get(station, {})
             south = data['southbound'].get(station, {})
-
+            
             north_cong = north.get('congestion', 0)
             south_cong = south.get('congestion', 0)
-
-            # Check for overrides
+            
             north_override_key = f"{station}_northbound"
             south_override_key = f"{station}_southbound"
-
-            is_north_overridden = north_override_key in active_overrides
-            is_south_overridden = south_override_key in active_overrides
-
-            north_override_info = None
-            south_override_info = None
-
-            if is_north_overridden:
-                north_override_info = active_overrides[north_override_key]
-                north_cong = north_override_info.get('congestion', north_cong)
-            if is_south_overridden:
-                south_override_info = active_overrides[south_override_key]
-                south_cong = south_override_info.get('congestion', south_cong)
-
+            
+            if north_override_key in active_overrides:
+                north_cong = active_overrides[north_override_key].get('congestion', north_cong)
+            if south_override_key in active_overrides:
+                south_cong = active_overrides[south_override_key].get('congestion', south_cong)
+            
             def get_status(cong):
                 if cong > 80:
                     return "SEVERE", "15-20 min"
@@ -1176,43 +1165,44 @@ def live_map_directions_v3():
                     return "MODERATE", "5-10 min"
                 else:
                     return "LIGHT", "2-5 min"
-
+            
             north_status, north_wait = get_status(north_cong)
             south_status, south_wait = get_status(south_cong)
-
-            p90_north = get_p90_for_station(station, 'Northbound')  # Changed from P95
-            p90_south = get_p90_for_station(station, 'Southbound')  # Changed from P95
-
+            
+            p90_north = get_p90_for_station(station, 'Northbound')
+            p90_south = get_p90_for_station(station, 'Southbound')
+            
             northbound[station] = {
                 "congestion": north_cong,
                 "wait_time": north_wait,
                 "status": north_status,
                 "ridership": int((north_cong / 100) * p90_north) if p90_north else 0,
-                "overridden": is_north_overridden,
-                "override_info": north_override_info,
-                "p90": round(p90_north, 0) if p90_north else 0  # Changed from P95
+                "overridden": north_override_key in active_overrides,
+                "override_info": active_overrides.get(north_override_key),
+                "p90": round(p90_north, 0) if p90_north else 0
             }
             southbound[station] = {
                 "congestion": south_cong,
                 "wait_time": south_wait,
                 "status": south_status,
                 "ridership": int((south_cong / 100) * p90_south) if p90_south else 0,
-                "overridden": is_south_overridden,
-                "override_info": south_override_info,
-                "p90": round(p90_south, 0) if p90_south else 0  # Changed from P95
+                "overridden": south_override_key in active_overrides,
+                "override_info": active_overrides.get(south_override_key),
+                "p90": round(p90_south, 0) if p90_south else 0
             }
-
+        
         return jsonify({
             "northbound": northbound,
             "southbound": southbound,
             "timestamp": Config.get_current_time().isoformat(),
             "cached": True,
-            "source": "directional_forecast/all cache"
+            "source": "internal helper (no double JSON)"
         })
-
+        
     except Exception as e:
         print(f"❌ Error in live_map_directions_v3: {e}")
         return jsonify({"error": str(e)}), 500
+    
 @api_other_bp.route('/live-map/directions/v2')
 def live_map_directions_v2():
     """Consistent with prediction API – uses get_directional_prediction_wrapper()"""

@@ -1146,100 +1146,78 @@ def admin_import_csvs():
 #  (after all route definitions so that @app.route decorators
 #   are processed before any request is made)
 # ================================================================
+# ================================================================
+#  🔥 MODEL LOADING OR CACHE LOADING – FAST STARTUP
+# ================================================================
 print("\n" + "="*50)
-print("🚀 MRT-3 PREDICTION SYSTEM - PRELOADING MODELS")
+print("🚀 MRT-3 PREDICTION SYSTEM - STARTUP")
 print("="*50)
-print("⏳ Loading models at startup (this is the slow part)...")
-print("💡 This takes 15-30 seconds ONCE, then all predictions are instant")
-print("💡 Your professor will see FAST predictions on first click")
-print("="*50 + "\n")
 
-print("🔄 Starting model preload...")
-with app.app_context():
+cache_dir = os.path.join(os.path.dirname(__file__), 'cache')
+os.makedirs(cache_dir, exist_ok=True)
+
+pred_cache_file = os.path.join(cache_dir, 'cached_predictions.pkl')
+p90_file = os.path.join(cache_dir, 'p90_cache.pkl')
+corr_file = os.path.join(cache_dir, 'correction_factors.pkl')
+
+# Try to load cached data
+if os.path.exists(pred_cache_file) and os.path.exists(p90_file):
     try:
-        # Load models at startup
-        directional_models_cached, directional_scalers_cached = load_models_with_cache(
-            STATIONS, DIRECTIONAL_MODELS_PATH
-        )
-        
-        # Load historical data
-        historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
-        
-        # Update services module
-        import services
-        services.directional_models = directional_models_cached
-        services.directional_scalers = directional_scalers_cached
-        services.historical_entry = historical_data.get('historical_entry', {})
-        services.historical_exit = historical_data.get('historical_exit', {})
-        services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
-        services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
-        
-        # Store in app config
-        app.config['DIRECTIONAL_MODELS'] = directional_models_cached
-        app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
-        app.config['HISTORICAL_DATA'] = historical_data
-        
-        _MODELS_LOADED = True
-        
-        print(f"\n✅ MODELS LOADED at startup!")
-        print(f"   📊 {len(directional_models_cached)} directional models loaded")
-        print(f"   📊 {len(historical_data['historical_entry'])} stations historical data")
-        
-        # NOW WARM THEM UP FOR INSTANT PREDICTIONS
-        warmup_all_models()
-        
-        warm_cache(app)
-        print("🔄 Pre‑warming all station forecasts...")
-        with app.test_client() as client:
-            for station in STATIONS:
-                try:
-                    client.get(f'/api/directional-forecast/{station}')
-                    print(f"   ✅ Warmed forecast for {station}")
-                except Exception as e:
-                    print(f"   ⚠️ Failed to warm {station}: {e}")
-        print("✅ All station forecasts warmed.")
-       
-      
-        # ✅ ADD THIS: Preload all station patterns (LOAD ALL 26 PARQUET FILES AND PATTERNS)
+        from routes.api_predict import _PREDICTION_CACHE, _P90_CACHE
+        with open(pred_cache_file, 'rb') as f:
+            _PREDICTION_CACHE.update(pickle.load(f))
+        with open(p90_file, 'rb') as f:
+            p90_data = pickle.load(f)
+            app.config['P90_CACHE'] = p90_data
+            _P90_CACHE.update(p90_data)
+        if os.path.exists(corr_file):
+            with open(corr_file, 'rb') as f:
+                from routes.api_predict import _PENDING_CORRECTION_FACTORS
+                _PENDING_CORRECTION_FACTORS.update(pickle.load(f))
+
+        print(f"✅ Loaded {len(_PREDICTION_CACHE)} cached predictions")
+        print(f"✅ Loaded {len(p90_data)} P90 values")
+        print("💡 Running in CACHE‑ONLY mode (no models loaded).")
+        print("💡 All predictions will be instant.")
+        _CACHE_ONLY = True
+    except Exception as e:
+        print(f"⚠️ Failed to load cache: {e}")
+        _CACHE_ONLY = False
+else:
+    print("⚠️ No cache files found – running full startup (models will be loaded).")
+    _CACHE_ONLY = False
+
+if not _CACHE_ONLY:
+    # Original startup: load models, historical data, etc.
+    print("🔄 Loading models and precomputing predictions (this may take 20+ sec)...")
+    with app.app_context():
         try:
-            from services.feature_engineering import (
-                preload_all_data,
-                precompute_all_scaled_sequences
+            # Load models
+            directional_models_cached, directional_scalers_cached = load_models_with_cache(
+                STATIONS, DIRECTIONAL_MODELS_PATH
             )
-            # 1. Load all DataFrames and scalers into RAM
-            preload_all_data()
-            # 2. Precompute ALL scaled sequences (this will also build typical profiles)
-            precompute_all_scaled_sequences()
-            print("   📊 All station patterns AND scaled sequences preloaded")
-        except Exception as e:
-            print(f"   ⚠️ Preload skipped: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        # ✅ Load correction factors
-        try:
-            from routes.api_predict import load_correction_factors
-            load_correction_factors()
-            print("   📊 Correction factors loaded")
-        except Exception as e:
-            print(f"   ⚠️ Correction factors load skipped: {e}")
-        
-        # ✅ Preload P90 cache from disk (changed from P95)
-        try:
+            # Load historical data
+            historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
+
+            # Store in app config
+            app.config['DIRECTIONAL_MODELS'] = directional_models_cached
+            app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+            app.config['HISTORICAL_DATA'] = historical_data
+
+            _MODELS_LOADED = True
+
+            # Precompute predictions (this also builds typical patterns, etc.)
             from routes.api_predict import precompute_all_predictions
             precompute_all_predictions()
-            print("   📊 All predictions precomputed for instant lookup")
+
+            # Warm up models (optional)
+            warmup_all_models()
+
+            print("✅ Full startup complete.")
         except Exception as e:
-            print(f"   ⚠️ Prediction precompute skipped: {e}")
+            print(f"⚠️ Startup load failed: {e}")
             import traceback
             traceback.print_exc()
-         
-    except Exception as e:
-        print(f"⚠️ Startup load failed: {e}")
-        print("   Models will load on first request instead (fallback)")
-        import traceback
-        traceback.print_exc()
-
 # ========== MEMORY TRACING ==========
 import tracemalloc
 tracemalloc.start()

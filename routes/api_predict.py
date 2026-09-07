@@ -13,7 +13,7 @@ import tensorflow as tf
 api_predict_bp = Blueprint('api_predict', __name__)
 
 STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-            "Ortigas", "Shaw Blvd", "Boni Ave", "Guaadalupe", "Buendia", 
+            "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
             "Ayala Ave", "Magallanes", "Taft"]
 
 import json
@@ -60,6 +60,32 @@ def get_p90_cache():
 
 
 _PENDING_CORRECTION_FACTORS = {}
+
+def get_all_stations_predictions():
+    """Internal helper: returns raw dict of all current predictions (no JSON)."""
+    result = {"northbound": {}, "southbound": {}}
+    now = Config.get_current_time()
+    
+    for station in STATIONS:
+        north_cong = get_directional_prediction(station, 'Northbound', now)
+        south_cong = get_directional_prediction(station, 'Southbound', now)
+        
+        def get_status(cong):
+            if cong > 80: return "SEVERE"
+            if cong > 50: return "CONGESTED"
+            if cong > 25: return "MODERATE"
+            return "LIGHT"
+        
+        result['northbound'][station] = {
+            "congestion": round(float(north_cong), 1),
+            "status": get_status(north_cong)
+        }
+        result['southbound'][station] = {
+            "congestion": round(float(south_cong), 1),
+            "status": get_status(south_cong)
+        }
+    
+    return result
 
 def get_correction_factors():
     """Get correction factors from app config"""
@@ -749,93 +775,15 @@ def debug_override_status():
     
 def get_batch_directional_predictions(station_name, direction, base_time, num_hours=6):
     """
-    Get predictions for the next `num_hours` hours (starting at base_time)
-    using a single batch call to the model.
-    Returns a list of congestion percentages (length = num_hours).
+    Get predictions for the next `num_hours` hours using the global cache.
+    No model loading – pure cache lookup.
     """
-    # Ensure models are loaded
-    ensure_models_loaded(station_name, direction)
-
-    # Check operating hours for each target time
-    # (We'll return 0 for closed hours, but still include them in the batch)
-    target_times = [base_time + timedelta(hours=i) for i in range(num_hours)]
-    operating = []
-    features_list = []
-    valid_indices = []
-
-    for i, dt in enumerate(target_times):
-        hour = dt.hour + dt.minute / 60
-        if 4.5 <= hour < 22.5:
-            # Get scaled features (cached)
-            features = get_scaled_feature_sequence(station_name, direction, dt)
-            if features is not None:
-                features_list.append(features)
-                valid_indices.append(i)
-                operating.append(True)
-            else:
-                operating.append(False)
-        else:
-            operating.append(False)
-
-    # Initialize result list with zeros
-    results = [0.0] * num_hours
-
-    if not features_list:
-        return results  # all closed
-
-    # Stack features into a batch (num_valid, 24, 16)
-    batch_features = np.stack(features_list, axis=0).astype(np.float32)
-
-    # Get model and target scaler
-    directional_models, directional_scalers = get_models()
-    model_key = f"{station_name}_{direction}"
-    model = directional_models.get(model_key)
-    target_scaler = directional_scalers.get(f'{model_key}_target')
-
-    if model is None or target_scaler is None:
-        # Fallback to individual predictions
-        for i in range(num_hours):
-            results[i] = get_directional_prediction(station_name, direction, target_times[i])
-        return results
-
-    # Batch prediction
-    pred_scaled = model.predict(batch_features, verbose=0)  # shape: (num_valid, 1)
-    # Inverse transform all at once
-    pred_passengers = target_scaler.inverse_transform(pred_scaled).flatten()
-
-    # Get P90 and correction factor once
-    p90 = get_p90_percentile(station_name, direction)
-    if p90 <= 0:
-        p90 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-    correction_factors = get_correction_factors()
-    factor = correction_factors.get(model_key, 1.0)
-
-    # Fill results for valid indices
-    for idx, (valid_i, passenger) in enumerate(zip(valid_indices, pred_passengers)):
-        congestion = (passenger / p90) * 100
-        congestion = max(0, min(congestion, 100))
-        congestion = congestion * factor
-        congestion = max(0, min(congestion, 100))
-
-        # Day of week adjustment
-        dow = target_times[valid_i].weekday()
-        if dow >= 5:
-            dow_factor = 0.7
-        elif dow == 4:
-            dow_factor = 1.1
-        elif dow == 0:
-            dow_factor = 1.05
-        else:
-            dow_factor = 1.0
-        congestion = congestion * dow_factor
-        congestion = max(0, min(congestion, 100))
-
-        results[valid_i] = congestion
-
-        # Also store in request cache for single calls (optional)
-        set_cached_prediction(station_name, direction, target_times[valid_i], congestion)
-
+    results = []
+    for i in range(num_hours):
+        dt = base_time + timedelta(hours=i)
+        results.append(get_directional_prediction(station_name, direction, dt))
     return results
+
 def get_directional_prediction(station_name, direction, target_datetime=None):
     if target_datetime is None:
         target_datetime = Config.get_current_time()
@@ -2260,34 +2208,11 @@ def test():
 
 @api_predict_bp.route('/directional-forecast/all')
 def directional_forecast_all():
-    """Get current congestion for ALL stations at once"""
-    result = {"northbound": {}, "southbound": {}}
-    now = Config.get_current_time()
-    
-    print(f"\n[PREDICTION API] Getting all stations at {now.strftime('%H:%M:%S')}")
-    
-    for station in STATIONS:
-        north_cong = get_directional_prediction(station, 'Northbound', now)
-        south_cong = get_directional_prediction(station, 'Southbound', now)
-        
-        def get_status(cong):
-            if cong > 80: return "SEVERE"
-            if cong > 50: return "CONGESTED"
-            if cong > 25: return "MODERATE"
-            return "LIGHT"
-        
-        result['northbound'][station] = {
-            "congestion": round(float(north_cong), 1),
-            "status": get_status(north_cong)
-        }
-        result['southbound'][station] = {
-            "congestion": round(float(south_cong), 1),
-            "status": get_status(south_cong)
-        }
-        import gc
-        gc.collect()
-    
-    return jsonify(result)
+    """Get current congestion for ALL stations at once."""
+    print(f"\n[PREDICTION API] Getting all stations at {Config.get_current_time().strftime('%H:%M:%S')}")
+    data = get_all_stations_predictions()
+    return jsonify(data)
+
 @api_predict_bp.route('/debug-model-output/<station_name>')
 def debug_model_output(station_name):
     """Check raw model output for different times - FIXED with capacity"""
