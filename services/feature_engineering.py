@@ -392,6 +392,8 @@ def build_typical_day_pattern_fast(station_name, direction, target_datetime, seq
     p90 = get_p90_percentile(station_name, direction)  # Changed from P95
     typical_df['congestion'] = (typical_df['TotalPassenger'] / p90 * 100).clip(0, 100)  # Changed from P95
     typical_df['congestion_percentage'] = typical_df['congestion']
+    # Ensure the DataFrame is a proper copy before adding columns
+    typical_df = typical_df.copy()
     typical_df['raw_passengers'] = typical_df['TotalPassenger']
     
     # ========== Add all features (fast vectorized operations) ==========
@@ -521,6 +523,8 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
     # ========== Calculate congestion using P90 (changed from P95) ==========
     typical_df['congestion'] = (typical_df['TotalPassenger'] / p90 * 100).clip(0, 100)  # Changed from P95
     typical_df['congestion_percentage'] = typical_df['congestion']
+    # Ensure the DataFrame is a proper copy before adding columns
+    typical_df = typical_df.copy()
     typical_df['raw_passengers'] = typical_df['TotalPassenger']
     
     # ========== Manually calculate ALL features ==========
@@ -570,13 +574,13 @@ def build_typical_day_pattern(df, target_datetime, seq_length=24, station_name=N
 def get_scaled_feature_sequence(station_name, direction, target_datetime, seq_length=24):
     """Returns already-scaled feature sequence - ZERO computation during requests!"""
     
-    # Round to hour for caching
-    hour_key = target_datetime.replace(minute=0, second=0, microsecond=0)
+    # --- NEW KEY: only dow + hour, no date ---
     dow = target_datetime.weekday()
-    cache_key = f"{station_name}_{direction}_{dow}_{hour_key.strftime('%Y%m%d%H')}_{seq_length}"
+    hour = target_datetime.hour
+    cache_key = f"{station_name}_{direction}_{dow}_{hour}_{seq_length}"
     
     if cache_key in _SCALED_SEQUENCE_CACHE:
-        print(f"⚡ Cache hit for {station_name}_{direction} at {hour_key}")
+        print(f"⚡ Cache hit for {station_name}_{direction} hour {hour} dow {dow}")
         return _SCALED_SEQUENCE_CACHE[cache_key].copy()
     
     # Build the sequence using fast pattern
@@ -865,3 +869,56 @@ def get_hourly_window_from_csv(station_name, direction, target_datetime, seq_len
 print("=" * 50)
 print("✅ feature_engineering.py loaded successfully!")
 print("=" * 50)
+
+# ============================================================
+# PRELOAD ALL STATION DATAFRAMES & SCALERS
+# ============================================================
+def preload_all_data():
+    """Load all 26 station Parquet files and scalers into memory."""
+    stations = list(STATION_NUMBERS.keys())
+    directions = ['Northbound', 'Southbound']
+    
+    for station in stations:
+        for direction in directions:
+            # 1. Load DataFrame (caches in _STATION_DATA_CACHE)
+            get_station_dataframe_cached(station, direction)
+            # 2. Load scalers
+            get_feature_scaler(station, direction)
+            get_target_scaler(station, direction)
+            # 3. Preload p90 values (from routes.api_predict)
+            from routes.api_predict import get_p90_percentile
+            get_p90_percentile(station, direction)
+    
+    print(f"✅ Loaded {len(_STATION_DATA_CACHE)} DataFrames, "
+          f"{len(_FEATURE_SCALER_CACHE)} feature scalers, "
+          f"{len(_TARGET_SCALER_CACHE)} target scalers")
+
+# ============================================================
+# PRECOMPUTE ALL SCALED SEQUENCES (24 hours × 7 days)
+# ============================================================
+def precompute_all_scaled_sequences():
+    """
+    Precompute scaled sequences for all stations, directions,
+    all 7 weekdays, and all 24 hours.
+    Stores them in _SCALED_SEQUENCE_CACHE with a uniform key.
+    """
+    stations = list(STATION_NUMBERS.keys())
+    directions = ['Northbound', 'Southbound']
+    base_date = datetime(2025, 1, 6)  # any Monday
+    
+    total = 0
+    for station in stations:
+        for direction in directions:
+            # Build typical day patterns for all DOW (populates _TYPICAL_PROFILE_CACHE)
+            for dow in range(7):
+                dt = base_date + timedelta(days=dow)
+                build_typical_day_pattern_fast(station, direction, dt, seq_length=24)
+            
+            # Precompute scaled sequences for each hour of each day
+            for dow in range(7):
+                for hour in range(24):
+                    target_dt = base_date + timedelta(days=dow, hours=hour)
+                    get_scaled_feature_sequence(station, direction, target_dt, seq_length=24)
+                    total += 1
+    
+    print(f"✅ Precomputed {total} scaled sequences (expected: {len(stations)*2*7*24})")

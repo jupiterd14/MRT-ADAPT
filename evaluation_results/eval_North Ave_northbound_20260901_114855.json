@@ -1,0 +1,94 @@
+{
+  "station": "North Ave",
+  "direction": "northbound",
+  "total_samples": 18,
+  "timestamp": "2026-09-01T11:48:55.046128",
+  "confusion_matrix": {
+    "labels": [
+      "Light",
+      "Moderate",
+      "Congested",
+      "Severe"
+    ],
+    "matrix": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        7,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        3,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        4
+      ]
+    ]
+  },
+  "accuracy": 83.33,
+  "precision_weighted": 90.56,
+  "recall_weighted": 83.33,
+  "f1_weighted": 84.18,
+  "regression_metrics": {
+    "mae": 5.79,
+    "rmse": 8.15,
+    "r2": 0.9155,
+    "mape": 17.15
+  },
+  "per_class_metrics": {
+    "Light": {
+      "precision": 50.0,
+      "recall": 100.0,
+      "f1_score": 66.7,
+      "support": 1.0
+    },
+    "Moderate": {
+      "precision": 100.0,
+      "recall": 70.0,
+      "f1_score": 82.4,
+      "support": 10.0
+    },
+    "Congested": {
+      "precision": 60.0,
+      "recall": 100.0,
+      "f1_score": 75.0,
+      "support": 3.0
+    },
+    "Severe": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 100.0,
+      "support": 4.0
+    }
+  },
+  "category_distribution": {
+    "Light": {
+      "actual": 1,
+      "predicted": 2
+    },
+    "Moderate": {
+      "actual": 10,
+      "predicted": 7
+    },
+    "Congested": {
+      "actual": 3,
+      "predicted": 5
+    },
+    "Severe": {
+      "actual": 4,
+      "predicted": 4
+    }
+  }
+}

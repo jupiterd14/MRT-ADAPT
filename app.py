@@ -8,6 +8,7 @@ print(f"GOOGLE_CLIENT_SECRET: {'FOUND' if os.getenv('GOOGLE_CLIENT_SECRET') else
 print("=" * 50)
 import gc
 
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_auto_jit=2'
 # Reduce Python memory
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 os.environ['PYTHONHASHSEED'] = '0'
@@ -150,7 +151,7 @@ def load_historical_with_cache(stations, base_capacity):
 def warmup_all_models():
     """
     🔥 CRITICAL: Warms up all 26 models to eliminate cold-start latency.
-    Forces TensorFlow graph compilation at startup.
+    Forces full graph compilation using a realistic random input and predict().
     """
     global directional_models_cached, _MODELS_LOADED, _WARMUP_COMPLETE
     
@@ -163,14 +164,20 @@ def warmup_all_models():
         return True
     
     print("\n" + "="*60)
-    print("🔥 WARMING UP ALL 26 MODELS (Building TensorFlow graphs)...")
+    print("🔥 WARMING UP ALL 26 MODELS (Full inference compilation)...")
     print("="*60)
     
     import time
     import numpy as np
     start_time = time.time()
     
-    dummy_input = np.zeros((1, 24, 16), dtype=np.float32)
+    # Use a realistic random input (not zeros) to trigger full graph optimization
+    # Get a real scaled sequence for a representative station and time
+    from services.feature_engineering import get_scaled_feature_sequence
+    from config import Config
+    real_dt = Config.get_current_time().replace(hour=8, minute=0, second=0)
+    real_features = get_scaled_feature_sequence("North Ave", "Northbound", real_dt)
+    dummy_input = real_features.reshape(1, 24, -1)
 
     successful = 0
     failed = 0
@@ -178,17 +185,12 @@ def warmup_all_models():
 
     for idx, (model_key, model) in enumerate(directional_models_cached.items(), 1):
         try:
-            # Fast tensor call
-            _ = model(dummy_input, training=False).numpy()
+            # Force a full inference pass using .predict() (compiles the graph)
+            _ = model.predict(dummy_input, verbose=0)
             successful += 1
-        except Exception:
-            # Fallback call
-            try:
-                _ = model.predict(dummy_input, verbose=0)
-                successful += 1
-            except Exception as e2:
-                failed += 1
-                print(f"  ⚠️ Failed to warmup {model_key}: {e2}")
+        except Exception as e:
+            failed += 1
+            print(f"  ⚠️ Failed to warmup {model_key}: {e}")
         
         if idx % 5 == 0 or idx == total:
             print(f"  ⏳ Warmup progress: {idx}/{total} models")
@@ -280,6 +282,7 @@ app.config['CACHE_THRESHOLD'] = 1000
 
 # Initialize cache
 cache.init_app(app)
+app.extensions.setdefault('cache', {})[cache] = cache
 
 @app.route('/warmup')
 def warmup():
@@ -516,13 +519,25 @@ def preload_all_models():
     app.config['HISTORICAL_DATA'] = historical_data
     
     # ✅ Add pattern preload here too
+    # ✅ Preload all station patterns (typical profiles) AND all scaled sequences
     try:
-        from services.feature_engineering import preload_all_station_patterns
+        from services.feature_engineering import (
+            preload_all_station_patterns,
+            preload_all_data,                # new
+            precompute_all_scaled_sequences  # new
+        )
+        # 1. Preload all DataFrames and scalers
+        preload_all_data()
+        # 2. Preload day-of-week typical patterns (already in your code)
         preload_all_station_patterns()
-        print("   📊 All station patterns preloaded")
+        # 3. Precompute ALL scaled sequences (7×24 per station/direction)
+        precompute_all_scaled_sequences()
+        print("   📊 All station patterns AND scaled sequences preloaded")
     except Exception as e:
-        print(f"   ⚠️ Pattern preload skipped: {e}")
-    
+        print(f"   ⚠️ Preload skipped: {e}")
+        import traceback
+        traceback.print_exc()
+        
     try:
         from routes.api_predict import preload_p90_cache, preload_typical_patterns, load_correction_factors  # Changed from P95
         print("\n📊 Preloading P90 cache and typical patterns...")
@@ -1187,11 +1202,19 @@ with app.app_context():
       
         # ✅ ADD THIS: Preload all station patterns (LOAD ALL 26 PARQUET FILES AND PATTERNS)
         try:
-            from services.feature_engineering import preload_all_station_patterns
-            preload_all_station_patterns()
-            print("   📊 All station patterns preloaded")
+            from services.feature_engineering import (
+                preload_all_data,
+                precompute_all_scaled_sequences
+            )
+            # 1. Load all DataFrames and scalers into RAM
+            preload_all_data()
+            # 2. Precompute ALL scaled sequences (this will also build typical profiles)
+            precompute_all_scaled_sequences()
+            print("   📊 All station patterns AND scaled sequences preloaded")
         except Exception as e:
-            print(f"   ⚠️ Pattern preload skipped: {e}")
+            print(f"   ⚠️ Preload skipped: {e}")
+            import traceback
+            traceback.print_exc()
         
         # ✅ Load correction factors
         try:
@@ -1203,11 +1226,13 @@ with app.app_context():
         
         # ✅ Preload P90 cache from disk (changed from P95)
         try:
-            from routes.api_predict import preload_p90_cache  # Changed from P95
-            preload_p90_cache()  # Changed from P95
-            print("   📊 P90 cache preloaded from disk")  # Changed from P95
+            from routes.api_predict import precompute_all_predictions
+            precompute_all_predictions()
+            print("   📊 All predictions precomputed for instant lookup")
         except Exception as e:
-            print(f"   ⚠️ P90 preload skipped: {e}")  # Changed from P95
+            print(f"   ⚠️ Prediction precompute skipped: {e}")
+            import traceback
+            traceback.print_exc()
          
     except Exception as e:
         print(f"⚠️ Startup load failed: {e}")

@@ -15,7 +15,6 @@ import time
 import traceback
 import math
 from config import Config
-from extensions import cache
 
 TESTING_MODE = False
 
@@ -1127,10 +1126,6 @@ def debug_check_lookback_data():
         "sample_lookback": lookback_data.head(3).to_dict() if len(lookback_data) > 0 else None
     })
 @api_other_bp.route('/live-map/directions/v3')
-@cache.cached(
-    timeout=300,
-    key_prefix=lambda: f"live_map_v3_{datetime.now().strftime('%Y%m%d%H')}"
-)
 def live_map_directions_v3():
     """Fast cached version - reuses directional_forecast/all cache and applies overrides."""
     try:
@@ -1219,7 +1214,6 @@ def live_map_directions_v3():
         print(f"❌ Error in live_map_directions_v3: {e}")
         return jsonify({"error": str(e)}), 500
 @api_other_bp.route('/live-map/directions/v2')
-@cache.cached(timeout=300, key_prefix='live_map_v2')
 def live_map_directions_v2():
     """Consistent with prediction API – uses get_directional_prediction_wrapper()"""
     try:

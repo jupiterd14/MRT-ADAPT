@@ -3056,7 +3056,8 @@ canvas {
 <script>
 // ========== OPTIMIZED DASHBOARD - 10 MINUTE CACHE ==========
 console.log('🚀 SCRIPT LOADED at:', new Date().toLocaleTimeString());
-
+const OPERATING_START = 4.5;
+const OPERATING_END = 22.5;
 let chart = null;
 let currentStation = '{{ favorite_station if favorite_station else "North Ave" }}';
 let updateInterval = null;
@@ -3432,8 +3433,7 @@ function setDirection(direction) {
 
 // ========== CONGESTION HELPER ==========
 function getCongestionLevel(percentage) {
-      const OPERATING_START = 4.5;
-    const OPERATING_END = 22.5;
+   
 
     const now = new Date();
     // Hint: .getHours() returns whole integers (0-23). 
@@ -3704,8 +3704,6 @@ function updateTrainScheduleUI(data) {
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
         const currentTime = currentHour + (currentMinute / 60);
-        const OPERATING_START = 4.5;
-    const OPERATING_END = 22.5;
         const isOperating = (currentTime >= OPERATING_START && currentTime < OPERATING_END);
         
         if (!isOperating) {

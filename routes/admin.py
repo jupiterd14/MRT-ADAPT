@@ -618,79 +618,48 @@ def debug_check_flags():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
 @admin_bp.route('/api/admin/station-status')
 def station_status():
-    """Get station status for admin dashboard - fetches both directions at once"""
+    """Get station status - NOW USING V2 API (matching live map & operator)"""
     try:
         from flask import current_app
-        from datetime import datetime
-        from routes.api_predict import get_directional_prediction  # IMPORT FROM API_PREDICT
         
-        stations = current_app.config.get('STATIONS', STATIONS)
-        now = datetime.now()
+        # ✅ FIX: Use the same V2 endpoint as operator and live map
+        with current_app.test_client() as client:
+            response = client.get('/api/live-map/directions/v2')
+            data = response.get_json()
         
-        def get_congestion(station_name, direction):
-            """Get congestion using the SAME function as live map (api_predict)"""
-            try:
-                # Use the SAME function as api_other.py live-map endpoint
-                prediction = get_directional_prediction(station_name, direction, now)
-                return max(0, min(100, prediction))
-            except Exception as e:
-                print(f"⚠️ Error predicting {station_name} {direction}: {e}")
-                # Fallback based on time
-                hour = now.hour
-                if 7 <= hour <= 9 or 17 <= hour <= 19:
-                    return 65
-                return 35
+        if not data or 'northbound' not in data or 'southbound' not in data:
+            return jsonify({'stations': []})
         
-        def get_status_info(congestion):
-            if congestion > 80:
-                return "SEVERE", "status-severe"
-            elif congestion > 60:
-                return "CONGESTED", "status-congested"
-            elif congestion > 30:
-                return "MODERATE", "status-moderate"
-            else:
-                return "LIGHT", "status-light"
+        northbound_data = data.get('northbound', {})
+        southbound_data = data.get('southbound', {})
         
         result = []
-        for station in stations:
-            north_congestion = get_congestion(station, 'Northbound')
-            south_congestion = get_congestion(station, 'Southbound')
-            
-            north_text, north_class = get_status_info(north_congestion)
-            south_text, south_class = get_status_info(south_congestion)
-            
-            # Add ridership based on DOTr capacity
-            capacity = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+        for station in STATIONS:
+            north = northbound_data.get(station, {})
+            south = southbound_data.get(station, {})
             
             result.append({
                 'name': station,
                 'northbound': {
-                    'congestion': round(north_congestion, 1),
-                    'status_text': north_text,
-                    'status_class': north_class,
-                    'ridership': int((north_congestion / 100) * capacity)
+                    'congestion': north.get('congestion', 0),
+                    'status_text': north.get('status', 'LIGHT'),
+                    'status_class': _get_status_class(north.get('congestion', 0)),
+                    'ridership': north.get('ridership', 0),  # ✅ Uses P90 now!
+                    'wait_time': north.get('wait_time', '2-5 min')
                 },
                 'southbound': {
-                    'congestion': round(south_congestion, 1),
-                    'status_text': south_text,
-                    'status_class': south_class,
-                    'ridership': int((south_congestion / 100) * capacity)
+                    'congestion': south.get('congestion', 0),
+                    'status_text': south.get('status', 'LIGHT'),
+                    'status_class': _get_status_class(south.get('congestion', 0)),
+                    'ridership': south.get('ridership', 0),  # ✅ Uses P90 now!
+                    'wait_time': south.get('wait_time', '2-5 min')
                 }
             })
         
-        # Debug print first few
-        if result:
-            print(f"📊 Admin Dashboard - First station: {result[0]['name']} North: {result[0]['northbound']['congestion']}%")
+        return jsonify({'stations': result})
         
-        return jsonify({
-            'stations': result,
-            'timestamp': now.isoformat()
-        })
     except Exception as e:
         print(f"Error in station_status: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'stations': []})

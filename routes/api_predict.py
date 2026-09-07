@@ -1,12 +1,13 @@
 from flask import Blueprint, request, jsonify, current_app
 from extensions import cache
 from datetime import datetime, timedelta
-from services.feature_engineering import get_feature_sequence_for_station
+from services.feature_engineering import get_feature_sequence_for_station, get_scaled_feature_sequence
 from config import Config
 import numpy as np
 import math
 from constants import MRT3_PLATFORM_CAPACITY
 import tensorflow as tf 
+
 
 
 api_predict_bp = Blueprint('api_predict', __name__)
@@ -22,43 +23,32 @@ import pickle
 import time
 
 # ========== REQUEST-LEVEL CACHE ==========
+_PREDICTION_CACHE = {}
 _REQUEST_CACHE = {}
 _REQUEST_CACHE_TTL = 300  # 10 seconds
 _P90_CACHE = {}  # Add this global variable
 _P90_FILE = 'p90_percentiles.json'
 _PENDING_CORRECTION_FACTORS = {}
-
 def get_cached_prediction(station_name, direction, target_datetime):
-    """Get prediction with request-level caching to prevent duplicate calls"""
     if target_datetime is None:
         target_datetime = Config.get_current_time()
-    
-    # Create cache key
-    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H')}_{target_datetime.minute // 5}"
-    
-    # Clean old cache entries
+    # NEW: hour only, no minute slot
+    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H')}"
+    # Clean old entries (optional)
     current_time = time.time()
     for key in list(_REQUEST_CACHE.keys()):
         if current_time - _REQUEST_CACHE[key]['timestamp'] > _REQUEST_CACHE_TTL:
             del _REQUEST_CACHE[key]
-    
-    # Return cached value if exists
     if cache_key in _REQUEST_CACHE:
         return _REQUEST_CACHE[cache_key]['value']
-    
     return None
 
 def set_cached_prediction(station_name, direction, target_datetime, value):
-    """Store prediction in request cache"""
     if target_datetime is None:
         target_datetime = Config.get_current_time()
-    
-    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H')}_{target_datetime.minute // 5}"
-    
-    _REQUEST_CACHE[cache_key] = {
-        'value': value,
-        'timestamp': time.time()
-    }
+    # NEW: hour only
+    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H')}"
+    _REQUEST_CACHE[cache_key] = {'value': value, 'timestamp': time.time()}
 
 # ========== P90 CACHE - USING APP CONFIG ==========
 _P90_FILE = 'p90_percentiles.json'
@@ -622,6 +612,87 @@ def historical_patterns(station_name):
         }
     })
     
+from services.feature_engineering import STATION_NUMBERS
+
+def precompute_all_predictions():
+    """
+    Precompute congestion predictions for all (station, direction, dow, hour)
+    using the cached scaled feature sequences and the trained models.
+    Stores results in _PREDICTION_CACHE for instant lookup.
+    """
+    stations = list(STATION_NUMBERS.keys())
+    directions = ['Northbound', 'Southbound']
+    dows = range(7)
+    hours = range(24)
+    
+    # Ensure models are loaded
+    ensure_models_loaded()
+    directional_models, directional_scalers = get_models()
+    
+    total = 0
+    for station in stations:
+        for direction in directions:
+            model_key = f"{station}_{direction}"
+            model = directional_models.get(model_key)
+            target_scaler = directional_scalers.get(f'{model_key}_target')
+            if model is None or target_scaler is None:
+                print(f"⚠️ Skipping {model_key} – model or scaler missing")
+                continue
+            
+            # Get P90 once per station-direction
+            p90 = get_p90_percentile(station, direction)
+            if p90 <= 0:
+                p90 = MRT3_PLATFORM_CAPACITY.get(station, 1000)
+            correction_factors = get_correction_factors()
+            factor = correction_factors.get(model_key, 1.0)
+            
+            for dow in dows:
+                # Build a batch of 24 hours for this station-direction-dow
+                features_list = []
+                for hour in hours:
+                    # Create a dummy datetime with the right dow and hour (any date)
+                    base_dt = datetime(2025, 1, 6) + timedelta(days=dow, hours=hour)
+                    features = get_scaled_feature_sequence(station, direction, base_dt)
+                    if features is None:
+                        # Should never happen after precompute_all_scaled_sequences
+                        features = np.zeros((24, 16), dtype=np.float32)
+                    features_list.append(features)
+                
+                # Stack into batch (24, 24, 16)
+                batch_features = np.stack(features_list, axis=0).astype(np.float32)  # (24, 24, 16)
+                
+                # Batch prediction (shape: (24, 1))
+                pred_scaled = model.predict(batch_features, verbose=0)
+                pred_passengers = target_scaler.inverse_transform(pred_scaled).flatten()
+                
+                # Convert each hour to congestion and store
+                for hour, passenger in enumerate(pred_passengers):
+                    congestion = (passenger / p90) * 100
+                    congestion = max(0, min(congestion, 100))
+                    congestion = congestion * factor
+                    congestion = max(0, min(congestion, 100))
+                    
+                    # Apply day-of-week adjustment (same as in get_directional_prediction)
+                    if dow >= 5:  # weekend
+                        dow_factor = 0.7
+                    elif dow == 4:  # Friday
+                        dow_factor = 1.1
+                    elif dow == 0:  # Monday
+                        dow_factor = 1.05
+                    else:
+                        dow_factor = 1.0
+                    congestion = congestion * dow_factor
+                    congestion = max(0, min(congestion, 100))
+                    
+                    cache_key = f"{station}_{direction}_{dow}_{hour}"
+                    _PREDICTION_CACHE[cache_key] = congestion
+                    total += 1
+                
+                if total % 100 == 0:
+                    print(f"   Precomputed {total} predictions...")
+    
+    print(f"✅ Precomputed {total} predictions (expected: {len(stations)*len(directions)*len(dows)*len(hours)})")
+    
 @api_predict_bp.route('/debug/model-weights/<station_name>')
 def debug_model_weights(station_name):
     """Check if model weights are balanced"""
@@ -675,9 +746,97 @@ def debug_override_status():
         'config_has_overrides': 'overrides' in current_app.config,
         'current_time': Config.get_current_time().isoformat()
     })
-def get_directional_prediction(station_name, direction, target_datetime=None):
-    """Get directional prediction with request-level caching."""
     
+def get_batch_directional_predictions(station_name, direction, base_time, num_hours=6):
+    """
+    Get predictions for the next `num_hours` hours (starting at base_time)
+    using a single batch call to the model.
+    Returns a list of congestion percentages (length = num_hours).
+    """
+    # Ensure models are loaded
+    ensure_models_loaded(station_name, direction)
+
+    # Check operating hours for each target time
+    # (We'll return 0 for closed hours, but still include them in the batch)
+    target_times = [base_time + timedelta(hours=i) for i in range(num_hours)]
+    operating = []
+    features_list = []
+    valid_indices = []
+
+    for i, dt in enumerate(target_times):
+        hour = dt.hour + dt.minute / 60
+        if 4.5 <= hour < 22.5:
+            # Get scaled features (cached)
+            features = get_scaled_feature_sequence(station_name, direction, dt)
+            if features is not None:
+                features_list.append(features)
+                valid_indices.append(i)
+                operating.append(True)
+            else:
+                operating.append(False)
+        else:
+            operating.append(False)
+
+    # Initialize result list with zeros
+    results = [0.0] * num_hours
+
+    if not features_list:
+        return results  # all closed
+
+    # Stack features into a batch (num_valid, 24, 16)
+    batch_features = np.stack(features_list, axis=0).astype(np.float32)
+
+    # Get model and target scaler
+    directional_models, directional_scalers = get_models()
+    model_key = f"{station_name}_{direction}"
+    model = directional_models.get(model_key)
+    target_scaler = directional_scalers.get(f'{model_key}_target')
+
+    if model is None or target_scaler is None:
+        # Fallback to individual predictions
+        for i in range(num_hours):
+            results[i] = get_directional_prediction(station_name, direction, target_times[i])
+        return results
+
+    # Batch prediction
+    pred_scaled = model.predict(batch_features, verbose=0)  # shape: (num_valid, 1)
+    # Inverse transform all at once
+    pred_passengers = target_scaler.inverse_transform(pred_scaled).flatten()
+
+    # Get P90 and correction factor once
+    p90 = get_p90_percentile(station_name, direction)
+    if p90 <= 0:
+        p90 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+    correction_factors = get_correction_factors()
+    factor = correction_factors.get(model_key, 1.0)
+
+    # Fill results for valid indices
+    for idx, (valid_i, passenger) in enumerate(zip(valid_indices, pred_passengers)):
+        congestion = (passenger / p90) * 100
+        congestion = max(0, min(congestion, 100))
+        congestion = congestion * factor
+        congestion = max(0, min(congestion, 100))
+
+        # Day of week adjustment
+        dow = target_times[valid_i].weekday()
+        if dow >= 5:
+            dow_factor = 0.7
+        elif dow == 4:
+            dow_factor = 1.1
+        elif dow == 0:
+            dow_factor = 1.05
+        else:
+            dow_factor = 1.0
+        congestion = congestion * dow_factor
+        congestion = max(0, min(congestion, 100))
+
+        results[valid_i] = congestion
+
+        # Also store in request cache for single calls (optional)
+        set_cached_prediction(station_name, direction, target_times[valid_i], congestion)
+
+    return results
+def get_directional_prediction(station_name, direction, target_datetime=None):
     if target_datetime is None:
         target_datetime = Config.get_current_time()
     
@@ -685,6 +844,19 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
     cached = get_cached_prediction(station_name, direction, target_datetime)
     if cached is not None:
         return cached
+    
+    # ========== NEW: Check precomputed prediction cache ==========
+    dow = target_datetime.weekday()
+    hour = target_datetime.hour
+    cache_key = f"{station_name}_{direction}_{dow}_{hour}"
+    if cache_key in _PREDICTION_CACHE:
+        congestion = _PREDICTION_CACHE[cache_key]
+        # Store in request-level cache for this specific time (optional)
+        set_cached_prediction(station_name, direction, target_datetime, congestion)
+        return congestion
+    
+    # ========== START TIMING (existing code below) ==========
+    total_start = time.time()
     
     ensure_models_loaded(station_name, direction)
     
@@ -710,44 +882,58 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
         return _get_operating_hours_fallback(target_datetime)
     
     try:
-        # ========== ✅ FIX: Use get_scaled_feature_sequence directly ==========
-        # This returns ALREADY SCALED features - DO NOT apply feature scaler again!
+        # ========== TIMING: Feature extraction ==========
+        t0 = time.time()
         from services.feature_engineering import get_scaled_feature_sequence
         features_scaled = get_scaled_feature_sequence(station_name, direction, target_datetime)
+        print(f"⏱️ [get_directional_prediction] get_scaled_feature_sequence: {time.time()-t0:.4f}s")
         
         if features_scaled is None:
             return _get_operating_hours_fallback(target_datetime)
         
-        # ========== ✅ FIX: Get target scaler ONLY ==========
+        # ========== TIMING: Get target scaler ==========
+        t1 = time.time()
         target_scaler = directional_scalers.get(f'{model_key}_target')
+        print(f"⏱️ [get_directional_prediction] get_target_scaler: {time.time()-t1:.4f}s")
+        
         if target_scaler is None:
             return _get_operating_hours_fallback(target_datetime)
         
-        # ========== ✅ FIX: features_scaled is already scaled ==========
+        # ========== TIMING: Model prediction ==========
+        t2 = time.time()
         input_sequence = features_scaled.reshape(1, 24, -1)
         input_tensor = tf.convert_to_tensor(input_sequence, dtype=tf.float32)
         
         prediction_scaled = directional_models[model_key](input_tensor, training=False).numpy()
         raw_output = float(prediction_scaled[0][0])
+        print(f"⏱️ [get_directional_prediction] model_predict: {time.time()-t2:.4f}s")
         
+        # ========== TIMING: Inverse transform ==========
+        t3 = time.time()
         passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
+        print(f"⏱️ [get_directional_prediction] inverse_transform: {time.time()-t3:.4f}s")
         
-        # Get P90 (changed from P95)
+        # ========== TIMING: P90 calculation ==========
+        t4 = time.time()
         p90 = get_p90_percentile(station_name, direction)
         if p90 <= 0:
             p90 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        print(f"⏱️ [get_directional_prediction] get_p90: {time.time()-t4:.4f}s")
         
         # Convert to congestion
         congestion = (passenger_count / p90) * 100
         congestion = max(0, min(congestion, 100))
         
-        # Apply correction factor
+        # ========== TIMING: Correction factors ==========
+        t5 = time.time()
         correction_factors = get_correction_factors()
         factor = correction_factors.get(model_key, 1.0)
         congestion = congestion * factor
         congestion = max(0, min(congestion, 100))
+        print(f"⏱️ [get_directional_prediction] correction_factors: {time.time()-t5:.4f}s")
         
-        # Day of week adjustment
+        # ========== TIMING: Day of week adjustment ==========
+        t6 = time.time()
         dow = target_datetime.weekday()
         if dow >= 5:
             dow_factor = 0.7
@@ -760,9 +946,17 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
         
         congestion = congestion * dow_factor
         congestion = max(0, min(congestion, 100))
+        print(f"⏱️ [get_directional_prediction] dow_adjustment: {time.time()-t6:.4f}s")
         
         # Store in request cache
         set_cached_prediction(station_name, direction, target_datetime, congestion)
+        
+        # ========== TOTAL TIME ==========
+        total_elapsed = time.time() - total_start
+        if total_elapsed > 0.5:
+            print(f"⏱️ [get_directional_prediction] TOTAL: {total_elapsed:.4f}s ⚠️ SLOW")
+        else:
+            print(f"⏱️ [get_directional_prediction] TOTAL: {total_elapsed:.4f}s")
         
         return congestion
         
@@ -1947,18 +2141,14 @@ def is_override_active(override, target_time):
     except Exception as e:
         print(f"⚠️ Error in is_override_active: {e}")
         return False
-
 @api_predict_bp.route('/directional-forecast/<station_name>')
 def directional_forecast(station_name):
-    
-    from services.feature_engineering import _TYPICAL_PATTERN_CACHE,  _BASELINE_FEATURES_CACHE
-    
-    
+    start_total = time.time()  # define at the start
     name = station_name.replace('%20', ' ')
-    
+
     date_param = request.args.get('date')
     time_param = request.args.get('time')
-    
+
     if date_param and time_param:
         try:
             year, month, day = map(int, date_param.split('-'))
@@ -1969,75 +2159,68 @@ def directional_forecast(station_name):
             base_time = Config.get_current_time()
     else:
         base_time = Config.get_current_time()
-    
-    # ========== GET ACTIVE OVERRIDES FROM FILE ==========
+
+    # ========== GET ACTIVE OVERRIDES (ONCE) ==========
+    t0 = time.time()
     active_overrides = get_active_overrides()
-    
-    # Debug: Print override status
+    print(f"⏱️ get_active_overrides: {time.time()-t0:.3f}s")
+
     print(f"\n🔍 DIRECTIONAL FORECAST for {name}")
     print(f"   Active overrides: {list(active_overrides.keys())}")
     north_key = f"{name}_northbound"
     south_key = f"{name}_southbound"
     print(f"   North override exists: {north_key in active_overrides}")
     print(f"   South override exists: {south_key in active_overrides}")
-    
+
+    # ========== BATCH PREDICTIONS (6 hours per direction) ==========
+    t1 = time.time()
+    north_preds = get_batch_directional_predictions(name, 'Northbound', base_time, num_hours=6)
+    south_preds = get_batch_directional_predictions(name, 'Southbound', base_time, num_hours=6)
+    print(f"⏱️ Batch predictions (both dirs): {time.time()-t1:.3f}s")
+
+    # ========== BUILD FORECASTS WITH OVERRIDES ==========
     forecasts = []
-    
     for i in range(6):
         target_time = base_time + timedelta(hours=i)
-        
+        # Start with batch predictions
+        north_cong = north_preds[i]
+        south_cong = south_preds[i]
+
         is_north_overridden = False
         is_south_overridden = False
-        north_cong = None
-        south_cong = None
-        
+
         # ========== CHECK NORTHBOUND OVERRIDE ==========
         if north_key in active_overrides:
             override = active_overrides[north_key]
             override_congestion = override.get('congestion', 50)
-            
-            # Check if override is active
             if is_override_active(override, target_time):
                 north_cong = override_congestion
                 is_north_overridden = True
                 print(f"🔧 OVERRIDE ACTIVE: {name} Northbound at {target_time} -> {north_cong}%")
             else:
                 print(f"⏰ Override NOT active for {target_time}")
-        
+
         # ========== CHECK SOUTHBOUND OVERRIDE ==========
         if south_key in active_overrides:
             override = active_overrides[south_key]
             override_congestion = override.get('congestion', 50)
-            
-            # Check if override is active
             if is_override_active(override, target_time):
                 south_cong = override_congestion
                 is_south_overridden = True
                 print(f"🔧 OVERRIDE ACTIVE: {name} Southbound at {target_time} -> {south_cong}%")
             else:
                 print(f"⏰ Override NOT active for {target_time}")
-        
-        # Use model predictions if no active override for this hour
-        if north_cong is None:
-            north_cong = get_directional_prediction(name, 'Northbound', target_time)
-            if north_cong is None:
-                north_cong = 0
-                
-        if south_cong is None:
-            south_cong = get_directional_prediction(name, 'Southbound', target_time)
-            if south_cong is None:
-                south_cong = 0
-        
-        # Handle None values
+
+        # Ensure values are numbers (should already be)
         if north_cong is None:
             north_cong = 0
         if south_cong is None:
             south_cong = 0
-        
+
         ampm = target_time.strftime('%I:%M %p')
         if i == 0:
             ampm = f"NOW ({ampm})"
-        
+
         forecasts.append({
             "hour": target_time.hour,
             "time": ampm,
@@ -2046,7 +2229,10 @@ def directional_forecast(station_name):
             "northbound_overridden": is_north_overridden,
             "southbound_overridden": is_south_overridden
         })
-    
+
+    # ========== TOTAL TIME ==========
+    print(f"⏱️ TOTAL directional_forecast: {time.time()-start_total:.3f}s")
+
     return jsonify({
         "station": name,
         "timestamp": base_time.isoformat(),
@@ -2073,10 +2259,6 @@ def test():
    })
 
 @api_predict_bp.route('/directional-forecast/all')
-@cache.cached(
-    timeout=300,
-    key_prefix=lambda: f"all_stations_{datetime.now().hour}"
-)
 def directional_forecast_all():
     """Get current congestion for ALL stations at once"""
     result = {"northbound": {}, "southbound": {}}
@@ -2566,10 +2748,6 @@ def debug_check_scaler_values():
     return jsonify(results)
 
 @api_predict_bp.route('/predict/<station_name>')
-@cache.cached(
-    timeout=300,
-    key_prefix=lambda: safe_cache_key('predict')
-)
 def predict_congestion(station_name):
     """Get current snapshot congestion metrics for a single station"""
     name = station_name.replace('%20', ' ')
@@ -2604,10 +2782,6 @@ def predict_congestion(station_name):
     })
 
 @api_predict_bp.route('/predict-direction/<station_name>')
-@cache.cached(
-    timeout=300,
-    key_prefix=lambda: safe_cache_key('pred_dir')
-)
 def predict_direction(station_name):
     name = station_name.replace('%20', ' ')
     
@@ -2657,10 +2831,6 @@ def predict_direction(station_name):
     })
 
 @api_predict_bp.route('/predict-route')
-@cache.cached(
-    timeout=300,
-    key_prefix=lambda: f"route_{request.args.get('from')}_{request.args.get('to')}_{datetime.now().hour}"
-)
 def predict_route():
     from_station = request.args.get('from')
     to_station = request.args.get('to')
