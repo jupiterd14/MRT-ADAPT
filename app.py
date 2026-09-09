@@ -9,9 +9,13 @@ print(f"GOOGLE_CLIENT_SECRET: {'FOUND' if os.getenv('GOOGLE_CLIENT_SECRET') else
 print("=" * 50)
 import gc
 import time
-os.environ['TZ'] = 'Asia/Manila'
-time.tzset()
-print(f"✅ Timezone set to: {time.tzname}")
+import sys
+if sys.platform != 'win32':
+    os.environ['TZ'] = 'Asia/Manila'
+    time.tzset()
+    print(f"✅ Timezone set to: {time.tzname}")
+else:
+    print("ℹ️ Windows detected – using system timezone (Asia/Manila assumed in Config)")
 
 os.environ['TF_XLA_FLAGS'] = '--tf_xla_auto_jit=2'
 # Reduce Python memory

@@ -13,7 +13,7 @@ email_bp = Blueprint('email', __name__)
 EMAIL_CONFIG = {
     'smtp_server': 'smtp.gmail.com',
     'smtp_port': 587,
-    'email': 'junnied1405@gmail.com',
+    'email': 'pingoljunnieper@gmail.com',
     'password': 'ppkmjgcydeofmejj'
 }
 
