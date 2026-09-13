@@ -2394,7 +2394,6 @@ document.addEventListener('DOMContentLoaded', function() {
     populateDateTimeSelects();
     
     // Update time period when hour changes
-    document.getElementById('hourSelect')?.addEventListener('change', updateTimePeriod);
     
     // Set up station event listeners with debouncing
     const fromSelect = document.getElementById('fromStation');
@@ -2529,14 +2528,16 @@ function populateDateTimeSelects() {
     const currentMonth = now.getMonth() + 1;
     const currentDay = now.getDate();
     
-    // ========== YEARS (2025 only) ==========
+    // ========== YEARS (2025 and 2026) ==========
     const yearSelect = document.getElementById('yearSelect');
     if (yearSelect) {
         yearSelect.innerHTML = '';
-        const option = document.createElement('option');
-        option.value = 2025;
-        option.textContent = 2025;
-        yearSelect.appendChild(option);
+        [2025, 2026].forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearSelect.appendChild(option);
+        });
         yearSelect.value = 2025;
     }
     
@@ -2566,20 +2567,37 @@ function populateDateTimeSelects() {
     // ========== DAYS ==========
     updateDays();
     
-    // ========== HOURS (4 AM to 11 PM) ==========
+    // ========== HOURS (1–12, 12-hour format) ==========
     const hourSelect = document.getElementById('hourSelect');
+    const ampmSelect = document.getElementById('ampmSelect');
+    
     if (hourSelect) {
         hourSelect.innerHTML = '';
-        for (let i = 4; i <= 23; i++) {
+        // Only 12-hour values: 1, 2, 3, ..., 12
+        for (let i = 1; i <= 12; i++) {
             const option = document.createElement('option');
-            option.value = String(i).padStart(2, '0');
-            const displayHour = i > 12 ? i - 12 : i;
-            option.textContent = displayHour;
+            option.value = String(i).padStart(2, '0');  // "01", "02", ..., "12"
+            option.textContent = i;                     // 1, 2, ..., 12
             hourSelect.appendChild(option);
         }
-        let currentHour = now.getHours() + 1;
-        if (currentHour > 23) currentHour = 23;
-        hourSelect.value = String(Math.min(currentHour, 23)).padStart(2, '0');
+        
+        // Default from real system time, clamped to operating hours (4 AM – 11 PM)
+        let currentHour24 = now.getHours();
+        if (now.getMinutes() >= 55) {
+            currentHour24 += 1;
+        }
+        if (currentHour24 < 4) currentHour24 = 4;
+        if (currentHour24 > 23) currentHour24 = 23;
+        
+        // Convert 24h → 12h for the dropdown
+        let hour12 = currentHour24 % 12;
+        if (hour12 === 0) hour12 = 12;
+        hourSelect.value = String(hour12).padStart(2, '0');
+        
+        // Set initial AM/PM from the same 24h value
+        if (ampmSelect) {
+            ampmSelect.value = currentHour24 >= 12 ? 'PM' : 'AM';
+        }
     }
     
     // ========== MINUTES (in 5-minute increments) ==========
@@ -2596,14 +2614,7 @@ function populateDateTimeSelects() {
         minuteSelect.value = String(Math.min(currentMinute, 55)).padStart(2, '0');
     }
     
-    // ========== AM/PM ==========
-    const ampmSelect = document.getElementById('ampmSelect');
-    if (ampmSelect) {
-        const hour = parseInt(document.getElementById('hourSelect')?.value || 12);
-        ampmSelect.value = hour >= 12 ? 'PM' : 'AM';
-    }
-    
-    // ========== Add event listeners for dynamic days ==========
+    // ========== Dynamic day updates ==========
     monthSelect?.addEventListener('change', function() {
         updateDays();
     });
@@ -2611,10 +2622,7 @@ function populateDateTimeSelects() {
     yearSelect?.addEventListener('change', function() {
         updateDays();
     });
-    
-    updateTimePeriod();
 }
-
 // ========== UPDATE DAYS ==========
 function updateDays() {
     const monthSelect = document.getElementById('monthSelect');
@@ -2677,13 +2685,18 @@ function getFormattedDateTime() {
 // ========== VALIDATE DATE TIME ==========
 function validateDateTime() {
     const dateTime = getFormattedDateTime();
-    const hour = parseInt(dateTime.time.split(':')[0]);
+    const [hourStr, minuteStr] = dateTime.time.split(':');
+    const hour = parseInt(hourStr);
+    const minute = parseInt(minuteStr);
+    const timeDecimal = hour + minute / 60;
     
-    if (hour < 4 || hour > 23) {
+    const OPERATING_START = 4.5;   // 4:30 AM
+    const OPERATING_END = 22.5;    // 10:30 PM
+    
+    if (timeDecimal < OPERATING_START || timeDecimal >= OPERATING_END) {
         showToast('Trains operate from 4:30 AM to 10:30 PM only', 'error');
         return false;
     }
-    
     return true;
 }
 
@@ -2742,19 +2755,32 @@ function planRoute() {
 }
 
 // ========== CANCEL ROUTE ==========
+// ========== CANCEL ROUTE ==========
 function cancelRoute() {
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentDay = now.getDate();
-    let currentHour = now.getHours() + 1;
-    if (currentHour > 23) currentHour = 23;
+    
+    let currentHour24 = now.getHours() + 1;
+    if (currentHour24 > 23) currentHour24 = 23;
+    if (currentHour24 < 4) currentHour24 = 4;
     const currentMinute = Math.floor(now.getMinutes() / 5) * 5;
     
     document.getElementById('monthSelect').value = currentMonth;
     document.getElementById('daySelect').value = String(currentDay).padStart(2, '0');
     document.getElementById('yearSelect').value = 2025;
-    document.getElementById('hourSelect').value = String(Math.min(currentHour, 23)).padStart(2, '0');
+    
+    // Convert 24h → 12h for the hour dropdown
+    let hour12 = currentHour24 % 12;
+    if (hour12 === 0) hour12 = 12;
+    document.getElementById('hourSelect').value = String(hour12).padStart(2, '0');
     document.getElementById('minuteSelect').value = String(Math.min(currentMinute, 55)).padStart(2, '0');
+    
+    // Set AM/PM from the 24h value
+    const ampmSelect = document.getElementById('ampmSelect');
+    if (ampmSelect) {
+        ampmSelect.value = currentHour24 >= 12 ? 'PM' : 'AM';
+    }
     
     document.getElementById('fromStation').value = 'North Ave';
     document.getElementById('toStation').value = 'Ayala Ave';
@@ -2774,10 +2800,8 @@ function cancelRoute() {
     `;
     container.classList.remove('has-content');
     
-    updateTimePeriod();
     showToast('Form reset to current date');
 }
-
 // ========== REFRESH PLAN ==========
 function refreshPlan() {
     const from = document.getElementById('fromStation').value;
@@ -2845,6 +2869,28 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     container.innerHTML = '';
     container.classList.add('has-content');
     
+       if (fromData?.status === 'CLOSED' || toData?.status === 'CLOSED') {
+        const closedCard = document.createElement('div');
+        closedCard.className = 'advisory-card info';
+        closedCard.style.background = '#F1F5F9';
+        closedCard.style.border = '2px solid #94A3B8';
+        closedCard.innerHTML = `
+            <div class="advisory-status-content">
+                <i class="fas fa-moon advisory-status-icon" style="color: #64748B;"></i>
+                <div class="advisory-status-text">
+                    <div class="advisory-status-message" style="color: #475569;">
+                        MRT-3 is CLOSED at ${time}
+                    </div>
+                    <div class="advisory-status-tip" style="color: #64748B;">
+                        <i class="fas fa-lightbulb"></i> 
+                        Operating hours: 4:30 AM – 10:30 PM daily
+                    </div>
+                </div>
+            </div>
+        `;
+        container.appendChild(closedCard);
+        return;
+    }
     const fromIdx = stations.indexOf(from);
     const toIdx = stations.indexOf(to);
     const stationDiff = Math.abs(fromIdx - toIdx);

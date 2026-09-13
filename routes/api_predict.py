@@ -60,13 +60,20 @@ def get_p90_cache():
 
 
 _PENDING_CORRECTION_FACTORS = {}
-
 def get_all_stations_predictions():
-    """Internal helper: returns raw dict of all current predictions (no JSON)."""
     result = {"northbound": {}, "southbound": {}}
     now = Config.get_current_time()
     
+    # Operating hours check
+    current_time = now.hour + now.minute / 60
+    is_closed = current_time < 4.5 or current_time >= 22.5
+    
     for station in STATIONS:
+        if is_closed:
+            result['northbound'][station] = {"congestion": 0, "status": "CLOSED"}
+            result['southbound'][station] = {"congestion": 0, "status": "CLOSED"}
+            continue
+        
         north_cong = get_directional_prediction(station, 'Northbound', now)
         south_cong = get_directional_prediction(station, 'Southbound', now)
         
@@ -783,41 +790,42 @@ def get_batch_directional_predictions(station_name, direction, base_time, num_ho
         dt = base_time + timedelta(hours=i)
         results.append(get_directional_prediction(station_name, direction, dt))
     return results
-
 def get_directional_prediction(station_name, direction, target_datetime=None):
     if target_datetime is None:
         target_datetime = Config.get_current_time()
+    
+    # ========== CLOSED CHECK FIRST — BEFORE ANY CACHE ==========
+    # This must happen before request cache and precomputed cache lookups,
+    # otherwise cached values for non-operating hours will be returned.
+    hour = target_datetime.hour
+    minute = target_datetime.minute
+    current_time_decimal = hour + minute / 60
+    
+    OPERATING_START = 4.5   # 4:30 AM
+    OPERATING_END = 22.5    # 10:30 PM
+    
+    if current_time_decimal < OPERATING_START or current_time_decimal >= OPERATING_END:
+        return 0
+    # ============================================================
     
     # Check request cache first
     cached = get_cached_prediction(station_name, direction, target_datetime)
     if cached is not None:
         return cached
     
-    # ========== NEW: Check precomputed prediction cache ==========
+    # Check precomputed prediction cache
     dow = target_datetime.weekday()
-    hour = target_datetime.hour
     cache_key = f"{station_name}_{direction}_{dow}_{hour}"
     if cache_key in _PREDICTION_CACHE:
         congestion = _PREDICTION_CACHE[cache_key]
-        # Store in request-level cache for this specific time (optional)
+        # Store in request-level cache for this specific time
         set_cached_prediction(station_name, direction, target_datetime, congestion)
         return congestion
     
-    # ========== START TIMING (existing code below) ==========
+    # ========== START TIMING (fallback path — models must be loaded) ==========
     total_start = time.time()
     
     ensure_models_loaded(station_name, direction)
-    
-    # Check if MRT is closed
-    hour = target_datetime.hour
-    minute = target_datetime.minute
-    current_time_decimal = hour + minute / 60
-    
-    OPERATING_START = 4.5
-    OPERATING_END = 22.5
-    
-    if current_time_decimal < OPERATING_START or current_time_decimal >= OPERATING_END:
-        return 0
     
     directional_models, directional_scalers = get_models()
     
@@ -883,11 +891,11 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
         # ========== TIMING: Day of week adjustment ==========
         t6 = time.time()
         dow = target_datetime.weekday()
-        if dow >= 5:
+        if dow >= 5:      # weekend
             dow_factor = 0.7
-        elif dow == 4:
+        elif dow == 4:    # Friday
             dow_factor = 1.1
-        elif dow == 0:
+        elif dow == 0:    # Monday
             dow_factor = 1.05
         else:
             dow_factor = 1.0
