@@ -8,3 +8,8 @@ __pycache__/
 
 .env
 ./env
+
+mrt.db
+*.db
+*.sqlite
+*.sqlite3
