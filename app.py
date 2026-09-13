@@ -2,11 +2,6 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 from zoneinfo import ZoneInfo
-print("=" * 50)
-print("🔍 ENVIRONMENT VARIABLES CHECK:")
-print(f"GOOGLE_CLIENT_ID: {os.getenv('GOOGLE_CLIENT_ID', 'NOT FOUND')[:20]}...")
-print(f"GOOGLE_CLIENT_SECRET: {'FOUND' if os.getenv('GOOGLE_CLIENT_SECRET') else 'NOT FOUND'}")
-print("=" * 50)
 import gc
 import time
 import sys

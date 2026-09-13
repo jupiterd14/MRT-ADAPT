@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Make sure the kaggle package sees the token (it reads os.environ directly)
+if os.getenv("KAGGLE_API_TOKEN"):
+    os.environ["KAGGLE_API_TOKEN"] = os.getenv("KAGGLE_API_TOKEN")
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', os.urandom(24))
     SESSION_COOKIE_SECURE = True
@@ -16,11 +20,11 @@ class Config:
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 
+    # Kaggle (optional, for automated retraining)
+    KAGGLE_API_TOKEN = os.environ.get('KAGGLE_API_TOKEN')
+
     # ========== SIMULATION CLOCK CENTER ==========
     @staticmethod
     def get_current_time():
         """Returns the real current time with year set to 2025 for dataset compatibility"""
-        now = datetime.now()
-        # Keep real month, day, hour, minute, second
-        # Only change the year to 2025 to match your dataset
         return datetime.now(ZoneInfo('Asia/Manila')).replace(year=2025)

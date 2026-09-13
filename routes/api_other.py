@@ -1129,17 +1129,59 @@ def debug_check_lookback_data():
 def live_map_directions_v3():
     try:
         from routes.api_predict import get_all_stations_predictions
+        from datetime import datetime as _dt
         
-        # Get raw predictions (no JSON serialization here)
+        now = Config.get_current_time()
+        current_time = now.hour + now.minute / 60
+        
+        OPERATING_START = 4.5
+        OPERATING_END = 22.5
+        is_closed = current_time < OPERATING_START or current_time >= OPERATING_END
+        
+        active_overrides = get_active_overrides()
+        stations = current_app.config.get('STATIONS', STATIONS)
+        
+        # ========== If closed, return CLOSED for all stations ==========
+        if is_closed:
+            northbound = {}
+            southbound = {}
+            for station in stations:
+                north_override_key = f"{station}_northbound"
+                south_override_key = f"{station}_southbound"
+                
+                northbound[station] = {
+                    "congestion": 0,
+                    "wait_time": "CLOSED",
+                    "status": "CLOSED",
+                    "ridership": 0,
+                    "overridden": north_override_key in active_overrides,
+                    "override_info": active_overrides.get(north_override_key),
+                    "p90": 0,
+                }
+                southbound[station] = {
+                    "congestion": 0,
+                    "wait_time": "CLOSED",
+                    "status": "CLOSED",
+                    "ridership": 0,
+                    "overridden": south_override_key in active_overrides,
+                    "override_info": active_overrides.get(south_override_key),
+                    "p90": 0,
+                }
+            
+            return jsonify({
+                "northbound": northbound,
+                "southbound": southbound,
+                "timestamp": now.isoformat(),
+                "is_operating": False,
+                "cached": False,
+                "source": "closed",
+            })
+        
+        # ========== Normal operation path (unchanged) ==========
         data = get_all_stations_predictions()
         
-        # Get active overrides
-        active_overrides = get_active_overrides()
-        
-        # Convert to live-map format (apply overrides)
         northbound = {}
         southbound = {}
-        stations = current_app.config.get('STATIONS', STATIONS)
         
         for station in stations:
             north = data['northbound'].get(station, {})
@@ -1179,7 +1221,7 @@ def live_map_directions_v3():
                 "ridership": int((north_cong / 100) * p90_north) if p90_north else 0,
                 "overridden": north_override_key in active_overrides,
                 "override_info": active_overrides.get(north_override_key),
-                "p90": round(p90_north, 0) if p90_north else 0
+                "p90": round(p90_north, 0) if p90_north else 0,
             }
             southbound[station] = {
                 "congestion": south_cong,
@@ -1188,17 +1230,18 @@ def live_map_directions_v3():
                 "ridership": int((south_cong / 100) * p90_south) if p90_south else 0,
                 "overridden": south_override_key in active_overrides,
                 "override_info": active_overrides.get(south_override_key),
-                "p90": round(p90_south, 0) if p90_south else 0
+                "p90": round(p90_south, 0) if p90_south else 0,
             }
         
         return jsonify({
             "northbound": northbound,
             "southbound": southbound,
-            "timestamp": Config.get_current_time().isoformat(),
+            "timestamp": now.isoformat(),
+            "is_operating": True,
             "cached": True,
-            "source": "internal helper (no double JSON)"
+            "source": "internal helper (no double JSON)",
         })
-        
+    
     except Exception as e:
         print(f"❌ Error in live_map_directions_v3: {e}")
         return jsonify({"error": str(e)}), 500
