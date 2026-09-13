@@ -128,16 +128,33 @@ def login():
             else:
                 session.clear()
     
+    # ========== INVITE HANDLING (GET only) ==========
     invite_email = request.args.get('email')
     invite_temp = request.args.get('temp')
     invite_station = request.args.get('station')
     
     if invite_email and invite_temp:
-        return render_template('operator_signup.html', 
-                             email=invite_email, 
-                             temp_password=invite_temp,
-                             assigned_station=invite_station or 'All Stations')
+        # Validate the invite exists, matches, and hasn't expired
+        operator = User.query.filter_by(username=invite_email, role='operator').first()
+        
+        if not operator:
+            flash('This invitation is invalid.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        if not operator.verify_password(invite_temp):
+            flash('This invitation is invalid or has already been used.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        if operator.is_invite_expired():
+            flash('This invitation has expired. Please request a new one from the administrator.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        return render_template('operator_signup.html',
+                               email=invite_email,
+                               temp_password=invite_temp,
+                               assigned_station=invite_station or 'All Stations')
     
+    # ========== NORMAL LOGIN (POST) ==========
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -179,7 +196,6 @@ def login():
             print(f"👤 User found: {user.username}")
             print(f"   Password hash in DB: {user.password_hash[:30] if user.password_hash else 'None'}...")
             
-            # Try verification
             result = user.verify_password(password)
             print(f"   Password verification result: {'✅ PASS' if result else '❌ FAIL'}")
             
@@ -196,8 +212,8 @@ def login():
                 user.last_login = datetime.now()
                 db.session.commit()
                 
-                log_activity(user.id, user.role, user.username, 'login_success', 
-                            f'Logged in from IP: {ip_address}')
+                log_activity(user.id, user.role, user.username, 'login_success',
+                             f'Logged in from IP: {ip_address}')
                 
                 if user.role == 'admin':
                     return redirect(url_for('admin.admin_dashboard'))
@@ -488,29 +504,28 @@ def operator_signup():
         if not operator:
             return jsonify({'success': False, 'error': 'Invalid invitation - user not found'}), 401
         
-        # Check temporary password
+        # Check temporary password (also confirms the invite hasn't been used)
         if not operator.verify_password(temp_password):
-            return jsonify({'success': False, 'error': 'Invalid invitation - wrong temporary password'}), 401
+            return jsonify({'success': False, 'error': 'Invalid invitation - wrong or already-used temporary password'}), 401
+        
+        # ✅ Check expiry
+        if operator.is_invite_expired():
+            return jsonify({'success': False, 'error': 'This invitation has expired. Please request a new one.'}), 401
         
         # Update operator
         operator.password = new_password
         operator.is_active = True
+        operator.clear_invite()  # ✅ consume the invite
         
         # Set station if provided
         if station and station != 'All Stations':
             operator.favorite_station = station
         
-        # Update name if provided (you might need to add a name field to User model)
-        if name:
-            # If you have a name field, set it here
-            # operator.name = name
-            pass
-        
         db.session.commit()
         
         # Log the activity
-        log_activity(operator.id, 'operator', operator.username, 'signup_complete', 
-                    f'Operator account activated from invitation')
+        log_activity(operator.id, 'operator', operator.username, 'signup_complete',
+                     f'Operator account activated from invitation')
         
         # Set session
         session.clear()
@@ -524,7 +539,7 @@ def operator_signup():
         db.session.commit()
         
         return jsonify({
-            'success': True, 
+            'success': True,
             'redirect': '/operator-dashboard',
             'message': 'Account created successfully!'
         })

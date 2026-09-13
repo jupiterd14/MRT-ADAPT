@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 import secrets, string, json, os
 from .auth import log_activity
 from routes.api_predict import get_directional_prediction
+from datetime import datetime, timedelta
+from routes.auth import no_cache
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -32,6 +34,7 @@ def get_station_prediction(station_name):
 
 
 @admin_bp.route('/admin/dashboard')
+@no_cache
 def admin_dashboard():
     is_admin = (session.get('admin_logged_in') or session.get('is_admin') or session.get('role') == 'admin')
     
@@ -426,15 +429,27 @@ def dashboard_stats():
 @admin_bp.route('/api/admin/operator-list')
 def operator_list():
     try:
-        log_activity(session.get('user_id'), 'admin', session.get('username'), 
-                    'view_operators', 'Viewed operator list')
-        
-        operators = User.query.filter_by(role='operator').all()
+        log_activity(session.get('user_id'), 'admin', session.get('username'),
+                     'view_operators', 'Viewed operator list')
+
+        now = datetime.now()
+
+        # Show: active operators OR operators with a still-valid pending invite
+        operators = User.query.filter_by(role='operator').filter(
+            db.or_(
+                User.is_active == True,
+                db.and_(
+                    User.is_active == False,
+                    User.invite_expires_at != None,
+                    User.invite_expires_at > now
+                )
+            )
+        ).all()
+
         operator_data = []
-        
         for op in operators:
             name = op.username.split('@')[0] if '@' in op.username else op.username
-            
+
             if op.access_level == 'line_wide':
                 station_display = "All Stations"
             elif op.access_level == 'zone':
@@ -448,19 +463,28 @@ def operator_list():
                         station_display = op.favorite_station or "Not Assigned"
                 else:
                     station_display = op.favorite_station or "Not Assigned"
-            
+
+            # ✅ Distinguish pending invites from active/deactivated
+            is_pending = (not op.is_active) and op.invite_expires_at is not None and op.invite_expires_at > now
+
             operator_data.append({
-                'id': op.id, 'name': name, 'email': op.username, 'station': station_display,
+                'id': op.id,
+                'name': name,
+                'email': op.username,
+                'station': station_display,
                 'joined': op.created_at.strftime('%b %d, %Y') if op.created_at else 'Unknown',
                 'last_login': op.last_login.strftime('%b %d, %Y') if op.last_login else 'Never',
-                'active': op.is_active, 'access_level': op.access_level
+                'active': op.is_active,
+                'access_level': op.access_level,
+                'status': 'pending' if is_pending else ('active' if op.is_active else 'deactivated'),
+                'invite_expires_at': op.invite_expires_at.isoformat() if op.invite_expires_at else None
             })
-        
+
         return jsonify(operator_data)
     except Exception as e:
+        print(f"Error in operator_list: {e}")
         return jsonify([])
-
-
+    
 @admin_bp.route('/api/admin/generate-invite', methods=['POST'])
 def generate_invite():
     try:
@@ -470,26 +494,42 @@ def generate_invite():
         access_level_type = data.get('access_level', 'standard')
         auth_method = data.get('auth_method', 'password')
         
+        # ✅ Invite expires in 48 hours
+        INVITE_TTL_HOURS = 24
+        expiry = datetime.now() + timedelta(hours=INVITE_TTL_HOURS)
+        
         existing_user = User.query.filter_by(username=email).first()
         if existing_user and existing_user.is_active:
             return jsonify({'success': False, 'error': 'Email already registered and active'}), 400
         
         if existing_user and not existing_user.is_active:
+            # Reactivating a deactivated operator — refresh the invite
             existing_user.is_active = True
+            existing_user.invite_expires_at = expiry  # ✅ refresh expiry
+            
             if auth_method == 'google':
                 existing_user.password_hash = None
+                db.session.commit()
+                invite_link = f"{request.host_url}login/google/authorize?invite=true&email={email}"
+                return jsonify({
+                    'success': True,
+                    'link': invite_link,
+                    'auth_method': 'google',
+                    'expires_at': expiry.isoformat()
+                })
             else:
                 temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(10))
                 existing_user.password = temp_password
-            db.session.commit()
-            
-            if auth_method == 'google':
-                invite_link = f"{request.host_url}login/google/authorize?invite=true&email={email}"
-                return jsonify({'success': True, 'link': invite_link, 'auth_method': 'google'})
-            else:
+                db.session.commit()
                 invite_link = f"{request.host_url}login?email={email}&temp={temp_password}&station={station}"
-                return jsonify({'success': True, 'link': invite_link, 'auth_method': 'password'})
+                return jsonify({
+                    'success': True,
+                    'link': invite_link,
+                    'auth_method': 'password',
+                    'expires_at': expiry.isoformat()
+                })
         
+        # Determine access level
         if access_level_type == 'full' or station == 'All Stations (Line-Wide)':
             db_access_level = 'line_wide'
             assigned_stations = STATIONS
@@ -501,30 +541,49 @@ def generate_invite():
         
         if auth_method == 'google':
             new_operator = User(
-                username=email, role='operator', access_level=db_access_level,
-                assigned_stations=json.dumps(assigned_stations), favorite_station=favorite_station,
-                created_at=datetime.now(), is_active=True
+                username=email,
+                role='operator',
+                access_level=db_access_level,
+                assigned_stations=json.dumps(assigned_stations),
+                favorite_station=favorite_station,
+                created_at=datetime.now(),
+                is_active=True,
+                invite_expires_at=expiry  # ✅ set expiry
             )
             db.session.add(new_operator)
             db.session.commit()
             invite_link = f"{request.host_url}login/google/authorize?invite=true&email={email}"
-            return jsonify({'success': True, 'link': invite_link, 'auth_method': 'google'})
+            return jsonify({
+                'success': True,
+                'link': invite_link,
+                'auth_method': 'google',
+                'expires_at': expiry.isoformat()
+            })
         else:
             new_operator = User(
-                username=email, role='operator', access_level=db_access_level,
-                assigned_stations=json.dumps(assigned_stations), favorite_station=favorite_station,
-                created_at=datetime.now(), is_active=False
+                username=email,
+                role='operator',
+                access_level=db_access_level,
+                assigned_stations=json.dumps(assigned_stations),
+                favorite_station=favorite_station,
+                created_at=datetime.now(),
+                is_active=False,
+                invite_expires_at=expiry  # ✅ set expiry
             )
             temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(10))
             new_operator.password = temp_password
             db.session.add(new_operator)
             db.session.commit()
             invite_link = f"{request.host_url}login?email={email}&temp={temp_password}&station={station}"
-            return jsonify({'success': True, 'link': invite_link, 'auth_method': 'password'})
+            return jsonify({
+                'success': True,
+                'link': invite_link,
+                'auth_method': 'password',
+                'expires_at': expiry.isoformat()
+            })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
-
+    
 @admin_bp.route('/api/admin/deactivate-operator/<int:operator_id>', methods=['POST'])
 def deactivate_operator(operator_id):
     try:

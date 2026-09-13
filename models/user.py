@@ -11,10 +11,13 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     favorite_station = db.Column(db.String(50), nullable=True)
     last_login = db.Column(db.DateTime, nullable=True)
-    is_active = db.Column(db.Boolean, default=True) 
+    is_active = db.Column(db.Boolean, default=True)
     access_level = db.Column(db.String(20), default='station')
     assigned_zone = db.Column(db.String(20), nullable=True)
     assigned_stations = db.Column(db.Text, nullable=True)
+    
+    # ✅ NEW: Invitation expiry tracking
+    invite_expires_at = db.Column(db.DateTime, nullable=True)
     
     @property
     def password(self):
@@ -44,3 +47,14 @@ class User(db.Model):
     def set_assigned_stations(self, stations_list):
         import json
         self.assigned_stations = json.dumps(stations_list)
+    
+    # ✅ NEW: Invite status helpers
+    def is_invite_expired(self):
+        """Returns True if the user has an invite expiry set and it's in the past."""
+        if self.invite_expires_at is None:
+            return False
+        return self.invite_expires_at < datetime.now()
+    
+    def clear_invite(self):
+        """Call after successful signup to consume the invite."""
+        self.invite_expires_at = None

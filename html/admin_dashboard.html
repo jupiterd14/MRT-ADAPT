@@ -3513,6 +3513,33 @@ if (autoTestsBtn) {
     }, 1000);
 });
 
+// Disable bfcache for this page (prevents stale dashboard after logout)
+window.addEventListener('unload', function() {});
+
+// Session re-check on bfcache restore (back/forward button)
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+        fetch('/api/check-session', { cache: 'no-store' })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.logged_in) {
+                    window.location.replace('/login');
+                }
+            })
+            .catch(() => window.location.replace('/login'));
+    }
+});
+
+// Session check on normal load (direct URL paste, hard refresh)
+fetch('/api/check-session', { cache: 'no-store' })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.logged_in) {
+            window.location.replace('/login');
+        }
+    })
+    .catch(() => window.location.replace('/login'));
+    
 // Expose global functions
 window.setDirection = setDirection;
 window.filterAuditLog = filterAuditLog;
