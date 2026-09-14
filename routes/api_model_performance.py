@@ -1976,7 +1976,7 @@ def preprocess_large_csv(filepath, max_rows=None):
         
         if all(col in sample_df.columns for col in required):
             # Read full file
-            df = pd.read_csv(filepath)
+            df = pd.read_csv(filepath, nrows=MAX_ROWS_TO_READ)
             df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
             df = df.dropna(subset=['datetime', 'actual_congestion', 'station', 'direction'])
             
@@ -2035,7 +2035,7 @@ def upload_batch_test():
         # ============================================================
         # FAST LOADING: Only read what's needed
         # ============================================================
-        MAX_ROWS_TO_READ = None  # Adjust: 50k = ~2-3 min, 100k = ~5 min
+        MAX_ROWS_TO_READ = 20000  # Adjust: 50k = ~2-3 min, 100k = ~5 min
         
         # Load models
         from services.model_loader import directional_models, load_single_model, directional_scalers
@@ -2092,7 +2092,7 @@ def upload_batch_test():
         if is_raw_mrt:
             print("📊 Detected RAW MRT format - preprocessing...")
             
-            df = pd.read_csv(filepath)
+            df = pd.read_csv(filepath, nrows=MAX_ROWS_TO_READ)
             if MAX_ROWS_TO_READ is None:
                 print(f"📊 Loaded {len(df):,} rows (full file)")
             else:
