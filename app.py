@@ -656,7 +656,7 @@ with app.app_context():
         if 'reviewed' not in columns:
             print("Adding 'reviewed' column to report table...")
             with db.engine.connect() as conn:
-                conn.execute(text('ALTER TABLE report ADD COLUMN reviewed BOOLEAN DEFAULT 0'))
+                conn.execute(text('ALTER TABLE report ADD COLUMN reviewed BOOLEAN DEFAULT FALSE'))
                 conn.commit()
             print("reviewed column added successfully")
         
@@ -665,7 +665,7 @@ with app.app_context():
             if 'direction' not in broadcast_columns:
                 print("Adding 'direction' column to broadcast table...")
                 with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE broadcast ADD COLUMN direction VARCHAR(20) DEFAULT "both"'))
+                    conn.execute(text("ALTER TABLE broadcast ADD COLUMN direction VARCHAR(20) DEFAULT 'both'"))
                     conn.commit()
                 print("Direction column added to broadcast table")
         except Exception as broadcast_error:
@@ -677,7 +677,7 @@ with app.app_context():
             if 'is_flagged' not in activity_columns:
                 print("Adding flag columns to activity_log table...")
                 with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE activity_log ADD COLUMN is_flagged BOOLEAN DEFAULT 0'))
+                    conn.execute(text('ALTER TABLE activity_log ADD COLUMN is_flagged BOOLEAN DEFAULT FALSE'))
                     conn.execute(text('ALTER TABLE activity_log ADD COLUMN flag_reason VARCHAR(500)'))
                     conn.execute(text('ALTER TABLE activity_log ADD COLUMN flagged_at DATETIME'))
                     conn.execute(text('ALTER TABLE activity_log ADD COLUMN admin_review_notes TEXT'))
