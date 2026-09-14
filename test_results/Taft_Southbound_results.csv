@@ -1,0 +1,19 @@
+station,direction,target_time,hour,predicted,actual,absolute_error,percentage_error,verdict,predicted_category,actual_category
+Taft,Southbound,2025-08-18 05:00:00,5,69.9,51.2,18.7,36.5,NEEDS_IMPROVEMENT,Congested,Congested
+Taft,Southbound,2025-06-17 06:00:00,6,85.2,79.9,5.3,6.6,GOOD,Severe,Congested
+Taft,Southbound,2025-06-17 07:00:00,7,80.2,55.8,24.4,43.7,NEEDS_IMPROVEMENT,Severe,Congested
+Taft,Southbound,2025-06-17 08:00:00,8,69.1,64.2,4.9,7.7,EXCELLENT,Congested,Congested
+Taft,Southbound,2025-06-17 09:00:00,9,65.2,54.0,11.2,20.7,OKAY,Congested,Congested
+Taft,Southbound,2025-06-17 10:00:00,10,63.2,51.6,11.6,22.5,OKAY,Congested,Congested
+Taft,Southbound,2025-06-17 11:00:00,11,63.3,50.4,12.9,25.6,OKAY,Congested,Congested
+Taft,Southbound,2025-06-17 12:00:00,12,63.1,53.0,10.1,19.1,OKAY,Congested,Congested
+Taft,Southbound,2025-06-17 13:00:00,13,64.0,55.0,9.0,16.4,GOOD,Congested,Congested
+Taft,Southbound,2025-06-17 14:00:00,14,67.8,62.5,5.3,8.4,GOOD,Congested,Congested
+Taft,Southbound,2025-06-17 15:00:00,15,79.3,81.4,2.1,2.6,EXCELLENT,Congested,Severe
+Taft,Southbound,2025-06-17 16:00:00,16,100.0,100.0,0.0,0.0,EXCELLENT,Severe,Severe
+Taft,Southbound,2025-06-17 17:00:00,17,100.0,100.0,0.0,0.0,EXCELLENT,Severe,Severe
+Taft,Southbound,2025-06-17 18:00:00,18,100.0,100.0,0.0,0.0,EXCELLENT,Severe,Severe
+Taft,Southbound,2025-06-17 19:00:00,19,100.0,100.0,0.0,0.0,EXCELLENT,Severe,Severe
+Taft,Southbound,2025-06-17 20:00:00,20,76.8,76.5,0.3,0.3,EXCELLENT,Congested,Congested
+Taft,Southbound,2025-08-17 21:00:00,21,22.4,36.9,14.5,39.3,OKAY,Light,Moderate
+Taft,Southbound,2025-04-29 22:00:00,22,2.6,16.0,13.4,84.0,OKAY,Light,Light

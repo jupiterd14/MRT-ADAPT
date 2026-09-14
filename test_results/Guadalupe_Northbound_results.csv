@@ -1,0 +1,19 @@
+station,direction,target_time,hour,predicted,actual,absolute_error,percentage_error,verdict,predicted_category,actual_category
+Guadalupe,Northbound,2025-08-18 05:00:00,5,82.9,4.6,78.3,1702.2,NEEDS_IMPROVEMENT,Severe,Light
+Guadalupe,Northbound,2025-06-17 06:00:00,6,95.4,10.0,85.4,854.4,NEEDS_IMPROVEMENT,Severe,Light
+Guadalupe,Northbound,2025-06-17 07:00:00,7,96.2,12.8,83.4,651.8,NEEDS_IMPROVEMENT,Severe,Light
+Guadalupe,Northbound,2025-06-17 08:00:00,8,77.1,6.8,70.3,1034.0,NEEDS_IMPROVEMENT,Congested,Light
+Guadalupe,Northbound,2025-06-17 09:00:00,9,63.3,6.5,56.8,873.8,NEEDS_IMPROVEMENT,Congested,Light
+Guadalupe,Northbound,2025-06-17 10:00:00,10,56.3,5.6,50.7,906.0,NEEDS_IMPROVEMENT,Congested,Light
+Guadalupe,Northbound,2025-06-17 11:00:00,11,54.1,5.1,49.0,960.0,NEEDS_IMPROVEMENT,Congested,Light
+Guadalupe,Northbound,2025-06-17 12:00:00,12,53.6,4.3,49.3,1145.7,NEEDS_IMPROVEMENT,Congested,Light
+Guadalupe,Northbound,2025-06-17 13:00:00,13,55.0,5.0,50.0,999.1,NEEDS_IMPROVEMENT,Congested,Light
+Guadalupe,Northbound,2025-06-17 14:00:00,14,59.2,5.7,53.5,937.8,NEEDS_IMPROVEMENT,Congested,Light
+Guadalupe,Northbound,2025-06-17 15:00:00,15,74.1,10.8,63.3,586.1,NEEDS_IMPROVEMENT,Congested,Light
+Guadalupe,Northbound,2025-06-17 16:00:00,16,100.0,18.8,81.2,431.9,NEEDS_IMPROVEMENT,Severe,Light
+Guadalupe,Northbound,2025-06-17 17:00:00,17,100.0,28.9,71.1,246.0,NEEDS_IMPROVEMENT,Severe,Moderate
+Guadalupe,Northbound,2025-06-17 18:00:00,18,100.0,30.8,69.2,224.7,NEEDS_IMPROVEMENT,Severe,Moderate
+Guadalupe,Northbound,2025-06-17 19:00:00,19,100.0,28.0,72.0,257.1,NEEDS_IMPROVEMENT,Severe,Moderate
+Guadalupe,Northbound,2025-06-17 20:00:00,20,83.0,18.1,64.9,358.4,NEEDS_IMPROVEMENT,Severe,Light
+Guadalupe,Northbound,2025-08-17 21:00:00,21,33.2,12.3,20.9,170.2,NEEDS_IMPROVEMENT,Moderate,Light
+Guadalupe,Northbound,2025-08-17 22:00:00,22,4.3,3.2,1.1,35.2,EXCELLENT,Light,Light

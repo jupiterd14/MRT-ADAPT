@@ -1,0 +1,19 @@
+station,direction,target_time,hour,predicted,actual,absolute_error,percentage_error,verdict,predicted_category,actual_category
+Santolan,Southbound,2025-08-18 05:00:00,5,18.7,22.7,4.0,17.8,EXCELLENT,Light,Light
+Santolan,Southbound,2025-06-17 06:00:00,6,42.8,39.6,3.2,8.1,EXCELLENT,Moderate,Moderate
+Santolan,Southbound,2025-08-17 07:00:00,7,12.1,13.0,0.9,7.1,EXCELLENT,Light,Light
+Santolan,Southbound,2025-08-17 08:00:00,8,12.9,20.0,7.1,35.6,GOOD,Light,Light
+Santolan,Southbound,2025-06-17 09:00:00,9,45.3,48.3,3.0,6.3,EXCELLENT,Moderate,Moderate
+Santolan,Southbound,2025-06-17 10:00:00,10,45.6,33.5,12.1,36.0,OKAY,Moderate,Moderate
+Santolan,Southbound,2025-06-17 11:00:00,11,48.7,27.6,21.1,76.5,NEEDS_IMPROVEMENT,Moderate,Moderate
+Santolan,Southbound,2025-06-17 12:00:00,12,51.5,17.3,34.2,197.9,NEEDS_IMPROVEMENT,Congested,Light
+Santolan,Southbound,2025-06-17 13:00:00,13,54.1,16.5,37.6,227.8,NEEDS_IMPROVEMENT,Congested,Light
+Santolan,Southbound,2025-06-17 14:00:00,14,64.9,13.7,51.2,373.5,NEEDS_IMPROVEMENT,Congested,Light
+Santolan,Southbound,2025-06-17 15:00:00,15,89.5,7.9,81.6,1032.3,NEEDS_IMPROVEMENT,Severe,Light
+Santolan,Southbound,2025-06-17 16:00:00,16,100.0,12.4,87.6,706.5,NEEDS_IMPROVEMENT,Severe,Light
+Santolan,Southbound,2025-06-17 17:00:00,17,100.0,13.3,86.7,651.9,NEEDS_IMPROVEMENT,Severe,Light
+Santolan,Southbound,2025-06-17 18:00:00,18,100.0,7.0,93.0,1328.6,NEEDS_IMPROVEMENT,Severe,Light
+Santolan,Southbound,2025-06-17 19:00:00,19,95.8,5.4,90.4,1674.7,NEEDS_IMPROVEMENT,Severe,Light
+Santolan,Southbound,2025-08-17 20:00:00,20,32.3,4.5,27.8,617.9,NEEDS_IMPROVEMENT,Moderate,Light
+Santolan,Southbound,2025-08-16 21:00:00,21,35.1,0.9,34.2,3801.1,NEEDS_IMPROVEMENT,Moderate,Light
+Santolan,Southbound,2025-10-14 22:00:00,22,15.4,0.6,14.8,2463.0,OKAY,Light,Light

@@ -1,0 +1,19 @@
+station,direction,target_time,hour,predicted,actual,absolute_error,percentage_error,verdict,predicted_category,actual_category
+Buendia,Southbound,2025-08-18 05:00:00,5,13.7,72.6,58.9,81.1,NEEDS_IMPROVEMENT,Light,Congested
+Buendia,Southbound,2025-06-17 06:00:00,6,42.4,100.0,57.6,57.6,NEEDS_IMPROVEMENT,Moderate,Severe
+Buendia,Southbound,2025-06-17 07:00:00,7,45.6,69.5,23.9,34.5,NEEDS_IMPROVEMENT,Moderate,Congested
+Buendia,Southbound,2025-06-17 08:00:00,8,31.3,86.0,54.7,63.6,NEEDS_IMPROVEMENT,Moderate,Severe
+Buendia,Southbound,2025-06-17 09:00:00,9,28.9,42.2,13.3,31.4,OKAY,Moderate,Moderate
+Buendia,Southbound,2025-06-17 10:00:00,10,28.8,27.4,1.4,5.1,EXCELLENT,Moderate,Moderate
+Buendia,Southbound,2025-06-17 11:00:00,11,29.3,21.0,8.3,39.4,GOOD,Moderate,Light
+Buendia,Southbound,2025-06-17 12:00:00,12,29.7,20.8,8.9,42.7,GOOD,Moderate,Light
+Buendia,Southbound,2025-06-17 13:00:00,13,31.7,23.3,8.4,36.0,GOOD,Moderate,Light
+Buendia,Southbound,2025-06-17 14:00:00,14,42.6,20.3,22.3,109.7,NEEDS_IMPROVEMENT,Moderate,Light
+Buendia,Southbound,2025-06-17 15:00:00,15,61.3,15.5,45.8,295.4,NEEDS_IMPROVEMENT,Congested,Light
+Buendia,Southbound,2025-06-17 16:00:00,16,100.0,19.5,80.5,412.8,NEEDS_IMPROVEMENT,Severe,Light
+Buendia,Southbound,2025-06-17 17:00:00,17,100.0,22.8,77.2,338.6,NEEDS_IMPROVEMENT,Severe,Light
+Buendia,Southbound,2025-06-17 18:00:00,18,100.0,19.1,80.9,423.6,NEEDS_IMPROVEMENT,Severe,Light
+Buendia,Southbound,2025-06-17 19:00:00,19,100.0,19.3,80.7,418.1,NEEDS_IMPROVEMENT,Severe,Light
+Buendia,Southbound,2025-06-17 20:00:00,20,62.1,17.3,44.8,259.0,NEEDS_IMPROVEMENT,Congested,Light
+Buendia,Southbound,2025-08-17 21:00:00,21,6.7,6.0,0.7,11.3,EXCELLENT,Light,Light
+Buendia,Southbound,2025-06-25 22:00:00,22,6.1,2.6,3.5,133.7,EXCELLENT,Light,Light

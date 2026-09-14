@@ -1,0 +1,19 @@
+station,direction,target_time,hour,predicted,actual,absolute_error,percentage_error,verdict,predicted_category,actual_category
+Boni Ave,Northbound,2025-08-18 05:00:00,5,90.1,15.6,74.5,477.3,NEEDS_IMPROVEMENT,Severe,Light
+Boni Ave,Northbound,2025-06-17 06:00:00,6,100.0,27.8,72.2,259.7,NEEDS_IMPROVEMENT,Severe,Moderate
+Boni Ave,Northbound,2025-06-17 07:00:00,7,100.0,25.1,74.9,298.4,NEEDS_IMPROVEMENT,Severe,Moderate
+Boni Ave,Northbound,2025-06-17 08:00:00,8,100.0,24.5,75.5,308.2,NEEDS_IMPROVEMENT,Severe,Light
+Boni Ave,Northbound,2025-06-17 09:00:00,9,77.9,18.2,59.7,327.9,NEEDS_IMPROVEMENT,Congested,Light
+Boni Ave,Northbound,2025-06-17 10:00:00,10,55.2,11.3,43.9,388.7,NEEDS_IMPROVEMENT,Congested,Light
+Boni Ave,Northbound,2025-06-17 11:00:00,11,53.2,11.6,41.6,358.4,NEEDS_IMPROVEMENT,Congested,Light
+Boni Ave,Northbound,2025-06-17 12:00:00,12,53.0,12.5,40.5,324.0,NEEDS_IMPROVEMENT,Congested,Light
+Boni Ave,Northbound,2025-06-17 13:00:00,13,52.1,13.0,39.1,300.9,NEEDS_IMPROVEMENT,Congested,Light
+Boni Ave,Northbound,2025-06-17 14:00:00,14,50.8,12.6,38.2,302.9,NEEDS_IMPROVEMENT,Congested,Light
+Boni Ave,Northbound,2025-06-17 15:00:00,15,53.4,17.5,35.9,205.4,NEEDS_IMPROVEMENT,Congested,Light
+Boni Ave,Northbound,2025-06-17 16:00:00,16,72.3,27.3,45.0,164.8,NEEDS_IMPROVEMENT,Congested,Moderate
+Boni Ave,Northbound,2025-06-17 17:00:00,17,100.0,42.6,57.4,134.7,NEEDS_IMPROVEMENT,Severe,Moderate
+Boni Ave,Northbound,2025-06-17 18:00:00,18,100.0,46.5,53.5,115.1,NEEDS_IMPROVEMENT,Severe,Moderate
+Boni Ave,Northbound,2025-06-17 19:00:00,19,100.0,44.0,56.0,127.3,NEEDS_IMPROVEMENT,Severe,Moderate
+Boni Ave,Northbound,2025-06-17 20:00:00,20,85.1,35.3,49.8,141.0,NEEDS_IMPROVEMENT,Severe,Moderate
+Boni Ave,Northbound,2025-08-17 21:00:00,21,28.3,19.5,8.8,45.2,GOOD,Moderate,Light
+Boni Ave,Northbound,2025-08-17 22:00:00,22,5.6,3.3,2.3,70.5,EXCELLENT,Light,Light

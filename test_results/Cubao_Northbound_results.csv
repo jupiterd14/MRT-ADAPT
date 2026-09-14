@@ -1,0 +1,19 @@
+station,direction,target_time,hour,predicted,actual,absolute_error,percentage_error,verdict,predicted_category,actual_category
+Cubao,Northbound,2025-08-18 05:00:00,5,35.7,21.2,14.5,68.5,OKAY,Moderate,Light
+Cubao,Northbound,2025-06-17 06:00:00,6,63.6,43.9,19.7,44.9,NEEDS_IMPROVEMENT,Congested,Moderate
+Cubao,Northbound,2025-06-17 07:00:00,7,61.9,25.5,36.4,142.7,NEEDS_IMPROVEMENT,Congested,Moderate
+Cubao,Northbound,2025-06-17 08:00:00,8,55.1,31.4,23.7,75.5,NEEDS_IMPROVEMENT,Congested,Moderate
+Cubao,Northbound,2025-06-17 09:00:00,9,49.2,24.8,24.4,98.4,NEEDS_IMPROVEMENT,Moderate,Light
+Cubao,Northbound,2025-06-17 10:00:00,10,46.3,23.7,22.6,95.4,NEEDS_IMPROVEMENT,Moderate,Light
+Cubao,Northbound,2025-06-17 11:00:00,11,46.1,22.9,23.2,101.3,NEEDS_IMPROVEMENT,Moderate,Light
+Cubao,Northbound,2025-06-17 12:00:00,12,47.2,25.4,21.8,86.0,NEEDS_IMPROVEMENT,Moderate,Moderate
+Cubao,Northbound,2025-06-17 13:00:00,13,50.2,26.1,24.1,92.2,NEEDS_IMPROVEMENT,Congested,Moderate
+Cubao,Northbound,2025-06-17 14:00:00,14,56.8,32.4,24.4,75.4,NEEDS_IMPROVEMENT,Congested,Moderate
+Cubao,Northbound,2025-06-17 15:00:00,15,80.4,51.3,29.1,56.6,NEEDS_IMPROVEMENT,Severe,Congested
+Cubao,Northbound,2025-06-17 16:00:00,16,100.0,82.1,17.9,21.8,NEEDS_IMPROVEMENT,Severe,Severe
+Cubao,Northbound,2025-06-17 17:00:00,17,100.0,100.0,0.0,0.0,EXCELLENT,Severe,Severe
+Cubao,Northbound,2025-06-17 18:00:00,18,100.0,98.9,1.1,1.1,EXCELLENT,Severe,Severe
+Cubao,Northbound,2025-06-17 19:00:00,19,100.0,88.1,11.9,13.5,OKAY,Severe,Severe
+Cubao,Northbound,2025-06-17 20:00:00,20,76.0,56.6,19.4,34.4,NEEDS_IMPROVEMENT,Congested,Congested
+Cubao,Northbound,2025-08-17 21:00:00,21,27.6,26.0,1.6,6.1,EXCELLENT,Moderate,Moderate
+Cubao,Northbound,2025-08-17 22:00:00,22,10.7,11.4,0.7,5.8,EXCELLENT,Light,Light

@@ -1,0 +1,19 @@
+station,direction,target_time,hour,predicted,actual,absolute_error,percentage_error,verdict,predicted_category,actual_category
+Ortigas,Southbound,2025-08-18 05:00:00,5,19.2,34.8,15.6,44.9,NEEDS_IMPROVEMENT,Light,Moderate
+Ortigas,Southbound,2025-06-17 06:00:00,6,48.7,51.6,2.9,5.7,EXCELLENT,Moderate,Congested
+Ortigas,Southbound,2025-06-17 07:00:00,7,47.4,44.4,3.0,6.8,EXCELLENT,Moderate,Moderate
+Ortigas,Southbound,2025-06-17 08:00:00,8,40.6,51.2,10.6,20.7,OKAY,Moderate,Congested
+Ortigas,Southbound,2025-06-17 09:00:00,9,34.9,34.7,0.2,0.5,EXCELLENT,Moderate,Moderate
+Ortigas,Southbound,2025-06-17 10:00:00,10,32.2,21.3,10.9,51.3,OKAY,Moderate,Light
+Ortigas,Southbound,2025-06-17 11:00:00,11,33.2,18.4,14.8,80.4,OKAY,Moderate,Light
+Ortigas,Southbound,2025-06-17 12:00:00,12,34.8,20.2,14.6,72.4,OKAY,Moderate,Light
+Ortigas,Southbound,2025-06-17 13:00:00,13,37.6,15.7,21.9,139.7,NEEDS_IMPROVEMENT,Moderate,Light
+Ortigas,Southbound,2025-06-17 14:00:00,14,52.0,12.0,40.0,333.6,NEEDS_IMPROVEMENT,Congested,Light
+Ortigas,Southbound,2025-06-17 15:00:00,15,79.5,8.2,71.3,869.3,NEEDS_IMPROVEMENT,Congested,Light
+Ortigas,Southbound,2025-06-17 16:00:00,16,100.0,14.0,86.0,614.3,NEEDS_IMPROVEMENT,Severe,Light
+Ortigas,Southbound,2025-06-17 17:00:00,17,100.0,13.2,86.8,657.6,NEEDS_IMPROVEMENT,Severe,Light
+Ortigas,Southbound,2025-06-17 18:00:00,18,100.0,12.1,87.9,726.4,NEEDS_IMPROVEMENT,Severe,Light
+Ortigas,Southbound,2025-06-17 19:00:00,19,100.0,15.8,84.2,532.9,NEEDS_IMPROVEMENT,Severe,Light
+Ortigas,Southbound,2025-08-17 20:00:00,20,27.7,6.5,21.2,326.6,NEEDS_IMPROVEMENT,Moderate,Light
+Ortigas,Southbound,2025-08-17 21:00:00,21,23.6,2.5,21.1,842.4,NEEDS_IMPROVEMENT,Light,Light
+Ortigas,Southbound,2025-08-06 22:00:00,22,25.1,2.2,22.9,1041.5,NEEDS_IMPROVEMENT,Moderate,Light

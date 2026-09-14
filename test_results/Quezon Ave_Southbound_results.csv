@@ -1,0 +1,19 @@
+station,direction,target_time,hour,predicted,actual,absolute_error,percentage_error,verdict,predicted_category,actual_category
+Quezon Ave,Southbound,2025-08-17 05:00:00,5,7.6,0.2,7.4,3694.7,GOOD,Light,Light
+Quezon Ave,Southbound,2025-08-17 06:00:00,6,10.7,0.5,10.2,2041.9,OKAY,Light,Light
+Quezon Ave,Southbound,2025-08-17 07:00:00,7,12.9,0.6,12.3,2043.1,OKAY,Light,Light
+Quezon Ave,Southbound,2025-08-17 08:00:00,8,17.4,0.1,17.3,17272.7,NEEDS_IMPROVEMENT,Light,Light
+Quezon Ave,Southbound,2025-08-17 09:00:00,9,20.0,0.8,19.2,2402.7,NEEDS_IMPROVEMENT,Light,Light
+Quezon Ave,Southbound,2025-06-17 10:00:00,10,45.0,1.7,43.3,2549.6,NEEDS_IMPROVEMENT,Moderate,Light
+Quezon Ave,Southbound,2025-06-17 11:00:00,11,42.8,2.2,40.6,1844.7,NEEDS_IMPROVEMENT,Moderate,Light
+Quezon Ave,Southbound,2025-06-17 12:00:00,12,41.4,1.9,39.5,2079.6,NEEDS_IMPROVEMENT,Moderate,Light
+Quezon Ave,Southbound,2025-06-17 13:00:00,13,38.3,1.5,36.8,2454.0,NEEDS_IMPROVEMENT,Moderate,Light
+Quezon Ave,Southbound,2025-06-17 14:00:00,14,35.0,1.9,33.1,1744.7,NEEDS_IMPROVEMENT,Moderate,Light
+Quezon Ave,Southbound,2025-06-17 15:00:00,15,37.9,1.5,36.4,2429.9,NEEDS_IMPROVEMENT,Moderate,Light
+Quezon Ave,Southbound,2025-06-17 16:00:00,16,60.2,1.3,58.9,4534.2,NEEDS_IMPROVEMENT,Congested,Light
+Quezon Ave,Southbound,2025-06-17 17:00:00,17,84.6,2.2,82.4,3745.2,NEEDS_IMPROVEMENT,Severe,Light
+Quezon Ave,Southbound,2025-06-17 18:00:00,18,69.1,3.5,65.6,1875.4,NEEDS_IMPROVEMENT,Congested,Light
+Quezon Ave,Southbound,2025-06-17 19:00:00,19,47.1,2.9,44.2,1522.9,NEEDS_IMPROVEMENT,Moderate,Light
+Quezon Ave,Southbound,2025-08-17 20:00:00,20,14.7,2.1,12.6,600.1,OKAY,Light,Light
+Quezon Ave,Southbound,2025-08-17 21:00:00,21,8.9,0.6,8.3,1376.5,GOOD,Light,Light
+Quezon Ave,Southbound,2025-04-25 22:00:00,22,3.5,0.3,3.2,1069.1,EXCELLENT,Light,Light

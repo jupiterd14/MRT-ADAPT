@@ -1,0 +1,19 @@
+station,direction,target_time,hour,predicted,actual,absolute_error,percentage_error,verdict,predicted_category,actual_category
+Kamuning,Southbound,2025-06-19 05:00:00,5,100.0,0.3,99.7,33233.3,NEEDS_IMPROVEMENT,Severe,Light
+Kamuning,Southbound,2025-08-18 06:00:00,6,100.0,0.7,99.3,14185.7,NEEDS_IMPROVEMENT,Severe,Light
+Kamuning,Southbound,2025-08-22 07:00:00,7,100.0,0.5,99.5,19900.0,NEEDS_IMPROVEMENT,Severe,Light
+Kamuning,Southbound,2025-08-20 08:00:00,8,100.0,0.6,99.4,16566.7,NEEDS_IMPROVEMENT,Severe,Light
+Kamuning,Southbound,2025-08-19 09:00:00,9,92.2,0.3,91.9,30637.6,NEEDS_IMPROVEMENT,Severe,Light
+Kamuning,Southbound,2025-08-17 10:00:00,10,35.8,0.3,35.5,11850.0,NEEDS_IMPROVEMENT,Moderate,Light
+Kamuning,Southbound,2025-08-17 11:00:00,11,35.0,0.2,34.8,17395.2,NEEDS_IMPROVEMENT,Moderate,Light
+Kamuning,Southbound,2025-08-17 12:00:00,12,32.6,0.3,32.3,10781.1,NEEDS_IMPROVEMENT,Moderate,Light
+Kamuning,Southbound,2025-08-16 13:00:00,13,31.6,0.8,30.8,3854.1,NEEDS_IMPROVEMENT,Moderate,Light
+Kamuning,Southbound,2025-08-17 14:00:00,14,27.3,0.6,26.7,4443.9,NEEDS_IMPROVEMENT,Moderate,Light
+Kamuning,Southbound,2025-08-17 15:00:00,15,27.8,0.5,27.3,5452.6,NEEDS_IMPROVEMENT,Moderate,Light
+Kamuning,Southbound,2025-08-17 16:00:00,16,31.4,0.3,31.1,10376.3,NEEDS_IMPROVEMENT,Moderate,Light
+Kamuning,Southbound,2025-08-18 17:00:00,17,80.2,1.0,79.2,7917.3,NEEDS_IMPROVEMENT,Severe,Light
+Kamuning,Southbound,2025-08-18 18:00:00,18,68.9,0.8,68.1,8518.2,NEEDS_IMPROVEMENT,Congested,Light
+Kamuning,Southbound,2025-08-17 19:00:00,19,25.9,0.3,25.6,8533.7,NEEDS_IMPROVEMENT,Moderate,Light
+Kamuning,Southbound,2025-08-23 20:00:00,20,21.9,0.1,21.8,21798.4,NEEDS_IMPROVEMENT,Light,Light
+Kamuning,Southbound,2025-02-21 21:00:00,21,25.4,0.2,25.2,12606.4,NEEDS_IMPROVEMENT,Moderate,Light
+Kamuning,Southbound,2025-08-18 22:00:00,22,2.2,0.0,2.2,2204.3,EXCELLENT,Light,Light
