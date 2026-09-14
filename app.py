@@ -32,11 +32,6 @@ os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 # Aggressive garbage collection
 gc.set_threshold(50, 3, 3)
 
-import tensorflow as tf
-tf.config.run_functions_eagerly(False)
-tf.keras.backend.clear_session()
-
-print("✅ Extreme memory optimization applied!")
 
 from flask import Flask, session, flash, redirect, url_for, jsonify, request
 from extensions import cache
