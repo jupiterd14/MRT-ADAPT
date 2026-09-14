@@ -581,8 +581,11 @@ def evaluate_model():
         rmse = np.sqrt(mean_squared_error(actuals, predictions))
         r2 = r2_score(actuals, predictions)
         
-        epsilon = 1e-8
-        mape = np.mean(np.abs((actuals - predictions) / (actuals + epsilon))) * 100
+        valid_mask = actuals > 1.0
+        if valid_mask.sum() > 0:
+            mape = np.mean(np.abs((actuals[valid_mask] - predictions[valid_mask]) / actuals[valid_mask])) * 100
+        else:
+            mape = 0.0
         
         per_class_metrics = {}
         for category in CATEGORY_ORDER:
