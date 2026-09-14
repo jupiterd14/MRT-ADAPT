@@ -1,6 +1,10 @@
 from dotenv import load_dotenv
 load_dotenv()
 import os
+import matplotlib
+os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
+# Don't try to build the cache during import
+matplotlib.use('Agg')  # Non-interactive backend, no GUI needed
 from zoneinfo import ZoneInfo
 import gc
 import time
