@@ -1,10 +1,25 @@
 from dotenv import load_dotenv
 load_dotenv()
 import os
-import matplotlib
-os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
+
+os.environ['MPLCONFIGDIR'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.matplotlib')
+os.makedirs(os.environ['MPLCONFIGDIR'], exist_ok=True)
+# Lazy TensorFlow loader - only imports when actually used
+class _LazyTF:
+    _mod = None
+    def __getattr__(self, name):
+        if self._mod is None:
+            import tensorflow as _t
+            _t.config.run_functions_eagerly(False)
+            try:
+                _t.keras.backend.clear_session()
+            except Exception:
+                pass
+            self._mod = _t
+        return getattr(self._mod, name)
+
+tf = _LazyTF()
 # Don't try to build the cache during import
-matplotlib.use('Agg')  # Non-interactive backend, no GUI needed
 from zoneinfo import ZoneInfo
 import gc
 import time
