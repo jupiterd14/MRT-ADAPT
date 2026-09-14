@@ -8,16 +8,26 @@ os.environ['TF_NUM_INTEROP_THREADS'] = '1'
 
 gc.set_threshold(50, 3, 3)
 
-import tensorflow as tf
-tf.config.run_functions_eagerly(False)
-tf.keras.backend.clear_session()
+class _LazyTF:
+    _mod = None
+    def __getattr__(self, name):
+        if self._mod is None:
+            import tensorflow as _t
+            _t.config.run_functions_eagerly(False)
+            try:
+                _t.keras.backend.clear_session()
+            except Exception:
+                pass
+            self._mod = _t
+        return getattr(self._mod, name)
+
+tf = _LazyTF()
 print("✅ TensorFlow memory optimized in model_loader.py")
 
 # ============================================================
 # REST OF IMPORTS
 # ============================================================
 import pickle
-from tensorflow.keras.saving import register_keras_serializable
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 
@@ -45,7 +55,6 @@ STATION_FILE_MAP = {
 }
 
 # Register the rmse function so it can be loaded
-@register_keras_serializable()
 def rmse(y_true, y_pred):
     return tf.sqrt(tf.reduce_mean(tf.square(y_true - y_pred)))
 

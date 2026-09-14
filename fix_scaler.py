@@ -1,50 +1,38 @@
-# test_predictions.py
-from app import app
-from datetime import datetime
+import psutil, subprocess, sys, time
 
-def test_predictions():
-    """Test predictions after scaler fix"""
-    
-    with app.app_context():
-        # Import here to ensure app context is set
-        from routes.api_predict import get_directional_prediction
-        
-        stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", 
-                    "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
-                    "Ayala Ave", "Magallanes", "Taft"]
-        
-        now = datetime.now()
-        
-        print("\n" + "="*60)
-        print("📊 TESTING PREDICTIONS AFTER SCALER FIX")
-        print(f"⏰ Time: {now.strftime('%H:%M')}")
-        print("="*60)
-        print()
-        
-        total_north = 0
-        total_south = 0
-        
-        for station in stations:
-            north = get_directional_prediction(station, 'Northbound', now)
-            south = get_directional_prediction(station, 'Southbound', now)
-            avg = (north + south) / 2
-            
-            if avg > 80:
-                status = "🔴 SEVERE"
-            elif avg > 60:
-                status = "🟠 CONGESTED"
-            elif avg > 30:
-                status = "🟡 MODERATE"
-            else:
-                status = "🟢 LIGHT"
-            
-            print(f"{station:15} | N: {north:5.1f}%  S: {south:5.1f}%  | {status}")
-            total_north += north
-            total_south += south
-        
-        print("\n" + "="*60)
-        print(f"📊 Average Congestion: N: {total_north/len(stations):.1f}%  S: {total_south/len(stations):.1f}%")
-        print("="*60)
+proc = subprocess.Popen([sys.executable, "app.py"])
+time.sleep(3)  # let Flask/TF boot
 
-if __name__ == '__main__':
-    test_predictions()
+# Find ALL python processes and pick the one using the most RAM
+candidates = []
+for p in psutil.process_iter(['pid', 'name', 'cmdline']):
+    try:
+        name = (p.info['name'] or '').lower()
+        if 'python' in name:
+            candidates.append(p)
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        continue
+
+if not candidates:
+    print("No python processes found")
+    sys.exit(1)
+
+# Sort by RSS descending, pick the biggest
+candidates.sort(key=lambda p: p.memory_info().rss, reverse=True)
+target = candidates[0]
+
+print(f"Monitoring PID {target.pid} ({target.name()})")
+print(f"All python PIDs found: {[p.pid for p in candidates]}")
+
+peak_ram = peak_cpu = 0
+while True:
+    try:
+        cpu = target.cpu_percent(interval=1)
+        ram = target.memory_info().rss
+        peak_ram = max(peak_ram, ram)
+        peak_cpu = max(peak_cpu, cpu)
+        print(f"CPU: {cpu:5.1f}%   RAM: {ram/1024**2:7.1f} MB   "
+              f"| Peak CPU: {peak_cpu:5.1f}%  Peak RAM: {peak_ram/1024**2:7.1f} MB")
+    except psutil.NoSuchProcess:
+        print("Process ended")
+        break

@@ -10,10 +10,15 @@ import logging
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+class _LazyTF:
+    _mod = None
+    def __getattr__(self, name):
+        if self._mod is None:
+            import tensorflow as _t
+            self._mod = _t
+        return getattr(self._mod, name)
+
+tf = _LazyTF()
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import schedule
 from flask import current_app

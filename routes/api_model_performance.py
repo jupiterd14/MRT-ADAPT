@@ -11,8 +11,17 @@ import os
 import pickle
 import random
 import json
-import tensorflow as tf
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+class _LazyTF:
+    _mod = None
+    def __getattr__(self, name):
+        if self._mod is None:
+            import tensorflow as _t
+            self._mod = _t
+        return getattr(self._mod, name)
+
+tf = _LazyTF()
+import logging
+logging.getLogger('tensorflow').setLevel(logging.ERROR)
 from werkzeug.utils import secure_filename
 from sklearn.metrics import (
     confusion_matrix, 

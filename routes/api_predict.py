@@ -6,8 +6,15 @@ from config import Config
 import numpy as np
 import math
 from constants import MRT3_PLATFORM_CAPACITY
-import tensorflow as tf 
+class _LazyTF:
+    _mod = None
+    def __getattr__(self, name):
+        if self._mod is None:
+            import tensorflow as _t
+            self._mod = _t
+        return getattr(self._mod, name)
 
+tf = _LazyTF()
 
 
 api_predict_bp = Blueprint('api_predict', __name__)
