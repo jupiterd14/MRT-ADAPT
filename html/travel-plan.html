@@ -2522,27 +2522,27 @@ async function updateStationCongestion() {
 }
 
 // ========== POPULATE CUSTOM DATE/TIME SELECTS ==========
+// ========== POPULATE CUSTOM DATE/TIME SELECTS ==========
 function populateDateTimeSelects() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
     const currentDay = now.getDate();
-    
-    // ========== YEARS (2025 and 2026) ==========
+
+    // ========== YEARS (locked to 2025 for testing) ==========
+    const TEST_YEAR = 2025;
     const yearSelect = document.getElementById('yearSelect');
     if (yearSelect) {
         yearSelect.innerHTML = '';
-        [2025, 2026].forEach(year => {
-            const option = document.createElement('option');
-            option.value = year;
-            option.textContent = year;
-            yearSelect.appendChild(option);
-        });
-        yearSelect.value = 2025;
+        const option = document.createElement('option');
+        option.value = TEST_YEAR;
+        option.textContent = TEST_YEAR;
+        yearSelect.appendChild(option);
+        yearSelect.value = TEST_YEAR;
     }
-    
-    // ========== MONTHS ==========
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+
+    // ========== MONTHS (block past months in 2025) ==========
+    const months = ['January', 'February', 'March', 'April', 'May', 'June',
                    'July', 'August', 'September', 'October', 'November', 'December'];
     const monthSelect = document.getElementById('monthSelect');
     if (monthSelect) {
@@ -2552,55 +2552,49 @@ function populateDateTimeSelects() {
             const monthNum = index + 1;
             option.value = monthNum;
             option.textContent = month;
-            
-            const selectedYear = parseInt(yearSelect?.value || currentYear);
-            if (selectedYear === currentYear && monthNum < currentMonth) {
+
+            // Block months before current month (September 2025)
+            if (monthNum < currentMonth) {
                 option.disabled = true;
                 option.style.color = '#94A3B8';
                 option.style.backgroundColor = '#F1F5F9';
             }
             monthSelect.appendChild(option);
         });
-        monthSelect.value = currentMonth;
+        monthSelect.value = currentMonth;   // default to September
     }
-    
+
     // ========== DAYS ==========
     updateDays();
-    
-    // ========== HOURS (1–12, 12-hour format) ==========
+
+    // ========== HOURS (1–12) ==========
     const hourSelect = document.getElementById('hourSelect');
     const ampmSelect = document.getElementById('ampmSelect');
-    
+
     if (hourSelect) {
         hourSelect.innerHTML = '';
-        // Only 12-hour values: 1, 2, 3, ..., 12
         for (let i = 1; i <= 12; i++) {
             const option = document.createElement('option');
-            option.value = String(i).padStart(2, '0');  // "01", "02", ..., "12"
-            option.textContent = i;                     // 1, 2, ..., 12
+            option.value = String(i).padStart(2, '0');
+            option.textContent = i;
             hourSelect.appendChild(option);
         }
-        
-        // Default from real system time, clamped to operating hours (4 AM – 11 PM)
+
         let currentHour24 = now.getHours();
-        if (now.getMinutes() >= 55) {
-            currentHour24 += 1;
-        }
+        if (now.getMinutes() >= 55) currentHour24 += 1;
         if (currentHour24 < 4) currentHour24 = 4;
         if (currentHour24 > 23) currentHour24 = 23;
-        
-        // Convert 24h → 12h for the dropdown
+
         let hour12 = currentHour24 % 12;
         if (hour12 === 0) hour12 = 12;
         hourSelect.value = String(hour12).padStart(2, '0');
-        
-        // Set initial AM/PM from the same 24h value
+
         if (ampmSelect) {
             ampmSelect.value = currentHour24 >= 12 ? 'PM' : 'AM';
         }
     }
-    
-    // ========== MINUTES (in 5-minute increments) ==========
+
+    // ========== MINUTES (5-min increments) ==========
     const minuteSelect = document.getElementById('minuteSelect');
     if (minuteSelect) {
         minuteSelect.innerHTML = '';
@@ -2613,40 +2607,48 @@ function populateDateTimeSelects() {
         const currentMinute = Math.floor(now.getMinutes() / 5) * 5;
         minuteSelect.value = String(Math.min(currentMinute, 55)).padStart(2, '0');
     }
-    
-    // ========== Dynamic day updates ==========
+
+    // ========== Dynamic updates ==========
     monthSelect?.addEventListener('change', function() {
         updateDays();
+        refreshHourOptions();
     });
-    
-    yearSelect?.addEventListener('change', function() {
-        updateDays();
-    });
+
+    // yearSelect is locked — no change handler needed
+
+    hourSelect?.addEventListener('change', refreshHourOptions);
+    ampmSelect?.addEventListener('change', refreshHourOptions);
+    minuteSelect?.addEventListener('change', refreshHourOptions);
+    document.getElementById('daySelect')?.addEventListener('change', refreshHourOptions);
 }
 // ========== UPDATE DAYS ==========
 function updateDays() {
     const monthSelect = document.getElementById('monthSelect');
     const yearSelect = document.getElementById('yearSelect');
     const daySelect = document.getElementById('daySelect');
-    
+
     if (!monthSelect || !yearSelect || !daySelect) return;
-    
+
     const month = parseInt(monthSelect.value);
     const year = parseInt(yearSelect.value);
     const now = new Date();
     const currentDay = now.getDate();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
-    
+
     const daysInMonth = new Date(year, month, 0).getDate();
-    
+
     daySelect.innerHTML = '';
     for (let i = 1; i <= daysInMonth; i++) {
         const option = document.createElement('option');
         const dayStr = String(i).padStart(2, '0');
         option.value = dayStr;
         option.textContent = i;
-        
+
+        // Block past days ONLY if:
+        //   - year is current year (2025 in test, or real current)
+        //   - month is current month (September)
+        //   - day is before today
         if (year === currentYear && month === currentMonth && i < currentDay) {
             option.disabled = true;
             option.style.color = '#94A3B8';
@@ -2654,14 +2656,14 @@ function updateDays() {
         }
         daySelect.appendChild(option);
     }
-    
+
+    // Default day
     if (year === currentYear && month === currentMonth) {
         daySelect.value = String(currentDay).padStart(2, '0');
     } else {
         daySelect.value = '01';
     }
 }
-
 // ========== GET FORMATTED DATE/TIME ==========
 function getFormattedDateTime() {
     const month = document.getElementById('monthSelect')?.value || '1';
@@ -2755,37 +2757,33 @@ function planRoute() {
 }
 
 // ========== CANCEL ROUTE ==========
-// ========== CANCEL ROUTE ==========
 function cancelRoute() {
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentDay = now.getDate();
-    
+
     let currentHour24 = now.getHours() + 1;
     if (currentHour24 > 23) currentHour24 = 23;
     if (currentHour24 < 4) currentHour24 = 4;
     const currentMinute = Math.floor(now.getMinutes() / 5) * 5;
-    
+
     document.getElementById('monthSelect').value = currentMonth;
     document.getElementById('daySelect').value = String(currentDay).padStart(2, '0');
-    document.getElementById('yearSelect').value = 2025;
-    
-    // Convert 24h → 12h for the hour dropdown
+    document.getElementById('yearSelect').value = 2025;   // still fine — locked year
+
     let hour12 = currentHour24 % 12;
     if (hour12 === 0) hour12 = 12;
     document.getElementById('hourSelect').value = String(hour12).padStart(2, '0');
     document.getElementById('minuteSelect').value = String(Math.min(currentMinute, 55)).padStart(2, '0');
-    
-    // Set AM/PM from the 24h value
+
     const ampmSelect = document.getElementById('ampmSelect');
     if (ampmSelect) {
         ampmSelect.value = currentHour24 >= 12 ? 'PM' : 'AM';
     }
-    
+
     document.getElementById('fromStation').value = 'North Ave';
     document.getElementById('toStation').value = 'Ayala Ave';
-    
-    // Reset advisories
+
     const container = document.getElementById('advisoriesContainer');
     container.innerHTML = `
         <div class="recommendation-alert" id="recommendation">
@@ -2799,7 +2797,7 @@ function cancelRoute() {
         </div>
     `;
     container.classList.remove('has-content');
-    
+
     showToast('Form reset to current date');
 }
 // ========== REFRESH PLAN ==========

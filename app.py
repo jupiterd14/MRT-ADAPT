@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 
+
 os.environ['MPLCONFIGDIR'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.matplotlib')
 os.makedirs(os.environ['MPLCONFIGDIR'], exist_ok=True)
 # Lazy TensorFlow loader - only imports when actually used
@@ -501,8 +502,6 @@ def warm_cache(app):
             print(f"⚠️ Cache warming error: {e}")
 
 
-print("⏳ LSTM models will load only when retraining is triggered")
-print("💡 Visit /admin/retrain to trigger retraining")
 
 
 LSTM_MODEL_PATH = 'models_2022-2024_v10'
@@ -644,69 +643,7 @@ app.config['TYPE_ICONS'] = typeIcons
 with app.app_context():
     db.create_all()
     
-    try:
-        from sqlalchemy import inspect, text
-        
-        inspector = inspect(db.engine)
-        
-        columns = [col['name'] for col in inspector.get_columns('report')]
-        
-        if 'direction' not in columns:
-            print("Adding 'direction' column to report table...")
-            with db.engine.connect() as conn:
-                conn.execute(text('ALTER TABLE report ADD COLUMN direction VARCHAR(20)'))
-                conn.commit()
-            print("Direction column added successfully")
-        else:
-            print("Direction column already exists")
-        
-        if 'flag_count' not in columns:
-            print("Adding 'flag_count' column to report table...")
-            with db.engine.connect() as conn:
-                conn.execute(text('ALTER TABLE report ADD COLUMN flag_count INTEGER DEFAULT 0'))
-                conn.commit()
-            print("flag_count column added successfully")
-        
-        if 'reviewed' not in columns:
-            print("Adding 'reviewed' column to report table...")
-            with db.engine.connect() as conn:
-                conn.execute(text('ALTER TABLE report ADD COLUMN reviewed BOOLEAN DEFAULT FALSE'))
-                conn.commit()
-            print("reviewed column added successfully")
-        
-        try:
-            broadcast_columns = [col['name'] for col in inspector.get_columns('broadcast')]
-            if 'direction' not in broadcast_columns:
-                print("Adding 'direction' column to broadcast table...")
-                with db.engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE broadcast ADD COLUMN direction VARCHAR(20) DEFAULT 'both'"))
-                    conn.commit()
-                print("Direction column added to broadcast table")
-        except Exception as broadcast_error:
-            print(f"Broadcast table note: {broadcast_error}")
-        
-        try:
-            activity_columns = [col['name'] for col in inspector.get_columns('activity_log')]
-            
-            if 'is_flagged' not in activity_columns:
-                print("Adding flag columns to activity_log table...")
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE activity_log ADD COLUMN is_flagged BOOLEAN DEFAULT FALSE'))
-                    conn.execute(text('ALTER TABLE activity_log ADD COLUMN flag_reason VARCHAR(500)'))
-                    conn.execute(text('ALTER TABLE activity_log ADD COLUMN flagged_at DATETIME'))
-                    conn.execute(text('ALTER TABLE activity_log ADD COLUMN admin_review_notes TEXT'))
-                    conn.execute(text('ALTER TABLE activity_log ADD COLUMN reviewed_by VARCHAR(100)'))
-                    conn.execute(text('ALTER TABLE activity_log ADD COLUMN reviewed_at DATETIME'))
-                    conn.commit()
-                print("✅ Flag columns added to activity_log table")
-            else:
-                print("Flag columns already exist in activity_log")
-        except Exception as flag_error:
-            print(f"Activity log migration note: {flag_error}")
-            
-    except Exception as e:
-        print(f"Note: {e}")
-
+  
     # ========== AUTO-IMPORT CSV FILES (RENDER FIX) ==========
     data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'services', 'data (2022-2024)')
     csv_files = ['2022.csv', '2023.csv', '2024.csv']
@@ -714,7 +651,7 @@ with app.app_context():
     all_present = all(os.path.exists(os.path.join(data_dir, f)) for f in csv_files)
 
     if all_present:
-        print("✅ All CSV files present! (not loading into memory)")
+        print("")
     else:
         print(f"⚠️ Some CSV files missing: {[f for f in csv_files if not os.path.exists(os.path.join(data_dir, f))]}")
         print("🔄 Auto-importing CSV files from Google Drive...")
@@ -1165,12 +1102,6 @@ def admin_import_csvs():
 #  (after all route definitions so that @app.route decorators
 #   are processed before any request is made)
 # ================================================================
-# ================================================================
-#  🔥 MODEL LOADING OR CACHE LOADING – FAST STARTUP
-# ================================================================
-print("\n" + "="*50)
-print("🚀 MRT-3 PREDICTION SYSTEM - STARTUP")
-print("="*50)
 
 cache_dir = os.path.join(os.path.dirname(__file__), 'cache')
 os.makedirs(cache_dir, exist_ok=True)
@@ -1194,10 +1125,6 @@ if os.path.exists(pred_cache_file) and os.path.exists(p90_file):
                 from routes.api_predict import _PENDING_CORRECTION_FACTORS
                 _PENDING_CORRECTION_FACTORS.update(pickle.load(f))
 
-        print(f"✅ Loaded {len(_PREDICTION_CACHE)} cached predictions")
-        print(f"✅ Loaded {len(p90_data)} P90 values")
-        print("💡 Running in CACHE‑ONLY mode (no models loaded).")
-        print("💡 All predictions will be instant.")
         _CACHE_ONLY = True
     except Exception as e:
         print(f"⚠️ Failed to load cache: {e}")
@@ -1245,19 +1172,11 @@ tracemalloc.start()
 snapshot = tracemalloc.take_snapshot()
 top_stats = snapshot.statistics('lineno')
 
-print("\n🔍 TOP 10 MEMORY USERS:")
 for stat in top_stats[:10]:
     print(stat)
 
 # ============ MAIN ============
 if __name__ == '__main__':
-    print("\n" + "="*50)
-    print("🚀 MRT-3 PREDICTION SYSTEM - STARTUP COMPLETE")
-    print("="*50)
-    print(f"✅ {len(directional_models_cached)} directional models loaded")
-    print(f"✅ Warmup: {'COMPLETE' if _WARMUP_COMPLETE else 'PENDING'}")
-    print("💡 All predictions will be INSTANT from the first click!")
-    print("="*50 + "\n")
     
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)

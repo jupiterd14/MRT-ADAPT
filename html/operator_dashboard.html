@@ -2168,11 +2168,270 @@
             visibility: visible !important;
             transition: opacity 0.3s ease !important;
         }
-            </style>
-        </head>
-        <body>
 
-            <!-- Override Confirmation Modal -->
+        
+/* ========== MOBILE BOTTOM NAVIGATION (matches user dashboard) ========== */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+    border-radius: 20px 20px 0 0;
+    z-index: 1000;
+    padding: 10px 16px 20px;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.bottom-nav-items {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 8px;
+}
+
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    color: var(--text-light);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 30px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    flex: 1;
+    white-space: nowrap;
+    position: relative;
+}
+
+.bottom-nav-item i {
+    font-size: 20px;
+    transition: transform 0.2s ease;
+}
+
+.bottom-nav-item.active {
+    color: var(--purple);
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.bottom-nav-item:active i {
+    transform: scale(0.95);
+}
+
+.bottom-nav-item .nav-badge-mobile {
+    position: absolute;
+    top: 2px;
+    right: 20%;
+    background: var(--danger-red);
+    color: white;
+    font-size: 9px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .bottom-nav {
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+}
+
+.bottom-nav::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20px;
+    right: 20px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========== MOBILE LAYOUT ========== */
+@media screen and (max-width: 768px) {
+
+    body {
+        display: block !important;
+        height: auto !important;
+        overflow-y: auto !important;
+    }
+
+    .sidebar { display: none !important; }
+    .bottom-nav { display: block !important; }
+
+    .main-content {
+        width: 100% !important;
+        overflow-y: auto !important;
+    }
+
+    .content-body {
+        padding: 14px 12px 90px 12px !important;
+    }
+
+    .topbar {
+        padding: 12px 14px !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+
+    .page-title {
+        font-size: 18px !important;
+    }
+
+    .topbar-right {
+        gap: 6px !important;
+    }
+
+    .date-badge, .station-badge {
+        font-size: 11px !important;
+        padding: 6px 10px !important;
+    }
+
+    /* Stat grid: 2x2 */
+    .stat-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+    }
+
+    .stat-card {
+        padding: 14px !important;
+    }
+
+    .stat-card h2 {
+        font-size: 24px !important;
+    }
+
+    .stat-card p {
+        font-size: 11px !important;
+    }
+
+    /* Status tables: stack */
+    .status-tables {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    .table-card {
+        padding: 14px !important;
+    }
+
+    .table-scroll-container {
+        max-height: 340px !important;
+    }
+
+    .data-table th, .data-table td {
+        padding: 8px 6px !important;
+        font-size: 12px !important;
+    }
+
+    /* Broadcast: single column */
+    .broadcast-layout {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    /* Disruption tiles: 2 per row */
+    .disruption-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* Station pills */
+    .stations-pills {
+        gap: 6px !important;
+        padding: 8px !important;
+    }
+
+    .station-pill {
+        padding: 6px 12px !important;
+        font-size: 11px !important;
+    }
+
+    /* Direction toggle */
+    .direction-filter {
+        flex-wrap: wrap !important;
+    }
+
+    .direction-option-broadcast {
+        font-size: 11px !important;
+        padding: 8px 6px !important;
+    }
+
+    /* Reports */
+    .report-item {
+        padding: 14px 40px 14px 14px !important;
+    }
+
+    /* Modals */
+    .modal-container {
+        width: 92% !important;
+        max-width: none !important;
+        padding: 20px !important;
+        margin: 0 auto !important;
+    }
+
+    /* Filter dropdown: full width */
+    .dropdown-card {
+        right: 10px !important;
+        left: 10px !important;
+        width: auto !important;
+    }
+
+    /* Forecast chart */
+    .chart-container {
+        height: 200px !important;
+    }
+
+    #forecastStationSelect {
+        max-width: 140px !important;
+        font-size: 12px !important;
+    }
+
+    /* Toast */
+    .toast {
+        left: 12px !important;
+        right: 12px !important;
+        bottom: 90px !important;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .stat-card h2 { font-size: 20px !important; }
+    .stat-card p { font-size: 10px !important; }
+
+    .data-table th, .data-table td {
+        font-size: 11px !important;
+        padding: 6px 4px !important;
+    }
+
+    .btn-override {
+        padding: 4px 8px !important;
+        font-size: 10px !important;
+    }
+
+    .password-requirements {
+        grid-template-columns: 1fr !important;
+    }
+}
+            </style>
+</head>
+<body>
+
 <!-- Override Confirmation Modal -->
 <div id="overrideConfirmModal" class="modal-overlay">
     <div class="modal-container" style="max-width: 450px;">
@@ -2446,6 +2705,27 @@
         <div class="loading-subtext">Please wait while we fetch the latest updates</div>
     </div>
 </div>
+    <div class="bottom-nav">
+        <div class="bottom-nav-items">
+            <button class="bottom-nav-item active" onclick="showPage('dashboard', this)">
+                <i class="fas fa-chart-pie"></i>
+                <span>Dashboard</span>
+            </button>
+            <button class="bottom-nav-item" onclick="showPage('broadcast', this)">
+                <i class="fas fa-bullhorn"></i>
+                <span>Broadcast</span>
+            </button>
+            <button class="bottom-nav-item" onclick="showPage('log', this)">
+                <i class="fas fa-history"></i>
+                <span>Log</span>
+            </button>
+            <button class="bottom-nav-item" onclick="showPage('userReports', this)">
+                <i class="fas fa-flag-checkered"></i>
+                <span>Reports</span>
+            </button>
+        </div>
+    </div>
+
             <div class="sidebar">
                 <div class="logo-section">
                     <div class="logo-icon"><i class="fas fa-user-tie"></i></div>
@@ -4828,40 +5108,67 @@ function displayOperatorReports(reports) {
         `).join('');
     }
         
-    window.showPage = function(pageId, element) {
-        console.log("Switching to page:", pageId);
-        
-        document.querySelectorAll('.page').forEach(p => {
-            p.classList.remove('active');
-            p.style.display = 'none';
-        });
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        
-        const page = document.getElementById(pageId);
-        if (page) {
-            page.classList.add('active');
-            page.style.display = 'block';
-            page.style.visibility = 'visible';
-        }
-        if (element) element.classList.add('active');
-        
-        const titles = { dashboard: 'Dashboard', broadcast: 'Broadcast Alerts', log: 'Incident Log', userReports: 'User Reports' };
-        const titleEl = document.getElementById('pageTitle');
-        if (titleEl) titleEl.textContent = titles[pageId];
-        
-        if (pageId === 'log') {
-            loadIncidentLogs();
-        } else if (pageId === 'userReports') {
-            fetchOperatorReports();
-        } else if (pageId === 'broadcast') {
-            initBroadcast();
-            renderStationPills();
-        } else if (pageId === 'dashboard') {
-            loadCongestionData();
-            // ========== FIX: Use the new forecast function ==========
-            updateForecastUI();
-        }
+   window.showPage = function(pageId, element) {
+    console.log("Switching to page:", pageId);
+
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(p => {
+        p.classList.remove('active');
+        p.style.display = 'none';
+    });
+
+    // Clear active state from BOTH sidebars and bottom nav
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.bottom-nav-item').forEach(n => n.classList.remove('active'));
+
+    // Show the target page
+    const page = document.getElementById(pageId);
+    if (page) {
+        page.classList.add('active');
+        page.style.display = 'block';
+        page.style.visibility = 'visible';
+    }
+
+    // Highlight the clicked element (if passed)
+    if (element) element.classList.add('active');
+
+    // ========== SYNC BOTTOM NAV ==========
+    // Map pageId → bottom nav button index
+    const bottomNavMap = {
+        'dashboard':   0,
+        'broadcast':   1,
+        'log':         2,
+        'userReports': 3
     };
+    const idx = bottomNavMap[pageId];
+    if (idx !== undefined) {
+        const items = document.querySelectorAll('.bottom-nav-item');
+        if (items[idx]) items[idx].classList.add('active');
+    }
+
+    // Update page title
+    const titles = {
+        dashboard: 'Dashboard',
+        broadcast: 'Broadcast Alerts',
+        log: 'Incident Log',
+        userReports: 'User Reports'
+    };
+    const titleEl = document.getElementById('pageTitle');
+    if (titleEl) titleEl.textContent = titles[pageId] || 'Dashboard';
+
+    // Load page-specific data
+    if (pageId === 'log') {
+        loadIncidentLogs();
+    } else if (pageId === 'userReports') {
+        fetchOperatorReports();
+    } else if (pageId === 'broadcast') {
+        initBroadcast();
+        renderStationPills();
+    } else if (pageId === 'dashboard') {
+        loadCongestionData();
+        updateForecastUI();
+    }
+};
 
     async function sendBroadcast() {
         let disruptionType = selectedDisruptionType;

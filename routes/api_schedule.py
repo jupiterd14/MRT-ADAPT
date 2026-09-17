@@ -527,4 +527,3 @@ def debug_headway():
     })
 
 
-print("✅ api_schedule.py loaded successfully!")

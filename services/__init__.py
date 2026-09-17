@@ -135,6 +135,3 @@ __all__ = [
     'get_enhanced_station_prediction'
 ]
 
-print("=" * 50)
-print("✅ services module loaded")
-print("=" * 50)

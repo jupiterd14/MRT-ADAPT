@@ -354,11 +354,7 @@ def dashboard_stats():
         from flask import current_app
         from datetime import datetime, timedelta
         from routes.api_predict import get_directional_prediction  # ✅ Add this import
-        
-        print("\n" + "="*50)
-        print("📊 FETCHING DASHBOARD STATS")
-        print("="*50)
-        
+    
         # Count reports
         total_reports = Report.query.count()
         print(f"   Total Reports: {total_reports}")

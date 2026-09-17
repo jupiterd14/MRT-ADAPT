@@ -240,13 +240,11 @@ def load_historical_peaks():
         except Exception as e:
             print(f"⚠️ Could not load peaks file: {e}")
     
-    print("📊 Calculating historical peaks for reference only...")
     from services.feature_engineering import load_data_fast, get_station_dataframe
     import numpy as np
     
     df = load_data_fast()
     if df is None:
-        print("❌ Could not load data for peak calculation")
         return {}
     
     for station in STATIONS:
@@ -294,7 +292,6 @@ def load_correction_factors():
             print(f"⚠️ Could not load correction factors: {e}")
             CORRECTION_FACTORS = {}
     else:
-        print("⚠️ No correction factors found – using 1.0")
         CORRECTION_FACTORS = {}
 
 load_correction_factors()

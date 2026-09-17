@@ -1,4 +1,5 @@
 import os
+
 import gc
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -474,15 +475,7 @@ STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
 # ============================================================
 # MODULE LOADED MESSAGE
 # ============================================================
-print("\n" + "="*50)
-print("✅ Using original target scalers from model files (passenger counts)")
-print("="*50)
 
-print("=" * 50)
-print("✅ model_loader.py loaded successfully!")
-print(f"✅ directional_models count: {len(directional_models)} (loaded on demand)")
-print(f"✅ directional_scalers count: {len(directional_scalers)} (loaded on demand)")
-print("=" * 50)
 
 # DO NOT auto-load here - let the app call when needed
 # auto_load_all_models() is available but NOT called

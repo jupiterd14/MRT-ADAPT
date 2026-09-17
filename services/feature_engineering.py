@@ -822,7 +822,6 @@ def smart_data_cleaner(df):
 # LEGACY / COMPATIBILITY FUNCTIONS
 # ============================================================
 def load_data_fast():
-    print("📊 Using memory-optimized data loading (no full data cache)")
     return None
 
 def load_data():
@@ -866,9 +865,6 @@ def get_hourly_window_from_csv(station_name, direction, target_datetime, seq_len
         return None
     return df.tail(seq_length)
 
-print("=" * 50)
-print("✅ feature_engineering.py loaded successfully!")
-print("=" * 50)
 
 # ============================================================
 # PRELOAD ALL STATION DATAFRAMES & SCALERS

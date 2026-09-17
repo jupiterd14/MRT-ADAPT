@@ -53,6 +53,3 @@ __all__ = [
     'directional_scalers'
 ]
 
-print("=" * 50)
-print("✅ predictor.py loaded - Lazy imports (no cache reload)")
-print("=" * 50)
