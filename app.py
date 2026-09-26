@@ -106,6 +106,7 @@ _MODELS_CACHE = {}
 _MODELS_CACHE_FILE = None
 _MODELS_LOADED = False  # Track if models are loaded
 _WARMUP_COMPLETE = False  # Track if models are warmed up
+_STARTUP_IN_PROGRESS = False  # Track if deferred startup is running
 
 
 def get_models_cache_path():
@@ -334,13 +335,14 @@ def debug_warmup_status():
     
     return jsonify({
         'warmup_complete': _WARMUP_COMPLETE,
+        'startup_in_progress': _STARTUP_IN_PROGRESS,
         'total_models': models_loaded,
         'models_warmed': warmup_stats.get('successful', 0),
         'warmup_failures': warmup_stats.get('failed', 0),
         'warmup_duration_seconds': warmup_stats.get('duration_seconds', 0),
         'status': 'ready' if (_WARMUP_COMPLETE and models_loaded > 0) else 'warming_up',
         'memory_mb': get_memory_usage(),
-        'message': 'All models are warmed up and ready for instant predictions!' if _WARMUP_COMPLETE else 'Models are loading...'
+        'message': 'All models are warmed up and ready for instant predictions!' if _WARMUP_COMPLETE else 'Models are loading in the background...'
     })
 
 
@@ -640,30 +642,8 @@ typeIcons = {
 app.config['TYPE_ICONS'] = typeIcons
 
 # ============ DATABASE SETUP ============
-with app.app_context():
-    db.create_all()
-    
-  
-    # ========== AUTO-IMPORT CSV FILES (RENDER FIX) ==========
-    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'services', 'data (2022-2024)')
-    csv_files = ['2022.csv', '2023.csv', '2024.csv']
-
-    all_present = all(os.path.exists(os.path.join(data_dir, f)) for f in csv_files)
-
-    if all_present:
-        print("")
-    else:
-        print(f"⚠️ Some CSV files missing: {[f for f in csv_files if not os.path.exists(os.path.join(data_dir, f))]}")
-        print("🔄 Auto-importing CSV files from Google Drive...")
-        results = import_csv_files()  # ✅ CALL the import function!
-        
-        # Verify after import
-        all_present_now = all(os.path.exists(os.path.join(data_dir, f)) for f in csv_files)
-        if all_present_now:
-            print("✅ CSV files imported successfully!")
-        else:
-            print("⚠️ Some CSV files still missing!")
-    # ===========================================
+# NOTE: db.create_all() is called inside _deferred_startup() via _init_db_safe()
+# so it never blocks Gunicorn from binding to $PORT.
 
 # ============ LSTM STATUS DEBUG ROUTE ============
 @app.route('/debug/lstm-status')
@@ -1098,9 +1078,8 @@ def admin_import_csvs():
     })
 
 # ================================================================
-#  🔥 MODEL LOADING AND CACHE WARMING – MOVED TO THE END
-#  (after all route definitions so that @app.route decorators
-#   are processed before any request is made)
+#  🔥 DEFERRED STARTUP — runs in background AFTER Gunicorn binds
+#  This is the KEY FIX for Render's "no open ports detected" error.
 # ================================================================
 
 cache_dir = os.path.join(os.path.dirname(__file__), 'cache')
@@ -1110,65 +1089,174 @@ pred_cache_file = os.path.join(cache_dir, 'cached_predictions.pkl')
 p90_file = os.path.join(cache_dir, 'p90_cache.pkl')
 corr_file = os.path.join(cache_dir, 'correction_factors.pkl')
 
-# Try to load cached data
-if os.path.exists(pred_cache_file) and os.path.exists(p90_file):
+_STARTUP_LOCK = threading.Lock()
+
+
+def _init_db_safe():
+    """Create tables without blocking startup if DB is unreachable."""
     try:
-        from routes.api_predict import _PREDICTION_CACHE, _P90_CACHE
-        with open(pred_cache_file, 'rb') as f:
-            _PREDICTION_CACHE.update(pickle.load(f))
-        with open(p90_file, 'rb') as f:
-            p90_data = pickle.load(f)
-            app.config['P90_CACHE'] = p90_data
-            _P90_CACHE.update(p90_data)
-        if os.path.exists(corr_file):
-            with open(corr_file, 'rb') as f:
-                from routes.api_predict import _PENDING_CORRECTION_FACTORS
-                _PENDING_CORRECTION_FACTORS.update(pickle.load(f))
-
-        _CACHE_ONLY = True
+        with app.app_context():
+            db.create_all()
+        print("✅ Database tables ensured.")
+        return True
     except Exception as e:
-        print(f"⚠️ Failed to load cache: {e}")
-        _CACHE_ONLY = False
-else:
-    print("⚠️ No cache files found – running full startup (models will be loaded).")
-    _CACHE_ONLY = False
+        print(f"⚠️ db.create_all() failed — app will still start: {e}")
+        return False
 
-if not _CACHE_ONLY:
-    # Original startup: load models, historical data, etc.
-    print("🔄 Loading models and precomputing predictions (this may take 20+ sec)...")
-    with app.app_context():
-        try:
-            # Load models
-            directional_models_cached, directional_scalers_cached = load_models_with_cache(
-                STATIONS, DIRECTIONAL_MODELS_PATH
-            )
-            # Load historical data
-            historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
 
-            # Store in app config
-            app.config['DIRECTIONAL_MODELS'] = directional_models_cached
-            app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
-            app.config['HISTORICAL_DATA'] = historical_data
+def _deferred_startup():
+    """
+    Heavy initialization that runs in a daemon thread.
+    By running here instead of at module import time, Gunicorn can bind
+    to $PORT immediately and Render's port scanner succeeds.
+    """
+    global directional_models_cached, directional_scalers_cached
+    global historical_data, _MODELS_LOADED, _WARMUP_COMPLETE, _STARTUP_IN_PROGRESS
 
-            _MODELS_LOADED = True
+    if not _STARTUP_LOCK.acquire(blocking=False):
+        print("⚠️ Deferred startup already running, skipping duplicate.")
+        return
 
-            # Precompute predictions (this also builds typical patterns, etc.)
-            from routes.api_predict import precompute_all_predictions
-            precompute_all_predictions()
+    _STARTUP_IN_PROGRESS = True
+    try:
+        _init_db_safe()  # ← runs db.create_all() safely, in background
 
-            # Warm up models (optional)
-            warmup_all_models()
+        with app.app_context():
+            try:
+                # ---------- STEP 1: Download CSVs if missing ----------
+                data_dir = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    'services', 'data (2022-2024)'
+                )
+                os.makedirs(data_dir, exist_ok=True)
+                csv_files = ['2022.csv', '2023.csv', '2024.csv']
+                missing = [f for f in csv_files if not os.path.exists(os.path.join(data_dir, f))]
+                if missing:
+                    print(f"⚠️ Missing CSVs: {missing}. Downloading from Google Drive...")
+                    import_csv_files()
+                    still_missing = [f for f in csv_files if not os.path.exists(os.path.join(data_dir, f))]
+                    if still_missing:
+                        print(f"⚠️ Still missing after import: {still_missing}")
+                    else:
+                        print("✅ CSV files downloaded successfully.")
+                else:
+                    print("✅ CSV files already present.")
 
-            print("✅ Full startup complete.")
-        except Exception as e:
-            print(f"⚠️ Startup load failed: {e}")
-            import traceback
-            traceback.print_exc()
+                # ---------- STEP 2: Try to load prediction cache ----------
+                cache_loaded = False
+                if os.path.exists(pred_cache_file) and os.path.exists(p90_file):
+                    try:
+                        from routes.api_predict import _PREDICTION_CACHE, _P90_CACHE
+                        with open(pred_cache_file, 'rb') as f:
+                            _PREDICTION_CACHE.update(pickle.load(f))
+                        with open(p90_file, 'rb') as f:
+                            p90_data = pickle.load(f)
+                            app.config['P90_CACHE'] = p90_data
+                            _P90_CACHE.update(p90_data)
+                        if os.path.exists(corr_file):
+                            with open(corr_file, 'rb') as f:
+                                from routes.api_predict import _PENDING_CORRECTION_FACTORS
+                                _PENDING_CORRECTION_FACTORS.update(pickle.load(f))
+                        print("✅ Loaded prediction cache from disk.")
+                        cache_loaded = True
+                    except Exception as e:
+                        print(f"⚠️ Cache load failed: {e}")
+
+                # ---------- STEP 3: Load models ----------
+                print("🔄 Loading models...")
+                directional_models_cached, directional_scalers_cached = load_models_with_cache(
+                    STATIONS, DIRECTIONAL_MODELS_PATH
+                )
+                historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
+
+                import services
+                services.directional_models = directional_models_cached
+                services.directional_scalers = directional_scalers_cached
+                services.historical_entry = historical_data.get('historical_entry', {})
+                services.historical_exit = historical_data.get('historical_exit', {})
+                services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
+                services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
+
+                app.config['DIRECTIONAL_MODELS'] = directional_models_cached
+                app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
+                app.config['HISTORICAL_DATA'] = historical_data
+
+                _MODELS_LOADED = True
+                print(f"✅ Models loaded: {len(directional_models_cached)}/26")
+
+                # ---------- STEP 4: Preload patterns & scaled sequences ----------
+                try:
+                    from services.feature_engineering import (
+                        preload_all_station_patterns,
+                        preload_all_data,
+                        precompute_all_scaled_sequences,
+                    )
+                    preload_all_data()
+                    preload_all_station_patterns()
+                    precompute_all_scaled_sequences()
+                    print("   📊 All station patterns AND scaled sequences preloaded")
+                except Exception as e:
+                    print(f"   ⚠️ Pattern preload skipped: {e}")
+
+                # ---------- STEP 5: Preload P90 / correction factors ----------
+                try:
+                    from routes.api_predict import (
+                        preload_p90_cache, preload_typical_patterns, load_correction_factors,
+                    )
+                    print("📊 Preloading P90 cache and typical patterns...")
+                    preload_p90_cache()
+                    preload_typical_patterns()
+                    load_correction_factors()
+                    print("   📊 Correction factors loaded")
+                except Exception as e:
+                    print(f"⚠️ Error preloading P90/typical patterns: {e}")
+
+                # ---------- STEP 6: Precompute predictions (skip if cache was enough) ----------
+                if not cache_loaded:
+                    try:
+                        from routes.api_predict import precompute_all_predictions
+                        print("🔄 Precomputing all predictions...")
+                        precompute_all_predictions()
+                        print("✅ Predictions precomputed.")
+                    except Exception as e:
+                        print(f"⚠️ Prediction precompute failed: {e}")
+
+                # ---------- STEP 7: Warm up models ----------
+                try:
+                    warmup_all_models()
+                except Exception as e:
+                    print(f"⚠️ Warmup failed: {e}")
+
+                # ---------- STEP 8: Warm live-map cache ----------
+                try:
+                    warm_cache(app)
+                except Exception as e:
+                    print(f"⚠️ Live-map cache warm failed: {e}")
+
+                print("✅ Deferred startup complete — service is fully ready.")
+
+            except Exception as e:
+                print(f"⚠️ Deferred startup failed: {e}")
+                import traceback
+                traceback.print_exc()
+    finally:
+        _STARTUP_IN_PROGRESS = False
+        _STARTUP_LOCK.release()
+
+
+# Kick off deferred startup in a daemon thread.
+# This must be AFTER all @app.route decorators and blueprint registrations.
+_startup_thread = threading.Thread(
+    target=_deferred_startup,
+    daemon=True,
+    name="deferred-startup",
+)
+_startup_thread.start()
+
 # ========== MEMORY TRACING ==========
 import tracemalloc
 tracemalloc.start()
 
-# At the end of startup, add:
 snapshot = tracemalloc.take_snapshot()
 top_stats = snapshot.statistics('lineno')
 
@@ -1177,7 +1265,6 @@ for stat in top_stats[:10]:
 
 # ============ MAIN ============
 if __name__ == '__main__':
-    
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
 
