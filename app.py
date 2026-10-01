@@ -432,33 +432,44 @@ historical_data = None
 
 import threading
 _MODEL_LOAD_LOCK = threading.Lock()
-
 def ensure_models_loaded(station_name=None, direction=None):
-    """Ensure models are loaded - now just returns since we preload at startup"""
+    """Wait for the deferred startup thread to finish loading, then return."""
     global directional_models_cached, directional_scalers_cached, _MODELS_LOADED, historical_data
-    
-    # Should already be loaded from startup, but check just in case
+
+    # Already loaded? Return immediately.
     if _MODELS_LOADED and directional_models_cached:
         return
-    
-    # Fallback: load if not loaded at startup (shouldn't happen)
+
+    # Startup is in progress — wait for it instead of loading a second time.
+    if _STARTUP_IN_PROGRESS:
+        print("⏳ Waiting for deferred startup to finish loading models...")
+        # Poll every 200ms up to 5 minutes
+        import time
+        start = time.time()
+        while _STARTUP_IN_PROGRESS and not _MODELS_LOADED:
+            if time.time() - start > 300:
+                print("⚠️ Timed out waiting for startup.")
+                break
+            time.sleep(0.2)
+        if _MODELS_LOADED and directional_models_cached:
+            print("✅ Models are ready (loaded by startup thread).")
+            return
+
+    # If we get here, startup is not running AND models aren't loaded.
+    # This is the true fallback — only happens if the startup thread crashed.
     print("\n" + "="*60)
     print("⚠️ FALLBACK: Loading models on first request...")
     print("⏳ This should NOT happen if startup preload worked")
     print("="*60)
-    
+
     import time
     start = time.time()
-    
-    # Load models from cache or disk
+
     directional_models_cached, directional_scalers_cached = load_models_with_cache(
         STATIONS, DIRECTIONAL_MODELS_PATH
     )
-    
-    # Load historical data
     historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
-    
-    # Update services module
+
     import services
     services.directional_models = directional_models_cached
     services.directional_scalers = directional_scalers_cached
@@ -466,20 +477,18 @@ def ensure_models_loaded(station_name=None, direction=None):
     services.historical_exit = historical_data.get('historical_exit', {})
     services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
     services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
-    
-    # Store in app config
+
     app.config['DIRECTIONAL_MODELS'] = directional_models_cached
     app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
     app.config['HISTORICAL_DATA'] = historical_data
-    
+
     _MODELS_LOADED = True
     elapsed = time.time() - start
-    
+
     print("="*60)
     print(f"✅ FALLBACK: MODELS LOADED in {elapsed:.1f} seconds")
     print(f"✅ {len(directional_models_cached)} directional models ready")
     print("="*60 + "\n")
-
 # Register the loader
 app.config['ENSURE_MODELS_LOADED'] = ensure_models_loaded
 

@@ -28,6 +28,10 @@ class Config:
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,   # reconnect if the connection went stale
         'pool_recycle': 300,     # recycle connections after 5 minutes
+        'connect_args': {
+            'connect_timeout': 5,   # fail fast if Aiven is unreachable
+            'sslmode': 'require',   # Aiven requires SSL
+        },
     }
 
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
