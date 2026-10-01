@@ -326,7 +326,33 @@ def warmup():
     except Exception as e:
         return jsonify({"status": "failed", "error": str(e)}), 500
 
-
+@app.route('/debug/prediction-cache-peek')
+def debug_prediction_cache_peek():
+    from routes.api_predict import _PREDICTION_CACHE
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    
+    now = datetime.now(ZoneInfo('Asia/Manila'))
+    dow = now.weekday()
+    hour = now.hour
+    
+    # The key our lookup would use
+    expected_key = f"North Ave_Northbound_{dow}_{hour}"
+    
+    # Some sample keys actually in the cache
+    sample_keys = list(_PREDICTION_CACHE.keys())[:10]
+    
+    return jsonify({
+        'cache_size': len(_PREDICTION_CACHE),
+        'now_dow': dow,
+        'now_hour': hour,
+        'expected_key': expected_key,
+        'expected_key_in_cache': expected_key in _PREDICTION_CACHE,
+        'expected_value': _PREDICTION_CACHE.get(expected_key),
+        'sample_keys': sample_keys,
+        'sample_values': {k: _PREDICTION_CACHE[k] for k in sample_keys[:5]},
+    })
+    
 @app.route('/debug/warmup-status')
 def debug_warmup_status():
     """Check if models are warmed up and ready for instant predictions"""
@@ -340,7 +366,7 @@ def debug_warmup_status():
         'models_warmed': warmup_stats.get('successful', 0),
         'warmup_failures': warmup_stats.get('failed', 0),
         'warmup_duration_seconds': warmup_stats.get('duration_seconds', 0),
-        'status': 'ready' if (_WARMUP_COMPLETE and models_loaded > 0) else 'warming_up',
+        'status': 'ready' if (_WARMUP_COMPLETE /and models_loaded > 0) else 'warming_up',
         'memory_mb': get_memory_usage(),
         'message': 'All models are warmed up and ready for instant predictions!' if _WARMUP_COMPLETE else 'Models are loading in the background...'
     })
