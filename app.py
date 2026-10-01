@@ -366,7 +366,7 @@ def debug_warmup_status():
         'models_warmed': warmup_stats.get('successful', 0),
         'warmup_failures': warmup_stats.get('failed', 0),
         'warmup_duration_seconds': warmup_stats.get('duration_seconds', 0),
-        'status': 'ready' if (_WARMUP_COMPLETE /and models_loaded > 0) else 'warming_up',
+        'status': 'ready' if (_WARMUP_COMPLETE and models_loaded > 0) else 'warming_up',
         'memory_mb': get_memory_usage(),
         'message': 'All models are warmed up and ready for instant predictions!' if _WARMUP_COMPLETE else 'Models are loading in the background...'
     })
