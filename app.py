@@ -1176,12 +1176,21 @@ def _deferred_startup():
         
 # Kick off deferred startup in a daemon thread.
 # This must be AFTER all @app.route decorators and blueprint registrations.
-_startup_thread = threading.Thread(
-    target=_deferred_startup,
-    daemon=True,
-    name="deferred-startup",
-)
-_startup_thread.start()
+_started_once = False
+
+@app.before_request
+def _lazy_start_deferred_startup():
+    """Start the deferred startup thread in the worker process, on first request."""
+    global _started_once
+    if not _started_once:
+        _started_once = True
+        t = threading.Thread(
+            target=_deferred_startup,
+            daemon=True,
+            name="deferred-startup",
+        )
+        t.start()
+        print(f"🚀 Started deferred startup in worker PID={os.getpid()}")
 
 # ========== MEMORY TRACING ==========
 import tracemalloc
