@@ -160,7 +160,7 @@ def debug_taft_recent():
         taft_reports = Report.query.filter(
             Report.station == 'Taft',
             Report.timestamp > cutoff
-        ).order_by(Report.timestamp.desc()).all()
+        ).order_by(Report.timestamp.desc()).limit(100).all()  # ← ADDED LIMIT
         
         return jsonify({
             'recent_taft_count': len(taft_reports),
@@ -175,13 +175,14 @@ def debug_taft_recent():
             } for r in taft_reports]
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)[:200]}), 500  # ← SHORTENED
     
 @api_reports_bp.route('/debug/all-reports')
 def debug_all_reports():
     """Debug endpoint to see all reports regardless of flags"""
     try:
-        reports = Report.query.order_by(Report.timestamp.desc()).all()
+        # ← ADDED LIMIT
+        reports = Report.query.order_by(Report.timestamp.desc()).limit(100).all()
         
         result = []
         for report in reports:
@@ -204,7 +205,7 @@ def debug_all_reports():
             }
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)[:200]}), 500  # ← SHORTENED
     
 def is_operating_hours(check_time=None):
     """
@@ -286,7 +287,7 @@ def predict_station():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)[:200]}), 500  # ← SHORTENED
 
 @api_reports_bp.route('/retrain-models', methods=['POST'])
 def retrain_models():
@@ -310,7 +311,7 @@ def retrain_models():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)[:200]}), 500  # ← SHORTENED
     
 @api_reports_bp.route('/retrain-now', methods=['POST'])
 def retrain_now():
@@ -337,7 +338,7 @@ def retrain_now():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)[:200]}), 500  # ← SHORTENED
     
 @api_reports_bp.route('/debug/latest-report', methods=['GET'])
 def debug_latest_report():
@@ -364,7 +365,7 @@ def debug_latest_report():
             'has_user': latest.user is not None
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)[:200]}), 500  # ← SHORTENED
     
     
 @api_reports_bp.route('/report-congestion', methods=['POST'])
@@ -376,7 +377,7 @@ def report_congestion():
         ip_address = request.remote_addr
         print(f"👤 User: {user_id}, IP: {ip_address}")
         print(f"📋 Content-Type: {request.content_type}")
-        """"
+        """"  # ← keep as-is, this is intentionally commented out in your code
         # Operating hours check
         if not is_operating_hours():
             next_open = get_next_opening_time()
@@ -385,7 +386,6 @@ def report_congestion():
                 "error": f"MRT-3 is currently closed. Operating hours are 4:30 AM - 10:30 PM. Reports can only be submitted during operating hours. Next opening: {next_open}"
                 }), 403
         """""
-        # Rate limiting
         # Rate limiting - 3 reports per day
         if is_rate_limited(user_id, ip_address, limit=3, window=86400):
             # Calculate remaining reports for today
@@ -451,14 +451,12 @@ def report_congestion():
                     safe_filename = f"report_{timestamp}_{file.filename}"
                     
                     # Save file
-                    # When saving the file, store the path correctly
                     upload_folder = os.path.join('static', 'uploads', 'reports')
                     os.makedirs(upload_folder, exist_ok=True)
 
                     file_path = os.path.join(upload_folder, safe_filename)
                     file.save(file_path)
 
-                    # Store the path for URL access - this should match your route URL
                     photo_paths.append(f"static/uploads/reports/{safe_filename}")
         else:
             # Try JSON data
@@ -526,9 +524,7 @@ def report_congestion():
             predicted = int((ridership / capacity) * 100)
             print(f"📊 Prediction: {predicted}%")
         except Exception as pred_error:
-            print(f"❌ Prediction error: {pred_error}")
-            import traceback
-            traceback.print_exc()
+            print(f"❌ Prediction error: {type(pred_error).__name__}")  # ← CHANGED: no full traceback
             predicted = 50
         
         # Create report
@@ -568,18 +564,25 @@ def report_congestion():
             })
             
         except Exception as db_error:
-            print(f"❌ Database error: {db_error}")
-            db.session.rollback()
-            import traceback
-            traceback.print_exc()
-            return jsonify({"success": False, "error": f"Database error: {str(db_error)}"}), 500
+            # ← CHANGED: no full traceback, shorter error, 503
+            print(f"❌ Database error: {type(db_error).__name__}")
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({
+                "success": False,
+                "error": "Database temporarily unavailable. Please try again in a moment."
+            }), 503
             
     except Exception as e:
-        db.session.rollback()
-        print(f"❌ UNHANDLED EXCEPTION: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "error": f"Server error: {str(e)}"}), 500
+        # ← CHANGED: no full traceback
+        print(f"❌ UNHANDLED EXCEPTION: {type(e).__name__}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({"success": False, "error": "Server error. Please try again."}), 500
     
 # Add this debug route to check
 @api_reports_bp.route('/debug/check-image/<filename>')
@@ -641,8 +644,17 @@ def get_reports():
     try:
         print("=" * 50)
         print("📊 GET /api/reports called")
-        
-        reports = Report.query.order_by(Report.timestamp.desc()).all()
+
+        # ← CHANGED: limit query to last 200 reports, support ?limit= up to 500
+        try:
+            limit = min(int(request.args.get('limit', 200)), 500)
+        except (TypeError, ValueError):
+            limit = 200
+
+        reports = (Report.query
+                   .order_by(Report.timestamp.desc())
+                   .limit(limit)
+                   .all())
         
         result = []
         for report in reports:
@@ -685,10 +697,9 @@ def get_reports():
         return response
         
     except Exception as e:
-        print(f"❌ Error in /reports: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        # ← CHANGED: no full traceback during DB outages
+        print(f"❌ Error in /reports: {type(e).__name__}: {str(e)[:200]}")
+        return jsonify({'error': 'Database temporarily unavailable'}), 503
     
 
 
@@ -717,8 +728,11 @@ def flag_report(report_id):
         
         return jsonify({'success': True, 'message': 'Report flagged for review'})
     except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)[:200]}), 503  # ← CHANGED
     
 # routes/api_reports_bp.py
 
@@ -736,8 +750,8 @@ def flag_report_user(report_id):
         # Auto-hide after 3 flags
         if report.flag_count >= 3:
             report.flagged = True
-            report.flagged_at = Config.get_current_time()  # Use Config for consistent year
-            report.status = 'pending'  # Needs admin review
+            report.flagged_at = Config.get_current_time()
+            report.status = 'pending'
             print(f"🔴 Report {report_id} automatically hidden after {report.flag_count} flags")
         
         db.session.commit()
@@ -747,6 +761,9 @@ def flag_report_user(report_id):
         
         return jsonify({'success': True, 'message': message, 'flag_count': report.flag_count})
     except Exception as e:
-        db.session.rollback()
-        print(f"Error flagging report: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        print(f"Error flagging report: {type(e).__name__}")  # ← CHANGED
+        return jsonify({'success': False, 'error': str(e)[:200]}), 503  # ← CHANGED
