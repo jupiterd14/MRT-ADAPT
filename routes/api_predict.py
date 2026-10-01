@@ -823,6 +823,7 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
     # Check precomputed prediction cache
     dow = target_datetime.weekday()
     cache_key = f"{station_name}_{direction}_{dow}_{hour}"
+    print(f"🔍 CACHE LOOKUP: key={cache_key} in_cache={cache_key in _PREDICTION_CACHE} cache_size={len(_PREDICTION_CACHE)}")
     if cache_key in _PREDICTION_CACHE:
         congestion = _PREDICTION_CACHE[cache_key]
         # Store in request-level cache for this specific time
