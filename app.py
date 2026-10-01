@@ -433,62 +433,11 @@ historical_data = None
 import threading
 _MODEL_LOAD_LOCK = threading.Lock()
 def ensure_models_loaded(station_name=None, direction=None):
-    """Wait for the deferred startup thread to finish loading, then return."""
-    global directional_models_cached, directional_scalers_cached, _MODELS_LOADED, historical_data
-
-    # Already loaded? Return immediately.
-    if _MODELS_LOADED and directional_models_cached:
-        return
-
-    # Startup is in progress — wait for it instead of loading a second time.
-    if _STARTUP_IN_PROGRESS:
-        print("⏳ Waiting for deferred startup to finish loading models...")
-        # Poll every 200ms up to 5 minutes
-        import time
-        start = time.time()
-        while _STARTUP_IN_PROGRESS and not _MODELS_LOADED:
-            if time.time() - start > 300:
-                print("⚠️ Timed out waiting for startup.")
-                break
-            time.sleep(0.2)
-        if _MODELS_LOADED and directional_models_cached:
-            print("✅ Models are ready (loaded by startup thread).")
-            return
-
-    # If we get here, startup is not running AND models aren't loaded.
-    # This is the true fallback — only happens if the startup thread crashed.
-    print("\n" + "="*60)
-    print("⚠️ FALLBACK: Loading models on first request...")
-    print("⏳ This should NOT happen if startup preload worked")
-    print("="*60)
-
-    import time
-    start = time.time()
-
-    directional_models_cached, directional_scalers_cached = load_models_with_cache(
-        STATIONS, DIRECTIONAL_MODELS_PATH
-    )
-    historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
-
-    import services
-    services.directional_models = directional_models_cached
-    services.directional_scalers = directional_scalers_cached
-    services.historical_entry = historical_data.get('historical_entry', {})
-    services.historical_exit = historical_data.get('historical_exit', {})
-    services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
-    services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
-
-    app.config['DIRECTIONAL_MODELS'] = directional_models_cached
-    app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
-    app.config['HISTORICAL_DATA'] = historical_data
-
-    _MODELS_LOADED = True
-    elapsed = time.time() - start
-
-    print("="*60)
-    print(f"✅ FALLBACK: MODELS LOADED in {elapsed:.1f} seconds")
-    print(f"✅ {len(directional_models_cached)} directional models ready")
-    print("="*60 + "\n")
+    """
+    Cache-only mode: nothing to load.
+    Prediction routes use _PREDICTION_CACHE directly.
+    """
+    return
 # Register the loader
 app.config['ENSURE_MODELS_LOADED'] = ensure_models_loaded
 
@@ -1115,9 +1064,8 @@ def _init_db_safe():
 
 def _deferred_startup():
     """
-    Heavy initialization that runs in a daemon thread.
-    By running here instead of at module import time, Gunicorn can bind
-    to $PORT immediately and Render's port scanner succeeds.
+    Cache-only startup — loads prediction cache from disk and nothing else.
+    Models, CSVs, and historical data are NOT loaded.
     """
     global directional_models_cached, directional_scalers_cached
     global historical_data, _MODELS_LOADED, _WARMUP_COMPLETE, _STARTUP_IN_PROGRESS
@@ -1128,11 +1076,11 @@ def _deferred_startup():
 
     _STARTUP_IN_PROGRESS = True
     try:
-        _init_db_safe()  # ← runs db.create_all() safely, in background
+        _init_db_safe()
 
         with app.app_context():
             try:
-                # ---------- STEP 1: Download CSVs if missing ----------
+                # ---------- STEP 1: CSV check (no download) ----------
                 data_dir = os.path.join(
                     os.path.dirname(os.path.abspath(__file__)),
                     'services', 'data (2022-2024)'
@@ -1141,108 +1089,56 @@ def _deferred_startup():
                 csv_files = ['2022.csv', '2023.csv', '2024.csv']
                 missing = [f for f in csv_files if not os.path.exists(os.path.join(data_dir, f))]
                 if missing:
-                    print(f"⚠️ Missing CSVs: {missing}. Downloading from Google Drive...")
-                    import_csv_files()
-                    still_missing = [f for f in csv_files if not os.path.exists(os.path.join(data_dir, f))]
-                    if still_missing:
-                        print(f"⚠️ Still missing after import: {still_missing}")
-                    else:
-                        print("✅ CSV files downloaded successfully.")
+                    print(f"ℹ️ CSVs not on disk (cache-only mode, not downloading): {missing}")
                 else:
-                    print("✅ CSV files already present.")
+                    print("✅ CSVs present on disk (not used).")
 
-                # ---------- STEP 2: Try to load prediction cache ----------
-                cache_loaded = False
-                if os.path.exists(pred_cache_file) and os.path.exists(p90_file):
+                # ---------- STEP 2: Load cache files ----------
+                loaded_any = False
+
+                if os.path.exists(pred_cache_file):
                     try:
-                        from routes.api_predict import _PREDICTION_CACHE, _P90_CACHE
+                        from routes.api_predict import _PREDICTION_CACHE
                         with open(pred_cache_file, 'rb') as f:
-                            _PREDICTION_CACHE.update(pickle.load(f))
+                            data = pickle.load(f)
+                            _PREDICTION_CACHE.update(data)
+                        print(f"✅ Prediction cache loaded: {len(data)} entries")
+                        loaded_any = True
+                    except Exception as e:
+                        print(f"⚠️ Prediction cache load failed: {e}")
+
+                if os.path.exists(p90_file):
+                    try:
+                        from routes.api_predict import _P90_CACHE
                         with open(p90_file, 'rb') as f:
                             p90_data = pickle.load(f)
-                            app.config['P90_CACHE'] = p90_data
                             _P90_CACHE.update(p90_data)
-                        if os.path.exists(corr_file):
-                            with open(corr_file, 'rb') as f:
-                                from routes.api_predict import _PENDING_CORRECTION_FACTORS
-                                _PENDING_CORRECTION_FACTORS.update(pickle.load(f))
-                        print("✅ Loaded prediction cache from disk.")
-                        cache_loaded = True
+                            app.config['P90_CACHE'] = p90_data
+                        print(f"✅ P90 cache loaded: {len(p90_data)} entries")
+                        loaded_any = True
                     except Exception as e:
-                        print(f"⚠️ Cache load failed: {e}")
+                        print(f"⚠️ P90 cache load failed: {e}")
 
-                # ---------- STEP 3: Load models ----------
-                print("🔄 Loading models...")
-                directional_models_cached, directional_scalers_cached = load_models_with_cache(
-                    STATIONS, DIRECTIONAL_MODELS_PATH
-                )
-                historical_data = load_historical_with_cache(STATIONS, STATION_BASE_CAPACITY)
-
-                import services
-                services.directional_models = directional_models_cached
-                services.directional_scalers = directional_scalers_cached
-                services.historical_entry = historical_data.get('historical_entry', {})
-                services.historical_exit = historical_data.get('historical_exit', {})
-                services.hourly_avg_entry = historical_data.get('hourly_avg_entry', {})
-                services.hourly_avg_exit = historical_data.get('hourly_avg_exit', {})
-
-                app.config['DIRECTIONAL_MODELS'] = directional_models_cached
-                app.config['DIRECTIONAL_SCALERS'] = directional_scalers_cached
-                app.config['HISTORICAL_DATA'] = historical_data
-
-                _MODELS_LOADED = True
-                print(f"✅ Models loaded: {len(directional_models_cached)}/26")
-
-                # ---------- STEP 4: Preload patterns & scaled sequences ----------
-                try:
-                    from services.feature_engineering import (
-                        preload_all_station_patterns,
-                        preload_all_data,
-                        precompute_all_scaled_sequences,
-                    )
-                    preload_all_data()
-                    preload_all_station_patterns()
-                    precompute_all_scaled_sequences()
-                    print("   📊 All station patterns AND scaled sequences preloaded")
-                except Exception as e:
-                    print(f"   ⚠️ Pattern preload skipped: {e}")
-
-                # ---------- STEP 5: Preload P90 / correction factors ----------
-                try:
-                    from routes.api_predict import (
-                        preload_p90_cache, preload_typical_patterns, load_correction_factors,
-                    )
-                    print("📊 Preloading P90 cache and typical patterns...")
-                    preload_p90_cache()
-                    preload_typical_patterns()
-                    load_correction_factors()
-                    print("   📊 Correction factors loaded")
-                except Exception as e:
-                    print(f"⚠️ Error preloading P90/typical patterns: {e}")
-
-                # ---------- STEP 6: Precompute predictions (skip if cache was enough) ----------
-                if not cache_loaded:
+                if os.path.exists(corr_file):
                     try:
-                        from routes.api_predict import precompute_all_predictions
-                        print("🔄 Precomputing all predictions...")
-                        precompute_all_predictions()
-                        print("✅ Predictions precomputed.")
+                        from routes.api_predict import _PENDING_CORRECTION_FACTORS
+                        with open(corr_file, 'rb') as f:
+                            corr_data = pickle.load(f)
+                            _PENDING_CORRECTION_FACTORS.update(corr_data)
+                        print(f"✅ Correction factors loaded: {len(corr_data)} entries")
                     except Exception as e:
-                        print(f"⚠️ Prediction precompute failed: {e}")
+                        print(f"⚠️ Correction factors load failed: {e}")
+                else:
+                    print("ℹ️ No correction_factors.pkl — running without correction.")
 
-                # ---------- STEP 7: Warm up models ----------
-                try:
-                    warmup_all_models()
-                except Exception as e:
-                    print(f"⚠️ Warmup failed: {e}")
+                if not loaded_any:
+                    print("⚠️ No prediction cache found. Predictions will use fallback values.")
+                else:
+                    print("✅ Deferred startup complete — cache-only mode ready.")
 
-                # ---------- STEP 8: Warm live-map cache ----------
-                try:
-                    warm_cache(app)
-                except Exception as e:
-                    print(f"⚠️ Live-map cache warm failed: {e}")
-
-                print("✅ Deferred startup complete — service is fully ready.")
+                # Mark ready so status endpoints don't hang
+                _WARMUP_COMPLETE = True
+                _MODELS_LOADED = False  # intentionally False — models are not loaded
 
             except Exception as e:
                 print(f"⚠️ Deferred startup failed: {e}")
@@ -1251,8 +1147,7 @@ def _deferred_startup():
     finally:
         _STARTUP_IN_PROGRESS = False
         _STARTUP_LOCK.release()
-
-
+        
 # Kick off deferred startup in a daemon thread.
 # This must be AFTER all @app.route decorators and blueprint registrations.
 _startup_thread = threading.Thread(
