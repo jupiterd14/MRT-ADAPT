@@ -1027,7 +1027,7 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
             
             try {
-                const response = await fetch('/api/profile/update-password', {
+                const response = await fetch('/api/auth/update-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1116,7 +1116,7 @@
             this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
             
             try {
-                const response = await fetch('/api/profile/request-reset', {
+                const response = await fetch('/api/auth/request-reset', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: email })
@@ -1159,7 +1159,7 @@
             this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             
             try {
-                const response = await fetch('/api/profile/request-reset', {
+               const response = await fetch('/api/auth/request-reset', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: email })
@@ -1234,7 +1234,7 @@
             this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting...';
             
             try {
-                const response = await fetch('/api/profile/reset-password', {
+                const response = await fetch('/api/auth/reset-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

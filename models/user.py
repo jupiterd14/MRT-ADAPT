@@ -29,6 +29,7 @@ class User(db.Model):
     # ✅ NEW: soft-ban flag. Lets admin mark an account as banned without
     # deleting it, so a re-invite can't silently revive it.
     banned = db.Column(db.Boolean, default=False, nullable=False)
+    session_epoch = db.Column(db.Integer, default=0, nullable=False)
 
     @property
     def password(self):

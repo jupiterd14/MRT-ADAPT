@@ -411,7 +411,6 @@ def google_login():
         return redirect(url_for('auth.login'))
 
     redirect_uri = url_for('auth.google_authorize', _external=True)
-    print(f"🔐 Redirect URI: {redirect_uri}")
 
     client_kwargs = {
         'scope': 'openid email profile',
@@ -473,14 +472,12 @@ def google_authorize():
         token = google.authorize_access_token()
 
         if not token:
-            print("❌ No token received")
             flash('Failed to get access token from Google.', 'error')
             return redirect(url_for('auth.login'))
 
         user_info = google.parse_id_token(token)
 
         if not user_info or 'email' not in user_info:
-            print("❌ No email in user info")
             flash('Failed to get user information from Google.', 'error')
             return redirect(url_for('auth.login'))
 
@@ -537,7 +534,6 @@ def google_authorize():
             return redirect(url_for('user.user_dashboard'))
 
     except Exception as e:
-        print(f"❌ Google login error: {e}")
         import traceback
         traceback.print_exc()
         flash(f'Google login failed: {str(e)}', 'error')
