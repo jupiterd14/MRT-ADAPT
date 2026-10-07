@@ -66,7 +66,7 @@ def _login_email_key():
 @auth_bp.before_app_request
 def check_session_validity():
     """Check if session is valid on every request - prevents back button access"""
-    from flask import request, session, flash, redirect, url_for
+    from flask import request, session, flash, redirect, url_for, jsonify
 
     path = request.path or ''
 
