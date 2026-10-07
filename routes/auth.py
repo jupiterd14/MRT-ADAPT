@@ -63,12 +63,105 @@ def _login_email_key():
     return f"{email}:{request.remote_addr or 'unknown'}"
 
 
+# ======================================================================
+# PUBLIC ENDPOINT ALLOWLIST (checked FIRST in the guard, wins over
+# protected prefixes). Password reset must be here — the user is
+# locked out and has no session.
+# ======================================================================
+PUBLIC_API_ENDPOINTS = {
+    # Live map & navigation
+    'api_other.live_map_directions_v3',
+    'api_other.live_map_directions_v2',
+    'api_other.live_map_directions',
+    'api_other.live_map_directions_now',
+    'api_other.travel_prediction',
+
+    # Stations & info
+    'api_other.get_stations',
+    'api_other.station_info',
+    'api_other.get_recommendation',
+
+    # Alerts & broadcasts (public reads)
+    'api_other.alerts_count',
+    'api_other.alerts_list',
+    'api_other.get_public_broadcasts',
+
+    # Predictions
+    'api_predict.predict_congestion',
+    'api_predict.predict_direction',
+    'api_predict.predict_route',
+    'api_predict.directional_forecast',
+    'api_predict.directional_forecast_all',
+    'api_predict.model_evaluation',
+    'api_predict.confusion_matrix_endpoint',
+    'api_predict.test_rush_hour',
+
+    # Schedules
+    'api_schedule.get_headway_route',
+    'api_schedule.get_next_trains_route',
+    'api_schedule.station_info_route',
+    'api_schedule.schedule_with_congestion',
+    'api_schedule.compare_stations',
+    'api_schedule.test_schedule',
+    'api_schedule.test_time_schedule',
+
+    # Public reports
+    'api_reports.get_reports',
+    'api_reports.get_remaining_reports',
+    'api_reports.report_congestion',
+    'api_reports.predict_station',
+
+    # Historical
+    'api_other.historical_patterns',
+
+    # Health & session
+    'model_performance.health_check',
+    'api_test',
+    'api_other.test_api',
+    'auth.check_session',
+
+    # ✅ Password reset — MUST be public (user is locked out).
+    # Confirmed endpoint names from url_map:
+    'email.request_password_reset',
+    'email.reset_password',
+}
+
+PUBLIC_PAGE_ENDPOINTS = {
+    'auth.login',
+    'auth.google_login',
+    'auth.google_authorize',
+    'auth.google_operator_login',
+    'auth.signup',
+    'auth.operator_signup',
+    'auth.check_session',
+    'static',
+    'public.home',
+    'public.live_map',
+    'public.travel_plan',
+    'public.alerts',
+    'public.report',
+    'user.user_dashboard',
+}
+
+
+# ======================================================================
+# SESSION VALIDITY GUARD
+# ======================================================================
 @auth_bp.before_app_request
 def check_session_validity():
     """Check if session is valid on every request - prevents back button access"""
     from flask import request, session, flash, redirect, url_for, jsonify
 
     path = request.path or ''
+    endpoint = request.endpoint or ''
+
+    # ------------------------------------------------------------------
+    # 0. PUBLIC ALLOWLIST — checked FIRST so it wins over protected prefixes.
+    # ------------------------------------------------------------------
+    if endpoint in PUBLIC_API_ENDPOINTS:
+        return None
+    if endpoint in PUBLIC_PAGE_ENDPOINTS:
+        return None
 
     # ------------------------------------------------------------------
     # 1. ALWAYS-PROTECTED PREFIXES
@@ -104,74 +197,7 @@ def check_session_validity():
         return None
 
     # ------------------------------------------------------------------
-    # 2. PUBLIC API ENDPOINTS — no auth required
-    # ------------------------------------------------------------------
-    PUBLIC_API_ENDPOINTS = {
-        'api_other.live_map_directions_v3',
-        'api_other.live_map_directions_v2',
-        'api_other.live_map_directions',
-        'api_other.live_map_directions_now',
-        'api_other.travel_prediction',
-        'api_other.get_stations',
-        'api_other.station_info',
-        'api_other.get_recommendation',
-        'api_other.alerts_count',
-        'api_other.alerts_list',
-        'api_other.get_public_broadcasts',
-        'api_predict.predict_congestion',
-        'api_predict.predict_direction',
-        'api_predict.predict_route',
-        'api_predict.directional_forecast',
-        'api_predict.directional_forecast_all',
-        'api_predict.model_evaluation',
-        'api_predict.confusion_matrix_endpoint',
-        'api_predict.test_rush_hour',
-        'api_schedule.get_headway_route',
-        'api_schedule.get_next_trains_route',
-        'api_schedule.station_info_route',
-        'api_schedule.schedule_with_congestion',
-        'api_schedule.compare_stations',
-        'api_schedule.test_schedule',
-        'api_schedule.test_time_schedule',
-        'api_reports.get_reports',
-        'api_reports.get_remaining_reports',
-        'api_reports.report_congestion',
-        'api_reports.predict_station',
-        'api_other.historical_patterns',
-        'model_performance.health_check',
-        'api_test',
-        'api_other.test_api',
-        'auth.check_session',
-    }
-
-    # ------------------------------------------------------------------
-    # 3. PUBLIC NON-API ENDPOINTS — page routes
-    # ------------------------------------------------------------------
-    public_endpoints = {
-        'auth.login',
-        'auth.google_login',
-        'auth.google_authorize',
-        'auth.google_operator_login',
-        'auth.signup',
-        'auth.operator_signup',
-        'auth.check_session',
-        'static',
-        'public.home',
-        'public.live_map',
-        'public.travel_plan',
-        'public.alerts',
-        'public.report',
-        'user.user_dashboard',
-    }
-
-    if request.endpoint in PUBLIC_API_ENDPOINTS:
-        return None
-
-    if request.endpoint in public_endpoints:
-        return None
-
-    # ------------------------------------------------------------------
-    # 4. DEFAULT for anything else (non-API pages) → require login
+    # 2. DEFAULT for non-API pages → require login
     # ------------------------------------------------------------------
     if not path.startswith('/api/'):
         if session.get('is_admin') and session.get('role') == 'admin':
@@ -215,7 +241,6 @@ def login():
     error = None
     error_type = None
 
-    # On GET request, check if user is actually logged in
     if request.method == 'GET':
         if 'user_id' in session:
             user = User.query.get(session['user_id'])
@@ -304,7 +329,6 @@ def login():
                 else:
                     return redirect(url_for('user.user_dashboard'))
             else:
-                print(f"❌ Incorrect password for {email}")
                 log_activity(user.id, user.role, user.username, 'login_failed',
                              f'Incorrect password from IP: {ip_address}')
                 error = "Incorrect password."

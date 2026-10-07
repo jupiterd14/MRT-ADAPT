@@ -496,7 +496,25 @@
 }
 
 /* Filled state - GREEN GLOW */
+/* Filled state - NEUTRAL BLUE (typing in progress, not yet validated) */
 .code-input.filled {
+    border-color: var(--btn-blue);
+    background: rgba(59, 130, 246, 0.12);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+    color: #ffffff !important;
+}
+
+/* Error state - RED (code was rejected) */
+.code-input.error {
+    border-color: var(--error-red);
+    background: rgba(239, 68, 68, 0.15);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.2);
+    color: #ffffff !important;
+    animation: shake 0.4s ease;
+}
+
+/* Success state - GREEN (code accepted) */
+.code-input.success {
     border-color: var(--success-green);
     background: rgba(34, 197, 94, 0.15);
     box-shadow: 0 0 16px rgba(34, 197, 94, 0.12);
@@ -1078,8 +1096,21 @@ document.getElementById('confirmPassword').addEventListener('keydown', function(
                     document.getElementById('email').value = resetEmail;
                     document.getElementById('password').focus();
                 } else {
-                    showToast(data.error || 'Failed to reset password', 'error');
-                }
+    // Red flash on the code inputs if the code was wrong
+    const errMsg = (data.error || '').toLowerCase();
+    if (errMsg.includes('code') || errMsg.includes('invalid')) {
+        document.querySelectorAll('.code-input').forEach(el => {
+            el.classList.add('error');
+            el.classList.remove('filled');
+        });
+        setTimeout(() => {
+            document.querySelectorAll('.code-input').forEach(el => {
+                el.classList.remove('error');
+            });
+        }, 2000);
+    }
+    showToast(data.error || 'Failed to reset password', 'error');
+}
             } catch (error) {
                 console.error('Error:', error);
                 showToast('Failed to reset password. Please try again.', 'error');
