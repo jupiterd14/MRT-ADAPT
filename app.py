@@ -357,8 +357,17 @@ def get_memory_usage():
     
 @app.route('/api/test')
 def api_test():
-    return jsonify({"status": "ok", "message": "API is working", "time": datetime.now().isoformat()})
-
+    from flask import current_app
+    before_names = [getattr(f, '__name__', repr(f)) for f in app.before_request_funcs.get(None, [])]
+    return jsonify({
+        "status": "ok",
+        "message": "API is working",
+        "time": datetime.now().isoformat(),
+        "before_request_funcs": before_names,
+        "blueprints": list(app.blueprints.keys()),
+        "auth_bp_module_file": __import__('routes.auth', fromlist=['__file__']).__file__,
+        "auth_guard_defined": hasattr(__import__('routes.auth', fromlist=['check_session_validity']), 'check_session_validity'),
+    })
 db.init_app(app)
 
 oauth = OAuth(app)
@@ -815,6 +824,25 @@ def _deferred_startup():
 # This must be AFTER all @app.route decorators and blueprint registrations.
 _started_once = False
 
+@app.route('/_dbg/who')
+def _dbg_who():
+    from flask import session, request, jsonify, current_app
+    from models import User
+    u = None
+    uid = session.get('user_id')
+    if uid:
+        u = User.query.get(uid)
+    before_names = [getattr(f, '__name__', repr(f)) for f in app.before_request_funcs.get(None, [])]
+    return jsonify({
+        'cookies_received': list(request.cookies.keys()),
+        'session_keys': list(session.keys()),
+        'session_user_id': uid,
+        'session_role': session.get('role'),
+        'before_request_names': before_names,
+        'blueprints': list(current_app.blueprints.keys()),
+        'user_row': {'username': u.username if u else None, 'role': u.role if u else None},
+    })
+    
 @app.before_request
 def _lazy_start_deferred_startup():
     """Start the deferred startup thread in the worker process, on first request."""
