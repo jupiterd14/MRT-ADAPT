@@ -430,7 +430,7 @@
 
             <form action="/operator-signup" method="POST" id="signupForm">
                 <input type="hidden" name="email" value="{{ email }}">
-                <input type="hidden" name="temp_password" value="{{ temp_password }}">
+                <input type="hidden" name="invite_token" value="{{ invite_token }}">
                 <input type="hidden" name="station" value="{{ assigned_station }}">
                 
                 <span class="input-label">Full Name</span>
@@ -480,9 +480,9 @@
             <div class="divider"><span>OR</span></div>
 
             <!-- FIXED: Use the correct Google signup route -->
-            <button class="btn-google" onclick="window.location.href='/login/google/operator?email={{ email }}&station={{ assigned_station }}'">
-                <i class="fab fa-google"></i> Sign up with Google
-            </button>
+            <button class="btn-google" onclick="window.location.href='/login/google/operator?invite={{ invite_token }}&email={{ email }}&station={{ assigned_station }}'">
+    <i class="fab fa-google"></i> Sign up with Google
+</button>
 
             <div class="login-link">
                 Already have an account? <a href="/login">Log in</a>

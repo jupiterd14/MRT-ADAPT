@@ -49,8 +49,8 @@ os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 gc.set_threshold(50, 3, 3)
 
 
-from flask import Flask, session, flash, redirect, url_for, jsonify, request
-from extensions import cache
+from flask import Flask, session, flash, redirect, url_for, jsonify, request, render_template
+from extensions import cache, limiter
 
 import warnings
 from authlib.integrations.flask_client import OAuth
@@ -82,9 +82,7 @@ from services.lstm_integration import (
 from utils import (
     STATIONS, STATION_BASE_CAPACITY, STATION_COORDINATES,
     get_operator_stations, get_station_list, get_capacity,
-    track_report_submission, is_rate_limited, is_suspicious_remarks, check_duplicate_report,
     log_activity as utils_log_activity,
-    report_tracker
 )
 
 from services import (
@@ -300,9 +298,30 @@ app.config['CACHE_TYPE'] = 'SimpleCache'
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 app.config['CACHE_THRESHOLD'] = 1000
 
+
+# Initialize cache
 # Initialize cache
 cache.init_app(app)
 app.extensions.setdefault('cache', {})[cache] = cache
+
+# Initialize rate limiter
+limiter.init_app(app)
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Return JSON for API routes, HTML page for others."""
+    if request.path.startswith('/api/'):
+        resp = jsonify({
+            'error': 'rate_limited',
+            'message': 'Too many requests. Please slow down.',
+            'retry_after_seconds': 60,
+        })
+        resp.status_code = 429
+        resp.headers['Retry-After'] = '60'
+        return resp
+    return render_template('429.html'), 429
+
 
 @app.route('/warmup')
 def warmup():
@@ -325,52 +344,6 @@ def warmup():
         })
     except Exception as e:
         return jsonify({"status": "failed", "error": str(e)}), 500
-
-@app.route('/debug/prediction-cache-peek')
-def debug_prediction_cache_peek():
-    from routes.api_predict import _PREDICTION_CACHE
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-    
-    now = datetime.now(ZoneInfo('Asia/Manila'))
-    dow = now.weekday()
-    hour = now.hour
-    
-    # The key our lookup would use
-    expected_key = f"North Ave_Northbound_{dow}_{hour}"
-    
-    # Some sample keys actually in the cache
-    sample_keys = list(_PREDICTION_CACHE.keys())[:10]
-    
-    return jsonify({
-        'cache_size': len(_PREDICTION_CACHE),
-        'now_dow': dow,
-        'now_hour': hour,
-        'expected_key': expected_key,
-        'expected_key_in_cache': expected_key in _PREDICTION_CACHE,
-        'expected_value': _PREDICTION_CACHE.get(expected_key),
-        'sample_keys': sample_keys,
-        'sample_values': {k: _PREDICTION_CACHE[k] for k in sample_keys[:5]},
-    })
-    
-@app.route('/debug/warmup-status')
-def debug_warmup_status():
-    """Check if models are warmed up and ready for instant predictions"""
-    warmup_stats = app.config.get('WARMUP_STATS', {})
-    models_loaded = len(directional_models_cached) if directional_models_cached else 0
-    
-    return jsonify({
-        'warmup_complete': _WARMUP_COMPLETE,
-        'startup_in_progress': _STARTUP_IN_PROGRESS,
-        'total_models': models_loaded,
-        'models_warmed': warmup_stats.get('successful', 0),
-        'warmup_failures': warmup_stats.get('failed', 0),
-        'warmup_duration_seconds': warmup_stats.get('duration_seconds', 0),
-        'status': 'ready' if (_WARMUP_COMPLETE and models_loaded > 0) else 'warming_up',
-        'memory_mb': get_memory_usage(),
-        'message': 'All models are warmed up and ready for instant predictions!' if _WARMUP_COMPLETE else 'Models are loading in the background...'
-    })
-
 
 def get_memory_usage():
     """Helper to get memory usage"""
@@ -561,15 +534,6 @@ def preload_all_models():
     
     return directional_models_cached, directional_scalers_cached
 
-@app.route('/debug/app-config')
-def debug_app_config():
-    return jsonify({
-        'ENSURE_SINGLE_MODEL_LOADED': app.config.get('ENSURE_SINGLE_MODEL_LOADED') is not None,
-        'DIRECTIONAL_MODELS': app.config.get('DIRECTIONAL_MODELS') is not None,
-        'DIRECTIONAL_SCALERS': app.config.get('DIRECTIONAL_SCALERS') is not None,
-        'models_loaded': len(directional_models_cached) if directional_models_cached else 0
-    })
-    
 # ============ WRAPPER FUNCTIONS ============
 def get_directional_prediction_wrapper(station_name, direction, target_datetime=None):
     """
@@ -628,333 +592,6 @@ app.config['TYPE_ICONS'] = typeIcons
 # ============ DATABASE SETUP ============
 # NOTE: db.create_all() is called inside _deferred_startup() via _init_db_safe()
 # so it never blocks Gunicorn from binding to $PORT.
-
-# ============ LSTM STATUS DEBUG ROUTE ============
-@app.route('/debug/lstm-status')
-def debug_lstm_status():
-    """Check if LSTM models are loaded"""
-    lstm_predictor = app.config.get('LSTM_PREDICTOR')
-    
-    if not lstm_predictor:
-        return jsonify({
-            'status': 'not_loaded',
-            'message': 'LSTM models not loaded. They load only when retraining is triggered.',
-            'models_loaded': 0
-        })
-    
-    return jsonify({
-        'status': 'loaded',
-        'models_loaded': len(lstm_predictor.models) if hasattr(lstm_predictor, 'models') else 0,
-        'station_directions': lstm_predictor.station_directions[:10] if hasattr(lstm_predictor, 'station_directions') else [],
-        'model_path': lstm_predictor.model_path if hasattr(lstm_predictor, 'model_path') else None
-    })
-
-@app.route('/debug/raw-prediction/<station_name>/<direction>')
-def raw_prediction(station_name, direction):
-    from services import get_feature_sequence_for_station
-    from routes.api_predict import get_p90_percentile  # Changed from P95
-    import numpy as np
-    
-    ensure_single_model_loaded(station_name, direction)
-    
-    model_key = f"{station_name}_{direction}"
-    
-    if model_key not in directional_models_cached:
-        return jsonify({'error': f'Model {model_key} not found'})
-    
-    try:
-        now = Config.get_current_time()
-        sequence = get_feature_sequence_for_station(station_name, direction, now)
-        
-        if sequence is None:
-            return jsonify({'error': 'Could not generate feature sequence'})
-        
-        # ✅ FIX: get_feature_sequence_for_station() already returns scaled features
-        # Do NOT transform again!
-        target_scaler = directional_scalers_cached.get(f'{model_key}_target')
-        
-        if not target_scaler:
-            return jsonify({'error': 'Target scaler not found'})
-        
-        # sequence is already scaled (24, 16)
-        scaled_sequence = sequence.reshape(1, 24, -1)
-        
-        input_tensor = tf.convert_to_tensor(scaled_sequence, dtype=tf.float32)
-        pred_scaled = directional_models_cached[model_key](input_tensor, training=False).numpy()
-        pred_passengers = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
-        
-        # ✅ Get P90 for congestion (changed from P95)
-        p90 = get_p90_percentile(station_name, direction)
-        pred_congestion = (pred_passengers / p90) * 100
-        pred_congestion = max(0, min(100, pred_congestion))
-        
-        return jsonify({
-            'station': station_name,
-            'direction': direction,
-            'predicted_passengers': round(pred_passengers, 1),
-            'predicted_congestion': round(pred_congestion, 1),
-            'p90_percentile': round(p90, 0),  # Changed from P95
-            'sequence_shape': sequence.shape,
-            'timestamp': now.isoformat(),
-            'success': True
-        })
-        
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        })
-@app.route('/debug/feature-sequence-test/<station>/<direction>')
-def test_feature_sequence(station, direction):
-    from services.feature_engineering import get_feature_sequence_for_station
-    from urllib.parse import unquote
-    
-    station = unquote(station)
-    direction = unquote(direction)
-    
-    now = Config.get_current_time()
-    sequence = get_feature_sequence_for_station(station, direction, now)
-    
-    result = {
-        "station": station,
-        "direction": direction,
-        "target_time": now.isoformat(),
-        "sequence_is_none": sequence is None,
-        "sequence_shape": sequence.shape if sequence is not None else None,
-        "current_working_directory": os.getcwd(),
-        "data_file_exists": os.path.exists('data (2022-2024)/2025.csv'),
-        "alternative_path_exists": os.path.exists('../data (2022-2024)/2025.csv'),
-        "models_loaded": len(directional_models_cached) if directional_models_cached else 0
-    }
-    
-    return jsonify(result)
-@app.route('/debug/test-real-model/<station_name>')
-def test_real_model(station_name):
-    from services import get_feature_sequence_for_station
-    import numpy as np
-    
-    results = {}
-    now = Config.get_current_time()
-    
-    for direction in ['Northbound', 'Southbound']:
-        ensure_single_model_loaded(station_name, direction)
-        model_key = f"{station_name}_{direction}"
-        
-        if model_key in directional_models_cached:
-            try:
-                sequence = get_feature_sequence_for_station(station_name, direction, now)
-                
-                # ✅ FIX: V10 models use 24x16, not 29
-                if sequence is not None and sequence.shape == (24, 16):
-                    target_scaler = directional_scalers_cached.get(f'{model_key}_target')
-                    
-                    if target_scaler:
-                        # sequence is already scaled
-                        scaled_sequence = sequence.reshape(1, 24, -1)
-                        
-                        input_tensor = tf.convert_to_tensor(scaled_sequence, dtype=tf.float32)
-                        pred_scaled = directional_models_cached[model_key](input_tensor, training=False).numpy()
-                        pred_real = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
-                        results[direction] = {
-                            'prediction': round(pred_real, 1),
-                            'model_key': model_key,
-                            'sequence_shape': sequence.shape,
-                            'using_real_model': True
-                        }
-                    else:
-                        results[direction] = {'error': 'Missing target scaler'}
-                else:
-                    results[direction] = {'error': f'Invalid sequence shape: {sequence.shape if sequence is not None else None}'}
-            except Exception as e:
-                results[direction] = {'error': str(e)}
-                import traceback
-                results[direction]['traceback'] = traceback.format_exc()
-        else:
-            results[direction] = {'error': f'Model {model_key} not found'}
-    
-    return jsonify({
-        'station': station_name,
-        'time': now.isoformat(),
-        'predictions': results,
-        'total_models_loaded': len(directional_models_cached) if directional_models_cached else 0
-    })
-
-@app.route('/debug/routes')
-def list_routes():
-    routes = []
-    for rule in app.url_map.iter_rules():
-        routes.append(str(rule))
-    return jsonify(sorted(routes))
-
-@app.route('/debug/model-status')
-def debug_model_status():
-    return jsonify({
-        'directional_models_loaded': len(directional_models_cached) if directional_models_cached else 0,
-        'stations': STATIONS,
-        'models': list(directional_models_cached.keys())[:10] if directional_models_cached else []
-    })
-
-@app.route('/debug/clear-cache')
-def debug_clear_cache():
-    """Clear all caches - useful for forcing a fresh load"""
-    cache_files = [get_models_cache_path(), get_historical_cache_path()]
-    results = {}
-    
-    for cache_file in cache_files:
-        if os.path.exists(cache_file):
-            os.remove(cache_file)
-            results[os.path.basename(cache_file)] = "deleted"
-        else:
-            results[os.path.basename(cache_file)] = "not found"
-    
-    # Also clear memory cache flag
-    global _MODELS_LOADED, _WARMUP_COMPLETE
-    _MODELS_LOADED = False
-    _WARMUP_COMPLETE = False
-    
-    return jsonify({
-        "status": "Cache cleared",
-        "files": results,
-        "message": "Restart the app or call /warmup to reload models from source"
-    })
-@app.route('/debug/raw-model-output/<station_name>/<direction>')
-def debug_raw_model_output(station_name, direction):
-    from services import get_feature_sequence_for_station
-    import numpy as np
-    from datetime import datetime
-    
-    ensure_single_model_loaded(station_name, direction)
-    now = Config.get_current_time()
-    model_key = f"{station_name}_{direction}"
-    
-    result = {
-        'station': station_name,
-        'direction': direction,
-        'model_key': model_key,
-        'model_exists': model_key in directional_models_cached if directional_models_cached else False,
-        'total_models_loaded': len(directional_models_cached) if directional_models_cached else 0
-    }
-    
-    if model_key in directional_models_cached:
-        try:
-            sequence = get_feature_sequence_for_station(station_name, direction, now)
-            
-            if sequence is not None and len(sequence) == 24:
-                target_scaler = directional_scalers_cached.get(f'{model_key}_target')
-                
-                if target_scaler:
-                    # sequence is already scaled
-                    scaled_sequence = sequence.reshape(1, 24, -1)
-                    
-                    input_tensor = tf.convert_to_tensor(scaled_sequence, dtype=tf.float32)
-                    pred_scaled = directional_models_cached[model_key](input_tensor, training=False).numpy()
-                    result['raw_scaled_output'] = float(pred_scaled[0][0])
-                    
-                    # ✅ FIX: Use StandardScaler inverse_transform
-                    pred_original = float(target_scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0])
-                    result['after_inverse_transform'] = pred_original
-                    
-                    # ✅ FIX: StandardScaler uses mean_ and scale_, not data_min_/data_max_
-                    if hasattr(target_scaler, 'mean_') and hasattr(target_scaler, 'scale_'):
-                        result['target_scaler_type'] = 'StandardScaler'
-                        result['target_scaler_mean'] = float(target_scaler.mean_[0])
-                        result['target_scaler_scale'] = float(target_scaler.scale_[0])
-                        
-                        # Manual calculation for verification
-                        calculated = pred_scaled[0][0] * target_scaler.scale_[0] + target_scaler.mean_[0]
-                        result['calculated_from_scaled'] = float(calculated)
-                    elif hasattr(target_scaler, 'data_min_') and hasattr(target_scaler, 'data_max_'):
-                        # Fallback for MinMaxScaler (backward compatibility)
-                        result['target_scaler_type'] = 'MinMaxScaler'
-                        result['target_scaler_min'] = float(target_scaler.data_min_[0])
-                        result['target_scaler_max'] = float(target_scaler.data_max_[0])
-                        calculated = pred_scaled[0][0] * (target_scaler.data_max_[0] - target_scaler.data_min_[0]) + target_scaler.data_min_[0]
-                        result['calculated_from_scaled'] = float(calculated)
-                    else:
-                        result['warning'] = 'Unknown scaler type'
-                        result['direct_model_output'] = float(pred_scaled[0][0])
-                    
-                    result['feature_sequence_shape'] = sequence.shape
-                    result['feature_scaler_exists'] = True
-                else:
-                    result['error'] = 'No target scaler found'
-            else:
-                result['error'] = f'Invalid sequence length: {len(sequence) if sequence is not None else None}'
-        except Exception as e:
-            result['error'] = str(e)
-            import traceback
-            result['traceback'] = traceback.format_exc()
-    else:
-        available = [k for k in directional_models_cached.keys() if station_name in k] if directional_models_cached else []
-        result['available_models_for_station'] = available
-        result['all_model_keys_sample'] = list(directional_models_cached.keys())[:10] if directional_models_cached else []
-    
-    return jsonify(result)
-
-@app.route('/debug/list-models')
-def debug_list_models():
-    import os
-    import glob
-    
-    model_dir = 'models_2022-2024_v10'
-    if not os.path.exists(model_dir):
-        return jsonify({'error': f'Directory {model_dir} not found'})
-    
-    files = glob.glob(os.path.join(model_dir, '*.keras'))
-    file_names = [os.path.basename(f) for f in files]
-    
-    return jsonify({
-        'directory': model_dir,
-        'exists': os.path.exists(model_dir),
-        'model_files': file_names,
-        'count': len(file_names)
-    })
-
-@app.route('/debug/csv-status')
-def debug_csv_status():
-    import os
-    
-    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'services', 'data (2022-2024)')
-    
-    results = {
-        'directory': data_dir,
-        'exists': os.path.exists(data_dir),
-        'files': {}
-    }
-    
-    if os.path.exists(data_dir):
-        for filename in ['2022.csv', '2023.csv', '2024.csv']:
-            filepath = os.path.join(data_dir, filename)
-            if os.path.exists(filepath):
-                size = os.path.getsize(filepath) / (1024 * 1024)
-                results['files'][filename] = {
-                    'exists': True,
-                    'size_mb': round(size, 2)
-                }
-            else:
-                results['files'][filename] = {'exists': False}
-    
-    return jsonify(results)
-
-@app.route('/debug/memory')
-def debug_memory():
-    import psutil
-    import gc
-    gc.collect()
-    
-    memory = psutil.virtual_memory()
-    process = psutil.Process()
-    
-    return jsonify({
-        'system_total_mb': memory.total / (1024 * 1024),
-        'system_available_mb': memory.available / (1024 * 1024),
-        'system_used_mb': memory.used / (1024 * 1024),
-        'process_memory_mb': process.memory_info().rss / (1024 * 1024),
-        'models_loaded': len(directional_models_cached) if directional_models_cached else 0,
-        'lstm_loaded': app.config.get('LSTM_PREDICTOR') is not None,
-        'warmup_complete': _WARMUP_COMPLETE
-    })
 
 @app.route('/admin/import-csvs', methods=['GET', 'POST'])
 def admin_import_csvs():
