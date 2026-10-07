@@ -426,7 +426,7 @@ app.register_blueprint(api_schedule_bp, url_prefix='/api')
 app.register_blueprint(api_reports_bp, url_prefix='/api')
 app.register_blueprint(api_other_bp, url_prefix='/api')
 app.register_blueprint(model_perf_bp, url_prefix='/api')
-app.register_blueprint(email_bp, url_prefix='/api/profile')
+app.register_blueprint(email_bp, url_prefix='/api/auth')
 register_admin_retrain(app)
 
 

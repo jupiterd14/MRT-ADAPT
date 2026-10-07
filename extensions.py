@@ -6,8 +6,6 @@ from flask_limiter.util import get_remote_address
 
 cache = Cache()
 
-# Aiven Valkey — same wire protocol as Redis, so redis:// client works as-is.
-# Falls back to memory:// in local dev.
 _VALKEY_URL = os.getenv("REDIS_URL", "memory://")
 
 limiter = Limiter(
@@ -23,3 +21,13 @@ limiter = Limiter(
     in_memory_fallback_enabled=True,
     in_memory_fallback=["500 per day", "100 per hour"],
 )
+
+
+# ✅ NEW: expose a per-email key func so /request-reset can rate-limit
+# by email as well as by IP.
+def get_email_from_request():
+    """Rate-limit key that falls back to IP when no email is in the body."""
+    from flask import request
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    return email or get_remote_address()

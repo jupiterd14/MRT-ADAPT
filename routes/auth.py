@@ -120,9 +120,8 @@ PUBLIC_API_ENDPOINTS = {
     'api_other.test_api',
     'auth.check_session',
 
-    # ✅ Password reset — MUST be public (user is locked out).
-    # Confirmed endpoint names from url_map:
     'email.request_password_reset',
+    'email.verify_code_endpoint',
     'email.reset_password',
 }
 
