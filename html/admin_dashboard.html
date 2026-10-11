@@ -456,6 +456,12 @@
             gap: 24px;
             margin-bottom: 32px;
         }
+        .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-bottom: 32px;
+}
 
         .grid-2 {
             display: grid;
@@ -1300,97 +1306,116 @@
 </div>
 
 <!-- MODEL HELP MODAL -->
+<!-- MODEL HELP MODAL -->
 <div id="modelHelpModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 650px; max-height: 80vh; overflow-y: auto;">
+    <div class="modal-content" style="max-width: 680px; max-height: 85vh; overflow-y: auto;">
         <div class="modal-header">
             <i class="fas fa-graduation-cap" style="color: #8B5CF6;"></i>
             <h2>How to Use Model Performance</h2>
             <button onclick="closeModelHelp()" style="margin-left: auto; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-light);">&times;</button>
         </div>
-        
-        <div style="margin-bottom: 24px;">
-            <p style="color: var(--text-light); margin-bottom: 16px;">
-                This dashboard helps you test and evaluate your ML models. Here's how to use each section:
+
+        <p style="color: var(--text-light); margin-bottom: 20px; font-size: 14px;">
+            This dashboard evaluates how well the congestion prediction model performs against real 2025 data. Follow the steps below to test, measure, and interpret results.
+        </p>
+
+        <!-- STEP 1 -->
+        <div style="background: #EFF6FF; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #3B82F6;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <span style="background: #3B82F6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;">1</span>
+                <strong style="color: var(--text-dark);">Generate Predictions — "Run Tests"</strong>
+            </div>
+            <p style="font-size: 13px; color: var(--text-light); margin-left: 34px; line-height: 1.6;">
+                Click the <strong>Run Tests</strong> button at the top of the Test Results card.
+                The system automatically predicts congestion for every hour in the 2025 test set
+                and compares each prediction against the actual value.
             </p>
-
-            <!-- Section 1 -->
-            <div style="background: #EFF6FF; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #3B82F6;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                    <span style="background: #3B82F6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">1</span>
-                    <strong style="color: var(--text-dark);">Run Tests</strong>
-                </div>
-                <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
-                    Click <strong>"Run Tests"</strong> to automatically test your models against 2025 data. 
-                    This generates predictions, compares them to actual values, and saves results.
-                </p>
-            </div>
-
-            <!-- Section 2 -->
-            <div style="background: #F0FDF4; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #22C55E;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                    <span style="background: #22C55E; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">2</span>
-                    <strong style="color: var(--text-dark);">Check Metrics</strong>
-                </div>
-                <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
-                    Look at the <strong>MAE (Mean Absolute Error)</strong> - lower is better. 
-                  
-                </p>
-            </div>
-
-            <!-- Section 3 -->
-            <div style="background: #FEF3C7; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #F59E0B;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                    <span style="background: #F59E0B; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">3</span>
-                    <strong style="color: var(--text-dark);">View Results by Station</strong>
-                </div>
-                <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
-                    Select a station from the dropdown to see detailed results. 
-                    The table shows each prediction with error and verdict.
-                </p>
-            </div>
-
-            <!-- Section 4 -->
-            <div style="background: #F3E8FF; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #8B5CF6;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                    <span style="background: #8B5CF6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">4</span>
-                    <strong style="color: var(--text-dark);">Run Evaluation (Advanced)</strong>
-                </div>
-                <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
-                    Click <strong>"Run Evaluation"</strong> to generate a confusion matrix and 
-                    classification metrics (precision, recall, F1-score). This shows 
-                    <strong>where</strong> your model makes mistakes.
-                </p>
-            </div>
-
-            <!-- Section 5 -->
-            <div style="background: #FCE7F3; border-radius: 12px; padding: 16px; border-left: 4px solid #EC4899;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                    <span style="background: #EC4899; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">5</span>
-                    <strong style="color: var(--text-dark);">Advanced Tools</strong>
-                </div>
-                <p style="font-size: 14px; color: var(--text-light); margin-left: 34px;">
-                    <strong>Upload CSV:</strong> Test with 2025.csv<br>
-                    <strong>Manual Test:</strong> Test a single specific prediction.<br>
-                    <strong>Chart:</strong> Visual comparison of predictions vs actuals.
-                </p>
-            </div>
-
         </div>
 
-        <!-- Quick Tips -->
-        <div style="background: #F1F5F9; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-            <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-dark);">
-                <i class="fas fa-lightbulb" style="color: #F59E0B;"></i> Quick Tips
+        <!-- STEP 2 -->
+        <div style="background: #F0FDF4; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #22C55E;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <span style="background: #22C55E; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;">2</span>
+                <strong style="color: var(--text-dark);">Review Regression Metrics (top cards)</strong>
             </div>
-            <ul style="color: var(--text-light); font-size: 13px; padding-left: 20px; line-height: 1.8;">
-               
-                <li>Run tests weekly to monitor if your model is drifting</li>
-                <li>Focus on stations with high MAE - they need retraining</li>
+            <p style="font-size: 13px; color: var(--text-light); margin-left: 34px; line-height: 1.6; margin-bottom: 8px;">
+                These measure how close the predicted congestion <em>percentages</em> are to reality:
+            </p>
+            <ul style="font-size: 12px; color: var(--text-light); margin-left: 50px; line-height: 1.7;">
+                <li><strong>MAE</strong> — Mean Absolute Error. Average size of the miss. Lower is better.</li>
+                <li><strong>MAPE</strong> — Mean Absolute Percentage Error. Same idea, in %.</li>
+                <li><strong>RMSE</strong> — Penalizes big misses harder than MAE.</li>
+                <li><strong>R²</strong> — How much variance the model explains. Closer to 1.0 is better.</li>
             </ul>
         </div>
 
-        <div class="modal-footer">
-            <button class="btn-cancel" onclick="closeModelHelp()">Got it!</button>
+        <!-- STEP 3 -->
+        <div style="background: #FEF3C7; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #F59E0B;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <span style="background: #F59E0B; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;">3</span>
+                <strong style="color: var(--text-dark);">Check Station-Level Accuracy</strong>
+            </div>
+            <p style="font-size: 13px; color: var(--text-light); margin-left: 34px; line-height: 1.6;">
+                Pick a station from the dropdown to see its predictions row-by-row. Each row shows the
+                <strong>Predicted</strong> congestion, the <strong>Actual</strong> value, the error, and a verdict
+                (<span style="color:#16A34A; font-weight:600;">Excellent</span> ·
+                <span style="color:#D97706; font-weight:600;">Good</span> ·
+                <span style="color:#EA580C; font-weight:600;">Okay</span> ·
+                <span style="color:#DC2626; font-weight:600;">Needs Improvement</span>).
+            </p>
+        </div>
+
+        <!-- STEP 4 — CONFUSION MATRIX (updated) -->
+        <div style="background: #F3E8FF; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #8B5CF6;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <span style="background: #8B5CF6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;">4</span>
+                <strong style="color: var(--text-dark);">Run Evaluation — Confusion Matrix & Classification</strong>
+            </div>
+            <p style="font-size: 13px; color: var(--text-light); margin-left: 34px; line-height: 1.6; margin-bottom: 8px;">
+                Click <strong>Run Evaluation</strong> on the Confusion Matrix card. You'll get:
+            </p>
+            <ul style="font-size: 12px; color: var(--text-light); margin-left: 50px; line-height: 1.7;">
+                <li><strong>2×2 Binary Matrix</strong> — the star. Shows <strong>TP / FP / FN / TN</strong> for
+                    <em>Congested (Severe + Congested)</em> vs. <em>Not Congested (Moderate + Light)</em>.</li>
+                <li><strong>Accuracy, Precision, Recall, Specificity, F1</strong> — derived directly from that 2×2.</li>
+                <li><strong>Weighted Precision / Recall / F1</strong> — averaged across all 4 severity classes,
+                    weighted by sample count.</li>
+                <li><em>Click "Show full 4-class confusion matrix"</em> if you need the raw 4×4 table.</li>
+                <li><em>Click "Show per-class metrics"</em> for TP/FP/FN/TN per severity level.</li>
+            </ul>
+        </div>
+
+        <!-- STEP 5 -->
+        <div style="background: #FCE7F3; border-radius: 12px; padding: 16px; margin-bottom: 20px; border-left: 4px solid #EC4899;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <span style="background: #EC4899; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;">5</span>
+                <strong style="color: var(--text-dark);">Explore the Chart & Manual Test</strong>
+            </div>
+            <p style="font-size: 13px; color: var(--text-light); margin-left: 34px; line-height: 1.6;">
+                <strong>Predictions vs Actuals Chart</strong> — visual trend of predicted (blue) vs. actual (green) congestion over time.
+                Filter by station, direction, or the last N predictions.<br>
+                <strong>Manual Test</strong> — enter any station, direction, and date/time to see a single prediction and its error.<br>
+                <strong>Upload CSV</strong> — batch-test a custom dataset if you want to evaluate on your own data.
+            </p>
+        </div>
+
+        <!-- QUICK TIPS -->
+        <div style="background: #F1F5F9; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+            <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-dark); font-size: 13px;">
+                <i class="fas fa-lightbulb" style="color: #F59E0B;"></i> Quick Tips
+            </div>
+            <ul style="color: var(--text-light); font-size: 12px; padding-left: 20px; line-height: 1.8; margin: 0;">
+                <li>Focus on <strong>Recall</strong> for transit — missing a real congestion event is worse than a false alarm.</li>
+                <li>Re-run tests weekly to detect model drift.</li>
+                <li>Stations with high MAE (see the station dropdown) are candidates for retraining.</li>
+                <li>R² above <strong>0.90</strong> generally indicates the model is capturing the underlying pattern well.</li>
+            </ul>
+        </div>
+
+        <div class="modal-footer" style="justify-content: center;">
+            <button class="btn-apply" onclick="closeModelHelp()" style="padding: 10px 28px; border-radius: 10px;">
+                <i class="fas fa-check"></i> Got it!
+            </button>
         </div>
     </div>
 </div>
@@ -1620,10 +1645,10 @@
         </button>
     </div>
 
-    <div class="grid-4">
+    <div class="grid-3">
         <div class="stat-card"><div class="stat-icon"><i class="fas fa-chart-line"></i></div><div class="stat-val" id="overallMAE">--</div><div class="stat-label">Overall MAE</div></div>
-        <div class="stat-card"><div class="stat-icon"><i class="fas fa-percent"></i></div><div class="stat-val" id="overallMAPE">--</div><div class="stat-label">Overall MAPE</div></div>
-        <div class="stat-card"><div class="stat-icon"><i class="fas fa-database"></i></div><div class="stat-val" id="testSamples">0</div><div class="stat-label">Test Samples</div></div>
+ 
+     <div class="stat-card"><div class="stat-icon"><i class="fas fa-database"></i></div><div class="stat-val" id="testSamples">0</div><div class="stat-label">Test Samples</div></div>
         <div class="stat-card"><div class="stat-icon"><i class="fas fa-calendar-week"></i></div><div class="stat-val" id="lastEvaluated">--</div><div class="stat-label">Last Evaluated</div></div>
     </div>
 
@@ -1729,7 +1754,6 @@
         <i class="fas fa-chart-line"></i> Recent Predictions vs Actuals
         <div style="margin-left: auto; display: flex; gap: 10px;">
             <select id="compareStation" class="form-input" style="width: auto; padding: 6px 12px;">
-                <option value="all">All Stations</option>
                 <option value="North Ave">North Ave</option>
                 <option value="Quezon Ave">Quezon Ave</option>
                 <option value="Kamuning">Kamuning</option>
@@ -1745,7 +1769,6 @@
                 <option value="Taft">Taft</option>
             </select>
             <select id="compareDirection" class="form-input" style="width: auto; padding: 6px 12px;">
-                <option value="both">Both Directions</option>
                 <option value="northbound">Northbound</option>
                 <option value="southbound">Southbound</option>
             </select>
@@ -2155,8 +2178,8 @@ function updateStationMetricsTableMP(perStationMetrics) {
 }
 
 async function loadPredictionChart() {
-    const station = document.getElementById('compareStation')?.value || 'all';
-    const direction = document.getElementById('compareDirection')?.value || 'both';
+    const station = document.getElementById('compareStation')?.value || 'North Ave';
+const direction = document.getElementById('compareDirection')?.value || 'northbound';
     const range = document.getElementById('chartRange')?.value || 20;
     
     try {
@@ -2488,88 +2511,258 @@ async function runEvaluation() {
 }
 
 function displayEvaluationResults(data) {
-    // Display Confusion Matrix
+    // ============================================================
+    // 1. CONFUSION MATRIX CARD (binary 2x2 only — the star)
+    // ============================================================
     const cmContainer = document.getElementById('confusionMatrixContainer');
     const cm = data.confusion_matrix;
     const labels = cm.labels;
     const matrix = cm.matrix;
-    
-    let cmHtml = `
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+    const total = matrix.flat().reduce((s, v) => s + v, 0);
+
+    // ---------- Collapse 4x4 into binary 2x2 ----------
+    // Positive class = Severe + Congested (i.e. "Congested")
+    const posIdx = labels
+        .map((l, i) => (l === 'Severe' || l === 'Congested') ? i : -1)
+        .filter(i => i >= 0);
+
+    let TP = 0, FN = 0, FP = 0, TN = 0;
+    for (let i = 0; i < labels.length; i++) {
+        for (let j = 0; j < labels.length; j++) {
+            const actualPos    = posIdx.includes(i);
+            const predictedPos = posIdx.includes(j);
+            const val          = matrix[i][j];
+            if (actualPos && predictedPos)       TP += val;
+            else if (actualPos && !predictedPos) FN += val;
+            else if (!actualPos && predictedPos) FP += val;
+            else                                 TN += val;
+        }
+    }
+
+    const binTotal = TP + TN + FP + FN;
+    const binAcc   = binTotal ? ((TP + TN) / binTotal * 100).toFixed(1) : '0.0';
+    const binPrec  = (TP + FP) ? (TP / (TP + FP) * 100).toFixed(1) : '0.0';
+    const binRec   = (TP + FN) ? (TP / (TP + FN) * 100).toFixed(1) : '0.0';
+    const binSpec  = (TN + FP) ? (TN / (TN + FP) * 100).toFixed(1) : '0.0';
+    const binF1    = (parseFloat(binPrec) > 0 && parseFloat(binRec) > 0)
+                     ? (2 * parseFloat(binPrec) * parseFloat(binRec) /
+                        (parseFloat(binPrec) + parseFloat(binRec))).toFixed(1)
+                     : '0.0';
+
+    // ---------- Build 4x4 HTML (hidden in a collapsible) ----------
+    const matrix4x4Html = `
+        <div style="overflow-x: auto; margin-top: 12px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                 <thead>
                     <tr>
-                        <th style="padding: 8px; text-align: center; font-weight: 600; color: var(--text-light);">Actual \\ Predicted</th>
-                        ${labels.map(l => `<th style="padding: 8px; text-align: center; font-weight: 600; color: var(--text-light);">${l}</th>`).join('')}
+                        <th style="padding: 6px; text-align: center; font-weight: 600; color: var(--text-light); font-size: 11px;">Actual \\ Predicted</th>
+                        ${labels.map(l => `<th style="padding: 6px; text-align: center; font-weight: 600; color: var(--text-light); font-size: 11px;">${l}</th>`).join('')}
                     </tr>
                 </thead>
                 <tbody>
                     ${matrix.map((row, i) => `
                         <tr>
-                            <td style="padding: 8px; text-align: center; font-weight: 600; color: var(--text-dark);">${labels[i]}</td>
+                            <td style="padding: 6px; text-align: center; font-weight: 600; color: var(--text-dark); font-size: 12px;">${labels[i]}</td>
                             ${row.map(val => `
-                                <td style="padding: 8px; text-align: center; background: ${val > 0 ? 'rgba(59, 130, 246, ' + Math.min(0.3 + (val / 50), 0.8) + ')' : '#F8FAFC'}; border-radius: 4px; font-weight: ${val > 0 ? '700' : '400'};">
-                                    ${val}
-                                </td>
+                                <td style="padding: 6px; text-align: center; background: ${val > 0 ? 'rgba(59, 130, 246, ' + Math.min(0.3 + (val / 50), 0.8) + ')' : '#F8FAFC'}; border-radius: 4px; font-weight: ${val > 0 ? '700' : '400'}; font-size: 12px;">${val}</td>
                             `).join('')}
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
         </div>
-        <div style="margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; font-size: 12px; color: var(--text-light);">
-            <span><span style="display: inline-block; width: 12px; height: 12px; background: #3B82F6; border-radius: 2px;"></span> Higher = More predictions</span>
-            <span>Total: ${data.total_samples} samples</span>
-            <span>Accuracy: <strong style="color: var(--accent-blue);">${data.accuracy}%</strong></span>
-        </div>
     `;
+
+    const cmHtml = `
+        <!-- ===== Binary 2x2 (STAR) ===== -->
+        <h4 style="font-size: 13px; color: var(--text-dark); margin-bottom: 4px;">
+            Congested (Severe + Congested) vs. Not Congested (Moderate + Light)
+        </h4>
+        <p style="font-size: 11px; color: var(--text-light); margin-bottom: 12px;">
+            TP / FP / TN / FN — the basis for Precision, Recall, and F1.
+        </p>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+                <tr>
+                    <th style="padding: 8px; border-bottom: 1px solid var(--border);"></th>
+                    <th style="padding: 8px; border-bottom: 1px solid var(--border); text-align: center; color: var(--text-light);">Predicted<br>Congested</th>
+                    <th style="padding: 8px; border-bottom: 1px solid var(--border); text-align: center; color: var(--text-light);">Predicted<br>Not Congested</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 8px; font-weight: 600; color: var(--text-dark);">Actual<br>Congested</td>
+                    <td style="padding: 14px; text-align: center; background: rgba(34,197,94,0.15); font-weight: 700; font-size: 16px; color: #16A34A; border-radius: 6px;">TP = ${TP}</td>
+                    <td style="padding: 14px; text-align: center; background: rgba(239,68,68,0.15); font-weight: 700; font-size: 16px; color: #DC2626; border-radius: 6px;">FN = ${FN}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; font-weight: 600; color: var(--text-dark);">Actual<br>Not Congested</td>
+                    <td style="padding: 14px; text-align: center; background: rgba(239,68,68,0.15); font-weight: 700; font-size: 16px; color: #DC2626; border-radius: 6px;">FP = ${FP}</td>
+                    <td style="padding: 14px; text-align: center; background: rgba(34,197,94,0.15); font-weight: 700; font-size: 16px; color: #16A34A; border-radius: 6px;">TN = ${TN}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- ===== Derived metrics strip ===== -->
+        <div style="margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; font-size: 12px;">
+            <div style="background: #F8FAFC; padding: 8px; border-radius: 8px; text-align: center;">
+                <div style="color: var(--text-light);">Accuracy</div>
+                <div style="font-weight: 700; color: var(--text-dark); font-size: 15px;">${binAcc}%</div>
+            </div>
+            <div style="background: #F8FAFC; padding: 8px; border-radius: 8px; text-align: center;">
+                <div style="color: var(--text-light);">Precision</div>
+                <div style="font-weight: 700; color: #3B82F6; font-size: 15px;">${binPrec}%</div>
+            </div>
+            <div style="background: #F8FAFC; padding: 8px; border-radius: 8px; text-align: center;">
+                <div style="color: var(--text-light);">Recall</div>
+                <div style="font-weight: 700; color: #22C55E; font-size: 15px;">${binRec}%</div>
+            </div>
+            <div style="background: #F8FAFC; padding: 8px; border-radius: 8px; text-align: center;">
+                <div style="color: var(--text-light);">Specificity</div>
+                <div style="font-weight: 700; color: #8B5CF6; font-size: 15px;">${binSpec}%</div>
+            </div>
+            <div style="background: #F8FAFC; padding: 8px; border-radius: 8px; text-align: center;">
+                <div style="color: var(--text-light);">F1-Score</div>
+                <div style="font-weight: 700; color: #EC4899; font-size: 15px;">${binF1}%</div>
+            </div>
+        </div>
+
+        <!-- ===== Collapsible full 4x4 for reference ===== -->
+        <details style="margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <summary style="cursor: pointer; font-size: 12px; color: var(--text-light); font-weight: 600; user-select: none;">
+                Show full 4-class confusion matrix (${data.total_samples} samples)
+            </summary>
+            ${matrix4x4Html}
+            <div style="margin-top: 8px; text-align: center; font-size: 11px; color: var(--text-light);">
+                Multiclass accuracy: <strong style="color: var(--accent-blue);">${data.accuracy}%</strong>
+            </div>
+        </details>
+    `;
+
     cmContainer.innerHTML = cmHtml;
-    
-    // Display Classification Metrics
+
+    // ============================================================
+    // 2. CLASSIFICATION METRICS CARD (weighted + regression only)
+    // ============================================================
     const metricsContainer = document.getElementById('classificationMetricsContainer');
-    const perClass = data.per_class_metrics;
     const weighted = {
         precision: data.precision_weighted,
         recall: data.recall_weighted,
         f1: data.f1_weighted
     };
-    
-    let metricsHtml = `
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
-            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 11px; color: var(--text-light);">Precision (Weighted)</div>
-                <div style="font-size: 22px; font-weight: 700; color: #3B82F6;">${weighted.precision}%</div>
-            </div>
-            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 11px; color: var(--text-light);">Recall (Weighted)</div>
-                <div style="font-size: 22px; font-weight: 700; color: #22C55E;">${weighted.recall}%</div>
-            </div>
-            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 11px; color: var(--text-light);">F1-Score (Weighted)</div>
-                <div style="font-size: 22px; font-weight: 700; color: #8B5CF6;">${weighted.f1}%</div>
-            </div>
-            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 11px; color: var(--text-light);">Samples</div>
-                <div style="font-size: 22px; font-weight: 700; color: #1E293B;">${data.total_samples}</div>
-            </div>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-            ${Object.entries(perClass).map(([category, metrics]) => `
-                <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; border-left: 4px solid ${category === 'Severe' ? '#EF4444' : category === 'Congested' ? '#F97316' : category === 'Moderate' ? '#F59E0B' : '#22C55E'};">
-                    <div style="font-weight: 600; font-size: 14px; color: var(--text-dark);">${category}</div>
-                    <div style="font-size: 12px; color: var(--text-light); margin-top: 4px;">
-                        Precision: <strong>${metrics.precision}%</strong> · Recall: <strong>${metrics.recall}%</strong> · F1: <strong>${metrics.f1_score}%</strong>
-                    </div>
-                    <div style="font-size: 11px; color: var(--text-light);">Support: ${metrics.support}</div>
+
+    // Build per-class TP/FP/FN/TN for the collapsible reference
+    const perClassCounts = {};
+    labels.forEach((label, cIdx) => {
+        const tp = matrix[cIdx][cIdx];
+        const fn = matrix[cIdx].reduce((s, v) => s + v, 0) - tp;
+        const fp = matrix.reduce((s, row) => s + row[cIdx], 0) - tp;
+        const tn = total - tp - fn - fp;
+        perClassCounts[label] = { tp, fp, fn, tn };
+    });
+
+    const perClass = data.per_class_metrics;
+
+    // Per-class rows for the collapsible section
+    const perClassHtml = Object.entries(perClass).map(([category, metrics]) => {
+        const counts = perClassCounts[category] || { tp: 0, fp: 0, fn: 0, tn: 0 };
+        const borderColor = category === 'Severe'    ? '#EF4444'
+                          : category === 'Congested' ? '#F97316'
+                          : category === 'Moderate'  ? '#F59E0B'
+                          : '#22C55E';
+        return `
+            <div style="background: #F8FAFC; padding: 10px; border-radius: 8px; border-left: 3px solid ${borderColor}; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <strong style="font-size: 12px; color: var(--text-dark);">${category}</strong>
+                    <span style="font-size: 10px; color: var(--text-light);">n=${metrics.support}</span>
                 </div>
-            `).join('')}
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 10px; margin-bottom: 6px;">
+                    <div style="background: rgba(34,197,94,0.12); padding: 4px; border-radius: 4px; text-align: center;">
+                        <div style="color: #16A34A; font-weight: 700;">TP</div>
+                        <div style="font-weight: 700; font-size: 12px;">${counts.tp}</div>
+                    </div>
+                    <div style="background: rgba(239,68,68,0.12); padding: 4px; border-radius: 4px; text-align: center;">
+                        <div style="color: #DC2626; font-weight: 700;">FP</div>
+                        <div style="font-weight: 700; font-size: 12px;">${counts.fp}</div>
+                    </div>
+                    <div style="background: rgba(239,68,68,0.12); padding: 4px; border-radius: 4px; text-align: center;">
+                        <div style="color: #DC2626; font-weight: 700;">FN</div>
+                        <div style="font-weight: 700; font-size: 12px;">${counts.fn}</div>
+                    </div>
+                    <div style="background: rgba(34,197,94,0.12); padding: 4px; border-radius: 4px; text-align: center;">
+                        <div style="color: #16A34A; font-weight: 700;">TN</div>
+                        <div style="font-weight: 700; font-size: 12px;">${counts.tn}</div>
+                    </div>
+                </div>
+                <div style="font-size: 11px; color: var(--text-light);">
+                    P: <strong style="color: var(--text-dark);">${metrics.precision}%</strong> ·
+                    R: <strong style="color: var(--text-dark);">${metrics.recall}%</strong> ·
+                    F1: <strong style="color: var(--text-dark);">${metrics.f1_score}%</strong>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const metricsHtml = `
+        <!-- ===== Weighted summary tiles ===== -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px;">
+            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-light);">Precision (Weighted)</div>
+                <div style="font-size: 20px; font-weight: 700; color: #3B82F6;">${weighted.precision}%</div>
+            </div>
+            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-light);">Recall (Weighted)</div>
+                <div style="font-size: 20px; font-weight: 700; color: #22C55E;">${weighted.recall}%</div>
+            </div>
+            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-light);">F1-Score (Weighted)</div>
+                <div style="font-size: 20px; font-weight: 700; color: #8B5CF6;">${weighted.f1}%</div>
+            </div>
+            <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-light);">Samples</div>
+                <div style="font-size: 20px; font-weight: 700; color: #1E293B;">${data.total_samples}</div>
+            </div>
         </div>
-        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #E2E8F0; font-size: 12px; color: var(--text-light);">
-            <strong>Regression Metrics:</strong> MAE: ${data.regression_metrics.mae}% · RMSE: ${data.regression_metrics.rmse}% · R²: ${data.regression_metrics.r2} · MAPE: ${data.regression_metrics.mape}%
+
+        <!-- ===== Regression metrics ===== -->
+        <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-dark); margin-bottom: 8px;">
+                Regression Metrics
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; font-size: 11px;">
+                <div>
+                    <div style="color: var(--text-light);">MAE</div>
+                    <div style="font-weight: 700; font-size: 14px; color: var(--text-dark);">${data.regression_metrics.mae}%</div>
+                </div>
+                <div>
+                    <div style="color: var(--text-light);">RMSE</div>
+                    <div style="font-weight: 700; font-size: 14px; color: var(--text-dark);">${data.regression_metrics.rmse}%</div>
+                </div>
+                <div>
+                    <div style="color: var(--text-light);">R²</div>
+                    <div style="font-weight: 700; font-size: 14px; color: var(--text-dark);">${data.regression_metrics.r2}</div>
+                </div>
+                <div>
+                    <div style="color: var(--text-light);">MAPE</div>
+                    <div style="font-weight: 700; font-size: 14px; color: var(--text-dark);">${data.regression_metrics.mape}%</div>
+                </div>
+            </div>
         </div>
+
+        <!-- ===== Collapsible per-class one-vs-rest ===== -->
+        <details style="margin-top: 4px;">
+            <summary style="cursor: pointer; font-size: 12px; color: var(--text-light); font-weight: 600; user-select: none;">
+                Show per-class metrics (one-vs-rest)
+            </summary>
+            <div style="margin-top: 10px;">
+                ${perClassHtml}
+            </div>
+        </details>
     `;
+
     metricsContainer.innerHTML = metricsHtml;
 }
+// ========== MODEL PERFORMANCE – METRICS CARDS ==========
 // ========== MODEL PERFORMANCE – METRICS CARDS ==========
 async function loadModelPerformanceMetrics() {
     const stationSelector = document.getElementById('stationSelector');
@@ -2581,44 +2774,72 @@ async function loadModelPerformanceMetrics() {
 
         if (result.success && result.data) {
             const data = result.data;
+
+            // Helper: safely set text on an element that may not exist
+            const setText = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = value;
+            };
+
             if (selectedStation !== 'all') {
                 const stationMetrics = data.per_station ? data.per_station[selectedStation] : null;
                 if (stationMetrics) {
                     const direction = currentDirectionViewMP;
                     const stationMae = stationMetrics[direction]?.mae;
-                    document.getElementById('overallMAE').innerText = (stationMae !== undefined && stationMae !== null) ? `${stationMae}%` : 'No data';
-                    document.getElementById('overallMAPE').innerText = (data.overall_mape !== undefined && data.overall_mape !== null) ? `${data.overall_mape}%` : 'N/A';
-                    document.getElementById('testSamples').innerText = data.total_predictions || data.total_tests || 0;
-                    document.getElementById('lastEvaluated').innerText = data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data';
+                    setText('overallMAE', (stationMae !== undefined && stationMae !== null) ? `${stationMae}%` : 'No data');
+
+                    const r2Value = (data.overall_r2 !== undefined && data.overall_r2 !== null)
+                        ? Number(data.overall_r2).toFixed(3)
+                        : '--';
+                    setText('overallR2', r2Value);
+
+                    setText('testSamples', data.total_predictions || data.total_tests || 0);
+                    setText('lastEvaluated', data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data');
                 } else {
-                    document.getElementById('overallMAE').innerText = 'No data';
-                    document.getElementById('overallMAPE').innerText = 'N/A';
-                    document.getElementById('testSamples').innerText = data.total_predictions || data.total_tests || 0;
-                    document.getElementById('lastEvaluated').innerText = data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data';
+                    setText('overallMAE', 'No data');
+                    setText('overallR2', '--');
+                    setText('testSamples', data.total_predictions || data.total_tests || 0);
+                    setText('lastEvaluated', data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data');
                 }
             } else {
-                document.getElementById('overallMAE').innerText = (data.overall_mae !== undefined && data.overall_mae !== null) ? `${data.overall_mae}%` : '--';
-                document.getElementById('overallMAPE').innerText = (data.overall_mape !== undefined && data.overall_mape !== null) ? `${data.overall_mape}%` : '--';
-                document.getElementById('testSamples').innerText = data.total_predictions || data.total_tests || 0;
-                document.getElementById('lastEvaluated').innerText = data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data';
+                const maeValue = (data.overall_mae !== undefined && data.overall_mae !== null)
+                    ? `${data.overall_mae}%`
+                    : '--';
+                setText('overallMAE', maeValue);
+
+                const r2Value = (data.overall_r2 !== undefined && data.overall_r2 !== null)
+                    ? Number(data.overall_r2).toFixed(3)
+                    : '--';
+                setText('overallR2', r2Value);
+
+                setText('testSamples', data.total_predictions || data.total_tests || 0);
+                setText('lastEvaluated', data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data');
             }
-            
+
             if (selectedStation === 'all' && data.per_station) {
                 updateStationMetricsTableMP(data.per_station);
             }
         } else {
-            document.getElementById('overallMAE').innerText = 'Run tests';
-            document.getElementById('overallMAPE').innerText = 'Run tests';
-            document.getElementById('testSamples').innerText = '0';
-            document.getElementById('lastEvaluated').innerText = 'Never';
+            // No data yet — set safe defaults (guarded)
+            const setText = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = value;
+            };
+            setText('overallMAE', 'Run tests');
+            setText('overallR2', '--');
+            setText('testSamples', '0');
+            setText('lastEvaluated', 'Never');
         }
     } catch (error) {
         console.error('Error loading model metrics:', error);
-        document.getElementById('overallMAE').innerText = 'Error';
-        document.getElementById('overallMAPE').innerText = 'Error';
+        const setText = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = value;
+        };
+        setText('overallMAE', 'Error');
+        setText('overallR2', 'Error');
     }
 }
-
 // ========== DASHBOARD FUNCTIONS - USING LIVE MAP API ==========
 async function loadDashboardStats() {
     try {
@@ -2677,7 +2898,7 @@ async function loadStationStatus() {
             const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
             const data = await response.json();
             
-            const overrideResponse = await fetch('/api/operator/debug-override?_=${Date.now()}');
+            const overrideResponse = await fetch(`/api/operator/debug-override?_=${Date.now()}`);
             const overrideData = await overrideResponse.json();
             const activeOverrides = overrideData.active_overrides || {};
             

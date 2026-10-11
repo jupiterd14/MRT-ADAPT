@@ -3,17 +3,19 @@ LIVE API - Real-time Station Data
 Purpose: Enriched station data for UI display
 Use for: Live map, alerts, station info pages
 NOT for: Pure ML predictions or forecasting
+
+UPDATED: All numpy types (float32/float64/int64) are cast to native Python
+types before JSON serialization, so /api/live-map/directions/v2 no longer
+throws "Object of type float32 is not JSON serializable".
 """
 
 # routes/api_other.py
 import os
 from flask import Blueprint, request, jsonify, session, current_app
-from models import Broadcast, User, ActivityLog, Report
 from datetime import datetime, timedelta
 import json
 import time
 import traceback
-import math
 from config import Config
 
 TESTING_MODE = False
@@ -25,7 +27,7 @@ STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
             "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", 
             "Ayala Ave", "Magallanes", "Taft"]
 
-# DOTr Official Platform Capacities (fallback only)
+# DOTr Official Platform Capacities (fallback only - NOT for congestion)
 MRT3_PLATFORM_CAPACITY = {
     "North Ave": 1142, "Quezon Ave": 1195, "Kamuning": 1364, "Cubao": 1747,
     "Santolan": 1306, "Ortigas": 1331, "Shaw Blvd": 1619, "Boni Ave": 1417,
@@ -46,16 +48,43 @@ typeIcons = {
 }
 
 
+# ========== SAFE CAST HELPERS ==========
+def _safe_float(value, default=0.0):
+    """Convert any numeric-ish value to native Python float."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(value, default=0):
+    """Convert any numeric-ish value to native Python int."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_round_float(value, digits=1, default=0.0):
+    """Round to N digits and return a native Python float."""
+    return round(_safe_float(value, default), digits)
+
+
 # ========== WRAPPER FUNCTIONS TO AVOID CIRCULAR IMPORTS ==========
 def get_p90_percentile_wrapper(station_name, direction):
     """Wrapper to avoid circular imports - changed from P95 to P90"""
     from routes.api_predict import get_p90_percentile
-    return get_p90_percentile(station_name, direction)
+    return _safe_float(get_p90_percentile(station_name, direction), 0.0)
+
 
 def get_directional_prediction_wrapper(station_name, direction, target_datetime=None):
-    """Wrapper to avoid circular imports"""
+    """Wrapper to avoid circular imports. Always returns native float."""
     from routes.api_predict import get_directional_prediction
-    return get_directional_prediction(station_name, direction, target_datetime)
+    return _safe_float(get_directional_prediction(station_name, direction, target_datetime), 0.0)
 
 
 # ========== P90 HELPER - USES PREDICTION API CACHE ==========
@@ -63,21 +92,27 @@ def get_p90_for_station(station_name, direction):
     """
     Get P90 value from app config cache (preloaded at startup).
     Falls back to computing if not in cache.
-    Changed from P95 to P90
+    Single source of truth: api_predict.get_p90_percentile
     """
     key = f"{station_name}_{direction}"
     
-    # ✅ Try to get from app config first
+    # Try to get from app config first
     p90_cache = current_app.config.get('P90_CACHE', {})
     if key in p90_cache:
-        return p90_cache[key]
+        return _safe_float(p90_cache[key], 1000.0)
     
-    # Fallback: compute it using the wrapper
+    # Fallback: compute it using the wrapper (single source of truth)
     try:
-        return get_p90_percentile_wrapper(station_name, direction)
+        p90 = get_p90_percentile_wrapper(station_name, direction)
+        # Cache it in app config for next time
+        if 'P90_CACHE' not in current_app.config:
+            current_app.config['P90_CACHE'] = {}
+        current_app.config['P90_CACHE'][key] = float(p90)
+        return float(p90)
     except Exception as e:
         print(f"⚠️ Could not get P90 for {station_name} {direction}: {e}")
-        return MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+        # Last resort fallback - use platform capacity
+        return _safe_float(MRT3_PLATFORM_CAPACITY.get(station_name, 1000), 1000.0)
 
 
 # ========== PERSISTENT OVERRIDE STORAGE ==========
@@ -94,10 +129,10 @@ def load_overrides():
             return {}
     return {}
 
+
 def get_active_overrides():
     """Get active overrides from file with expiry check – always reload from file."""
-    import time
-    from flask import current_app
+    from flask import current_app, has_app_context
 
     overrides_file = 'overrides.json'
     overrides = {}
@@ -133,8 +168,9 @@ def get_active_overrides():
         except Exception as e:
             print(f"Error saving cleaned overrides: {e}")
 
-    # Update app config for other uses
-    current_app.config['overrides'] = active_overrides
+    # Update app config for other uses (only when we have app context)
+    if has_app_context():
+        current_app.config['overrides'] = active_overrides
 
     return active_overrides
 
@@ -167,35 +203,46 @@ def get_stations_from_config():
 def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name, direction):
     """
     Convert model prediction to congestion percentage using P90.
-    MATCHES api_predict.py behavior.
-    Changed from P95 to P90
+    Single source of truth: api_predict.get_p90_percentile
+
+    Returns native Python floats (never numpy).
     """
-    raw_value = float(pred_scaled[0][0]) if hasattr(pred_scaled, '__getitem__') else float(pred_scaled)
+    raw_value = _safe_float(
+        pred_scaled[0][0] if hasattr(pred_scaled, '__getitem__') else pred_scaled,
+        0.0
+    )
+    
+    # Get P90 FIRST (single source of truth)
+    p90 = get_p90_for_station(station_name, direction)
     
     if target_scaler is not None:
         try:
-            passenger_count = float(target_scaler.inverse_transform([[raw_value]])[0][0])
+            passenger_count = _safe_float(
+                target_scaler.inverse_transform([[raw_value]])[0][0], 0.0
+            )
         except Exception as e:
-            capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-            passenger_count = raw_value * capacity * 1.5
+            # Fallback uses P90, NOT capacity
+            print(f"⚠️ inverse_transform failed for {station_name} {direction}: {e}")
+            passenger_count = raw_value * p90 * 1.5
     else:
-        capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
-        passenger_count = raw_value * capacity * 1.5
+        # Fallback uses P90, NOT capacity
+        passenger_count = raw_value * p90 * 1.5
     
-    passenger_count = max(0, passenger_count)
+    passenger_count = max(0.0, float(passenger_count))
     
-    # ========== USE P90 INSTEAD OF CAPACITY ==========
-    p90 = get_p90_for_station(station_name, direction)
-    congestion = (passenger_count / p90) * 100
-    congestion = max(0, min(congestion, 100))
+    # Use P90 for congestion
+    congestion = (passenger_count / p90) * 100.0
+    congestion = max(0.0, min(congestion, 100.0))
     
-    return congestion, passenger_count
+    return float(congestion), float(passenger_count)
+
+
 def clear_prediction_caches(station_name=None, direction=None):
     """Clear feature caches and flush live map response cache."""
     from services.feature_engineering import _TYPICAL_PATTERN_CACHE, _BASELINE_FEATURES_CACHE
     from extensions import cache
     
-    # ✅ Clear app config caches too
+    # Clear app config caches too
     if 'TYPICAL_PATTERN_CACHE' in current_app.config:
         if station_name and direction:
             key_pattern = f"{station_name}_{direction}"
@@ -220,7 +267,9 @@ def clear_prediction_caches(station_name=None, direction=None):
     
     # Delete live map endpoint cache key
     cache.delete('live_map_v2')
-    print("🗑️ Flushed live_map_v2 cache live_map_v2")
+    print("🗑️ Flushed live_map_v2 cache")
+
+
 # ========== ENDPOINTS ==========
 
 @api_other_bp.route('/travel-prediction')
@@ -250,10 +299,10 @@ def travel_prediction():
         directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
         directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
         
-        north_pred = 0
-        south_pred = 0
-        north_passengers = 0
-        south_passengers = 0
+        north_pred = 0.0
+        south_pred = 0.0
+        north_passengers = 0.0
+        south_passengers = 0.0
         
         # Northbound prediction
         model_key_north = f"{station}_Northbound"
@@ -270,7 +319,7 @@ def travel_prediction():
                         )
             except Exception as e:
                 print(f"Error predicting northbound: {e}")
-                north_pred = 50
+                north_pred = 50.0
         
         # Southbound prediction
         model_key_south = f"{station}_Southbound"
@@ -287,9 +336,9 @@ def travel_prediction():
                         )
             except Exception as e:
                 print(f"Error predicting southbound: {e}")
-                south_pred = 50
+                south_pred = 50.0
         
-        avg_cong = (north_pred + south_pred) / 2
+        avg_cong = (north_pred + south_pred) / 2.0
         
         def get_level(cong):
             if cong > 80: return "SEVERE"
@@ -302,11 +351,11 @@ def travel_prediction():
             "station": station,
             "date": date_param,
             "time": time_param,
-            "northbound": round(north_pred, 1),
-            "southbound": round(south_pred, 1),
-            "northbound_passengers": round(north_passengers, 0),
-            "southbound_passengers": round(south_passengers, 0),
-            "average_congestion": round(avg_cong, 1),
+            "northbound": _safe_round_float(north_pred, 1),
+            "southbound": _safe_round_float(south_pred, 1),
+            "northbound_passengers": _safe_round_float(north_passengers, 0),
+            "southbound_passengers": _safe_round_float(south_passengers, 0),
+            "average_congestion": _safe_round_float(avg_cong, 1),
             "status": get_level(avg_cong),
             "timestamp": target_datetime.isoformat()
         })
@@ -320,11 +369,9 @@ def travel_prediction():
 
 @api_other_bp.route('/live-map/directions')
 def live_map_directions():
-    """Get congestion data for both directions - uses P90-based scaling (MATCHES api_predict)"""
+    """Get congestion data for both directions - uses get_directional_prediction_wrapper() for consistency"""
     try:
         from flask import current_app
-        from services.model_loader import directional_models, directional_scalers
-        from services import get_feature_sequence_for_station
         import time
         
         stations_list = current_app.config.get('STATIONS', STATIONS)
@@ -337,49 +384,11 @@ def live_map_directions():
         OPERATING_START = 4.5
         OPERATING_END = 22.5
         
-        if 'overrides' not in current_app.config:
-            current_app.config['overrides'] = {}
-        
         current_timestamp = time.time()
         active_overrides = get_active_overrides()
-        for key, override in current_app.config['overrides'].items():
+        for key, override in current_app.config.get('overrides', {}).items():
             if override.get('expiry') is None or override.get('expiry', 0) > current_timestamp:
                 active_overrides[key] = override
-        
-        def get_direct_prediction(station_name, direction):
-            """Get prediction using App Config model references with P90-based scaling."""
-            from flask import current_app
-            
-            # Retrieve models directly from App Config populated during app startup
-            directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
-            directional_scalers = current_app.config.get('DIRECTIONAL_SCALERS', {})
-            
-            model_key = f"{station_name}_{direction}"
-            
-            # Fallback if model not found in app config
-            if model_key not in directional_models:
-                hour_now = now.hour
-                if 7 <= hour_now <= 9 or 17 <= hour_now <= 19:
-                    return 65, 0
-                return 35, 0
-                
-            try:
-                sequence = get_feature_sequence_for_station(station_name, direction, now)
-                if sequence is not None and len(sequence) == 24:
-                    target_scaler = directional_scalers.get(f'{model_key}_target')
-                    
-                    # Direct tensor execution
-                    input_tensor = tf.convert_to_tensor(sequence.reshape(1, 24, -1), dtype=tf.float32)
-                    pred_scaled = directional_models[model_key](input_tensor, training=False).numpy()
-                    
-                    congestion, passengers = _get_congestion_from_prediction(
-                        pred_scaled, target_scaler, station_name, direction
-                    )
-                    return congestion, passengers
-            except Exception as e:
-                print(f"⚠️ Live Map Direct Prediction Error for {model_key}: {e}")
-                
-            return 35, 0
         
         def get_wait_time(congestion):
             if congestion > 80:
@@ -405,34 +414,48 @@ def live_map_directions():
                 south_override_key = f"{station}_southbound"
                 
                 northbound[station] = {
-                    "congestion": 0, "wait_time": "CLOSED", "status": "CLOSED",
-                    "ridership": 0, "overridden": north_override_key in active_overrides
+                    "congestion": 0.0, "wait_time": "CLOSED", "status": "CLOSED",
+                    "ridership": 0, "overridden": bool(north_override_key in active_overrides)
                 }
                 southbound[station] = {
-                    "congestion": 0, "wait_time": "CLOSED", "status": "CLOSED",
-                    "ridership": 0, "overridden": south_override_key in active_overrides
+                    "congestion": 0.0, "wait_time": "CLOSED", "status": "CLOSED",
+                    "ridership": 0, "overridden": bool(south_override_key in active_overrides)
                 }
         else:
             for station in stations_list:
                 north_override_key = f"{station}_northbound"
                 south_override_key = f"{station}_southbound"
                 
+                # Northbound
                 if north_override_key in active_overrides:
-                    north_congestion = active_overrides[north_override_key].get('congestion', 40)
+                    north_congestion = _safe_float(
+                        active_overrides[north_override_key].get('congestion', 40), 40.0
+                    )
                     is_north_overridden = True
-                    p90_north = get_p90_for_station(station, 'Northbound')  # Changed from P95
-                    north_passengers = int((north_congestion / 100) * p90_north)
+                    p90_north = get_p90_for_station(station, 'Northbound')
+                    north_passengers = int((north_congestion / 100.0) * p90_north)
                 else:
-                    north_congestion, north_passengers = get_direct_prediction(station, 'Northbound')
+                    north_congestion = get_directional_prediction_wrapper(station, 'Northbound', now)
+                    if north_congestion is None:
+                        north_congestion = 10.0
+                    p90_north = get_p90_for_station(station, 'Northbound')
+                    north_passengers = int((north_congestion / 100.0) * p90_north)
                     is_north_overridden = False
                 
+                # Southbound
                 if south_override_key in active_overrides:
-                    south_congestion = active_overrides[south_override_key].get('congestion', 40)
+                    south_congestion = _safe_float(
+                        active_overrides[south_override_key].get('congestion', 40), 40.0
+                    )
                     is_south_overridden = True
-                    p90_south = get_p90_for_station(station, 'Southbound')  # Changed from P95
-                    south_passengers = int((south_congestion / 100) * p90_south)
+                    p90_south = get_p90_for_station(station, 'Southbound')
+                    south_passengers = int((south_congestion / 100.0) * p90_south)
                 else:
-                    south_congestion, south_passengers = get_direct_prediction(station, 'Southbound')
+                    south_congestion = get_directional_prediction_wrapper(station, 'Southbound', now)
+                    if south_congestion is None:
+                        south_congestion = 10.0
+                    p90_south = get_p90_for_station(station, 'Southbound')
+                    south_passengers = int((south_congestion / 100.0) * p90_south)
                     is_south_overridden = False
                 
                 north_status = get_status_text(north_congestion)
@@ -441,27 +464,26 @@ def live_map_directions():
                 south_wait = get_wait_time(south_congestion)
                 
                 northbound[station] = {
-                    "congestion": round(north_congestion, 1),
+                    "congestion": _safe_round_float(north_congestion, 1),
                     "wait_time": north_wait,
                     "status": north_status,
-                    "ridership": int(north_passengers),
-                    "overridden": is_north_overridden
+                    "ridership": _safe_int(north_passengers),
+                    "overridden": bool(is_north_overridden)
                 }
-                
                 southbound[station] = {
-                    "congestion": round(south_congestion, 1),
+                    "congestion": _safe_round_float(south_congestion, 1),
                     "wait_time": south_wait,
                     "status": south_status,
-                    "ridership": int(south_passengers),
-                    "overridden": is_south_overridden
+                    "ridership": _safe_int(south_passengers),
+                    "overridden": bool(is_south_overridden)
                 }
         
         return jsonify({
             "northbound": northbound,
             "southbound": southbound,
             "timestamp": now.isoformat(),
-            "is_operating": OPERATING_START <= current_time < OPERATING_END,
-            "active_overrides": len(active_overrides)
+            "is_operating": bool(OPERATING_START <= current_time < OPERATING_END),
+            "active_overrides": int(len(active_overrides))
         })
         
     except Exception as e:
@@ -492,6 +514,7 @@ def test_api():
         "stations": get_stations_from_config()
     })
 
+
 @api_other_bp.route('/alerts/count')
 def alerts_count():
     """Get alert count - uses get_directional_prediction_wrapper() for consistency"""
@@ -507,16 +530,13 @@ def alerts_count():
             now = Config.get_current_time()
             
             for station in stations_list:
-                # ========== FIX: Use the wrapper ==========
                 north_cong = get_directional_prediction_wrapper(station, 'Northbound', now)
                 south_cong = get_directional_prediction_wrapper(station, 'Southbound', now)
                 
-                if north_cong is None:
-                    north_cong = 0
-                if south_cong is None:
-                    south_cong = 0
+                north_cong = _safe_float(north_cong, 0.0)
+                south_cong = _safe_float(south_cong, 0.0)
                 
-                avg_cong = (north_cong + south_cong) / 2
+                avg_cong = (north_cong + south_cong) / 2.0
                 
                 if avg_cong > 80:
                     severe_count += 1
@@ -534,9 +554,9 @@ def alerts_count():
                     severity = 'none'
                 
                 station_statuses[station] = {
-                    'congestion': round(avg_cong, 1),
-                    'northbound': round(north_cong, 1),
-                    'southbound': round(south_cong, 1),
+                    'congestion': _safe_round_float(avg_cong, 1),
+                    'northbound': _safe_round_float(north_cong, 1),
+                    'southbound': _safe_round_float(south_cong, 1),
                     'severity': severity
                 }
             
@@ -551,14 +571,14 @@ def alerts_count():
         display = str(total) if total < 10 else "9+"
         
         return jsonify({
-            "count": total,
+            "count": int(total),
             "display": display,
             "breakdown": {
-                "severe": severe_count,
-                "congested": congested_count,
-                "moderate": moderate_count,
-                "light": light_count,
-                "total_stations": len(stations_list)
+                "severe": int(severe_count),
+                "congested": int(congested_count),
+                "moderate": int(moderate_count),
+                "light": int(light_count),
+                "total_stations": int(len(stations_list))
             },
             "station_statuses": station_statuses
         })
@@ -568,6 +588,8 @@ def alerts_count():
         import traceback
         traceback.print_exc()
         return jsonify({"count": 0, "display": "0"})
+
+
 @api_other_bp.route('/alerts/list')
 def alerts_list():
     """Get list of active alerts"""
@@ -594,21 +616,24 @@ def alerts_list():
         
         stations_list = get_stations_from_config()
         for station in stations_list:
-            ridership = get_station_predictions_from_config(station)
-            capacity = STATION_BASE_CAPACITY.get(station, 10000)
-            congestion = min(100, int((ridership / capacity) * 100))
+            # Use directional prediction wrapper for consistency
+            north_cong = _safe_float(get_directional_prediction_wrapper(station, 'Northbound', now), 0.0)
+            south_cong = _safe_float(get_directional_prediction_wrapper(station, 'Southbound', now), 0.0)
             
-            if congestion > 80:
+            avg_congestion = (north_cong + south_cong) / 2.0
+            
+            if avg_congestion > 80:
                 alerts.append({
                     "id": f"critical-{station}", "type": "critical",
                     "title": f"Critical Congestion at {station}",
-                    "message": f"Congestion at {congestion}%. Expect delays of 15-20 minutes.",
+                    "message": f"Congestion at {_safe_round_float(avg_congestion, 1)}%. Expect delays of 15-20 minutes.",
                     "time": now.strftime("%I:%M %p"), "severity": "critical"
                 })
                 break
         
         return jsonify(alerts)
     except Exception as e:
+        print(f"Error in alerts_list: {e}")
         return jsonify([])
 
 
@@ -659,7 +684,7 @@ def get_public_broadcasts():
                 message = broadcast.message
             
             result.append({
-                'id': broadcast.id,
+                'id': int(broadcast.id),
                 'type': 'broadcast',
                 'priority': 1,
                 'icon': icon,
@@ -683,11 +708,13 @@ def get_recommendation(station_name):
     name = station_name.replace('%20', ' ')
     
     try:
-        ridership = get_station_predictions_from_config(name)
-        capacity = STATION_BASE_CAPACITY.get(name, 10000)
-        congestion = min(100, int((ridership / capacity) * 100))
-        
         now = Config.get_current_time()
+        
+        # Use directional predictions (P90-based) for consistency
+        north_cong = _safe_float(get_directional_prediction_wrapper(name, 'Northbound', now), 0.0)
+        south_cong = _safe_float(get_directional_prediction_wrapper(name, 'Southbound', now), 0.0)
+        
+        congestion = _safe_round_float((north_cong + south_cong) / 2.0, 1)
         hour = now.hour
         
         if congestion > 80:
@@ -716,6 +743,7 @@ def get_recommendation(station_name):
             "recommendation": recommendation, "best_time": get_best_time()
         })
     except Exception as e:
+        print(f"Error in get_recommendation: {e}")
         return jsonify({
             "recommendation": "Normal operations. Trains running on schedule.",
             "best_time": "10:00 AM - 3:00 PM"
@@ -729,9 +757,13 @@ def station_info(station_name):
     stations_list = get_stations_from_config()
     
     try:
-        ridership = get_station_predictions_from_config(name)
-        capacity = STATION_BASE_CAPACITY.get(name, 10000)
-        congestion = min(100, int((ridership / capacity) * 100))
+        now = Config.get_current_time()
+        
+        # Use directional predictions (P90-based) for consistency
+        north_cong = _safe_float(get_directional_prediction_wrapper(name, 'Northbound', now), 0.0)
+        south_cong = _safe_float(get_directional_prediction_wrapper(name, 'Southbound', now), 0.0)
+        
+        congestion = _safe_round_float((north_cong + south_cong) / 2.0, 1)
         
         station_idx = stations_list.index(name) if name in stations_list else 0
         
@@ -755,13 +787,26 @@ def station_info(station_name):
             color = "light"
             description = "Light traffic. Good time to travel."
         
+        # Ridership based on P90
+        p90_north = get_p90_for_station(name, 'Northbound')
+        p90_south = get_p90_for_station(name, 'Southbound')
+        avg_p90 = (p90_north + p90_south) / 2.0
+        ridership = int((congestion / 100.0) * avg_p90)
+        
         return jsonify({
-            "station": name, "congestion": congestion, "status": status,
-            "color": color, "description": description, "ridership": ridership,
-            "capacity": capacity, "previous_station": prev_station,
-            "next_station": next_station, "index": station_idx
+            "station": name,
+            "congestion": congestion,
+            "status": status,
+            "color": color,
+            "description": description,
+            "ridership": _safe_int(ridership),
+            "capacity": _safe_round_float(avg_p90, 0),
+            "previous_station": prev_station,
+            "next_station": next_station,
+            "index": int(station_idx)
         })
     except Exception as e:
+        print(f"Error in station_info: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -808,7 +853,7 @@ def review_report(report_id):
             'success': True,
             'message': f'Report {verdict}',
             'verdict': verdict,
-            'report_id': report_id
+            'report_id': int(report_id)
         })
         
     except Exception as e:
@@ -844,7 +889,7 @@ def historical_patterns():
                 elif station in ["Santolan", "Magallanes"]:
                     base -= 5
                 
-                station_patterns[hour] = min(100, max(0, base))
+                station_patterns[int(hour)] = int(min(100, max(0, base)))
             patterns[station] = station_patterns
         return jsonify(patterns)
     except Exception as e:
@@ -853,9 +898,9 @@ def historical_patterns():
 
 @api_other_bp.route('/live-map/directions/v3')
 def live_map_directions_v3():
+    """Live map v3 - uses get_all_stations_predictions (batch) with P90 consistency"""
     try:
         from routes.api_predict import get_all_stations_predictions
-        from datetime import datetime as _dt
         
         now = Config.get_current_time()
         current_time = now.hour + now.minute / 60
@@ -867,7 +912,7 @@ def live_map_directions_v3():
         active_overrides = get_active_overrides()
         stations = current_app.config.get('STATIONS', STATIONS)
         
-        # ========== If closed, return CLOSED for all stations ==========
+        # If closed, return CLOSED for all stations
         if is_closed:
             northbound = {}
             southbound = {}
@@ -876,22 +921,22 @@ def live_map_directions_v3():
                 south_override_key = f"{station}_southbound"
                 
                 northbound[station] = {
-                    "congestion": 0,
+                    "congestion": 0.0,
                     "wait_time": "CLOSED",
                     "status": "CLOSED",
                     "ridership": 0,
-                    "overridden": north_override_key in active_overrides,
+                    "overridden": bool(north_override_key in active_overrides),
                     "override_info": active_overrides.get(north_override_key),
-                    "p90": 0,
+                    "p90": 0.0,
                 }
                 southbound[station] = {
-                    "congestion": 0,
+                    "congestion": 0.0,
                     "wait_time": "CLOSED",
                     "status": "CLOSED",
                     "ridership": 0,
-                    "overridden": south_override_key in active_overrides,
+                    "overridden": bool(south_override_key in active_overrides),
                     "override_info": active_overrides.get(south_override_key),
-                    "p90": 0,
+                    "p90": 0.0,
                 }
             
             return jsonify({
@@ -903,7 +948,7 @@ def live_map_directions_v3():
                 "source": "closed",
             })
         
-        # ========== Normal operation path (unchanged) ==========
+        # Normal operation path
         data = get_all_stations_predictions()
         
         northbound = {}
@@ -913,16 +958,20 @@ def live_map_directions_v3():
             north = data['northbound'].get(station, {})
             south = data['southbound'].get(station, {})
             
-            north_cong = north.get('congestion', 0)
-            south_cong = south.get('congestion', 0)
+            north_cong = _safe_float(north.get('congestion', 0), 0.0)
+            south_cong = _safe_float(south.get('congestion', 0), 0.0)
             
             north_override_key = f"{station}_northbound"
             south_override_key = f"{station}_southbound"
             
             if north_override_key in active_overrides:
-                north_cong = active_overrides[north_override_key].get('congestion', north_cong)
+                north_cong = _safe_float(
+                    active_overrides[north_override_key].get('congestion', north_cong), north_cong
+                )
             if south_override_key in active_overrides:
-                south_cong = active_overrides[south_override_key].get('congestion', south_cong)
+                south_cong = _safe_float(
+                    active_overrides[south_override_key].get('congestion', south_cong), south_cong
+                )
             
             def get_status(cong):
                 if cong > 80:
@@ -941,22 +990,22 @@ def live_map_directions_v3():
             p90_south = get_p90_for_station(station, 'Southbound')
             
             northbound[station] = {
-                "congestion": north_cong,
+                "congestion": _safe_round_float(north_cong, 1),
                 "wait_time": north_wait,
                 "status": north_status,
-                "ridership": int((north_cong / 100) * p90_north) if p90_north else 0,
-                "overridden": north_override_key in active_overrides,
+                "ridership": _safe_int((north_cong / 100.0) * p90_north) if p90_north else 0,
+                "overridden": bool(north_override_key in active_overrides),
                 "override_info": active_overrides.get(north_override_key),
-                "p90": round(p90_north, 0) if p90_north else 0,
+                "p90": _safe_round_float(p90_north, 0) if p90_north else 0.0,
             }
             southbound[station] = {
-                "congestion": south_cong,
+                "congestion": _safe_round_float(south_cong, 1),
                 "wait_time": south_wait,
                 "status": south_status,
-                "ridership": int((south_cong / 100) * p90_south) if p90_south else 0,
-                "overridden": south_override_key in active_overrides,
+                "ridership": _safe_int((south_cong / 100.0) * p90_south) if p90_south else 0,
+                "overridden": bool(south_override_key in active_overrides),
                 "override_info": active_overrides.get(south_override_key),
-                "p90": round(p90_south, 0) if p90_south else 0,
+                "p90": _safe_round_float(p90_south, 0) if p90_south else 0.0,
             }
         
         return jsonify({
@@ -970,8 +1019,11 @@ def live_map_directions_v3():
     
     except Exception as e:
         print(f"❌ Error in live_map_directions_v3: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-    
+
+
 @api_other_bp.route('/live-map/directions/v2')
 def live_map_directions_v2():
     """Consistent with prediction API – uses get_directional_prediction_wrapper()"""
@@ -1004,33 +1056,33 @@ def live_map_directions_v2():
             is_north_overridden = north_override_key in active_overrides
             is_south_overridden = south_override_key in active_overrides
 
-            # ----- Northbound - USE WRAPPER -----
+            # ----- Northbound -----
             if is_north_overridden:
                 override = active_overrides[north_override_key]
-                north_pred = override.get('congestion', 50)
-                p90_north = get_p90_for_station(station, 'Northbound')  # Changed from P95
-                north_passengers = int((north_pred / 100) * p90_north)
+                north_pred = _safe_float(override.get('congestion', 50), 50.0)
+                p90_north = get_p90_for_station(station, 'Northbound')
+                north_passengers = int((north_pred / 100.0) * p90_north)
             else:
-                # ========== FIX: Use the wrapper ==========
                 north_pred = get_directional_prediction_wrapper(station, 'Northbound', now)
                 if north_pred is None:
-                    north_pred = 10
-                p90_north = get_p90_for_station(station, 'Northbound')  # Changed from P95
-                north_passengers = int((north_pred / 100) * p90_north)
+                    north_pred = 10.0
+                north_pred = _safe_float(north_pred, 10.0)
+                p90_north = get_p90_for_station(station, 'Northbound')
+                north_passengers = int((north_pred / 100.0) * p90_north)
 
-            # ----- Southbound - USE WRAPPER -----
+            # ----- Southbound -----
             if is_south_overridden:
                 override = active_overrides[south_override_key]
-                south_pred = override.get('congestion', 50)
-                p90_south = get_p90_for_station(station, 'Southbound')  # Changed from P95
-                south_passengers = int((south_pred / 100) * p90_south)
+                south_pred = _safe_float(override.get('congestion', 50), 50.0)
+                p90_south = get_p90_for_station(station, 'Southbound')
+                south_passengers = int((south_pred / 100.0) * p90_south)
             else:
-                # ========== FIX: Use the wrapper ==========
                 south_pred = get_directional_prediction_wrapper(station, 'Southbound', now)
                 if south_pred is None:
-                    south_pred = 10
-                p90_south = get_p90_for_station(station, 'Southbound')  # Changed from P95
-                south_passengers = int((south_pred / 100) * p90_south)
+                    south_pred = 10.0
+                south_pred = _safe_float(south_pred, 10.0)
+                p90_south = get_p90_for_station(station, 'Southbound')
+                south_passengers = int((south_pred / 100.0) * p90_south)
 
             # ----- Status & wait time -----
             def get_status(cong):
@@ -1047,20 +1099,20 @@ def live_map_directions_v2():
             south_status, south_wait = get_status(south_pred)
 
             northbound[station] = {
-                "congestion": round(north_pred, 1),
+                "congestion": _safe_round_float(north_pred, 1),
                 "wait_time": north_wait,
                 "status": north_status,
-                "ridership": north_passengers,
-                "overridden": is_north_overridden,
-                "p90": round(p90_north, 0)  # Changed from P95
+                "ridership": _safe_int(north_passengers),
+                "overridden": bool(is_north_overridden),
+                "p90": _safe_round_float(p90_north, 0)
             }
             southbound[station] = {
-                "congestion": round(south_pred, 1),
+                "congestion": _safe_round_float(south_pred, 1),
                 "wait_time": south_wait,
                 "status": south_status,
-                "ridership": south_passengers,
-                "overridden": is_south_overridden,
-                "p90": round(p90_south, 0)  # Changed from P95
+                "ridership": _safe_int(south_passengers),
+                "overridden": bool(is_south_overridden),
+                "p90": _safe_round_float(p90_south, 0)
             }
 
         # Check if MRT is closed for display
@@ -1074,9 +1126,9 @@ def live_map_directions_v2():
             "southbound": southbound,
             "timestamp": now.isoformat(),
             "model_version": "get_directional_prediction_wrapper (with boost/cap)",
-            "active_overrides": len(active_overrides),
+            "active_overrides": int(len(active_overrides)),
             "requested_time": f"{date_param} {time_param}" if date_param and time_param else None,
-            "is_operating": not is_closed,
+            "is_operating": bool(not is_closed),
             "cached": True
         })
 
@@ -1085,15 +1137,12 @@ def live_map_directions_v2():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-    
+
+
 @api_other_bp.route('/live-map/directions/now')
 def live_map_directions_now():
     """Live map WITHOUT cache - for debugging"""
     try:
-        # Temporarily disable caching
-        from flask import current_app
-        from services import get_directional_prediction
-        
         stations_list = current_app.config.get('STATIONS', STATIONS)
         now = Config.get_current_time()
         active_overrides = get_active_overrides()
@@ -1102,14 +1151,16 @@ def live_map_directions_now():
         southbound = {}
         
         for station in stations_list:
-            # Force fresh prediction
-            north_pred = get_directional_prediction(station, 'Northbound', now)
-            south_pred = get_directional_prediction(station, 'Southbound', now)
+            # Force fresh prediction using the wrapper
+            north_pred = get_directional_prediction_wrapper(station, 'Northbound', now)
+            south_pred = get_directional_prediction_wrapper(station, 'Southbound', now)
             
             if north_pred is None:
-                north_pred = 10
+                north_pred = 10.0
             if south_pred is None:
-                south_pred = 10
+                south_pred = 10.0
+            north_pred = _safe_float(north_pred, 10.0)
+            south_pred = _safe_float(south_pred, 10.0)
             
             def get_status(cong):
                 if cong > 80:
@@ -1124,22 +1175,22 @@ def live_map_directions_now():
             north_status, north_wait = get_status(north_pred)
             south_status, south_wait = get_status(south_pred)
             
-            p90_north = get_p90_for_station(station, 'Northbound')  # Changed from P95
-            p90_south = get_p90_for_station(station, 'Southbound')  # Changed from P95
+            p90_north = get_p90_for_station(station, 'Northbound')
+            p90_south = get_p90_for_station(station, 'Southbound')
             
             northbound[station] = {
-                "congestion": round(north_pred, 1),
+                "congestion": _safe_round_float(north_pred, 1),
                 "wait_time": north_wait,
                 "status": north_status,
-                "ridership": int((north_pred / 100) * p90_north),
-                "p90": round(p90_north, 0)  # Changed from P95
+                "ridership": _safe_int((north_pred / 100.0) * p90_north),
+                "p90": _safe_round_float(p90_north, 0)
             }
             southbound[station] = {
-                "congestion": round(south_pred, 1),
+                "congestion": _safe_round_float(south_pred, 1),
                 "wait_time": south_wait,
                 "status": south_status,
-                "ridership": int((south_pred / 100) * p90_south),
-                "p90": round(p90_south, 0)  # Changed from P95
+                "ridership": _safe_int((south_pred / 100.0) * p90_south),
+                "p90": _safe_round_float(p90_south, 0)
             }
         
         return jsonify({
@@ -1151,5 +1202,7 @@ def live_map_directions_now():
         })
         
     except Exception as e:
+        print(f"❌ Error in live_map_directions_now: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-  

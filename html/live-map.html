@@ -1989,12 +1989,388 @@ nav {
         }
     }
 }
+
+/* ========== HELP BUTTON (LIVE MAP) ========== */
+.livemap-help-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3B82F6, #2563EB);
+    color: white;
+    border: none;
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    z-index: 999;
+    transition: all 0.25s ease;
+    animation: helpPulse 3s infinite;
+}
+
+.livemap-help-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 10px 28px rgba(59, 130, 246, 0.6);
+}
+
+.livemap-help-btn:active {
+    transform: scale(0.95);
+}
+
+@keyframes helpPulse {
+    0%, 100% {
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45);
+    }
+    50% {
+        box-shadow: 0 6px 28px rgba(59, 130, 246, 0.7),
+                    0 0 0 8px rgba(59, 130, 246, 0.1);
+    }
+}
+
+/* ========== HELP MODAL ========== */
+.help-modal-overlay {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 34, 77, 0.75);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.help-modal-overlay.active {
+    display: flex;
+}
+
+.help-modal-container {
+    background: white;
+    border-radius: 24px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 28px;
+    position: relative;
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+.help-modal-container .close-btn {
+    position: absolute;
+    right: 18px;
+    top: 18px;
+    background: #F1F5F9;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--text-light);
+    border: none;
+    transition: 0.2s;
+    z-index: 2;
+}
+
+.help-modal-container .close-btn:hover {
+    background: #E2E8F0;
+    transform: rotate(90deg);
+}
+
+.help-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding-right: 40px;
+}
+
+.help-modal-header .help-icon {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, #3B82F6, #60A5FA);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.help-modal-header h2 {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text-dark);
+    margin: 0;
+    letter-spacing: -0.3px;
+}
+
+.help-modal-header p {
+    font-size: 13px;
+    color: var(--text-light);
+    margin: 4px 0 0 0;
+}
+
+.help-step {
+    display: flex;
+    gap: 14px;
+    padding: 14px;
+    border-radius: 14px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+}
+
+.help-step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.help-step-content h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0 0 4px 0;
+}
+
+.help-step-content p {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.help-tips {
+    background: #F1F5F9;
+    border-radius: 14px;
+    padding: 16px;
+    margin-top: 16px;
+}
+
+.help-tips-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-dark);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.help-tips ul {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 12px;
+    color: var(--text-light);
+    line-height: 1.7;
+}
+
+/* ========== MOBILE ========== */
+@media screen and (max-width: 768px) {
+    .livemap-help-btn {
+        bottom: 90px; /* Above bottom nav */
+        right: 16px;
+        width: 46px;
+        height: 46px;
+        font-size: 19px;
+    }
+
+    .help-modal-container {
+        padding: 20px;
+        max-height: 85vh;
+        border-radius: 20px;
+    }
+
+    .help-modal-header .help-icon {
+        width: 44px;
+        height: 44px;
+        font-size: 20px;
+        border-radius: 14px;
+    }
+
+    .help-modal-header h2 {
+        font-size: 17px;
+    }
+
+    .help-modal-header p {
+        font-size: 12px;
+    }
+
+    .help-step {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .help-step-content h3 {
+        font-size: 13px;
+    }
+
+    .help-step-content p {
+        font-size: 12px;
+    }
+
+    .help-tips ul {
+        font-size: 11px;
+    }
+}
+
+/* ========== HEADER HELP ICON WITH HOVER TOOLTIP ========== */
+.help-icon-btn {
+    position: relative;
+}
+
+.help-icon-btn .tooltip-text {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    background: #1E293B;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition: all 0.2s ease;
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Small arrow pointing up at the icon */
+.help-icon-btn .tooltip-text::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    right: 12px;
+    border: 5px solid transparent;
+    border-bottom-color: #1E293B;
+}
+
+/* Show on hover */
+.help-icon-btn:hover .tooltip-text {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* Mobile: slightly smaller tooltip */
+@media screen and (max-width: 768px) {
+    .help-icon-btn .tooltip-text {
+        font-size: 11px;
+        padding: 5px 10px;
+        top: calc(100% + 8px);
+    }
+}
 </style>
 
 
 </head>
 <body>
 
+    <!-- LIVE MAP HELP BUTTON -->
+
+<!-- LIVE MAP HELP MODAL -->
+<div id="liveMapHelpModal" class="help-modal-overlay" onclick="if(event.target===this) closeLiveMapHelp()">
+    <div class="help-modal-container">
+        <button class="close-btn" onclick="closeLiveMapHelp()">&times;</button>
+
+        <div class="help-modal-header">
+            <div class="help-icon">
+                <i class="fas fa-map-marked-alt"></i>
+            </div>
+            <div>
+                <h2>How to Use the Live Map</h2>
+                <p>Check real-time congestion for every MRT-3 station</p>
+            </div>
+        </div>
+
+        <!-- STEP 1 -->
+        <div class="help-step" style="background: #EFF6FF; border-left: 4px solid #3B82F6;">
+            <div class="help-step-num" style="background: #3B82F6;">1</div>
+            <div class="help-step-content">
+                <h3>Switch Direction</h3>
+                <p>Tap <strong>Northbound</strong> or <strong>Southbound</strong> at the top to see congestion for the direction you're traveling.</p>
+            </div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="help-step" style="background: #F0FDF4; border-left: 4px solid #22C55E;">
+            <div class="help-step-num" style="background: #22C55E;">2</div>
+            <div class="help-step-content">
+                <h3>Read the Station Colors</h3>
+                <p>
+                    <span style="display:inline-block;width:10px;height:10px;background:#22C55E;border-radius:50%;margin-right:4px;"></span><strong>Light</strong> — smooth, minimal crowds<br>
+                    <span style="display:inline-block;width:10px;height:10px;background:#EAB308;border-radius:50%;margin-right:4px;"></span><strong>Moderate</strong> — some waiting (5–10 min)<br>
+                    <span style="display:inline-block;width:10px;height:10px;background:#F97316;border-radius:50%;margin-right:4px;"></span><strong>Congested</strong> — heavy crowds (10–15 min)<br>
+                    <span style="display:inline-block;width:10px;height:10px;background:#EF4444;border-radius:50%;margin-right:4px;"></span><strong>Severe</strong> — expect 15–20 min delays<br>
+                    <span style="display:inline-block;width:10px;height:10px;background:#94A3B8;border-radius:50%;margin-right:4px;"></span><strong>Closed</strong> — outside operating hours (4:30 AM – 10:30 PM)
+                </p>
+            </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="help-step" style="background: #FEF3C7; border-left: 4px solid #F59E0B;">
+            <div class="help-step-num" style="background: #F59E0B;">3</div>
+            <div class="help-step-content">
+                <h3>Find Your Nearest Station</h3>
+                <p>Allow location access when prompted. The station closest to you will glow blue with a <strong>"YOU ARE NEAR"</strong> badge so you can spot it instantly.</p>
+            </div>
+        </div>
+
+        <!-- STEP 4 -->
+        <div class="help-step" style="background: #F3E8FF; border-left: 4px solid #8B5CF6;">
+            <div class="help-step-num" style="background: #8B5CF6;">4</div>
+            <div class="help-step-content">
+                <h3>Tap Any Station for Details</h3>
+                <p>Tap a station marker to see its congestion level, estimated wait time, and an alternative station suggestion if it's crowded.</p>
+            </div>
+        </div>
+
+        <!-- STEP 5 -->
+        <div class="help-step" style="background: #FCE7F3; border-left: 4px solid #EC4899;">
+            <div class="help-step-num" style="background: #EC4899;">5</div>
+            <div class="help-step-content">
+                <h3>Report Congestion</h3>
+                <p>Inside the station popup, tap <strong>"Report this station"</strong> to submit real-time feedback and help other commuters.</p>
+            </div>
+        </div>
+
+        <!-- TIPS -->
+        <div class="help-tips">
+            <div class="help-tips-title">
+                <i class="fas fa-lightbulb" style="color: #F59E0B;"></i> Quick Tips
+            </div>
+            <ul>
+                <li>Purple ring on a station means an operator has manually overridden the status.</li>
+                <li>Best travel times: before 7 AM or after 8 PM for lighter crowds.</li>
+                <li>Pull down to refresh if you've been idle for a while.</li>
+            </ul>
+        </div>
+    </div>
+</div>
     <!-- ========== LOADING OVERLAY WITH MOVING TRAIN - 3 CARS ========== -->
 <div id="loadingOverlay" class="loading-overlay">
     <div class="loading-container">
@@ -2114,13 +2490,17 @@ nav {
         <div class="header-top">
             <h1>Live Map</h1>
 
-            <div class="header-icons">
-                <span class="icon-btn" onclick="refreshMap()" style="display:none;"><i class="fas fa-sync-alt"></i></span>
-                <span class="icon-btn" onclick="window.location.href='/alerts'">
-                    <i class="fas fa-bell"></i>
-                    <span class="badge" id="alertBadge">0</span>
-                </span>
-            </div>
+         <div class="header-icons">
+    <span class="icon-btn" onclick="refreshMap()" style="display:none;"><i class="fas fa-sync-alt"></i></span>
+    <span class="icon-btn help-icon-btn" onclick="openLiveMapHelp()" aria-label="How to use Live Map">
+        <i class="fas fa-question"></i>
+        <span class="tooltip-text">How to use</span>
+    </span>
+    <span class="icon-btn" onclick="window.location.href='/alerts'">
+        <i class="fas fa-bell"></i>
+        <span class="badge" id="alertBadge">0</span>
+    </span>
+</div>
         </div>
 
          <div class="header-subtitle">
@@ -2405,14 +2785,7 @@ async function fetchStationData() {
         }
         
         // Get active overrides for reference
-        let activeOverrides = {};
-        try {
-            const overrideResponse = await fetch(`/api/operator/debug-override?_=${Date.now()}`);
-            const overrideData = await overrideResponse.json();
-            activeOverrides = overrideData.active_overrides || {};
-        } catch (e) {
-            console.log('⚠️ Could not fetch overrides:', e);
-        }
+       
         
         const nowTime = new Date();
         const hour = nowTime.getHours();
@@ -3398,6 +3771,34 @@ function initializeMap() {
         });
     }, 60000);
 }
+
+// ========== LIVE MAP HELP MODAL ==========
+function openLiveMapHelp() {
+    const modal = document.getElementById('liveMapHelpModal');
+    if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent background scroll on mobile
+    }
+}
+
+function closeLiveMapHelp() {
+    const modal = document.getElementById('liveMapHelpModal');
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+
+// Close on Escape key
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        closeLiveMapHelp();
+    }
+});
+
+// Expose globally (in case anything else calls them)
+window.openLiveMapHelp = openLiveMapHelp;
+window.closeLiveMapHelp = closeLiveMapHelp;
 
 document.addEventListener('DOMContentLoaded', initializeMap);
 

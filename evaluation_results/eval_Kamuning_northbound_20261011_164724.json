@@ -1,0 +1,94 @@
+{
+  "station": "Kamuning",
+  "direction": "northbound",
+  "total_samples": 18,
+  "timestamp": "2026-10-11T16:47:24.350704",
+  "confusion_matrix": {
+    "labels": [
+      "Light",
+      "Moderate",
+      "Congested",
+      "Severe"
+    ],
+    "matrix": [
+      [
+        2,
+        0,
+        5,
+        0
+      ],
+      [
+        0,
+        1,
+        4,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        4
+      ]
+    ]
+  },
+  "accuracy": 38.89,
+  "precision_weighted": 92.59,
+  "recall_weighted": 38.89,
+  "f1_weighted": 44.78,
+  "regression_metrics": {
+    "mae": 26.64,
+    "rmse": 31.21,
+    "r2": -0.415,
+    "mape": 91.3
+  },
+  "per_class_metrics": {
+    "Light": {
+      "precision": 100.0,
+      "recall": 28.6,
+      "f1_score": 44.4,
+      "support": 7.0
+    },
+    "Moderate": {
+      "precision": 100.0,
+      "recall": 14.3,
+      "f1_score": 25.0,
+      "support": 7.0
+    },
+    "Congested": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 0.0
+    },
+    "Severe": {
+      "precision": 66.7,
+      "recall": 100.0,
+      "f1_score": 80.0,
+      "support": 4.0
+    }
+  },
+  "category_distribution": {
+    "Light": {
+      "actual": 7,
+      "predicted": 2
+    },
+    "Moderate": {
+      "actual": 7,
+      "predicted": 1
+    },
+    "Congested": {
+      "actual": 0,
+      "predicted": 9
+    },
+    "Severe": {
+      "actual": 4,
+      "predicted": 6
+    }
+  }
+}
