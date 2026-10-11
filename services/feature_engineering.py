@@ -146,7 +146,7 @@ def get_synthetic_congestion(hour):
 # ============================================================
 # SCALER LOADERS
 # ============================================================
-MODEL_FOLDER = 'models_2022-2024_v10'
+MODEL_FOLDER = 'models_2022-2024_v11'
 
 
 def get_feature_scaler(station_name, direction):

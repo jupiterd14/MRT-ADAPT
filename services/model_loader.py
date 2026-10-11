@@ -66,15 +66,19 @@ def rmse(y_true, y_pred):
 def get_model_file_path(model_path, model_key):
     """
     Get the correct model file path, checking all possible suffixes.
-    Supports: _lstm_v10_plus.keras, _lstm_enhanced.keras, _best.keras
+    Supports v11 (_model.keras) and legacy v10 suffixes.
     """
-    suffixes = ['_lstm_v10_plus.keras', '_lstm_enhanced.keras', '_best.keras']
+    suffixes = [
+        '_model.keras',           # v11
+        '_lstm_v10_plus.keras',   # v10_plus
+        '_lstm_enhanced.keras',   # old
+        '_best.keras',            # old
+    ]
     for suffix in suffixes:
         path = os.path.join(model_path, f'{model_key}{suffix}')
         if os.path.exists(path):
             return path
     return None
-
 
 def get_scaler_paths(model_path, model_key):
     """Get feature and target scaler paths for a model"""
@@ -86,7 +90,7 @@ def get_scaler_paths(model_path, model_key):
 # ============================================================
 # LOAD ALL MODELS
 # ============================================================
-def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_v10'):
+def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_v11'):
     """
     Load ALL directional models - USE WITH CAUTION!
     This loads all 26 models and uses ~300MB memory.
@@ -178,7 +182,7 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
 # ============================================================
 # LOAD SINGLE MODEL (Memory Efficient)
 # ============================================================
-def load_single_model(station, direction, model_path='models_2022-2024_v10'):
+def load_single_model(station, direction, model_path='models_2022-2024_v11'):
     """
     Load a SINGLE model for one station-direction (memory efficient)
     This is the recommended way to load models.
@@ -395,7 +399,7 @@ def auto_load_all_models(limit=None):
     print("=" * 50)
     print("🔄 Auto-loading all models...")
     
-    correct_dir = "models_2022-2024_v10"
+    correct_dir = "models_2022-2024_v11"
     
     if not os.path.exists(correct_dir):
         print(f"⚠️ Models directory not found: {correct_dir}")
@@ -419,7 +423,10 @@ def auto_load_all_models(limit=None):
     
     for f in model_files:
         # ✅ FIX: Handle all filename patterns
-        name = f.replace('_lstm_v10_plus.keras', '').replace('_lstm_enhanced.keras', '').replace('_best.keras', '')
+        name = (f.replace('_model.keras', '')
+         .replace('_lstm_v10_plus.keras', '')
+         .replace('_lstm_enhanced.keras', '')
+         .replace('_best.keras', ''))
         parts = name.split('_')
         
         if len(parts) >= 2:

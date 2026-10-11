@@ -1232,6 +1232,56 @@
     display: flex;
 }
 
+.cm-tier-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+}
+.cm-tier-table thead th {
+    background: #1E293B;
+    color: #fff;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 10px 8px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+.cm-tier-table thead th:first-child {
+    text-align: left;
+    padding-left: 14px;
+}
+.cm-tier-table tbody td {
+    padding: 9px 8px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dark);
+}
+.cm-tier-table tbody td:first-child {
+    text-align: left;
+    padding-left: 14px;
+    font-weight: 600;
+}
+.cm-tier-table tbody tr:hover td {
+    background: #F8FAFC;
+}
+.cm-tier-table tbody tr.avg-row {
+    background: #F1F5F9;
+    font-weight: 700;
+    border-top: 2px solid #94A3B8;
+}
+.cm-tier-table tbody tr.avg-row td:first-child {
+    color: var(--purple);
+}
+.cm-tier-table tbody tr.tier-light td:first-child      { border-left: 3px solid #22C55E; }
+.cm-tier-table tbody tr.tier-moderate td:first-child   { border-left: 3px solid #F59E0B; }
+.cm-tier-table tbody tr.tier-congested td:first-child  { border-left: 3px solid #EA580C; }
+.cm-tier-table tbody tr.tier-severe td:first-child     { border-left: 3px solid #DC2626; }
+
     </style>
     </head>
        <body>
@@ -1671,6 +1721,7 @@
     <!-- Select Station - Directly below buttons -->
     <div style="margin-bottom: 16px;">
         <select id="stationSelector" class="form-select" style="width: 100%; padding: 8px 12px; font-size: 13px; border-radius: 8px;">
+              <option value="all">All Stations</option>
             <option value="North Ave">North Ave</option>
             <option value="Quezon Ave">Quezon Ave</option>
             <option value="Kamuning">Kamuning</option>
@@ -1732,8 +1783,39 @@
                 <p>Click "Run Evaluation" to generate confusion matrix and classification metrics.</p>
             </div>
         </div>
+
+        <!-- ============================================================ -->
+        <!-- TIER-LEVEL CONFUSION TABLE (TP/FP/FN/TN/P/R/F1/Support)      -->
+        <!-- ============================================================ -->
+        <div id="confusionTableContainer" style="margin-top: 20px; display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h4 style="font-size: 13px; color: var(--text-dark); margin: 0;">
+                    <i class="fas fa-layer-group" style="color: var(--purple);"></i>
+                    Tier-Level Metrics
+                </h4>
+                <span id="confusionTableMeta" style="font-size: 11px; color: var(--text-light);"></span>
+            </div>
+
+            <div class="table-scroll-container" style="max-height: 420px;">
+                <table class="cm-tier-table" id="cmTierTable">
+                    <thead>
+                        <tr>
+                            <th>Tier</th>
+                            <th>TP</th>
+                            <th>FP</th>
+                            <th>FN</th>
+                            <th>TN</th>
+                            <th>Precision</th>
+                            <th>Recall</th>
+                            <th>F1</th>
+                            <th>Support</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cmTierTableBody"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
-    
     <!-- Classification Metrics -->
     <div class="card">
         <div class="card-title">
@@ -2476,7 +2558,10 @@ async function uploadTestData() {
 // ========== EVALUATION FUNCTIONS ==========
 async function runEvaluation() {
     const station = document.getElementById('stationSelector').value || 'all';
-    const direction = currentDirectionViewMP === 'northbound' ? 'northbound' : 'southbound';
+    // When evaluating all stations, use both directions
+    // When evaluating one station, use the currently-selected direction
+    const direction = (station === 'all') ? 'both' 
+                    : (currentDirectionViewMP === 'northbound' ? 'northbound' : 'southbound')
     
     showToast('📊', 'Running evaluation...');
     
@@ -2497,6 +2582,7 @@ async function runEvaluation() {
         
         if (result.success) {
             displayEvaluationResults(result.data);
+            loadConfusionTable(); 
             showToast('✅', 'Evaluation complete!');
         } else {
             showToast('❌', result.error || 'Evaluation failed');
@@ -2507,6 +2593,133 @@ async function runEvaluation() {
     } finally {
         loadingOverlay.classList.remove('active');
         loadingText.innerText = originalText;
+    }
+}
+
+// ============================================================
+// CONFUSION TABLE (Tier × TP/FP/FN/TN/P/R/F1/Support)
+// ============================================================
+async function loadConfusionTable() {
+    const container = document.getElementById('confusionTableContainer');
+    const tbody = document.getElementById('cmTierTableBody');
+    const meta = document.getElementById('confusionTableMeta');
+    if (!container || !tbody) return;
+
+    const station = document.getElementById('stationSelector')?.value || 'all';
+    const direction = (station === 'all')
+        ? 'both'
+        : (currentDirectionViewMP === 'northbound' ? 'northbound' : 'southbound');
+
+    try {
+        // Try the transposed endpoint first
+        let response = await fetch(
+            `/api/model/evaluation/confusion-table?station=${encodeURIComponent(station)}&direction=${direction}`
+        );
+        let result = await response.json();
+
+        // ── Fallback: transpose /model/evaluate/per-class ──
+        if (!result.success) {
+            response = await fetch(
+                `/api/model/evaluate/per-class?station=${encodeURIComponent(station)}&direction=${direction}`
+            );
+            const alt = await response.json();
+            if (!alt.success) {
+                container.style.display = 'none';
+                return;
+            }
+            const colLabels = alt.data.column_labels;          // 6 cols
+            const metricRows = alt.data.rows;                  // 8 metric rows
+            const lookup = {};
+            metricRows.forEach(r => { lookup[r.metric] = r.values; });
+
+            const pick = (key, i) => (lookup[key] || [])[i] ?? 0;
+
+            const rows = [];
+            // 4 tier rows → PERCENT
+            for (let i = 0; i < 4; i++) {
+                rows.push({
+                    tier: colLabels[i],
+                    TP: pick('TP', i), FP: pick('FP', i),
+                    FN: pick('FN', i), TN: pick('TN', i),
+                    Precision: pick('Precision (%)', i),
+                    Recall:    pick('Recall (%)', i),
+                    F1:        pick('F1-Score (%)', i),
+                    Support:   pick('Support', i),
+                });
+            }
+            // Macro & Weighted → DECIMAL, counts = null
+            [['Macro Average', 4], ['Weighted Average', 5]].forEach(([label, i]) => {
+                rows.push({
+                    tier: label,
+                    TP: null, FP: null, FN: null, TN: null,
+                    Precision: +(pick('Precision (%)', i) / 100).toFixed(4),
+                    Recall:    +(pick('Recall (%)',    i) / 100).toFixed(4),
+                    F1:        +(pick('F1-Score (%)',  i) / 100).toFixed(4),
+                    Support:   pick('Support', i),
+                });
+            });
+
+            result = {
+                success: true,
+                data: {
+                    rows,
+                    accuracy: alt.data.overall.accuracy,
+                    total_samples: alt.data.overall.total_samples,
+                }
+            };
+        }
+
+        if (!result.success || !result.data?.rows?.length) {
+            container.style.display = 'none';
+            return;
+        }
+
+        const rows = result.data.rows;
+
+        // ── Render ──
+        tbody.innerHTML = rows.map(r => {
+            const isAvg = r.tier.includes('Average');
+            const tierKey = (r.tier === 'Severe' || r.tier === 'Severely Congested')
+                ? 'severe'
+                : r.tier.toLowerCase();
+
+            const rowClass = isAvg ? 'avg-row' : `tier-${tierKey}`;
+            const displayTier = r.tier === 'Severe' ? 'Severely Congested' : r.tier;
+
+            const dash = '<span style="color:#CBD5E1;">—</span>';
+
+            // Tier rows: show as "%";  Average rows: show as decimal float
+            const fmtNum = (v) => {
+                if (v === null || v === undefined) return dash;
+                return isAvg ? Number(v).toFixed(4) : `${Number(v).toFixed(2)}%`;
+            };
+
+            const tp = isAvg ? dash : r.TP;
+            const fp = isAvg ? dash : r.FP;
+            const fn = isAvg ? dash : r.FN;
+            const tn = isAvg ? dash : r.TN;
+
+            return `
+                <tr class="${rowClass}">
+                    <td>${displayTier}</td>
+                    <td>${tp}</td>
+                    <td>${fp}</td>
+                    <td>${fn}</td>
+                    <td>${tn}</td>
+                    <td>${fmtNum(r.Precision)}</td>
+                    <td>${fmtNum(r.Recall)}</td>
+                    <td>${fmtNum(r.F1)}</td>
+                    <td>${r.Support}</td>
+                </tr>
+            `;
+        }).join('');
+
+        meta.textContent = `${result.data.total_samples} samples · Accuracy ${result.data.accuracy}%`;
+        container.style.display = 'block';
+
+    } catch (err) {
+        console.error('Error loading confusion table:', err);
+        container.style.display = 'none';
     }
 }
 
@@ -2576,7 +2789,6 @@ function displayEvaluationResults(data) {
     const cmHtml = `
         <!-- ===== Binary 2x2 (STAR) ===== -->
         <h4 style="font-size: 13px; color: var(--text-dark); margin-bottom: 4px;">
-            Congested (Severe + Congested) vs. Not Congested (Moderate + Light)
         </h4>
         <p style="font-size: 11px; color: var(--text-light); margin-bottom: 12px;">
             TP / FP / TN / FN — the basis for Precision, Recall, and F1.

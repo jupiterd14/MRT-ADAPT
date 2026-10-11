@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
+
 class _LazyTF:
     _mod = None
     def __getattr__(self, name):
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ================================================================
 
 class MRT3LSTMPredictor:
-    def __init__(self, model_path_pattern='./models_2022-2024_v10_plus_*/'):
+    def __init__(self, model_path_pattern='./models_2022-2024_v11/'):
         self.model_path_pattern = model_path_pattern
         self.model_path = None
         self.models = {}
@@ -58,7 +59,7 @@ class MRT3LSTMPredictor:
             self.model_path = sorted(matching)[-1]
             logger.info(f"📁 Using latest model folder: {self.model_path}")
         else:
-            default = './models_2022-2024_v10_plus_latest/'
+            default = './models_2022-2024_v11/'
             if os.path.exists(default):
                 self.model_path = default
                 logger.info(f"📁 Using default folder: {default}")
@@ -91,7 +92,7 @@ class MRT3LSTMPredictor:
                 for direction in self.directions:
                     key = f"{station}_{direction}"
                     try:
-                        model_file = os.path.join(self.model_path, f'{key}_lstm_v10_plus.keras')
+                        model_file = os.path.join(self.model_path, f'{key}_model.keras')
                         fs_file = os.path.join(self.model_path, f'{key}_feature_scaler.pkl')
                         ts_file = os.path.join(self.model_path, f'{key}_target_scaler.pkl')
 
@@ -406,7 +407,7 @@ def train_lstm_on_reports():
         return None
 
     # 2. Loop over each station-direction pair
-    model_path = f"./models_2022-2024_v10_plus_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    model_path = f"./models_2022-2024_v11"
     os.makedirs(model_path, exist_ok=True)
 
     stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
@@ -501,7 +502,7 @@ def train_lstm_on_reports():
                 logger.info(f"✅ {key} – No test data, skipping evaluation.")
 
             # Save model and scalers
-            model.save(os.path.join(model_path, f'{key}_lstm_v10_plus.keras'))
+            model.save(os.path.join(model_path, f'{key}_model.keras'))
             with open(os.path.join(model_path, f'{key}_feature_scaler.pkl'), 'wb') as f:
                 pickle.dump(feature_scaler, f)
             with open(os.path.join(model_path, f'{key}_target_scaler.pkl'), 'wb') as f:

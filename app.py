@@ -61,10 +61,6 @@ from flask import Flask, session, flash, redirect, url_for, jsonify, request, re
 from werkzeug.middleware.proxy_fix import ProxyFix
 from extensions import cache, limiter
 
-# ✅ JSON provider + numpy (for the NumpyJSONProvider safety net)
-import numpy as np
-from flask.json.provider import DefaultJSONProvider
-
 import warnings
 from authlib.integrations.flask_client import OAuth
 import pickle
@@ -129,8 +125,8 @@ _MODEL_LOAD_LOCK = threading.Lock()
 _STARTUP_LOCK = threading.Lock()
 _started_once = False
 
-DIRECTIONAL_MODELS_PATH = 'models_2022-2024_v10'
-LSTM_MODEL_PATH = 'models_2022-2024_v10'
+DIRECTIONAL_MODELS_PATH = 'models_2022-2024_v11'
+LSTM_MODEL_PATH = 'models_2022-2024_v11'
 
 
 # ============================================================
@@ -340,31 +336,6 @@ cache.init_app(app)
 app.extensions.setdefault('cache', {})[cache] = cache
 
 limiter.init_app(app)
-
-
-# ============================================================
-# JSON PROVIDER — safety net against numpy types
-# (float32, float64, int64, bool_, ndarray) leaking into JSON
-# responses. Prevents "Object of type float32 is not JSON
-# serializable" errors from any endpoint that returns ML output.
-# ============================================================
-class NumpyJSONProvider(DefaultJSONProvider):
-    """Serializes numpy scalars/arrays as native Python types."""
-
-    @staticmethod
-    def default(obj):
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.bool_):
-            return bool(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return DefaultJSONProvider.default(obj)
-
-
-app.json = NumpyJSONProvider(app)
 
 
 @app.errorhandler(429)

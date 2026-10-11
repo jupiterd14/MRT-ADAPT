@@ -1,0 +1,94 @@
+{
+  "station": "all",
+  "direction": "both",
+  "total_samples": 468,
+  "timestamp": "2026-10-11T18:32:39.559955",
+  "confusion_matrix": {
+    "labels": [
+      "Light",
+      "Moderate",
+      "Congested",
+      "Severe"
+    ],
+    "matrix": [
+      [
+        64,
+        39,
+        13,
+        3
+      ],
+      [
+        31,
+        117,
+        24,
+        8
+      ],
+      [
+        13,
+        42,
+        44,
+        17
+      ],
+      [
+        6,
+        17,
+        23,
+        7
+      ]
+    ]
+  },
+  "accuracy": 49.57,
+  "precision_weighted": 47.96,
+  "recall_weighted": 49.57,
+  "f1_weighted": 48.47,
+  "regression_metrics": {
+    "mae": 17.73,
+    "rmse": 25.24,
+    "r2": 0.033,
+    "mape": 49.86
+  },
+  "per_class_metrics": {
+    "Light": {
+      "precision": 56.1,
+      "recall": 53.8,
+      "f1_score": 54.9,
+      "support": 119.0
+    },
+    "Moderate": {
+      "precision": 54.4,
+      "recall": 65.0,
+      "f1_score": 59.2,
+      "support": 180.0
+    },
+    "Congested": {
+      "precision": 42.3,
+      "recall": 37.9,
+      "f1_score": 40.0,
+      "support": 116.0
+    },
+    "Severe": {
+      "precision": 20.0,
+      "recall": 13.2,
+      "f1_score": 15.9,
+      "support": 53.0
+    }
+  },
+  "category_distribution": {
+    "Light": {
+      "actual": 119,
+      "predicted": 114
+    },
+    "Moderate": {
+      "actual": 180,
+      "predicted": 215
+    },
+    "Congested": {
+      "actual": 116,
+      "predicted": 104
+    },
+    "Severe": {
+      "actual": 53,
+      "predicted": 35
+    }
+  }
+}

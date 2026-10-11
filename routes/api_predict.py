@@ -303,12 +303,10 @@ def clear_models_cache():
     global _models_cache, _scalers_cache
     _models_cache = None
     _scalers_cache = None
-# 1. app.py — make ensure_models_loaded a strict no-op
+    
 def ensure_models_loaded(station_name=None, direction=None):
-    """Cache-only mode: never auto-load models."""
+    """Cache-only mode: never auto-load models at request time."""
     return
-
-# ============================================================
 # RAW PREDICTION (passengers, not congestion)
 # ============================================================
 def get_raw_prediction(station_name, direction, target_datetime):

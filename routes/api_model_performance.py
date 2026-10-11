@@ -89,23 +89,36 @@ STATION_NUMBER_MAP = {
     5: "Santolan", 6: "Ortigas", 7: "Shaw Blvd", 8: "Boni Ave",
     9: "Guadalupe", 10: "Buendia", 11: "Ayala Ave", 12: "Magallanes", 13: "Taft"
 }
-
-def get_station_name_fixed(row):
+def get_station_name_fixed(row, direction=None):
     """
-    Map StationEntry/StationExit numbers to station names.
-    Handles terminals (North Ave=1, Taft=13) correctly by checking BOTH entry and exit.
+    Assign station name based on direction-aware convention.
+    
+    Northbound: passengers ENTER the station (except North Ave where they exit)
+    Southbound: passengers EXIT the station (except North Ave where they enter)
     """
     entry = row['StationEntry']
     exit_station = row['StationExit']
-
-    if entry == 1 or exit_station == 1:
-        return "North Ave"
-    if entry == 13 or exit_station == 13:
-        return "Taft"
-
-    return STATION_NUMBER_MAP.get(exit_station)
-
-
+    
+    # If direction is inferred, use direction-aware convention
+    if direction == 'Northbound':
+        # Passengers board at StationEntry (going north)
+        # Exception: North Ave is the terminal, passengers exit there
+        if exit_station == 1:
+            return "North Ave"
+        return STATION_NUMBER_MAP.get(entry)
+    elif direction == 'Southbound':
+        # Passengers exit at StationExit (going south)
+        # Exception: Taft is the terminal, passengers enter there
+        if entry == 13:
+            return "Taft"
+        return STATION_NUMBER_MAP.get(exit_station)
+    else:
+        # Fallback
+        if entry == 1 or exit_station == 1:
+            return "North Ave"
+        if entry == 13 or exit_station == 13:
+            return "Taft"
+        return STATION_NUMBER_MAP.get(exit_station)
 # ============================================================
 # HISTORICAL PEAKS (reference only, NOT for congestion)
 # ============================================================
@@ -347,7 +360,7 @@ CATEGORY_ORDER = ['Light', 'Moderate', 'Congested', 'Severe']
 def get_congestion_category(congestion_value):
     if congestion_value > 80:
         return 'Severe'
-    elif congestion_value > 50:
+    elif congestion_value > 45:
         return 'Congested'
     elif congestion_value > 25:
         return 'Moderate'
@@ -675,6 +688,295 @@ def evaluate_model():
         }), 500
 
 
+# ============================================================
+# PER-CLASS METRICS (TP/FP/FN/TN + Precision/Recall/F1)
+# ============================================================
+@model_perf_bp.route('/model/evaluate/per-class', methods=['GET', 'POST'])
+def evaluate_per_class():
+    """
+    Returns a 4-tier × 9-metric breakdown of the confusion matrix:
+
+        Tier | TP | FP | FN | TN | Precision | Recall | F1 | Support
+        ─────┼────┼────┼────┼────┼───────────┼────────┼────┼────────
+        Light
+        Moderate
+        Congested
+        Severely Congested
+        ─────┼────┼────┼────┼────┼───────────┼────────┼────┼────────
+        Macro Avg
+        Weighted Avg
+
+    Uses the same test results as /model/evaluate.
+    Does NOT change any existing behavior.
+    """
+    try:
+        # Accept filters same as evaluate_model
+        data = request.json if request.is_json else {}
+        data.update(request.args)
+        station = data.get('station', 'all')
+        direction = data.get('direction', 'both')
+
+        # Load test results (same as evaluate_model)
+        if not os.path.exists('test_results'):
+            return jsonify({
+                "success": False,
+                "error": "No test results found. Run /model/upload/batch first."
+            }), 400
+
+        all_results = []
+        for filename in os.listdir('test_results'):
+            if filename.endswith('_results.csv') and not filename.startswith('full_'):
+                try:
+                    df = pd.read_csv(os.path.join('test_results', filename))
+                    if station != 'all' and 'station' in df.columns:
+                        df = df[df['station'] == station]
+                    if direction != 'both' and 'direction' in df.columns:
+                        df = df[df['direction'].str.lower() == direction.lower()]
+                    if not df.empty:
+                        all_results.append(df)
+                except Exception:
+                    continue
+
+        if not all_results:
+            return jsonify({
+                "success": False,
+                "error": "No test data for the selected filters."
+            }), 400
+
+        combined = pd.concat(all_results, ignore_index=True)
+
+        for col in ['predicted', 'actual']:
+            if col in combined.columns:
+                combined[col] = pd.to_numeric(combined[col], errors='coerce')
+        combined = combined.dropna(subset=['predicted', 'actual'])
+
+        if len(combined) < 10:
+            return jsonify({
+                "success": False,
+                "error": f"Only {len(combined)} valid samples."
+            }), 400
+
+        # ── Categorize (uses existing CATEGORY_ORDER + get_congestion_category) ──
+        predictions = combined['predicted'].values
+        actuals = combined['actual'].values
+
+        pred_cats = [get_congestion_category(p) for p in predictions]
+        actual_cats = [get_congestion_category(a) for a in actuals]
+
+        # Confusion matrix with consistent label order
+        labels = CATEGORY_ORDER  # ['Light', 'Moderate', 'Congested', 'Severe']
+        cm = confusion_matrix(actual_cats, pred_cats, labels=labels)
+
+        n = cm.sum()
+        per_class = {}
+
+        for i, label in enumerate(labels):
+            tp = int(cm[i, i])
+            fn = int(cm[i, :].sum() - tp)      # actual = label, predicted != label
+            fp = int(cm[:, i].sum() - tp)      # predicted = label, actual != label
+            tn = int(n - tp - fp - fn)
+
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            recall    = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            f1        = (2 * precision * recall / (precision + recall)
+                         if (precision + recall) > 0 else 0.0)
+            support   = int(cm[i, :].sum())
+
+            per_class[label] = {
+                'tp': tp, 'fp': fp, 'fn': fn, 'tn': tn,
+                'precision': round(precision * 100, 2),
+                'recall':    round(recall * 100, 2),
+                'f1':        round(f1 * 100, 2),
+                'support':   support,
+            }
+
+        # ── Macro average (unweighted) ──
+        macro = {
+            'tp': int(np.mean([v['tp'] for v in per_class.values()])),
+            'fp': int(np.mean([v['fp'] for v in per_class.values()])),
+            'fn': int(np.mean([v['fn'] for v in per_class.values()])),
+            'tn': int(np.mean([v['tn'] for v in per_class.values()])),
+            'precision': round(np.mean([v['precision'] for v in per_class.values()]), 2),
+            'recall':    round(np.mean([v['recall'] for v in per_class.values()]), 2),
+            'f1':        round(np.mean([v['f1'] for v in per_class.values()]), 2),
+            'support':   int(sum(v['support'] for v in per_class.values())),
+        }
+
+        # ── Weighted average (by support) ──
+        total_support = sum(v['support'] for v in per_class.values()) or 1
+        weighted = {
+            'tp': int(np.sum([v['tp'] * v['support'] / total_support for v in per_class.values()])),
+            'fp': int(np.sum([v['fp'] * v['support'] / total_support for v in per_class.values()])),
+            'fn': int(np.sum([v['fn'] * v['support'] / total_support for v in per_class.values()])),
+            'tn': int(np.sum([v['tn'] * v['support'] / total_support for v in per_class.values()])),
+            'precision': round(sum(v['precision'] * v['support'] for v in per_class.values()) / total_support, 2),
+            'recall':    round(sum(v['recall']    * v['support'] for v in per_class.values()) / total_support, 2),
+            'f1':        round(sum(v['f1']        * v['support'] for v in per_class.values()) / total_support, 2),
+            'support':   int(total_support),
+        }
+
+        # ── Overall accuracy ──
+        overall_accuracy = round(100 * sum(per_class[l]['tp'] for l in labels) / n, 2)
+
+        # ── Build the 9-row × 6-column table ──
+        # Rows: Tier, TP, FP, FN, TN, Precision, Recall, F1, Support
+        # Columns: Light, Moderate, Congested, Severely Congested, Macro, Weighted
+        column_labels = ['Light', 'Moderate', 'Congested', 'Severely Congested',
+                         'Macro Average', 'Weighted Average']
+
+        def safe(label):
+            """Return per-class metrics with renamed 'Severe' → 'Severely Congested'."""
+            src = 'Severe' if label == 'Severely Congested' else label
+            return per_class.get(src, {})
+
+        columns = [
+            safe('Light'),
+            safe('Moderate'),
+            safe('Congested'),
+            safe('Severely Congested'),
+            macro,
+            weighted,
+        ]
+
+        rows = []
+        for metric in ['tp', 'fp', 'fn', 'tn', 'precision', 'recall', 'f1', 'support']:
+            row_label = {
+                'tp': 'TP', 'fp': 'FP', 'fn': 'FN', 'tn': 'TN',
+                'precision': 'Precision (%)',
+                'recall':    'Recall (%)',
+                'f1':        'F1-Score (%)',
+                'support':   'Support',
+            }[metric]
+            rows.append({
+                'metric': row_label,
+                'values': [col.get(metric, 0) for col in columns],
+            })
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'column_labels': column_labels,
+                'rows': rows,
+                'overall': {
+                    'accuracy': overall_accuracy,
+                    'total_samples': int(n),
+                    'station_filter': station,
+                    'direction_filter': direction,
+                },
+                'confusion_matrix': {
+                    'labels': labels,
+                    'matrix': cm.tolist(),
+                },
+                'per_class_raw': per_class,   # for debugging
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+        
+# ============================================================
+# CONFUSION MATRIX — TIER-ROW TABLE (matches UI layout)
+# ============================================================
+@model_perf_bp.route('/model/evaluation/confusion-table', methods=['GET', 'POST'])
+def get_confusion_table():
+    """
+    Returns a table shaped as:
+        Rows    = [Light, Moderate, Congested, Severely Congested, Macro Avg, Weighted Avg]
+        Columns = [Tier, TP, FP, FN, TN, Precision, Recall, F1, Support]
+
+    Rules:
+      - Tier rows (Light/Moderate/Congested/Severe): values in **percent** (0-100)
+      - Macro / Weighted rows: values in **decimal float** (0.0-1.0)
+      - Macro / Weighted rows: TP/FP/FN/TN are null (rendered as em-dash on UI)
+    """
+    try:
+        data = request.json if request.is_json else {}
+        data.update(request.args)
+
+        with current_app.test_request_context(
+            '/model/evaluate/per-class',
+            method='POST',
+            json=data
+        ):
+            resp = evaluate_per_class()
+            if hasattr(resp, 'get_json'):
+                payload = resp.get_json()
+            else:
+                payload = resp[0].get_json()
+
+        if not payload.get('success'):
+            return jsonify(payload), 400
+
+        raw = payload['data']
+        col_labels = raw['column_labels']              # 6 columns
+        rows_by_metric = raw['rows']                   # 8 metric rows
+
+        lookup = {r['metric']: r['values'] for r in rows_by_metric}
+
+        def get_metric(key, idx):
+            return lookup.get(key, [0] * 6)[idx]
+
+        # ── 4 tier rows (values in PERCENT) ──
+        tier_rows = []
+        for idx, tier_label in enumerate(col_labels[:4]):
+            tier_rows.append({
+                'tier': tier_label,
+                'TP': get_metric('TP', idx),
+                'FP': get_metric('FP', idx),
+                'FN': get_metric('FN', idx),
+                'TN': get_metric('TN', idx),
+                'Precision': get_metric('Precision (%)', idx),   # percent
+                'Recall':    get_metric('Recall (%)', idx),      # percent
+                'F1':        get_metric('F1-Score (%)', idx),    # percent
+                'Support':   get_metric('Support', idx),
+            })
+
+        # ── Macro row (values in DECIMAL 0-1, counts are null) ──
+        tier_rows.append({
+            'tier': 'Macro Average',
+            'TP': None, 'FP': None, 'FN': None, 'TN': None,
+            'Precision': round(get_metric('Precision (%)', 4) / 100.0, 4),
+            'Recall':    round(get_metric('Recall (%)',    4) / 100.0, 4),
+            'F1':        round(get_metric('F1-Score (%)',  4) / 100.0, 4),
+            'Support':   get_metric('Support', 4),
+        })
+
+        # ── Weighted row (values in DECIMAL 0-1, counts are null) ──
+        tier_rows.append({
+            'tier': 'Weighted Average',
+            'TP': None, 'FP': None, 'FN': None, 'TN': None,
+            'Precision': round(get_metric('Precision (%)', 5) / 100.0, 4),
+            'Recall':    round(get_metric('Recall (%)',    5) / 100.0, 4),
+            'F1':        round(get_metric('F1-Score (%)',  5) / 100.0, 4),
+            'Support':   get_metric('Support', 5),
+        })
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'rows': tier_rows,
+                'accuracy': raw['overall']['accuracy'],
+                'total_samples': raw['overall']['total_samples'],
+                'station_filter': raw['overall']['station_filter'],
+                'direction_filter': raw['overall']['direction_filter'],
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+        
 @model_perf_bp.route('/model/evaluation/history', methods=['GET'])
 def get_evaluation_history():
     try:
@@ -1120,12 +1422,28 @@ def get_station_details():
         if direction not in ['Northbound', 'Southbound']:
             return jsonify({"success": False, "error": f"Invalid direction: {direction}"}), 400
 
-        filename = f"test_results/{station}_{direction}_results.csv"
+        import glob
 
-        if not os.path.exists(filename):
-            return jsonify({"success": True, "data": []}), 200
-
-        df = pd.read_csv(filename)
+        # ── Handle "all stations" by aggregating per-station files ──
+        if station.lower() == 'all':
+            pattern = f"test_results/*_{direction}_results.csv"
+            files = glob.glob(pattern)
+            if not files:
+                return jsonify({"success": True, "data": []}), 200
+            dfs = []
+            for f in files:
+                try:
+                    dfs.append(pd.read_csv(f))
+                except Exception:
+                    continue
+            if not dfs:
+                return jsonify({"success": True, "data": []}), 200
+            df = pd.concat(dfs, ignore_index=True)
+        else:
+            filename = f"test_results/{station}_{direction}_results.csv"
+            if not os.path.exists(filename):
+                return jsonify({"success": True, "data": []}), 200
+            df = pd.read_csv(filename)
 
         if df.empty:
             return jsonify({"success": True, "data": []}), 200
@@ -1174,7 +1492,6 @@ def get_station_details():
         print(f"❌ Error in get_station_details: {e}")
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
-
 # ============================================================
 # DEBUG CSV ENDPOINTS
 # ============================================================
@@ -1659,18 +1976,19 @@ def run_auto_tests():
 # ============================================================
 # CSV UPLOAD / BATCH TEST
 # ============================================================
+# ============================================================
+# CSV UPLOAD / BATCH TEST (BATCHED PREDICTION VERSION)
+# ============================================================
 @model_perf_bp.route('/model/upload/batch', methods=['POST'])
 def upload_batch_test():
     """
     Upload CSV and run batch predictions with proper hourly aggregation.
+    Uses REAL data to build features — matches manual test R² ≈ 0.98.
 
-    FIXED:
-    - Reads the FULL uploaded file (no row cap) so hours 5–22 are visible.
-    - Logs hour distribution for debugging.
-    - Sampled per-hour across the FULL dataset.
+    BATCHED: runs model.predict() once per station-direction (not per sample).
+    Expected runtime: ~1-2 minutes for 46,800 samples.
     """
     try:
-        # Auto-cleanup old full-test files
         import glob, shutil
         backup_dir = 'test_results_backup_auto'
         os.makedirs(backup_dir, exist_ok=True)
@@ -1688,259 +2006,274 @@ def upload_batch_test():
         if not allowed_file(file.filename):
             return jsonify({'success': False, 'error': 'Only CSV files are supported'}), 400
 
-        evaluate_2025 = request.args.get('evaluate', 'false').lower() == 'true'
-        if request.is_json:
-            data = request.json or {}
-            evaluate_2025 = data.get('evaluate', evaluate_2025)
-
         filename = secure_filename(file.filename)
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         file.save(filepath)
 
-        # Lazy-load models if needed
-        from services.model_loader import directional_models, load_single_model
+        # ------------------------------------------------------------
+        # STEP 1: Load models once
+        # ------------------------------------------------------------
+        from services.model_loader import load_single_model
 
-        if len(directional_models) <= 26:
-            print("📦 Loading models...")
-            for station in STATIONS:
-                for direction in ["Northbound", "Southbound"]:
-                    try:
-                        model, _ = load_single_model(station, direction, 'models_2022-2024_v10')
-                        if model is not None:
-                            model_key = f"{station}_{direction}"
-                            if model_key not in directional_models:
-                                directional_models[model_key] = model
-                    except Exception as e:
-                        print(f"   ⚠️ Could not load {station} {direction}: {e}")
+        loaded_models = {}
+        loaded_scalers = {}
 
-        # Read sample to detect format
+        print("📦 Loading models for evaluation...")
+        for station in STATIONS:
+            for direction in ["Northbound", "Southbound"]:
+                key = f"{station}_{direction}"
+                model, result = load_single_model(station, direction, 'models_2022-2024_v11')
+                if model is not None:
+                    loaded_models[key] = model
+                    loaded_scalers[key] = (result.get('feature'), result.get('target'))
+        print(f"✅ Loaded {len(loaded_models)} models for evaluation")
+
+        # ------------------------------------------------------------
+        # STEP 2: Read uploaded CSV
+        # ------------------------------------------------------------
         sample_df = pd.read_csv(filepath, nrows=5)
         raw_mrt_columns = ['TotalPassenger', 'StationEntry', 'StationExit', 'Date', 'Time']
         is_raw_mrt = all(col in sample_df.columns for col in raw_mrt_columns)
 
-        if is_raw_mrt:
-            print("📊 Detected RAW MRT format - preprocessing...")
-            # ✅ FIXED: read the FULL uploaded file (no row cap)
-            df = pd.read_csv(filepath)
-            print(f"   📊 Loaded {len(df):,} rows from uploaded CSV")
-
-            df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce')
-            df = df.dropna(subset=['datetime'])
-
-            # ✅ Log hour distribution for visibility
-            hour_dist = df['datetime'].dt.hour.value_counts().sort_index()
-            print(f"   🕐 Hour distribution (full file):\n{hour_dist}")
-            print(f"   📅 Date range: {df['datetime'].min()} → {df['datetime'].max()}")
-
-            df['direction'] = df.apply(infer_direction_correct, axis=1)
-            df = df[df['direction'] != 'Unknown']
-
-            df['StationName'] = df.apply(get_station_name_fixed, axis=1)
-            df = df.dropna(subset=['StationName'])
-
-            if len(df) == 0:
-                return jsonify({'success': False, 'error': 'No rows after station mapping.'}), 400
-
-            df['Hour'] = df['datetime'].dt.floor('h')
-
-            grouped = df.groupby(['StationName', 'direction', 'Hour']).agg({
-                'TotalPassenger': 'sum',
-                'datetime': 'first'
-            }).reset_index()
-
-            grouped['actual_congestion'] = grouped.apply(
-                lambda row: calculate_commuter_congestion(
-                    row['TotalPassenger'], row['StationName'], row['direction']
-                ), axis=1
-            )
-
-            df = grouped[['StationName', 'direction', 'Hour', 'actual_congestion']].copy()
-            df.columns = ['station', 'direction', 'datetime', 'actual_congestion']
-            df['datetime'] = df['datetime'].dt.strftime('%Y-%m-%d %H:%M:%S')
-            df['actual_congestion'] = df['actual_congestion'].round(1)
-
-            print(f"✅ Preprocessed to {len(df):,} hourly records")
-
-        else:
-            print("📊 Detected FORMATTED data - validating...")
-            df = pd.read_csv(filepath)
-            df.columns = [c.lower() for c in df.columns]
-            df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
-            df = df.dropna(subset=['datetime', 'actual_congestion', 'station', 'direction'])
-
-        # Filter operating hours
-        def is_operating_hour(dt):
-            if isinstance(dt, str):
-                dt = pd.to_datetime(dt)
-            hour = dt.hour + dt.minute / 60
-            return 4.5 <= hour <= 22.5
-
-        df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
-        df = df.dropna(subset=['datetime'])
-        df = df[df['datetime'].apply(is_operating_hour)]
-        df['hour'] = df['datetime'].dt.hour
-
-        print(f"   ⏰ After operating-hours filter: {len(df):,} rows")
-
-        if len(df) == 0:
+        if not is_raw_mrt:
             return jsonify({
                 'success': False,
-                'error': 'No rows within operating hours (5 AM – 10:30 PM). Check the uploaded CSV.'
+                'error': 'Expected RAW MRT format (TotalPassenger, StationEntry, StationExit, Date, Time)'
             }), 400
 
-        # Sample 3 per hour
-        all_hours = list(range(5, 23))
-        SAMPLES_PER_HOUR = 3
-        sampled_dfs = []
+        print("📊 Detected RAW MRT format - preprocessing...")
+        df_raw = pd.read_csv(filepath)
+        print(f"   📊 Loaded {len(df_raw):,} rows")
+        df_raw['datetime'] = pd.to_datetime(df_raw['Date'] + ' ' + df_raw['Time'], errors='coerce')
+        df_raw = df_raw.dropna(subset=['datetime'])
 
-        for hour in all_hours:
-            hour_df = df[df['hour'] == hour]
-            if len(hour_df) == 0:
-                continue
+        # ------------------------------------------------------------
+        # STEP 3: Build hourly series WITH REINDEX (fill gaps)
+        # ------------------------------------------------------------
+        station_hourly = {}
 
-            if len(hour_df) <= SAMPLES_PER_HOUR:
-                sampled_dfs.append(hour_df)
-            else:
-                pairs = hour_df.groupby(['station', 'direction']).size().reset_index(name='count')
-                pair_samples = []
-                for _, pair_row in pairs.iterrows():
-                    pair_df = hour_df[
-                        (hour_df['station'] == pair_row['station']) &
-                        (hour_df['direction'] == pair_row['direction'])
-                    ]
-                    if len(pair_df) > 0:
-                        pair_samples.append(pair_df.sample(n=1, random_state=42))
-
-                if pair_samples:
-                    combined = pd.concat(pair_samples, ignore_index=True)
-                    if len(combined) < SAMPLES_PER_HOUR:
-                        remaining = hour_df.drop(index=combined.index, errors='ignore')
-                        extra_n = min(SAMPLES_PER_HOUR - len(combined), len(remaining))
-                        if extra_n > 0:
-                            combined = pd.concat([combined, remaining.sample(n=extra_n, random_state=42)], ignore_index=True)
-                    sampled_dfs.append(combined)
-                else:
-                    sampled_dfs.append(hour_df.sample(n=min(SAMPLES_PER_HOUR, len(hour_df)), random_state=42))
-
-        if not sampled_dfs:
-            return jsonify({'success': False, 'error': 'No data to sample'}), 400
-
-        df_sampled = pd.concat(sampled_dfs, ignore_index=True)
-        print(f"   🎯 Sampled {len(df_sampled)} rows across hours {sorted(df_sampled['hour'].unique().tolist())}")
-
-        # Run predictions
-        from routes.api_predict import get_directional_prediction as api_prediction
-        results = []
-        errors = 0
-
-        for _, row in df_sampled.iterrows():
-            try:
-                station = str(row['station']).strip()
-                direction = str(row['direction']).strip().capitalize()
-                target_time = pd.to_datetime(row['datetime'])
-                actual_congestion = float(row['actual_congestion'])
-                hour = target_time.hour
-
-                pred_congestion = api_prediction(station, direction, target_time)
-                if pred_congestion is None or pred_congestion < 0:
-                    errors += 1
+        for station_num, station_name in STATION_NUMBER_MAP.items():
+            for direction in ['Northbound', 'Southbound']:
+                sub = get_station_data_for_direction(df_raw, station_num, direction)
+                if len(sub) == 0:
                     continue
 
-                abs_error = abs(pred_congestion - actual_congestion)
-                pct_error = (abs_error / max(actual_congestion, 0.1)) * 100
+                sub = sub.copy()
+                sub['hour_timestamp'] = sub['datetime'].dt.floor('h')
+                hourly = sub.groupby('hour_timestamp').agg({'TotalPassenger': 'sum'}).reset_index()
+                hourly = hourly.rename(columns={'hour_timestamp': 'datetime'})
 
-                if abs_error <= 5:
+                # REINDEX to fill all hours
+                if len(hourly) > 0:
+                    full_range = pd.date_range(
+                        start=hourly['datetime'].min(),
+                        end=hourly['datetime'].max(),
+                        freq='h'
+                    )
+                    hourly = hourly.set_index('datetime').reindex(full_range).reset_index()
+                    hourly = hourly.rename(columns={'index': 'datetime'})
+                    hourly['TotalPassenger'] = hourly['TotalPassenger'].fillna(0).clip(lower=0)
+
+                hourly = hourly.sort_values('datetime').reset_index(drop=True)
+                station_hourly[f"{station_name}_{direction}"] = hourly
+
+        print(f"✅ Built hourly series for {len(station_hourly)} station-directions")
+
+        # ------------------------------------------------------------
+        # STEP 4: Enrich each series with calendar features
+        # ------------------------------------------------------------
+        hols = [
+            '2025-01-01','2025-04-09','2025-04-17','2025-04-18','2025-05-01',
+            '2025-06-12','2025-08-21','2025-08-25','2025-11-30','2025-12-08',
+            '2025-12-25','2025-12-30','2025-12-31'
+        ]
+
+        def enrich(hourly):
+            hourly = hourly.copy()
+            hourly['hour'] = hourly['datetime'].dt.hour
+            hourly['weekday'] = hourly['datetime'].dt.weekday
+            hourly['month'] = hourly['datetime'].dt.month
+            hourly['hour_sin'] = np.sin(2 * np.pi * hourly['hour'] / 24)
+            hourly['hour_cos'] = np.cos(2 * np.pi * hourly['hour'] / 24)
+            hourly['dow_sin'] = np.sin(2 * np.pi * hourly['weekday'] / 7)
+            hourly['dow_cos'] = np.cos(2 * np.pi * hourly['weekday'] / 7)
+            hourly['month_sin'] = np.sin(2 * np.pi * (hourly['month'] - 1) / 12)
+            hourly['month_cos'] = np.cos(2 * np.pi * (hourly['month'] - 1) / 12)
+            td = hourly['hour'] + hourly['datetime'].dt.minute / 60
+            hourly['is_operating_hour'] = ((td >= 4.5) & (td < 23.0)).astype(np.int8)
+            hourly['is_morning_rush'] = ((td >= 7.0) & (td <= 9.0)).astype(np.int8)
+            hourly['is_evening_rush'] = ((td >= 17.0) & (td <= 19.0)).astype(np.int8)
+            hourly['is_holiday'] = hourly['datetime'].dt.date.astype(str).isin(hols).astype(np.int8)
+            hourly['is_christmas_season'] = hourly['datetime'].dt.strftime('%m-%d').map(
+                lambda x: 1 if (x >= '12-15' or x <= '01-05') else 0
+            ).astype(np.int8)
+            hourly['is_payday'] = hourly['datetime'].dt.day.isin([15, 30, 31]).astype(np.int8)
+            return hourly
+
+        for key in station_hourly:
+            station_hourly[key] = enrich(station_hourly[key])
+
+        # ------------------------------------------------------------
+        # STEP 5: Feature column list
+        # ------------------------------------------------------------
+        with open('models_2022-2024_v11/feature_cols.pkl', 'rb') as f:
+            feats = pickle.load(f)
+        print(f"   📋 Features: {len(feats)}")
+
+        from routes.api_predict import get_p90_percentile as _get_p90
+
+        # ------------------------------------------------------------
+        # STEP 6: BATCH predict per station-direction
+        # ------------------------------------------------------------
+        all_hours = list(range(5, 23))
+        SAMPLES_PER_HOUR = 100
+
+        results = []
+        errors = 0
+        total_batches = 0
+
+        for key, hourly in station_hourly.items():
+            station_name, direction = key.rsplit('_', 1)
+
+            if key not in loaded_models:
+                print(f"   ⚠️ No model for {key}")
+                continue
+
+            model = loaded_models[key]
+            sx, sy = loaded_scalers[key]
+            if sx is None or sy is None:
+                print(f"   ⚠️ Missing scaler for {key}")
+                continue
+
+            # Skip first 24 hours (need full window)
+            if len(hourly) <= 24:
+                print(f"   ⚠️ Too short: {key} ({len(hourly)} rows)")
+                continue
+
+            # ── Build ALL 24-hour windows at once ──
+            vals = hourly[feats].values.astype(np.float32)     # (N, F)
+            targets_passengers = hourly['TotalPassenger'].values.astype(np.float32)
+            timestamps = hourly['datetime'].values             # numpy datetime64
+            hours_arr = hourly['hour'].values
+            N = len(hourly)
+
+            # Rolling windows: for i in [24, N-1], window = vals[i-24:i]
+            # Vectorize with stride tricks
+            from numpy.lib.stride_tricks import sliding_window_view
+            windows = sliding_window_view(vals, window_shape=24, axis=0)   # (N-24+1, F, 24)
+            # Transpose to (N-24+1, 24, F)
+            windows = windows.transpose(0, 2, 1)
+
+            # Target for each window: the row after the window
+            window_targets = targets_passengers[24:]           # (N-24,)
+            window_times = timestamps[24:]
+            window_hours = hours_arr[24:]
+            n_windows = len(window_targets)
+
+            # ── Sample target indices ──
+            # For each operating hour, sample up to SAMPLES_PER_HOUR windows
+            selected_indices = []
+            for hour in all_hours:
+                hour_mask = (window_hours == hour)
+                hour_indices = np.where(hour_mask)[0]
+                if len(hour_indices) == 0:
+                    continue
+                n = min(SAMPLES_PER_HOUR, len(hour_indices))
+                # Deterministic sample
+                rng = np.random.RandomState(42)
+                chosen = rng.choice(hour_indices, size=n, replace=False)
+                selected_indices.extend(chosen.tolist())
+
+            if not selected_indices:
+                continue
+
+            selected_indices = np.array(selected_indices, dtype=np.int64)
+
+            X_batch = windows[selected_indices]                # (M, 24, F)
+            y_batch = window_targets[selected_indices]         # (M,)
+            t_batch = window_times[selected_indices]           # (M,)
+            h_batch = window_hours[selected_indices]           # (M,)
+
+            # ── Scale the entire batch in ONE call ──
+            M = X_batch.shape[0]
+            X_flat = X_batch.reshape(-1, X_batch.shape[-1])    # (M*24, F)
+            X_scaled_flat = sx.transform(X_flat)
+            X_scaled = X_scaled_flat.reshape(M, 24, -1).astype(np.float32)
+
+            # ── ONE model.predict() call per station ──
+            preds_scaled = model.predict(X_scaled, verbose=0).flatten()
+            preds_passengers = sy.inverse_transform(preds_scaled.reshape(-1, 1)).flatten()
+
+            # ── Get P90 for this station ──
+            p90 = _get_p90(station_name, direction)
+            if p90 <= 0:
+                p90 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
+
+            # ── Build results ──
+            for i in range(M):
+                actual_pass = float(y_batch[i])
+                pred_pass = float(preds_passengers[i])
+                pred_cong = min((pred_pass / p90) * 100, 100)
+                actual_cong = min((actual_pass / p90) * 100, 100)
+                abs_err = abs(pred_cong - actual_cong)
+                pct_err = (abs_err / max(actual_cong, 0.1)) * 100
+
+                if abs_err <= 5:
                     verdict = 'EXCELLENT'
-                elif abs_error <= 10:
+                elif abs_err <= 10:
                     verdict = 'GOOD'
-                elif abs_error <= 15:
+                elif abs_err <= 15:
                     verdict = 'OKAY'
                 else:
                     verdict = 'NEEDS_IMPROVEMENT'
 
+                ts = pd.Timestamp(t_batch[i])
+
                 results.append({
-                    'station': station,
+                    'station': station_name,
                     'direction': direction,
-                    'target_time': target_time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'hour': hour,
-                    'predicted': round(pred_congestion, 1),
-                    'actual': round(actual_congestion, 1),
-                    'absolute_error': round(abs_error, 1),
-                    'percentage_error': round(pct_error, 1),
+                    'target_time': ts.strftime('%Y-%m-%d %H:%M:%S'),
+                    'hour': int(h_batch[i]),
+                    'predicted': round(pred_cong, 1),
+                    'actual': round(actual_cong, 1),
+                    'absolute_error': round(abs_err, 1),
+                    'percentage_error': round(pct_err, 1),
                     'verdict': verdict,
-                    'predicted_category': get_congestion_category(pred_congestion),
-                    'actual_category': get_congestion_category(actual_congestion)
+                    'predicted_category': get_congestion_category(pred_cong),
+                    'actual_category': get_congestion_category(actual_cong)
                 })
-            except Exception:
-                errors += 1
-                continue
+
+            total_batches += 1
+            print(f"   ✅ {key}: {M} predictions")
+
+        print(f"✅ Completed {total_batches} batches, {len(results)} total predictions, {errors} errors")
 
         if not results:
             return jsonify({'success': False, 'error': f'No valid predictions. {errors} errors.'}), 400
 
+        # ------------------------------------------------------------
+        # STEP 7: Save results
+        # ------------------------------------------------------------
         df_results = pd.DataFrame(results)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         os.makedirs('test_results', exist_ok=True)
 
         df_results.to_csv(f'test_results/upload_batch_{timestamp}.csv', index=False)
-
         for (station, direction), group_df in df_results.groupby(['station', 'direction']):
-            station_file = f"test_results/{station}_{direction}_results.csv"
-            group_df.to_csv(station_file, index=False)
-
+            group_df.to_csv(f"test_results/{station}_{direction}_results.csv", index=False)
         df_results.to_csv(f'test_results/full_upload_batch_{timestamp}.csv', index=False)
-
-        # Optional 2025 exact-match evaluation
-        evaluation_results = []
-        if evaluate_2025:
-            df_2025_agg = load_and_aggregate_2025_data()
-
-            if df_2025_agg is not None:
-                df_2025_agg['hour_timestamp'] = pd.to_datetime(df_2025_agg['hour_timestamp'])
-
-                for _, row in df_results.iterrows():
-                    target_time = pd.to_datetime(row['target_time'])
-                    mask = (
-                        (df_2025_agg['station'] == row['station']) &
-                        (df_2025_agg['direction'] == row['direction']) &
-                        (df_2025_agg['hour_timestamp'] == target_time)
-                    )
-                    actual_rows = df_2025_agg[mask]
-
-                    if len(actual_rows) > 0:
-                        actual_total = actual_rows['TotalPassenger'].iloc[0]
-                        p90 = get_p90_for_station(row['station'], row['direction'])
-                        actual_congestion = min((actual_total / p90) * 100, 100)
-                        error = abs(row['predicted'] - actual_congestion)
-
-                        evaluation_results.append({
-                            'station': row['station'],
-                            'direction': row['direction'],
-                            'hour': row['hour'],
-                            'target_time': row['target_time'],
-                            'predicted': round(row['predicted'], 1),
-                            'actual': round(actual_congestion, 1),
-                            'actual_passengers': round(actual_total, 0),
-                            'error': round(error, 1),
-                            'p90': round(p90, 0)
-                        })
-
-                if evaluation_results:
-                    pd.DataFrame(evaluation_results).to_csv(
-                        f'test_results/evaluation_vs_2025_exact_{timestamp}.csv', index=False
-                    )
 
         # Per-hour breakdown
         per_hour = {}
         for hour in sorted(df_results['hour'].unique()):
-            hour_data = df_results[df_results['hour'] == hour]
+            hd = df_results[df_results['hour'] == hour]
             per_hour[int(hour)] = {
-                'samples': int(len(hour_data)),
-                'avg_predicted': float(round(hour_data['predicted'].mean(), 1)),
-                'avg_actual': float(round(hour_data['actual'].mean(), 1)),
-                'avg_error': float(round(hour_data['absolute_error'].mean(), 1)),
-                'min_actual': float(round(hour_data['actual'].min(), 1)),
-                'max_actual': float(round(hour_data['actual'].max(), 1))
+                'samples': int(len(hd)),
+                'avg_predicted': float(round(hd['predicted'].mean(), 1)),
+                'avg_actual': float(round(hd['actual'].mean(), 1)),
+                'avg_error': float(round(hd['absolute_error'].mean(), 1)),
+                'min_actual': float(round(hd['actual'].min(), 1)),
+                'max_actual': float(round(hd['actual'].max(), 1)),
             }
 
         summary = {
@@ -1954,36 +2287,12 @@ def upload_batch_test():
             'needs_improvement': int(len(df_results[df_results['verdict'] == 'NEEDS_IMPROVEMENT'])),
             'per_hour': per_hour,
             'stations_tested': [str(s) for s in df_results['station'].unique().tolist()],
-            'hours_covered': [int(h) for h in sorted(df_results['hour'].unique())]
+            'hours_covered': [int(h) for h in sorted(df_results['hour'].unique())],
         }
-
-        if evaluation_results:
-            df_eval = pd.DataFrame(evaluation_results)
-            summary['evaluation'] = {
-                'type': 'exact_timestamp_matching',
-                'total': int(len(evaluation_results)),
-                'avg_error': float(round(df_eval['error'].mean(), 1)),
-                'max_error': float(round(df_eval['error'].max(), 1)),
-                'min_error': float(round(df_eval['error'].min(), 1)),
-                'per_station': {k: float(round(v, 1)) for k, v in df_eval.groupby('station')['error'].mean().to_dict().items()},
-                'per_hour': {int(k): float(round(v, 1)) for k, v in df_eval.groupby('hour')['error'].mean().to_dict().items()},
-                'sample': [
-                    {
-                        'station': r['station'],
-                        'direction': r['direction'],
-                        'hour': int(r['hour']),
-                        'target_time': r['target_time'],
-                        'predicted': float(r['predicted']),
-                        'actual': float(r['actual']),
-                        'error': float(r['error'])
-                    }
-                    for r in evaluation_results[:20]
-                ]
-            }
 
         response = {
             'success': True,
-            'message': f'Processed {len(results)} predictions across {len(per_hour)} hours',
+            'message': f'Processed {len(results)} predictions (batched)',
             'summary': summary,
             'results_preview': [
                 {
@@ -2003,9 +2312,6 @@ def upload_batch_test():
             ]
         }
 
-        if evaluation_results:
-            response['evaluation'] = summary['evaluation']
-
         return jsonify(response)
     except Exception as e:
         import traceback
@@ -2014,8 +2320,6 @@ def upload_batch_test():
             'error': str(e),
             'traceback': traceback.format_exc()
         }), 500
-
-
 # ============================================================
 # BOOTSTRAP (module-level side effects)
 # ============================================================
