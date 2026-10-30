@@ -2103,53 +2103,90 @@ function updateTableHeaders() {
     }
 }
 
-// ========== MODEL PERFORMANCE – TEST RESULTS ==========
 async function loadTestResults() {
     const station = document.getElementById('stationSelector').value;
     const direction = currentDirectionViewMP === 'northbound' ? 'Northbound' : 'Southbound';
     const tbody = document.getElementById('stationMetricsBodyMP');
     if (!tbody) return;
-    
+
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
-    
+
     try {
         const url = `/api/model/station-details?station=${encodeURIComponent(station)}&direction=${encodeURIComponent(direction)}&_=${Date.now()}`;
         const response = await fetch(url);
         const result = await response.json();
-        
-        if (result.success && result.data && result.data.length > 0) {
+
+        if (!result.success || !result.data || result.data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px;">No test results found for ${station} (${direction}). Run auto-tests or upload data.</td></tr>`;
+            return;
+        }
+
+        // ========== ALL STATIONS: summary rows ==========
+        if (station === 'all') {
             let html = '';
-            for (let row of result.data) {
-                let verdictClass = '';
-                const errorValue = row.absolute_error || row.error;
-                const verdict = row.verdict || (errorValue <= 5 ? 'EXCELLENT' : errorValue <= 10 ? 'GOOD' : errorValue <= 15 ? 'OKAY' : 'NEEDS_IMPROVEMENT');
-                
-                if (verdict === 'EXCELLENT') verdictClass = 'status-light';
-                else if (verdict === 'GOOD') verdictClass = 'status-moderate';
-                else if (verdict === 'OKAY') verdictClass = 'status-congested';
-                else verdictClass = 'status-severe';
-                
-                const predicted = row.predicted !== undefined && row.predicted !== null ? row.predicted : '--';
-                const actual = row.actual !== undefined && row.actual !== null ? row.actual : '--';
-                
-                html += `<tr>
-                    <td style="font-size:12px;">${row.target_time || row.datetime || 'N/A'}</td>
-                    <td><strong>${predicted}%</strong></td>
-                    <td>${actual}%</td>
-                    <td>${errorValue || '--'}%</td>
-                    <td><span class="${verdictClass}" style="padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; display:inline-block;">${verdict}</span></td>
+            for (const row of result.data) {
+                const mae = (row.mae !== undefined && row.mae !== null) ? row.mae : null;
+                const displayMae = mae !== null ? `${mae}%` : '--';
+
+                let statusClass = 'status-light';
+                let statusText = 'Excellent';
+                if (mae !== null) {
+                    if (mae > 15) { statusClass = 'status-severe';   statusText = 'Needs Improvement'; }
+                    else if (mae > 10) { statusClass = 'status-congested'; statusText = 'Moderate'; }
+                    else if (mae > 5)  { statusClass = 'status-moderate';  statusText = 'Fair'; }
+                }
+                // Use backend-provided status if present
+                if (row.status) {
+                    if (row.status === 'NEEDS_IMPROVEMENT') { statusClass = 'status-severe'; statusText = 'Needs Improvement'; }
+                    else if (row.status === 'OKAY') { statusClass = 'status-congested'; statusText = 'Okay'; }
+                    else if (row.status === 'GOOD') { statusClass = 'status-moderate';  statusText = 'Good'; }
+                    else if (row.status === 'EXCELLENT') { statusClass = 'status-light'; statusText = 'Excellent'; }
+                }
+
+                html += `<tr style="cursor:pointer;" onclick="showStationDetails('${row.station}', '${currentDirectionViewMP}')">
+                    <td style="font-weight:500;">${row.station}</td>
+                    <td><strong>${displayMae}</strong></td>
+                    <td><span class="${statusClass}">${statusText}</span></td>
                 </tr>`;
             }
             tbody.innerHTML = html;
-        } else {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px;">No detailed test results found for ${station} (${direction}). Run auto-tests or upload data to generate results.</td></tr>`;
+            return;
         }
+
+        // ========== SINGLE STATION: prediction rows ==========
+        let html = '';
+        for (let row of result.data) {
+            let verdictClass = 'status-light';
+            const errorValue = row.absolute_error !== undefined ? row.absolute_error : row.error;
+            let verdict = row.verdict;
+            if (!verdict) {
+                if (errorValue <= 5) verdict = 'EXCELLENT';
+                else if (errorValue <= 10) verdict = 'GOOD';
+                else if (errorValue <= 15) verdict = 'OKAY';
+                else verdict = 'NEEDS_IMPROVEMENT';
+            }
+            if (verdict === 'EXCELLENT') verdictClass = 'status-light';
+            else if (verdict === 'GOOD') verdictClass = 'status-moderate';
+            else if (verdict === 'OKAY') verdictClass = 'status-congested';
+            else verdictClass = 'status-severe';
+
+            const predicted = row.predicted !== undefined && row.predicted !== null ? row.predicted : '--';
+            const actual = row.actual !== undefined && row.actual !== null ? row.actual : '--';
+
+            html += `<tr>
+                <td style="font-size:12px;">${row.target_time || row.datetime || 'N/A'}</td>
+                <td><strong>${predicted}%</strong></td>
+                <td>${actual}%</td>
+                <td>${errorValue !== undefined ? errorValue + '%' : '--'}</td>
+                <td><span class="${verdictClass}" style="padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; display:inline-block;">${verdict}</span></td>
+            </tr>`;
+        }
+        tbody.innerHTML = html;
     } catch (error) {
         console.error('Error loading test results:', error);
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Error loading results. Check console for details.</td></tr>';
     }
 }
-
 async function showStationDetails(station, direction) {
     const directionFormatted = direction === 'northbound' ? 'Northbound' : 'Southbound';
     
@@ -2220,45 +2257,38 @@ async function showStationDetails(station, direction) {
         loadingText.innerText = originalText;
     }
 }
-
 function updateStationMetricsTableMP(perStationMetrics) {
     const stationSelector = document.getElementById('stationSelector');
     if (stationSelector && stationSelector.value !== 'all') return;
     const tbody = document.getElementById('stationMetricsBodyMP');
     if (!tbody) return;
-    const stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan", "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia", "Ayala Ave", "Magallanes", "Taft"];
+
+    const stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
+                      "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia",
+                      "Ayala Ave", "Magallanes", "Taft"];
     let html = '';
     for (let station of stations) {
         const stationData = perStationMetrics[station] || {};
-        let mae = '--';
+        const dirKey = currentDirectionViewMP === 'northbound' ? 'northbound' : 'southbound';
+        const dirData = stationData[dirKey] || {};
+        const mae = (dirData.mae !== undefined && dirData.mae !== null) ? dirData.mae : null;
+        const displayMae = mae !== null ? `${mae}%` : '--';
+
         let statusClass = 'status-light';
-        let statusText = 'Good';
-        if (currentDirectionViewMP === 'northbound') {
-            if (stationData.northbound && stationData.northbound.mae !== null) {
-                mae = stationData.northbound.mae + '%';
-                if (stationData.northbound.mae > 15) { statusClass = 'status-severe'; statusText = 'Needs Improvement'; }
-                else if (stationData.northbound.mae > 10) { statusClass = 'status-congested'; statusText = 'Moderate'; }
-                else if (stationData.northbound.mae > 5) { statusClass = 'status-moderate'; statusText = 'Fair'; }
-                else { statusClass = 'status-light'; statusText = 'Excellent'; }
-            }
-        } else {
-            if (stationData.southbound && stationData.southbound.mae !== null) {
-                mae = stationData.southbound.mae + '%';
-                if (stationData.southbound.mae > 15) { statusClass = 'status-severe'; statusText = 'Needs Improvement'; }
-                else if (stationData.southbound.mae > 10) { statusClass = 'status-congested'; statusText = 'Moderate'; }
-                else if (stationData.southbound.mae > 5) { statusClass = 'status-moderate'; statusText = 'Fair'; }
-                else { statusClass = 'status-light'; statusText = 'Excellent'; }
-            }
+        let statusText = 'Excellent';
+        if (mae !== null) {
+            if (mae > 15) { statusClass = 'status-severe';   statusText = 'Needs Improvement'; }
+            else if (mae > 10) { statusClass = 'status-congested'; statusText = 'Moderate'; }
+            else if (mae > 5)  { statusClass = 'status-moderate';  statusText = 'Fair'; }
         }
         html += `<tr style="cursor:pointer;" onclick="showStationDetails('${station}', '${currentDirectionViewMP}')">
             <td style="font-weight:500;">${station}</td>
-            <td><strong>${mae}</strong></td>
+            <td><strong>${displayMae}</strong></td>
             <td><span class="${statusClass}">${statusText}</span></td>
         </tr>`;
     }
     tbody.innerHTML = html;
 }
-
 async function loadPredictionChart() {
     const station = document.getElementById('compareStation')?.value || 'North Ave';
 const direction = document.getElementById('compareDirection')?.value || 'northbound';
@@ -3028,9 +3058,6 @@ async function loadModelPerformanceMetrics() {
                 setText('lastEvaluated', data.last_evaluated ? new Date(data.last_evaluated).toLocaleDateString() : 'No data');
             }
 
-            if (selectedStation === 'all' && data.per_station) {
-                updateStationMetricsTableMP(data.per_station);
-            }
         } else {
             // No data yet — set safe defaults (guarded)
             const setText = (id, value) => {

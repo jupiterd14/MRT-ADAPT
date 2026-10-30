@@ -1,4 +1,4 @@
-"""
+﻿"""
 Feature engineering for LSTM predictions
 Optimized for Render free tier (speed + memory).
 
@@ -146,7 +146,7 @@ def get_synthetic_congestion(hour):
 # ============================================================
 # SCALER LOADERS
 # ============================================================
-MODEL_FOLDER = 'models_2022-2024_v11'
+MODEL_FOLDER = 'models_2023-2025_v14'
 
 
 def get_feature_scaler(station_name, direction):
@@ -255,7 +255,7 @@ def get_station_dataframe(station_name, direction):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(script_dir, 'data (2022-2024)')
 
-    csv_files = ['2022.csv', '2023.csv', '2024.csv']
+    csv_files = ['2023.csv', '2024.csv', '2025.csv']
     station_num = STATION_NUMBERS.get(station_name)
 
     if not station_num:
@@ -316,7 +316,11 @@ def get_station_dataframe(station_name, direction):
     gc.collect()
 
     # Datetime index
-    combined['datetime'] = pd.to_datetime(combined['Date'] + ' ' + combined['Time'])
+    combined['datetime'] = pd.to_datetime(
+    combined['Date'].astype(str) + ' ' + combined['Time'].astype(str),
+    format='mixed',
+    errors='coerce'
+)
     combined = combined.set_index('datetime')
     combined = combined[['TotalPassenger']]
 

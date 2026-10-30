@@ -1,4 +1,4 @@
-import os
+﻿import os
 
 import gc
 
@@ -69,7 +69,7 @@ def get_model_file_path(model_path, model_key):
     Supports v11 (_model.keras) and legacy v10 suffixes.
     """
     suffixes = [
-        '_model.keras',           # v11
+        '_model.keras',           # v11,
         '_lstm_v10_plus.keras',   # v10_plus
         '_lstm_enhanced.keras',   # old
         '_best.keras',            # old
@@ -90,7 +90,7 @@ def get_scaler_paths(model_path, model_key):
 # ============================================================
 # LOAD ALL MODELS
 # ============================================================
-def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_v11'):
+def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2023-2025_v14'):
     """
     Load ALL directional models - USE WITH CAUTION!
     This loads all 26 models and uses ~300MB memory.
@@ -182,7 +182,7 @@ def load_directional_models(STATIONS, DIRECTIONAL_MODELS_PATH='models_2022-2024_
 # ============================================================
 # LOAD SINGLE MODEL (Memory Efficient)
 # ============================================================
-def load_single_model(station, direction, model_path='models_2022-2024_v11'):
+def load_single_model(station, direction, model_path='models_2023-2025_v14'):
     """
     Load a SINGLE model for one station-direction (memory efficient)
     This is the recommended way to load models.
@@ -399,7 +399,7 @@ def auto_load_all_models(limit=None):
     print("=" * 50)
     print("🔄 Auto-loading all models...")
     
-    correct_dir = "models_2022-2024_v11"
+    correct_dir = "models_2023-2025_v14"
     
     if not os.path.exists(correct_dir):
         print(f"⚠️ Models directory not found: {correct_dir}")

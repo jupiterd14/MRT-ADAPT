@@ -71,7 +71,7 @@ def get_cached_prediction(station_name, direction, target_datetime):
     if target_datetime is None:
         target_datetime = Config.get_current_time()
 
-    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H')}"
+    cache_key = f"{station_name}_{direction}_{target_datetime.weekday()}_{target_datetime.hour}"
 
     # Periodic cleanup (every 60s, not every call)
     now = time.time()
@@ -92,7 +92,7 @@ def set_cached_prediction(station_name, direction, target_datetime, value):
     if target_datetime is None:
         target_datetime = Config.get_current_time()
 
-    cache_key = f"{station_name}_{direction}_{target_datetime.strftime('%Y%m%d%H')}"
+    cache_key = f"{station_name}_{direction}_{target_datetime.weekday()}_{target_datetime.hour}"
     # Cast to native float to prevent numpy types from leaking into JSON
     _REQUEST_CACHE[cache_key] = {'value': float(value), 'timestamp': time.time()}
 
@@ -606,8 +606,9 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
 
     dow = target_datetime.weekday()
     cache_key = f"{station_name}_{direction}_{dow}_{hour}"
-    if cache_key in _PREDICTION_CACHE:
-        congestion = float(_PREDICTION_CACHE[cache_key])   # ← CAST
+    pred_cache = current_app.config.get('PREDICTION_CACHE') or _PREDICTION_CACHE
+    if cache_key in pred_cache:
+        congestion = float(pred_cache[cache_key])
         set_cached_prediction(station_name, direction, target_datetime, congestion)
         return congestion
 

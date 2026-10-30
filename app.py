@@ -125,8 +125,8 @@ _MODEL_LOAD_LOCK = threading.Lock()
 _STARTUP_LOCK = threading.Lock()
 _started_once = False
 
-DIRECTIONAL_MODELS_PATH = 'models_2022-2024_v11'
-LSTM_MODEL_PATH = 'models_2022-2024_v11'
+DIRECTIONAL_MODELS_PATH = 'models_2023-2025_v14'
+LSTM_MODEL_PATH = 'models_2023-2025_v14'
 
 
 # ============================================================
@@ -751,7 +751,6 @@ def _init_db_safe():
         print(f"⚠️ db.create_all() failed — app will still start: {e}")
         return False
 
-
 def _deferred_startup():
     """
     Cache-only startup. Loads persisted caches from disk.
@@ -791,7 +790,10 @@ def _deferred_startup():
                         from routes.api_predict import _PREDICTION_CACHE
                         with open(pred_cache_file, 'rb') as f:
                             data = pickle.load(f)
+                        _PREDICTION_CACHE.clear()
                         _PREDICTION_CACHE.update(data)
+                        # Mirror into app.config so any module can reach it
+                        app.config['PREDICTION_CACHE'] = dict(data)
                         print(f"✅ Prediction cache loaded: {len(data)} entries")
                         loaded_any = True
                     except Exception as e:
@@ -847,6 +849,14 @@ def _deferred_startup():
                         import traceback
                         traceback.print_exc()
 
+                # ---------- STEP 4: Clear stale request-level cache ----------
+                try:
+                    from routes.api_predict import _REQUEST_CACHE
+                    _REQUEST_CACHE.clear()
+                    print("✅ Cleared stale request-level cache")
+                except Exception as e:
+                    print(f"⚠️ Could not clear request cache: {e}")
+
                 print("✅ Deferred startup complete — cache-only mode ready.")
                 _WARMUP_COMPLETE = True
                 # _MODELS_LOADED remains False in cache-only mode (intentional)
@@ -860,22 +870,18 @@ def _deferred_startup():
         _STARTUP_LOCK.release()
 
 
-# Kick off deferred startup in a daemon thread, lazily, per worker process.
+
+# Run deferred startup synchronously on the first request in each worker.
+# Blocks the very first request (~1s) so the prediction cache is guaranteed
+# to be populated BEFORE any handler runs. No race condition.
 @app.before_request
 def _lazy_start_deferred_startup():
-    """Start deferred startup thread on first request in this worker."""
+    """Run deferred startup synchronously on first request in this worker."""
     global _started_once
     if not _started_once:
         _started_once = True
-        t = threading.Thread(
-            target=_deferred_startup,
-            daemon=True,
-            name="deferred-startup",
-        )
-        t.start()
-        print(f"🚀 Started deferred startup in worker PID={os.getpid()}")
-
-
+        print(f"🚀 Running deferred startup synchronously in worker PID={os.getpid()}")
+        _deferred_startup()
 # ============================================================
 # MEMORY TRACING (opt-in only — off by default to save RAM)
 # ============================================================

@@ -1,4 +1,4 @@
-# services/lstm_integration.py
+﻿# services/lstm_integration.py
 
 import os
 import pickle
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ================================================================
 
 class MRT3LSTMPredictor:
-    def __init__(self, model_path_pattern='./models_2022-2024_v11/'):
+    def __init__(self, model_path_pattern='./models_2023-2025_v14/'):
         self.model_path_pattern = model_path_pattern
         self.model_path = None
         self.models = {}
@@ -59,7 +59,7 @@ class MRT3LSTMPredictor:
             self.model_path = sorted(matching)[-1]
             logger.info(f"📁 Using latest model folder: {self.model_path}")
         else:
-            default = './models_2022-2024_v11/'
+            default = './models_2023-2025_v14/'
             if os.path.exists(default):
                 self.model_path = default
                 logger.info(f"📁 Using default folder: {default}")
@@ -407,7 +407,7 @@ def train_lstm_on_reports():
         return None
 
     # 2. Loop over each station-direction pair
-    model_path = f"./models_2022-2024_v11"
+    model_path = f"./models_2023-2025_v14"
     os.makedirs(model_path, exist_ok=True)
 
     stations = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",

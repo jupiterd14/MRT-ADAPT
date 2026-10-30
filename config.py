@@ -88,10 +88,19 @@ class Config:
     @staticmethod
     def get_current_time():
         """
-        Returns 'now' in Manila time.
+        Returns 'now' with day-of-week and time-of-day preserved, but anchored
+        to a representative week in the model's training window (2024-01-01 = Monday).
 
-        NOTE: year is pinned to 2025 on purpose so predictions align with
-        the model's training window (2022-2024). Do NOT change without
-        retraining / re-verifying the model's date features.
+        Do NOT use a plain .replace(year=...) -- that shifts the day-of-week.
+        The anchor approach guarantees Monday -> Monday, Tuesday -> Tuesday, etc.
         """
-        return datetime.now(ZoneInfo('Asia/Manila')).replace(year=2025)
+        from datetime import timedelta
+        now = datetime.now(ZoneInfo('Asia/Manila'))
+        reference_monday = datetime(2024, 1, 1, tzinfo=ZoneInfo('Asia/Manila'))
+        return reference_monday + timedelta(
+            days=now.weekday(),
+            hours=now.hour,
+            minutes=now.minute,
+            seconds=now.second,
+            microseconds=now.microsecond,
+        )
