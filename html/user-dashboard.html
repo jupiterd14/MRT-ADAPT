@@ -3658,69 +3658,121 @@ function updateTrainScheduleUI(data) {
     const southEl = document.getElementById('southTime');
     const northOriginEl = document.getElementById('northOrigin');
     const southOriginEl = document.getElementById('southOrigin');
-    
+
     if (!northEl || !southEl) return;
-    
-    // Check if station is closed from API response
+
+    // Clear any previous "reopen" notice before rendering new state
+    const oldNotice = document.getElementById('reopenNotice');
+    if (oldNotice) oldNotice.remove();
+
+    // ============================================================
+    // CASE 1 — Station fully closed (outside operating hours)
+    // ============================================================
     if (data && data.is_closed === true) {
-        northEl.innerHTML = '<span>CLOSED</span>';
-        southEl.innerHTML = '<span>CLOSED</span>';
-        if (northOriginEl) northOriginEl.textContent = 'MRT-3 is currently closed';
-        if (southOriginEl) southOriginEl.textContent = 'MRT-3 is currently closed';
+        northEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">SERVICE ENDED</span>';
+        southEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">SERVICE ENDED</span>';
+
+        const nbLast = (data.northbound && data.northbound.last_train) ? data.northbound.last_train : null;
+        const sbLast = (data.southbound && data.southbound.last_train) ? data.southbound.last_train : null;
+
+        if (northOriginEl) {
+            northOriginEl.textContent = (nbLast && nbLast !== 'N/A')
+                ? `Last NB departure: ${nbLast}`
+                : 'No NB departures from this terminal';
+        }
+        if (southOriginEl) {
+            southOriginEl.textContent = (sbLast && sbLast !== 'N/A')
+                ? `Last SB departure: ${sbLast}`
+                : 'No SB departures from this terminal';
+        }
+
+        // Single line under the grid explaining when it reopens
+        const trainGrid = document.querySelector('.train-grid');
+        if (trainGrid) {
+            const notice = document.createElement('div');
+            notice.id = 'reopenNotice';
+            notice.style.cssText = 'font-size: 11px; color: #64748B; margin-top: 10px; text-align: center; font-weight: 500;';
+            notice.textContent = 'Reopens tomorrow at 4:20 AM (Southbound) · 5:24 AM (Northbound)';
+            trainGrid.parentNode.insertBefore(notice, trainGrid.nextSibling);
+        }
         return;
     }
-    
-    // Use data from API response
+
+    // ============================================================
+    // CASE 2 — Station open, render per-direction status
+    // ============================================================
     if (data && data.southbound && data.northbound) {
         const northMinutes = data.northbound.minutes;
         const southMinutes = data.southbound.minutes;
-        const northOrigin = data.northbound.origin; 
-        const southOrigin = data.southbound.origin        
-        // Check if trains are available in each direction
+        const northOrigin   = data.northbound.origin;
+        const southOrigin   = data.southbound.origin;
+        const nbLast        = data.northbound.last_train;
+        const sbLast        = data.southbound.last_train;
+
+        // ---- NORTHBOUND ----
         if (data.northbound.available === false) {
-            northEl.innerHTML = '<span>LAST TRAIN</span>';
-            if (northOriginEl) northOriginEl.textContent = `Last train: ${data.northbound.last_train || 'N/A'}`;
+            northEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">ENDED</span>';
+            if (northOriginEl) {
+                northOriginEl.textContent = (nbLast && nbLast !== 'N/A')
+                    ? `Last NB departure: ${nbLast}`
+                    : 'No NB departures from this terminal';
+            }
         } else if (northMinutes !== null && northMinutes !== undefined) {
             northEl.innerHTML = `${northMinutes} <span>min</span>`;
-            if (northOriginEl) northOriginEl.textContent = `Arriving from ${northOrigin}`;
+            if (northOriginEl) northOriginEl.textContent = `Arriving from ${northOrigin || 'previous station'}`;
         } else {
             northEl.innerHTML = '<span>--</span>';
             if (northOriginEl) northOriginEl.textContent = 'No train data available';
         }
-        
+
+        // ---- SOUTHBOUND ----
         if (data.southbound.available === false) {
-            southEl.innerHTML = '<span>LAST TRAIN</span>';
-            if (southOriginEl) southOriginEl.textContent = `Last train: ${data.southbound.last_train || 'N/A'}`;
+            southEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">ENDED</span>';
+            if (southOriginEl) {
+                southOriginEl.textContent = (sbLast && sbLast !== 'N/A')
+                    ? `Last SB departure: ${sbLast}`
+                    : 'No SB departures from this terminal';
+            }
         } else if (southMinutes !== null && southMinutes !== undefined) {
             southEl.innerHTML = `${southMinutes} <span>min</span>`;
-            if (southOriginEl) southOriginEl.textContent = `Arriving from ${southOrigin}`;
+            if (southOriginEl) southOriginEl.textContent = `Arriving from ${southOrigin || 'previous station'}`;
         } else {
             southEl.innerHTML = '<span>--</span>';
             if (southOriginEl) southOriginEl.textContent = 'No train data available';
         }
-    } else {
-        // Fallback: use system time to determine if operating
-        const now = new Date();
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-        const currentTime = currentHour + (currentMinute / 60);
-        const isOperating = (currentTime >= OPERATING_START && currentTime < OPERATING_END);
-        
-        if (!isOperating) {
-            northEl.innerHTML = '<span>CLOSED</span>';
-            southEl.innerHTML = '<span>CLOSED</span>';
-            if (northOriginEl) northOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
-            if (southOriginEl) southOriginEl.textContent = 'MRT-3 is currently closed. First trip at 4:30 AM';
-        } else {
-            // Generic fallback
-            northEl.innerHTML = '5 <span>min</span>';
-            southEl.innerHTML = '3 <span>min</span>';
-            if (northOriginEl) northOriginEl.textContent = 'Arriving from Taft';
-            if (southOriginEl) southOriginEl.textContent = 'Arriving from North Ave';
-        }
+
+        return;
     }
 
-    
+    // ============================================================
+    // CASE 3 — API failed or incomplete; fall back to clock logic
+    // ============================================================
+    const now          = new Date();
+    const currentTime  = now.getHours() + now.getMinutes() / 60;
+    const isOperating  = currentTime >= OPERATING_START && currentTime < OPERATING_END;
+
+    if (!isOperating) {
+        northEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">SERVICE ENDED</span>';
+        southEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">SERVICE ENDED</span>';
+        if (northOriginEl) northOriginEl.textContent = 'MRT-3 is currently closed';
+        if (southOriginEl) southOriginEl.textContent = 'MRT-3 is currently closed';
+
+        const trainGrid = document.querySelector('.train-grid');
+        if (trainGrid) {
+            const notice = document.createElement('div');
+            notice.id = 'reopenNotice';
+            notice.style.cssText = 'font-size: 11px; color: #64748B; margin-top: 10px; text-align: center; font-weight: 500;';
+            notice.textContent = 'Reopens tomorrow at 4:20 AM (Southbound) · 5:24 AM (Northbound)';
+            trainGrid.parentNode.insertBefore(notice, trainGrid.nextSibling);
+        }
+        return;
+    }
+
+    // Operating but API returned nothing usable
+    northEl.innerHTML = '-- <span>min</span>';
+    southEl.innerHTML = '-- <span>min</span>';
+    if (northOriginEl) northOriginEl.textContent = 'Schedule unavailable';
+    if (southOriginEl) southOriginEl.textContent = 'Schedule unavailable';
 }
 
 // ========== UPDATE BEST TIME UI ==========

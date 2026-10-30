@@ -1321,7 +1321,7 @@ def upload_batch_test():
         # STEP 6: Batch predict
         # ------------------------------------------------------------
         all_hours = list(range(5, 23))
-        SAMPLES_PER_HOUR = 100
+        SAMPLES_PER_HOUR = 500
 
         results = []
         errors = 0
