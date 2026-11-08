@@ -1,0 +1,94 @@
+{
+  "station": "North Ave",
+  "direction": "southbound",
+  "total_samples": 4895,
+  "timestamp": "2026-11-08T22:26:18.171152",
+  "confusion_matrix": {
+    "labels": [
+      "Light",
+      "Moderate",
+      "Congested",
+      "Severe"
+    ],
+    "matrix": [
+      [
+        1036,
+        144,
+        1,
+        0
+      ],
+      [
+        165,
+        2672,
+        12,
+        1
+      ],
+      [
+        1,
+        102,
+        277,
+        41
+      ],
+      [
+        0,
+        0,
+        61,
+        382
+      ]
+    ]
+  },
+  "accuracy": 89.21,
+  "precision_weighted": 89.05,
+  "recall_weighted": 89.21,
+  "f1_weighted": 89.07,
+  "regression_metrics": {
+    "mae": 3.05,
+    "rmse": 4.68,
+    "r2": 0.9563,
+    "mape": 10.54
+  },
+  "per_class_metrics": {
+    "Light": {
+      "precision": 86.2,
+      "recall": 87.7,
+      "f1_score": 86.9,
+      "support": 1181.0
+    },
+    "Moderate": {
+      "precision": 91.6,
+      "recall": 93.8,
+      "f1_score": 92.6,
+      "support": 2850.0
+    },
+    "Congested": {
+      "precision": 78.9,
+      "recall": 65.8,
+      "f1_score": 71.8,
+      "support": 421.0
+    },
+    "Severe": {
+      "precision": 90.1,
+      "recall": 86.2,
+      "f1_score": 88.1,
+      "support": 443.0
+    }
+  },
+  "category_distribution": {
+    "Light": {
+      "actual": 1181,
+      "predicted": 1202
+    },
+    "Moderate": {
+      "actual": 2850,
+      "predicted": 2918
+    },
+    "Congested": {
+      "actual": 421,
+      "predicted": 351
+    },
+    "Severe": {
+      "actual": 443,
+      "predicted": 424
+    }
+  }
+}

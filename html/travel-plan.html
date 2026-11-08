@@ -1847,6 +1847,72 @@ nav {
     font-size: 8px;
     color: #94A3B8;
 }
+
+/* ========== STATION CONGESTION PILL ========== */
+.station-congestion-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    width: fit-content;
+    letter-spacing: 0.3px;
+    animation: slideDown 0.2s ease-out;
+}
+
+.station-congestion-pill .pill-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+}
+
+.station-congestion-light {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #22C55E;
+}
+
+.station-congestion-moderate {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #F59E0B;
+}
+
+.station-congestion-congested {
+    background: #ffedd5;
+    color: #9a3412;
+    border: 1px solid #F97316;
+}
+
+.station-congestion-severe {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #EF4444;
+    animation: pulse-warning 1.5s infinite;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@media screen and (max-width: 768px) {
+    .station-congestion-pill {
+        padding: 4px 8px;
+        font-size: 10px;
+        margin-top: 4px;
+    }
+    .station-congestion-pill .pill-dot {
+        width: 6px;
+        height: 6px;
+    }
+}
+
 </style>
 </head>
 <body>
@@ -2400,8 +2466,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const toSelect = document.getElementById('toStation');
     
     const debouncedUpdate = debounce(updateStationCongestion, 300);
+
+    // Stations
     fromSelect?.addEventListener('change', debouncedUpdate);
     toSelect?.addEventListener('change', debouncedUpdate);
+
+    // Date/time — refetch so the pill reflects the new time slot
+    ['monthSelect', 'daySelect', 'hourSelect', 'minuteSelect', 'ampmSelect'].forEach(id => {
+        document.getElementById(id)?.addEventListener('change', debouncedUpdate);
+    });
     
     // Don't call updateStationCongestion on load - let user trigger it
     // updateStationCongestion(); // REMOVED - prevents 2 API calls on load
@@ -2473,52 +2546,118 @@ function swapStations() {
 }
 
 // ========== UPDATE STATION CONGESTION - WITH CACHING ==========
+// ========== UPDATE STATION CONGESTION - WITH CACHING + LIVE PILL ==========
 async function updateStationCongestion() {
     const fromStation = document.getElementById('fromStation').value;
     const toStation = document.getElementById('toStation').value;
     const dateTime = getFormattedDateTime();
-    
+
     console.log(`FROM: ${fromStation}, TO: ${toStation}, Date: ${dateTime.date}, Time: ${dateTime.time}`);
-    
-    // Check cache first
-    const fromCached = getCachedCongestion(fromStation, dateTime.date, dateTime.time);
-    const toCached = getCachedCongestion(toStation, dateTime.date, dateTime.time);
-    
-    if (fromCached && toCached) {
-        console.log('📦 Using cached congestion data');
+
+    // Same station → no direction, no pill
+    if (fromStation === toStation) {
+        renderCongestionPill('from', null);
+        renderCongestionPill('to', null);
         return;
     }
-    
+
+    // Travel direction: FROM → TO
+    const fromIdx = stations.indexOf(fromStation);
+    const toIdx = stations.indexOf(toStation);
+    const travelingSouth = fromIdx < toIdx;
+    const direction = travelingSouth ? 'southbound' : 'northbound';
+
+    // ---- Cache check ----
+    const fromCached = getCachedCongestion(fromStation, dateTime.date, dateTime.time);
+    const toCached = getCachedCongestion(toStation, dateTime.date, dateTime.time);
+
+    if (fromCached && toCached) {
+        console.log('📦 Using cached congestion data');
+        renderCongestionPill('from', extractDirectionalValue(fromCached, direction));
+        renderCongestionPill('to', extractDirectionalValue(toCached, direction));
+        return;
+    }
+
+    // ---- Fetch what's not cached ----
+    let fromData = fromCached;
+    let toData = toCached;
     const promises = [];
+
     if (!fromCached) {
         promises.push(
             fetch(`/api/directional-forecast/${encodeURIComponent(fromStation)}?date=${dateTime.date}&time=${dateTime.time}`)
                 .then(res => res.json())
                 .then(data => {
                     setCachedCongestion(fromStation, dateTime.date, dateTime.time, data);
+                    fromData = data;
                     console.log('FROM forecast:', data);
-                    return data;
                 })
                 .catch(e => console.log('Error fetching from congestion:', e))
         );
     }
-    
+
     if (!toCached) {
         promises.push(
             fetch(`/api/directional-forecast/${encodeURIComponent(toStation)}?date=${dateTime.date}&time=${dateTime.time}`)
                 .then(res => res.json())
                 .then(data => {
                     setCachedCongestion(toStation, dateTime.date, dateTime.time, data);
+                    toData = data;
                     console.log('TO forecast:', data);
-                    return data;
                 })
                 .catch(e => console.log('Error fetching to congestion:', e))
         );
     }
-    
+
     if (promises.length > 0) {
         await Promise.all(promises);
     }
+
+    // ---- Render pills ----
+    renderCongestionPill('from', extractDirectionalValue(fromData, direction));
+    renderCongestionPill('to', extractDirectionalValue(toData, direction));
+}
+
+// ========== HELPER: pull the value matching the travel direction ==========
+function extractDirectionalValue(forecastData, direction) {
+    if (!forecastData || !Array.isArray(forecastData.forecasts)) return null;
+
+    // Find the row matching the currently-selected departure hour
+    const dateTime = getFormattedDateTime();
+    const departureHour = parseInt(dateTime.time.split(':')[0], 10);
+
+    const row = forecastData.forecasts.find(f => f.hour === departureHour)
+             || forecastData.forecasts[0];
+    if (!row) return null;
+
+    // `direction` is 'northbound' or 'southbound'
+    const raw = row[direction];
+    if (raw === null || raw === undefined) return null;
+    const num = Number(raw);
+    return isNaN(num) ? null : num;
+}
+
+// ========== HELPER: render the pill under a station dropdown ==========
+function renderCongestionPill(which, congestionValue) {
+    const selectEl = document.getElementById(which === 'from' ? 'fromStation' : 'toStation');
+    const group = selectEl?.closest('.select-group');
+    if (!group) return;
+
+    // Remove any previous pill
+    const existing = group.querySelector('.station-congestion-pill');
+    if (existing) existing.remove();
+
+    // No value → don't render
+    if (congestionValue === null || congestionValue === undefined || isNaN(congestionValue)) return;
+
+    const status = getCongestionLevel(congestionValue);
+    const pill = document.createElement('div');
+    pill.className = `station-congestion-pill station-congestion-${status}`;
+    pill.innerHTML = `
+        <span class="pill-dot"></span>
+        <span class="pill-label">${congestionValue.toFixed(1)}% · ${status.toUpperCase()}</span>
+    `;
+    group.appendChild(pill);
 }
 
 // ========== POPULATE CUSTOM DATE/TIME SELECTS ==========
@@ -2970,7 +3109,7 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     const shortMsg = getShortMessage(fromCongestion, from);
     const shortTip = getShortTip(fromCongestion);
     const iconClass = fromCongestion > 80 ? 'fa-exclamation-triangle' : 
-                     fromCongestion > 60 ? 'fa-exclamation-circle' : 'fa-info-circle';
+                     fromCongestion > 50 ? 'fa-exclamation-circle' : 'fa-info-circle';
     
     advisory2.innerHTML = `
         <div class="advisory-status-content">
