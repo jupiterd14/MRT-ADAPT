@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session, current_app
 from models import Report, User, db
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import json, os, re, time
 from collections import defaultdict
 from werkzeug.utils import secure_filename
@@ -37,6 +38,28 @@ _MAGIC_BYTES = (
     b'RIFF',                # WebP container (loose check)
 )
 _MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+# ── Timezone helpers ──
+_MANILA = ZoneInfo('Asia/Manila')
+_UTC    = ZoneInfo('UTC')
+
+
+def _naive_to_manila_iso(ts):
+    """
+    DB column `timestamp` is TIMESTAMP WITHOUT TIME ZONE; SQLAlchemy hands
+    back a *naive* datetime whose digits are UTC (Postgres converted on write).
+    Re-attach UTC, convert to Manila, and emit an ISO string WITH offset so
+    the browser doesn't mis-parse it as local time.
+
+    Accepts either naive (assumed UTC) or already-aware datetimes.
+    """
+    if ts is None:
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=_UTC)
+    return ts.astimezone(_MANILA).isoformat()
+
 
 def _is_valid_image(file):
     """Check size + magic bytes. Leaves file pointer at 0."""
@@ -136,12 +159,14 @@ def remaining_reports():
         user_id = session.get('user_id')
         ip_address = request.remote_addr
         remaining = _get_remaining(user_id, ip_address, limit=3, window=86400)
+        # Reset at midnight *real* Manila time, with explicit offset
+        reset_at = Config.get_real_time().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         return jsonify({
             'remaining': remaining,
             'max_per_day': 3,
-            'reset_at': Config.get_current_time().replace(
-                hour=0, minute=0, second=0, microsecond=0
-            ).isoformat()
+            'reset_at': reset_at.isoformat()
         })
     except Exception as e:
         return jsonify({'error': str(e)[:200]}), 500
@@ -178,7 +203,7 @@ def predict_station():
             'station': station,
             'direction': direction,
             'predicted_congestion': prediction,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': Config.get_real_time().isoformat()
         })
     except Exception as e:
         return jsonify({'error': str(e)[:200]}), 500
@@ -303,7 +328,7 @@ def report_congestion():
         if not (0 <= reported <= 100):
             return jsonify({"success": False, "error": "Congestion must be between 0 and 100"}), 400
 
-        # Suspicious remarks guard (existing helper, now actually used)
+        # Suspicious remarks guard
         if is_suspicious_remarks(remarks):
             return jsonify({"success": False, "error": "Remarks look like spam. Please be more descriptive."}), 400
 
@@ -316,7 +341,7 @@ def report_congestion():
 
         try:
             photo_path_json = json.dumps(photo_paths) if photo_paths else None
-            current_time = Config.get_current_time()
+            current_time = Config.get_real_time()
             report = Report(
                 user_id=user_id,
                 station=station,
@@ -338,6 +363,7 @@ def report_congestion():
                 "photo_paths": photo_paths,
                 "direction": direction,
                 "report_id": report.id,
+                # current_time is already aware; keep isoformat which includes +08:00
                 "timestamp": current_time.isoformat()
             })
         except Exception as db_error:
@@ -403,11 +429,11 @@ def get_reports():
                 'photo_paths': photo_paths,
                 'photo_path': report.photo_path,
                 'anonymous': report.anonymous,
-                'timestamp': report.timestamp.isoformat() if report.timestamp else None,
+                # ✅ re-attach UTC + convert to Manila so the browser shows the right time
+                'timestamp': _naive_to_manila_iso(report.timestamp),
                 'status': getattr(report, 'status', 'active'),
                 'flagged': getattr(report, 'flagged', False),
                 'flag_count': getattr(report, 'flag_count', 0),
-                # ✅ user_id removed. Instead, tell the caller if it's theirs:
                 'is_mine': current_user is not None and report.user_id == current_user,
             })
 
@@ -451,7 +477,7 @@ def flag_report(report_id):
         report.flag_count = (report.flag_count or 0) + 1
         if report.flag_count >= 3:
             report.flagged = True
-            report.flagged_at = Config.get_current_time()
+            report.flagged_at = Config.get_real_time()
             report.status = 'pending'
 
         db.session.commit()
@@ -493,7 +519,7 @@ def flag_report_user(report_id):
         report.flag_count = (report.flag_count or 0) + 1
         if report.flag_count >= 3:
             report.flagged = True
-            report.flagged_at = Config.get_current_time()
+            report.flagged_at = Config.get_real_time()
             report.status = 'pending'
             print(f"🔴 Report {report_id} automatically hidden after {report.flag_count} flags")
 

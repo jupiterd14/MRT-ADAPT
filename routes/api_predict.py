@@ -65,11 +65,27 @@ _scalers_cache = None
 
 
 # ============================================================
+# TIME HELPERS
+# ============================================================
+def _now():
+    """
+    Real wall clock (Manila, aware).
+    Uses Config.get_real_time() so overrides, live predictions, and
+    operator actions all agree on the same 'now'.
+    """
+    try:
+        return Config.get_real_time()
+    except AttributeError:
+        # Fallback if get_real_time isn't defined — use system time
+        return datetime.now()
+
+
+# ============================================================
 # REQUEST-LEVEL CACHE
 # ============================================================
 def get_cached_prediction(station_name, direction, target_datetime):
     if target_datetime is None:
-        target_datetime = Config.get_current_time()
+        target_datetime = _now()
 
     cache_key = f"{station_name}_{direction}_{target_datetime.weekday()}_{target_datetime.hour}"
 
@@ -90,10 +106,9 @@ def get_cached_prediction(station_name, direction, target_datetime):
 
 def set_cached_prediction(station_name, direction, target_datetime, value):
     if target_datetime is None:
-        target_datetime = Config.get_current_time()
+        target_datetime = _now()
 
     cache_key = f"{station_name}_{direction}_{target_datetime.weekday()}_{target_datetime.hour}"
-    # Cast to native float to prevent numpy types from leaking into JSON
     _REQUEST_CACHE[cache_key] = {'value': float(value), 'timestamp': time.time()}
 
 
@@ -112,7 +127,6 @@ def get_correction_factors():
                 current_app.config['CORRECTION_FACTORS'] = {}
         return current_app.config['CORRECTION_FACTORS']
     except RuntimeError:
-        # Outside app context (e.g., during startup)
         return _PENDING_CORRECTION_FACTORS
 
 
@@ -134,37 +148,21 @@ def load_correction_factors():
 # P90 CACHE - SINGLE SOURCE OF TRUTH
 # ============================================================
 def get_p90_cache():
-    """Get P90 cache from app config (persistent across requests)."""
     if 'P90_CACHE' not in current_app.config:
         current_app.config['P90_CACHE'] = {}
     return current_app.config['P90_CACHE']
 
+
 def get_p90_percentile(station_name, direction):
-    """
-    Get P90 percentile for a station-direction.
-    Single source of truth for all congestion calculations.
-
-    Uses MAX over per-hour P90s (peak-hour capacity) so congestion
-    is meaningful across the day. Prevents evening rush from clamping
-    at 100% when the global P90 is dragged down by off-peak hours.
-
-    Priority:
-      1. App config cache (fastest)
-      2. Compute from historical data
-      3. Fallback to platform capacity
-    """
     key = f"{station_name}_{direction}"
     p90_cache = get_p90_cache()
 
-    # 1. Check cache
     if key in p90_cache:
         return p90_cache[key]
 
-    # 2. Compute from data
     hourly = get_station_dataframe_cached(station_name, direction)
 
     if hourly is not None and len(hourly) > 0:
-        # ── Compute P90 for EACH hour of day, then take the max ──
         hour_p90s = []
         for hr in range(24):
             hr_data = hourly[hourly.index.hour == hr]
@@ -176,33 +174,23 @@ def get_p90_percentile(station_name, direction):
                     hour_p90s.append(hr_p90)
 
         if hour_p90s:
-            # ✅ MAX of per-hour P90s = peak-hour capacity
             p90 = max(hour_p90s)
-            p90 = max(p90, 100)  # Minimum sanity floor
-
-            # Cap at platform capacity × 10 to prevent absurd values
+            p90 = max(p90, 100)
             capacity = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
             max_reasonable = capacity * 10
             if p90 > max_reasonable:
                 p90 = max_reasonable
         else:
-            # No non-zero data → use platform capacity
             p90 = float(MRT3_PLATFORM_CAPACITY.get(station_name, 1000))
     else:
-        # No data at all → use platform capacity (NOT flat 1000)
         p90 = float(MRT3_PLATFORM_CAPACITY.get(station_name, 1000))
 
-    # Store in app config cache
     p90_cache[key] = p90
-
-    # 3. Persist to disk (atomic write to avoid race conditions)
     _persist_p90_to_disk(key, p90)
-
     return p90
 
 
 def _persist_p90_to_disk(key, value):
-    """Atomic write of a single P90 value to disk. Swallows errors silently."""
     try:
         p90_file = _P90_FILE
         all_p90 = {}
@@ -213,7 +201,7 @@ def _persist_p90_to_disk(key, value):
             except (json.JSONDecodeError, IOError):
                 all_p90 = {}
 
-        all_p90[key] = float(value)   # ✓ already cast
+        all_p90[key] = float(value)
 
         tmp_file = p90_file + '.tmp'
         with open(tmp_file, 'w') as f:
@@ -221,9 +209,9 @@ def _persist_p90_to_disk(key, value):
         os.replace(tmp_file, p90_file)
     except Exception as e:
         print(f"⚠️ Could not persist P90 to disk: {e}")
-        
+
+
 def preload_p90_cache():
-    """Preload all P90 values from file, or compute them if file is missing."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     p90_file = os.path.join(script_dir, _P90_FILE)
 
@@ -240,7 +228,6 @@ def preload_p90_cache():
         except Exception as e:
             print(f"⚠️ Error loading P90 cache: {e}")
 
-    # File missing → compute all
     print("🔄 Calculating P90 values from data...")
     for station in STATION_NUMBERS.keys():
         for direction in ['Northbound', 'Southbound']:
@@ -254,7 +241,6 @@ def preload_p90_cache():
 # TYPICAL PATTERN PRELOAD
 # ============================================================
 def preload_typical_patterns():
-    """Pre-compute typical patterns for all station-direction pairs."""
     stations = current_app.config.get('STATIONS', STATIONS)
     directions = ['Northbound', 'Southbound']
 
@@ -274,7 +260,6 @@ def preload_typical_patterns():
 # MODEL CACHE
 # ============================================================
 def get_models():
-    """Get models from app config (with local cache)."""
     global _models_cache, _scalers_cache
 
     if _models_cache is not None:
@@ -292,25 +277,26 @@ def get_models():
 
 
 def set_models(models, scalers):
-    """Update the local model cache."""
     global _models_cache, _scalers_cache
     _models_cache = models
     _scalers_cache = scalers
 
 
 def clear_models_cache():
-    """Clear the local model cache (useful for hot reloads)."""
     global _models_cache, _scalers_cache
     _models_cache = None
     _scalers_cache = None
-    
+
+
 def ensure_models_loaded(station_name=None, direction=None):
     """Cache-only mode: never auto-load models at request time."""
     return
+
+
+# ============================================================
 # RAW PREDICTION (passengers, not congestion)
 # ============================================================
 def get_raw_prediction(station_name, direction, target_datetime):
-    """Returns the raw passenger count from the model."""
     ensure_models_loaded(station_name, direction)
 
     directional_models = current_app.config.get('DIRECTIONAL_MODELS', {})
@@ -340,10 +326,9 @@ def get_raw_prediction(station_name, direction, target_datetime):
 
 
 def compute_and_save_correction_factors(test_days=30, end_date=None):
-    """Compute correction factors by comparing model vs actual for all station-directions."""
     factors = {}
     if end_date is None:
-        end_date = Config.get_current_time()
+        end_date = _now()
     start_date = end_date - timedelta(days=test_days)
 
     for station in STATIONS:
@@ -377,7 +362,7 @@ def compute_and_save_correction_factors(test_days=30, end_date=None):
 
             if ratios:
                 factor = float(np.median(ratios))
-                factor = min(1.5, factor)  # Clamp
+                factor = min(1.5, factor)
                 factors[model_key] = factor
                 print(f"✅ {station} {direction}: factor = {factor:.3f} ({len(ratios)} samples)")
 
@@ -391,7 +376,6 @@ def compute_and_save_correction_factors(test_days=30, end_date=None):
 # HISTORICAL PEAKS (reference only)
 # ============================================================
 def get_historical_peak(station_name, direction):
-    """Lazy-load historical peak for one station-direction."""
     key = f"{station_name}_{direction}"
 
     if 'HISTORICAL_PEAKS' not in current_app.config:
@@ -419,8 +403,10 @@ def get_historical_peak(station_name, direction):
 # ============================================================
 def get_active_overrides():
     """
-    Get active overrides using Config time for consistency across modules.
-    Handles expiry in UTC epoch seconds.
+    Return overrides whose expiry is still in the future.
+    Uses Config.get_real_time() (real wall clock) so that any override with
+    a real-world expiry is considered active — even if Config.get_current_time()
+    is frozen for ML simulation/testing.
     """
     overrides_file = 'overrides.json'
 
@@ -431,8 +417,7 @@ def get_active_overrides():
         with open(overrides_file, 'r') as f:
             all_overrides = json.load(f)
 
-        config_time = Config.get_current_time()
-        now_timestamp = config_time.timestamp()
+        now_timestamp = _now().timestamp()
 
         active = {}
         for key, override in all_overrides.items():
@@ -446,11 +431,11 @@ def get_active_overrides():
         print(f"Error loading overrides: {e}")
         return {}
 
-
 def is_override_active(override, target_time):
     """
-    Check if an override is active for the given target time.
-    Handles overnight windows correctly.
+    Check if the override's time window overlaps target_time.
+    Handles both aware and naive target_time, and treats
+    duration_minutes == 0 / None as 'active until expiry'.
     """
     expiry = override.get('expiry')
     timestamp = override.get('timestamp')
@@ -460,25 +445,35 @@ def is_override_active(override, target_time):
         return False
 
     try:
-        config_time = Config.get_current_time()
-        now_timestamp = config_time.timestamp()
+        now_timestamp = _now().timestamp()
 
-        # First check: has the override already expired?
         if expiry <= now_timestamp:
             return False
 
+        # Manual overrides: active until expiry, no window restriction
+        if duration_minutes is None or duration_minutes == 0:
+            return True
+
         override_start = datetime.fromisoformat(timestamp)
+
+        # Normalize tz-awareness on BOTH sides so comparisons don't throw
+        if target_time.tzinfo is None and override_start.tzinfo is not None:
+            # Strip tz from override_start to match naive target_time
+            override_start = override_start.replace(tzinfo=None)
+        elif target_time.tzinfo is not None and override_start.tzinfo is None:
+            # Add tz to override_start to match aware target_time
+            override_start = override_start.replace(tzinfo=target_time.tzinfo)
+
         target_date = target_time.date()
 
-        # Overlay the override's time-of-day onto the target date
-        override_start_in_target_date = datetime(
-            target_date.year, target_date.month, target_date.day,
-            override_start.hour, override_start.minute,
-            override_start.second, override_start.microsecond
+        # Build window start on the target date using the same tz awareness
+        override_start_in_target_date = override_start.replace(
+            year=target_date.year,
+            month=target_date.month,
+            day=target_date.day,
         )
         override_end = override_start_in_target_date + timedelta(minutes=duration_minutes)
 
-        # Handle overnight windows (end time crosses midnight)
         if override_end.day != override_start_in_target_date.day:
             return (
                 target_time >= override_start_in_target_date
@@ -490,17 +485,10 @@ def is_override_active(override, target_time):
         print(f"⚠️ Error in is_override_active: {e}")
         return False
 
-
 # ============================================================
 # PRECOMPUTE ALL PREDICTIONS
 # ============================================================
 def precompute_all_predictions():
-    """
-    Precompute congestion for all (station, direction, dow, hour) combos.
-    Stores in _PREDICTION_CACHE for O(1) lookups.
-
-    All cached values are native Python floats to keep jsonify happy.
-    """
     stations = list(STATION_NUMBERS.keys())
     directions = ['Northbound', 'Southbound']
     dows = list(range(7))
@@ -545,7 +533,6 @@ def precompute_all_predictions():
                 pred_passengers = target_scaler.inverse_transform(pred_scaled).flatten()
 
                 for hour, passenger in enumerate(pred_passengers):
-                    # ── All arithmetic on native floats ──
                     passenger = float(passenger)
                     congestion = (passenger / p90) * 100.0
                     congestion = max(0.0, min(congestion, 100.0))
@@ -564,7 +551,7 @@ def precompute_all_predictions():
                     congestion = max(0.0, min(congestion, 100.0))
 
                     cache_key = f"{station}_{direction}_{dow}_{hour}"
-                    _PREDICTION_CACHE[cache_key] = float(congestion)   # ← CAST
+                    _PREDICTION_CACHE[cache_key] = float(congestion)
                     total += 1
 
                 if total % 100 == 0:
@@ -572,11 +559,12 @@ def precompute_all_predictions():
 
     expected = len(stations) * len(directions) * len(dows) * len(hours)
     print(f"✅ Precomputed {total} predictions (expected: {expected})")
+
+
 # ============================================================
 # BATCH PREDICTIONS
 # ============================================================
 def get_batch_directional_predictions(station_name, direction, base_time, num_hours=6):
-    """Get predictions for the next `num_hours` hours via cache."""
     return [
         get_directional_prediction(station_name, direction, base_time + timedelta(hours=i))
         for i in range(num_hours)
@@ -588,7 +576,7 @@ def get_batch_directional_predictions(station_name, direction, base_time, num_ho
 # ============================================================
 def get_directional_prediction(station_name, direction, target_datetime=None):
     if target_datetime is None:
-        target_datetime = Config.get_current_time()
+        target_datetime = _now()
 
     hour = target_datetime.hour
     minute = target_datetime.minute
@@ -602,7 +590,7 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
 
     cached = get_cached_prediction(station_name, direction, target_datetime)
     if cached is not None:
-        return float(cached)   # ← CAST
+        return float(cached)
 
     dow = target_datetime.weekday()
     cache_key = f"{station_name}_{direction}_{dow}_{hour}"
@@ -612,11 +600,10 @@ def get_directional_prediction(station_name, direction, target_datetime=None):
         set_cached_prediction(station_name, direction, target_datetime, congestion)
         return congestion
 
-    return float(_live_model_prediction(station_name, direction, target_datetime) or 0)   # ← CAST
+    return float(_live_model_prediction(station_name, direction, target_datetime) or 0)
 
 
 def _live_model_prediction(station_name, direction, target_datetime):
-    """Slow path: run model inference for a single datetime."""
     total_start = time.time()
 
     ensure_models_loaded(station_name, direction)
@@ -638,16 +625,13 @@ def _live_model_prediction(station_name, direction, target_datetime):
         if target_scaler is None:
             return _get_operating_hours_fallback(target_datetime)
 
-        # Model inference
         input_sequence = features_scaled.reshape(1, 24, -1)
         input_tensor = tf.convert_to_tensor(input_sequence, dtype=tf.float32)
         prediction_scaled = directional_models[model_key](input_tensor, training=False).numpy()
         raw_output = float(prediction_scaled[0][0])
 
-        # Inverse transform
         passenger_count = float(target_scaler.inverse_transform([[raw_output]])[0][0])
 
-        # P90 normalization
         p90 = get_p90_percentile(station_name, direction)
         if p90 <= 0:
             p90 = MRT3_PLATFORM_CAPACITY.get(station_name, 1000)
@@ -655,13 +639,11 @@ def _live_model_prediction(station_name, direction, target_datetime):
         congestion = (passenger_count / p90) * 100
         congestion = max(0.0, min(congestion, 100.0))
 
-        # Correction factor
         correction_factors = get_correction_factors()
         factor = correction_factors.get(model_key, 1.0)
         congestion = congestion * factor
         congestion = max(0.0, min(congestion, 100.0))
 
-        # DOW adjustment
         dow = target_datetime.weekday()
         if dow >= 5:
             dow_factor = 0.7
@@ -694,7 +676,6 @@ def _live_model_prediction(station_name, direction, target_datetime):
 # FALLBACKS
 # ============================================================
 def _get_operating_hours_fallback(target_datetime):
-    """Realistic fallback based on hour of day."""
     hour = target_datetime.hour
     if 7 <= hour <= 9 or 17 <= hour <= 19:
         return 65
@@ -707,8 +688,7 @@ def _get_operating_hours_fallback(target_datetime):
 
 
 def get_fallback_directional_prediction(station_name, direction, target_datetime=None):
-    """Fallback when models aren't available."""
-    target_datetime = target_datetime or Config.get_current_time()
+    target_datetime = target_datetime or _now()
     hour = target_datetime.hour
     current_time = hour + target_datetime.minute / 60
 
@@ -724,8 +704,7 @@ def get_fallback_directional_prediction(station_name, direction, target_datetime
 
 
 def clamp_prediction_by_time(congestion, target_datetime):
-    """Clamp prediction to reasonable ranges based on time of day."""
-    target_datetime = target_datetime or Config.get_current_time()
+    target_datetime = target_datetime or _now()
     hour = target_datetime.hour
     current_time = hour + target_datetime.minute / 60
 
@@ -744,7 +723,7 @@ def clamp_prediction_by_time(congestion, target_datetime):
 # HELPERS
 # ============================================================
 def get_best_time_to_travel(station_name=None):
-    now = Config.get_current_time()
+    now = _now()
     hour = now.hour
     if 7 <= hour <= 9:
         return "10:00 AM - 3:00 PM (Avoid morning rush hour)"
@@ -763,9 +742,10 @@ def get_wait_time(congestion):
     else:
         return "2-5 min"
 
+
 def get_all_stations_predictions():
     result = {"northbound": {}, "southbound": {}}
-    now = Config.get_current_time()
+    now = _now()
 
     current_time = now.hour + now.minute / 60
     is_closed = current_time < 4.5 or current_time >= 22.5
@@ -801,7 +781,6 @@ def get_all_stations_predictions():
 
 
 def _get_directional_prediction_with_details(station_name, direction, target_datetime):
-    """Returns both congestion and passenger count (for debug endpoints)."""
     ensure_models_loaded(station_name, direction)
 
     directional_models, directional_scalers = get_models()
@@ -851,7 +830,6 @@ def _get_directional_prediction_with_details(station_name, direction, target_dat
 
 
 def get_station_prediction(station_name):
-    """Average congestion for a station (both directions)."""
     north = get_directional_prediction(station_name, 'Northbound') or 0
     south = get_directional_prediction(station_name, 'Southbound') or 0
     return (north + south) / 2
@@ -874,10 +852,10 @@ def directional_forecast(station_name):
             hour, minute = map(int, time_param.split(':'))
             base_time = datetime(year, month, day, hour, minute)
         except Exception as e:
-            print(f"⚠️ Invalid date/time: {e}, using current time")
-            base_time = Config.get_current_time()
+            print(f"⚠️ Invalid date/time: {e}, using real time")
+            base_time = _now()
     else:
-        base_time = Config.get_current_time()
+        base_time = _now()
 
     active_overrides = get_active_overrides()
 
@@ -945,14 +923,12 @@ def directional_forecast(station_name):
 
 @api_predict_bp.route('/directional-forecast/all')
 def directional_forecast_all():
-    """Get current congestion for ALL stations."""
-    print(f"\n[PREDICTION API] Getting all stations at {Config.get_current_time().strftime('%H:%M:%S')}")
+    print(f"\n[PREDICTION API] Getting all stations at {_now().strftime('%H:%M:%S')}")
     return jsonify(get_all_stations_predictions())
 
 
 @api_predict_bp.route('/model-evaluation')
 def model_evaluation():
-    """Evaluate model performance using the same P90 as the API."""
     from sklearn.metrics import (
         confusion_matrix, classification_report, accuracy_score, f1_score,
         mean_absolute_error, mean_squared_error, r2_score
@@ -1082,7 +1058,6 @@ def model_evaluation():
 
 @api_predict_bp.route('/confusion-matrix')
 def confusion_matrix_endpoint():
-    """Deprecated. Use POST /api/model/evaluate."""
     station = request.args.get('station', 'North Ave')
     direction = request.args.get('direction', 'Northbound')
 
@@ -1096,8 +1071,7 @@ def confusion_matrix_endpoint():
 
 @api_predict_bp.route('/test-rush-hour')
 def test_rush_hour():
-    """Test predictions for rush hour times."""
-    now = Config.get_current_time()
+    now = _now()
     results = {}
 
     for hour in [8, 12, 18, 21]:
@@ -1115,7 +1089,6 @@ def test_rush_hour():
 
 @api_predict_bp.route('/predict/<station_name>')
 def predict_congestion(station_name):
-    """Current snapshot for a single station."""
     name = station_name.replace('%20', ' ')
 
     date_param = request.args.get('date')
@@ -1130,8 +1103,27 @@ def predict_congestion(station_name):
         except Exception:
             target_datetime = None
 
+    if target_datetime is None:
+        target_datetime = _now()
+
     north_congestion = get_directional_prediction(name, 'Northbound', target_datetime) or 0
     south_congestion = get_directional_prediction(name, 'Southbound', target_datetime) or 0
+    congestion = (north_congestion + south_congestion) / 2
+
+    # Apply override if present (so /api/predict agrees with /api/live-map/directions/v3)
+    active_overrides = get_active_overrides()
+    for key, dir_name, which in [
+        (f"{name}_northbound", 'Northbound', 'northbound'),
+        (f"{name}_southbound", 'Southbound', 'southbound'),
+    ]:
+        if key in active_overrides:
+            override = active_overrides[key]
+            if is_override_active(override, target_datetime):
+                val = override.get('congestion', 50)
+                if which == 'northbound':
+                    north_congestion = val
+                else:
+                    south_congestion = val
     congestion = (north_congestion + south_congestion) / 2
 
     if congestion > 80:
@@ -1257,7 +1249,6 @@ def predict_route():
 
 @api_predict_bp.route('/admin/generate-factors', methods=['POST'])
 def generate_factors():
-    """Recompute correction factors from historical data."""
     try:
         test_days = 30
         if request.is_json:

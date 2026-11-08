@@ -1,6 +1,7 @@
 from flask import Blueprint, session, request, jsonify, flash, redirect, url_for, render_template, current_app
 from models import User, Report, Broadcast, ActivityLog, db
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import json, time, math, os, threading
 from .auth import login_required, log_activity
 from flask_caching import Cache
@@ -9,6 +10,23 @@ from config import Config
 
 operator_bp = Blueprint('operator', __name__)
 
+# ── Timezone helpers ────────────────────────────────────────────────
+_MANILA = ZoneInfo('Asia/Manila')
+_UTC    = ZoneInfo('UTC')
+
+def _naive_to_manila_iso(ts):
+    """DB stores naive UTC; re-attach UTC, convert to Manila, emit ISO with offset."""
+    if ts is None:
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=_UTC)
+    return ts.astimezone(_MANILA).isoformat()
+
+def _now_naive_utc():
+    """Aware Manila 'now', returned as naive UTC — safe to compare against DB columns."""
+    return Config.get_real_time().astimezone(_UTC).replace(tzinfo=None)
+
+# ── Constants ───────────────────────────────────────────────────────
 STATIONS = ["North Ave", "Quezon Ave", "Kamuning", "Cubao", "Santolan",
             "Ortigas", "Shaw Blvd", "Boni Ave", "Guadalupe", "Buendia",
             "Ayala Ave", "Magallanes", "Taft"]
@@ -32,8 +50,6 @@ STATION_BASE_CAPACITY = {
 
 # ======================================================================
 # BLUEPRINT-LEVEL AUTH GUARD  (FIX #1)
-# Every /operator/ and /api/operator/ route now requires a valid session.
-# check_session_validity in auth.py is a second line of defense.
 # ======================================================================
 PUBLIC_OPERATOR_ENDPOINTS = {
     'operator.get_public_broadcasts',
@@ -46,7 +62,6 @@ def _require_operator_auth():
     if request.endpoint in PUBLIC_OPERATOR_ENDPOINTS:
         return None
 
-    # Env-admin can browse everything
     if session.get('is_admin') and session.get('role') == 'admin':
         return None
 
@@ -111,7 +126,6 @@ def _validate_override_payload(data):
     if not (0 <= congestion_value <= 100):
         return None, 'congestion_value must be between 0 and 100'
 
-    # Validate duration
     duration_minutes = 0
     if duration != 'manual':
         try:
@@ -140,7 +154,6 @@ _OVERRIDES_LOCK = threading.Lock()
 
 
 def load_overrides():
-    """Load overrides from file (thread-safe)."""
     with _OVERRIDES_LOCK:
         if os.path.exists(OVERRIDES_FILE):
             try:
@@ -153,7 +166,6 @@ def load_overrides():
 
 
 def save_overrides(overrides):
-    """Save overrides to file (thread-safe)."""
     with _OVERRIDES_LOCK:
         try:
             with open(OVERRIDES_FILE, 'w') as f:
@@ -161,13 +173,15 @@ def save_overrides(overrides):
             print(f"✅ Saved {len(overrides)} overrides to file")
         except Exception as e:
             print(f"Error saving overrides: {e}")
-
-
 def get_active_overrides():
-    """Get active overrides from file with expiry check."""
+    """
+    Return overrides whose expiry is still in the future.
+    Uses Config.get_real_time() (real wall clock) instead of Config.get_current_time()
+    (which may be frozen for testing / ML simulation). This guarantees overrides set
+    in the operator dashboard show up immediately on the user dashboard and live map.
+    """
     overrides = load_overrides()
-
-    now_timestamp = Config.get_current_time().timestamp()
+    now_timestamp = Config.get_real_time().timestamp()
 
     active_overrides = {}
     for key, override in overrides.items():
@@ -181,7 +195,6 @@ def get_active_overrides():
 
 
 def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name, direction='southbound'):
-    """Convert model prediction to congestion percentage using P90."""
     raw_value = float(pred_scaled[0][0]) if hasattr(pred_scaled, '__getitem__') else float(pred_scaled)
 
     if target_scaler is not None:
@@ -212,7 +225,7 @@ def _get_congestion_from_prediction(pred_scaled, target_scaler, station_name, di
 
 
 # ======================================================================
-# REPORTS
+# REPORTS  ← the bug is here; timestamp now goes through the helper
 # ======================================================================
 
 @operator_bp.route('/api/reports', methods=['GET'])
@@ -263,7 +276,7 @@ def get_reports():
                 'direction': getattr(report, 'direction', 'both'),
                 'reported_congestion': report.reported_congestion,
                 'remarks': report.remarks,
-                'timestamp': report.timestamp.isoformat(),
+                'timestamp': _naive_to_manila_iso(report.timestamp),   # ✅ fixed
                 'username': username or 'Anonymous',
                 'anonymous': report.anonymous,
                 'flagged': getattr(report, 'flagged', False),
@@ -283,14 +296,15 @@ def get_reports():
 
 
 # ======================================================================
-# PUBLIC BROADCASTS  (allowlisted — no auth)
+# PUBLIC BROADCASTS
 # ======================================================================
 
 @operator_bp.route('/api/broadcasts/public', methods=['GET'])
 def get_public_broadcasts():
     """Get active broadcasts for public alerts page."""
     try:
-        now = datetime.now()
+        # compare naive-UTC 'now' against naive-UTC DB columns
+        now = _now_naive_utc()
 
         expired_by_date = Broadcast.query.filter(
             Broadcast.is_active == True,
@@ -313,7 +327,7 @@ def get_public_broadcasts():
             stations = json.loads(broadcast.stations) if broadcast.stations else []
 
             created_at = broadcast.created_at
-            diff_seconds = (now - created_at).total_seconds()
+            diff_seconds = (now - created_at).total_seconds() if created_at else 0
 
             if diff_seconds < 60:
                 time_display = 'Just now'
@@ -332,8 +346,8 @@ def get_public_broadcasts():
                 'severity': broadcast.severity,
                 'direction': getattr(broadcast, 'direction', 'both'),
                 'stations': stations,
-                'created_at': broadcast.created_at.isoformat(),
-                'expires_at': broadcast.expires_at.isoformat() if broadcast.expires_at else None,
+                'created_at': _naive_to_manila_iso(broadcast.created_at),
+                'expires_at': _naive_to_manila_iso(broadcast.expires_at),
                 'is_active': broadcast.is_active,
                 'time': time_display,
             })
@@ -349,7 +363,6 @@ def get_public_broadcasts():
 # ======================================================================
 
 def get_live_map_data_direct():
-    """Get live map data directly without HTTP calls."""
     try:
         try:
             from .live_map import get_directional_data
@@ -385,68 +398,82 @@ def get_live_map_data_direct():
         current_app.logger.exception("get_live_map_data_direct failed")
         return None
 
-
 @operator_bp.route('/api/operator/station-status')
 def operator_station_status():
-    """Get station status for operator dashboard — USING V2 PREDICTION API."""
     try:
-        # FIX: call the function directly instead of going through test_client.
-        # That was spawning a real HTTP request against the local server,
-        # which caused deadlocks under gunicorn with a single worker.
-        try:
-            from routes.api_other import live_map_directions_v2
-            # Call the underlying function — it's registered as a route but
-            # we can also call it directly if it returns a Flask Response.
-            # Simplest safe approach: replicate the shape here.
-            from routes.api_predict import get_directional_prediction
-            northbound_data = {}
-            southbound_data = {}
-            now = datetime.now()
-            for st in STATIONS:
-                north_cong = get_directional_prediction(st, 'Northbound', now) or 0
-                south_cong = get_directional_prediction(st, 'Southbound', now) or 0
-                northbound_data[st] = {
-                    'congestion': north_cong,
-                    'status': _get_status_from_congestion(north_cong),
-                    'wait_time': _get_wait_time(north_cong),
-                    'ridership': int(north_cong * 10),
-                }
-                southbound_data[st] = {
-                    'congestion': south_cong,
-                    'status': _get_status_from_congestion(south_cong),
-                    'wait_time': _get_wait_time(south_cong),
-                    'ridership': int(south_cong * 10),
-                }
-        except Exception as inner:
-            current_app.logger.warning(f"Prediction unavailable: {inner}")
-            return jsonify({'stations': _generate_fallback_stations(), 'fallback': True})
+        from routes.api_predict import (
+            get_directional_prediction,
+            get_active_overrides,
+            is_override_active,
+        )
 
+        now = Config.get_real_time()
         active_overrides = get_active_overrides()
-        overrides_lower = {k.lower() for k in active_overrides.keys()}
+
+        northbound_data = {}
+        southbound_data = {}
+
+        for st in STATIONS:
+            north_cong = get_directional_prediction(st, 'Northbound', now) or 0
+            south_cong = get_directional_prediction(st, 'Southbound', now) or 0
+
+            north_override_key = f"{st}_northbound"
+            south_override_key = f"{st}_southbound"
+            north_overridden = False
+            south_overridden = False
+
+            if north_override_key in active_overrides:
+                ov = active_overrides[north_override_key]
+                if is_override_active(ov, now):
+                    north_cong = float(ov.get('congestion', north_cong))
+                    north_overridden = True
+                else:
+                    # Key exists but window doesn't match — still mark presence
+                    north_overridden = True
+
+            if south_override_key in active_overrides:
+                ov = active_overrides[south_override_key]
+                if is_override_active(ov, now):
+                    south_cong = float(ov.get('congestion', south_cong))
+                    south_overridden = True
+                else:
+                    south_overridden = True
+
+            northbound_data[st] = {
+                'congestion': north_cong,
+                'status': _get_status_from_congestion(north_cong),
+                'wait_time': _get_wait_time(north_cong),
+                'ridership': int(north_cong * 10),
+                'overridden': north_overridden,
+            }
+            southbound_data[st] = {
+                'congestion': south_cong,
+                'status': _get_status_from_congestion(south_cong),
+                'wait_time': _get_wait_time(south_cong),
+                'ridership': int(south_cong * 10),
+                'overridden': south_overridden,
+            }
 
         result = []
         for station in STATIONS:
             north = northbound_data.get(station, {})
             south = southbound_data.get(station, {})
 
-            north_key = f"{station}_northbound".lower()
-            south_key = f"{station}_southbound".lower()
-
             result.append({
                 'name': station,
                 'northbound': {
                     'congestion': north.get('congestion', 0),
-                    'status': north.get('status', _get_status_from_congestion(north.get('congestion', 0))),
-                    'wait_time': north.get('wait_time', _get_wait_time(north.get('congestion', 0))),
+                    'status': north.get('status', 'LIGHT'),
+                    'wait_time': north.get('wait_time', '2-5 min'),
                     'ridership': north.get('ridership', 0),
-                    'overridden': north_key in overrides_lower,
+                    'overridden': north.get('overridden', False),
                 },
                 'southbound': {
                     'congestion': south.get('congestion', 0),
-                    'status': south.get('status', _get_status_from_congestion(south.get('congestion', 0))),
-                    'wait_time': south.get('wait_time', _get_wait_time(south.get('congestion', 0))),
+                    'status': south.get('status', 'LIGHT'),
+                    'wait_time': south.get('wait_time', '2-5 min'),
                     'ridership': south.get('ridership', 0),
-                    'overridden': south_key in overrides_lower,
+                    'overridden': south.get('overridden', False),
                 },
             })
 
@@ -455,18 +482,17 @@ def operator_station_status():
     except Exception as e:
         current_app.logger.exception("operator_station_status failed")
         return jsonify({'stations': _generate_fallback_stations(), 'error': str(e)}), 500
-
-
+    
 @operator_bp.route('/api/operator/forecast/<station_name>')
 def operator_forecast(station_name):
-    """Get 6-hour forecast for a station."""
     try:
         station = station_name.replace('%20', ' ')
         if station not in STATIONS:
             return jsonify({'error': 'Invalid station'}), 400
 
-        now = datetime.now()
-        base_time = now.replace(minute=0, second=0, microsecond=0)
+        # aware Manila 'now' so the emitted ISO carries +08:00
+        now = Config.get_real_time()
+        base_time = now.replace(minute=0, second=0, microsecond=0, tzinfo=None)
 
         forecasts = []
         from routes.api_predict import get_directional_prediction
@@ -482,7 +508,6 @@ def operator_forecast(station_name):
                 north_cong = None
                 south_cong = None
 
-            # FIX #18-style: propagate None instead of faking 0
             north_cong = north_cong if north_cong is not None else None
             south_cong = south_cong if south_cong is not None else None
 
@@ -521,7 +546,7 @@ def operator_forecast(station_name):
 
         return jsonify({
             'station': station,
-            'timestamp': now.isoformat(),
+            'timestamp': now.isoformat(),   # aware → +08:00 included
             'forecasts': forecasts,
         })
 
@@ -542,7 +567,6 @@ def _generate_fallback_stations():
 
 
 def _get_status_from_congestion(congestion):
-    # FIX #13: use >= to match admin.py
     if congestion >= 80:
         return 'SEVERE'
     elif congestion >= 50:
@@ -565,7 +589,7 @@ def _get_wait_time(congestion):
 
 
 # ======================================================================
-# DEBUG  (FIX #5 — dev only)
+# DEBUG
 # ======================================================================
 
 @operator_bp.route('/api/operator/debug-override')
@@ -615,7 +639,6 @@ def get_operator_stations(user_id):
 @operator_bp.route('/operator-dashboard')
 @operator_bp.route('/operator_dashboard')
 def operator_dashboard():
-    # FIX #9: guard against deleted user row
     user = User.query.get(session['user_id'])
     if not user or not user.is_active:
         session.clear()
@@ -651,7 +674,7 @@ def get_operator_broadcasts():
         if not user_id:
             return jsonify({'success': False, 'error': 'Not logged in'}), 401
 
-        now = datetime.now()
+        now = _now_naive_utc()
 
         expired_by_date = Broadcast.query.filter(
             Broadcast.is_active == True,
@@ -688,8 +711,8 @@ def get_operator_broadcasts():
                     'stations': stations,
                     'severity': broadcast.severity,
                     'direction': getattr(broadcast, 'direction', 'both'),
-                    'created_at': broadcast.created_at.isoformat(),
-                    'expires_at': broadcast.expires_at.isoformat() if broadcast.expires_at else None,
+                    'created_at': _naive_to_manila_iso(broadcast.created_at),   # ✅
+                    'expires_at': _naive_to_manila_iso(broadcast.expires_at),   # ✅
                     'duration_minutes': getattr(broadcast, 'duration_minutes', 60),
                     'is_active': broadcast.is_active,
                     'icon': typeIcons.get(broadcast.disruption_type, 'fa-bullhorn'),
@@ -732,8 +755,8 @@ def get_broadcast(broadcast_id):
                 'direction': getattr(broadcast, 'direction', 'both'),
                 'duration_minutes': getattr(broadcast, 'duration_minutes', 60),
                 'is_active': broadcast.is_active,
-                'created_at': broadcast.created_at.isoformat(),
-                'expires_at': broadcast.expires_at.isoformat() if broadcast.expires_at else None,
+                'created_at': _naive_to_manila_iso(broadcast.created_at),   # ✅
+                'expires_at': _naive_to_manila_iso(broadcast.expires_at),   # ✅
             },
         })
     except Exception as e:
@@ -757,7 +780,6 @@ def send_broadcast():
         if not operator_id:
             return jsonify({'success': False, 'error': 'Not logged in'}), 401
 
-        # Basic validation
         if not isinstance(stations, list) or not stations:
             return jsonify({'success': False, 'error': 'No stations selected'}), 400
         if direction not in VALID_DIRECTIONS:
@@ -766,7 +788,6 @@ def send_broadcast():
             if s not in STATIONS:
                 return jsonify({'success': False, 'error': f'Invalid station: {s}'}), 400
 
-        # ✅ FIX #2: verify operator can broadcast to every station listed
         user = User.query.get(operator_id)
         if user.role != 'admin' and user.access_level != 'line_wide':
             managed = get_operator_stations(operator_id)
@@ -777,9 +798,11 @@ def send_broadcast():
                     'error': f'You do not manage: {", ".join(unauthorized)}'
                 }), 403
 
+        # write with aware Manila time so Postgres stores correct UTC
+        real_now = Config.get_real_time()
         expires_at = None
         if duration_minutes and duration_minutes > 0:
-            expires_at = datetime.now() + timedelta(minutes=int(duration_minutes))
+            expires_at = real_now + timedelta(minutes=int(duration_minutes))
 
         broadcast = Broadcast(
             title=title,
@@ -788,7 +811,7 @@ def send_broadcast():
             stations=json.dumps(stations),
             severity=severity,
             operator_id=operator_id,
-            created_at=datetime.now(),
+            created_at=real_now,     # ✅ aware
             is_active=True,
             direction=direction,
             duration_minutes=duration_minutes,
@@ -816,7 +839,6 @@ def update_broadcast(broadcast_id):
         if not broadcast:
             return jsonify({'success': False, 'error': 'Broadcast not found'}), 404
 
-        # ✅ FIX #4: verify ownership before mutating
         user_id = session.get('user_id')
         user = User.query.get(user_id)
         broadcast_stations = json.loads(broadcast.stations) if broadcast.stations else []
@@ -831,7 +853,7 @@ def update_broadcast(broadcast_id):
         if 'is_active' in data:
             broadcast.is_active = data['is_active']
             if data['is_active'] is False:
-                broadcast.archived_at = datetime.now()
+                broadcast.archived_at = Config.get_real_time()   # ✅ aware
                 broadcast.archived_by = session.get('username', 'operator')
             else:
                 broadcast.archived_at = None
@@ -863,7 +885,6 @@ def delete_broadcast(broadcast_id):
         if not broadcast:
             return jsonify({'success': False, 'error': 'Broadcast not found'}), 404
 
-        # ✅ FIX #4: verify ownership before archiving
         user_id = session.get('user_id')
         user = User.query.get(user_id)
         broadcast_stations = json.loads(broadcast.stations) if broadcast.stations else []
@@ -876,7 +897,7 @@ def delete_broadcast(broadcast_id):
                 }), 403
 
         broadcast.is_active = False
-        broadcast.archived_at = datetime.now()
+        broadcast.archived_at = Config.get_real_time()   # ✅ aware
         broadcast.archived_by = session.get('username', 'operator')
 
         db.session.commit()
@@ -899,7 +920,6 @@ def delete_broadcast(broadcast_id):
 def override_congestion():
     try:
         data = request.json or {}
-        # ✅ FIX #7: validate payload
         parsed, err = _validate_override_payload(data)
         if err:
             return jsonify({'success': False, 'error': err}), 400
@@ -915,7 +935,6 @@ def override_congestion():
         operator_id = session.get('user_id')
         operator_email = session.get('username')
 
-        # ✅ FIX #2: verify operator manages this station
         user = User.query.get(operator_id)
         try:
             _require_station_access(user, station)
@@ -926,7 +945,7 @@ def override_congestion():
 
         overrides = load_overrides()
 
-        current_time = datetime.now()
+        current_time = Config.get_real_time()   # ✅ aware Manila
         current_timestamp = current_time.timestamp()
 
         expiry = None
@@ -978,7 +997,6 @@ def clear_override():
         if station not in STATIONS or direction not in VALID_DIRECTIONS:
             return jsonify({'success': False, 'error': 'Invalid station or direction'}), 400
 
-        # ✅ FIX #3: verify operator manages this station
         user_id = session.get('user_id')
         user = User.query.get(user_id)
         try:
@@ -997,7 +1015,7 @@ def clear_override():
             current_app.config['overrides'].pop(target_key, None)
             current_app.config['overrides'].pop(target_key.lower(), None)
 
-        _clear_override_cache(station, datetime.now())
+        _clear_override_cache(station, Config.get_real_time())
 
         active = get_active_overrides()
 
@@ -1017,7 +1035,6 @@ def clear_override():
 
 
 def _clear_override_cache(station, current_time):
-    """Clear cache keys touched by an override change."""
     try:
         cache_instance = current_app.extensions.get('cache')
         if not cache_instance:
@@ -1047,7 +1064,6 @@ def _clear_override_cache(station, current_time):
 
 
 def clear_v3_cache():
-    """Clear all live_map_v3 cache keys (for all hours)."""
     cache_instance = current_app.extensions.get('cache')
     if not cache_instance:
         return
@@ -1082,12 +1098,12 @@ def review_report(report_id):
             report.flagged = False
             report.flag_count = 0
             report.reviewed = True
-            report.reviewed_at = datetime.now()
+            report.reviewed_at = Config.get_real_time()   # ✅ aware
             report.reviewed_by = user.username
             message = 'Report kept as True Positive, flags cleared'
         elif verdict == 'false_positive':
             report.archived = True
-            report.archived_at = datetime.now()
+            report.archived_at = Config.get_real_time()   # ✅ aware
             report.archived_by = user.username
             report.flagged = False
             report.flag_count = 0
@@ -1125,7 +1141,7 @@ def keep_report(report_id):
         report.flagged = False
         report.flag_count = 0
         report.reviewed = True
-        report.reviewed_at = datetime.now()
+        report.reviewed_at = Config.get_real_time()   # ✅ aware
         report.reviewed_by = user.username
 
         db.session.commit()
@@ -1157,7 +1173,7 @@ def archive_report(report_id):
             return jsonify({'success': False, 'error': 'You cannot archive reports from this station'}), 403
 
         report.archived = True
-        report.archived_at = datetime.now()
+        report.archived_at = Config.get_real_time()   # ✅ aware
         report.archived_by = user.username
         report.flagged = False
         report.flag_count = 0
@@ -1228,8 +1244,8 @@ def get_operator_report_stats():
         Report.flagged == True, Report.station.in_(managed_stations), Report.reviewed == False
     ).count()
 
-    # ✅ FIX #6: compare against a datetime, not a date
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    # compare against naive-UTC midnight (same as DB column)
+    today_start = _now_naive_utc().replace(hour=0, minute=0, second=0, microsecond=0)
     today_reports = Report.query.filter(
         Report.station.in_(managed_stations),
         Report.timestamp >= today_start,
@@ -1276,7 +1292,7 @@ def operator_my_activity():
         log_data = [{
             'action': log.action,
             'details': log.details,
-            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'timestamp': _naive_to_manila_iso(log.timestamp),   # ✅ fixed
         } for log in logs]
 
         return jsonify(log_data)

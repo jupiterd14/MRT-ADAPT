@@ -1187,34 +1187,26 @@ async function getCongestionAlerts() {
             for (const [station, stationData] of Object.entries(data.northbound)) {
                 const congestion = stationData.congestion || 0;
                 
-                if (congestion > 80) {
-                    northbound.severe.push(station);
-                } else if (congestion > 60) {
-                    northbound.congested.push(station);
-                } else if (congestion > 30) {
-                    northbound.moderate.push(station);
-                } else if (congestion > 0) {
-                    northbound.light.push(station);
-                }
+                // AFTER — matches operator dashboard + live map
+if (congestion > 80) northbound.severe.push(station);
+else if (congestion > 50) northbound.congested.push(station);   // 50
+else if (congestion > 25) northbound.moderate.push(station);    // 25
+else if (congestion > 0)  northbound.light.push(station);
             }
         }
         
         // Process southbound data
-        if (data.southbound) {
-            for (const [station, stationData] of Object.entries(data.southbound)) {
-                const congestion = stationData.congestion || 0;
-                
-                if (congestion > 80) {
-                    southbound.severe.push(station);
-                } else if (congestion > 60) {
-                    southbound.congested.push(station);
-                } else if (congestion > 30) {
-                    southbound.moderate.push(station);
-                } else if (congestion > 0) {
-                    southbound.light.push(station);
-                }
-            }
-        }
+        // Process southbound data
+if (data.southbound) {
+    for (const [station, stationData] of Object.entries(data.southbound)) {
+        const congestion = stationData.congestion || 0;
+        
+        if (congestion > 80) southbound.severe.push(station);
+        else if (congestion > 50) southbound.congested.push(station);   // 50
+        else if (congestion > 25) southbound.moderate.push(station);    // 25
+        else if (congestion > 0)  southbound.light.push(station);
+    }
+}
         
         console.log('📊 Northbound grouping:', northbound);
         console.log('📊 Southbound grouping:', southbound);

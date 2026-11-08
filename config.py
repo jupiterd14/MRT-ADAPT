@@ -104,3 +104,12 @@ class Config:
             seconds=now.second,
             microseconds=now.microsecond,
         )
+        
+    @staticmethod
+    def get_real_time():
+        """
+        Real wall-clock time in Manila. Use this for Report.timestamp and any
+        user-facing time (created_at, submitted_at, etc.).
+        Do NOT use for LSTM model input — the model is anchored to 2024.
+        """
+        return datetime.now(ZoneInfo('Asia/Manila'))

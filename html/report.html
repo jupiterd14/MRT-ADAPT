@@ -2276,55 +2276,73 @@ function filterAndDisplayReports() {
     // ========== FILTER BY DATE ==========
    // ========== FILTER BY DATE ==========
 // ========== FILTER BY DATE ==========
-if (activeFilters.dateRange && filteredReports.length > 0) {
-    // Get current date but FORCE year to 2025
-    const now = new Date();
-    const referenceDate = new Date(2025, now.getMonth(), now.getDate());
-    referenceDate.setHours(0, 0, 0, 0);
-    
-    console.log("📅 Using date as reference:", referenceDate.toLocaleDateString());
-    
-    filteredReports = filteredReports.filter(report => {
-        if (!report.timestamp) return false;
-        
-        try {
-            const reportDate = new Date(report.timestamp);
-            if (isNaN(reportDate.getTime())) return false;
-            
-            const reportDateOnly = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
-            reportDateOnly.setHours(0, 0, 0, 0);
-            
-            switch(activeFilters.dateRange) {
-                case 'today': {
-                    return reportDateOnly.getTime() === referenceDate.getTime();
-                }
-                case 'yesterday': {
-                    const yesterday = new Date(referenceDate);
-                    yesterday.setDate(yesterday.getDate() - 1);
-                    return reportDateOnly.getTime() === yesterday.getTime();
-                }
-                case 'week': {
-                    const weekAgo = new Date(referenceDate);
-                    weekAgo.setDate(weekAgo.getDate() - 7);
-                    console.log(`Week range: ${weekAgo.toLocaleDateString()} to ${referenceDate.toLocaleDateString()}`);
-                    return reportDateOnly >= weekAgo && reportDateOnly <= referenceDate;
-                }
-                case 'month': {
-                    const monthAgo = new Date(referenceDate);
-                    monthAgo.setDate(monthAgo.getDate() - 30);
-                    console.log(`Month range: ${monthAgo.toLocaleDateString()} to ${referenceDate.toLocaleDateString()}`);
-                    return reportDateOnly >= monthAgo && reportDateOnly <= referenceDate;
-                }
-                default:
-                    return true;
-            }
-        } catch(e) {
-            console.error("Error parsing date for report:", report.id, e);
-            return false;
+    // ========== FILTER BY DATE ==========
+    if (activeFilters.dateRange && filteredReports.length > 0) {
+        // Anchor "today" to the newest report's calendar day.
+        // This works whether reports are 2024, 2025, or 2026.
+        let referenceDate = new Date();
+
+        if (allReportsData.length > 0) {
+            const newest = allReportsData.reduce((a, b) => {
+                const ta = new Date(a.timestamp).getTime();
+                const tb = new Date(b.timestamp).getTime();
+                return tb > ta ? b : a;
+            });
+            referenceDate = new Date(newest.timestamp);
         }
-    });
-    console.log("After date filter:", filteredReports.length);
-}
+
+        referenceDate = new Date(
+            referenceDate.getFullYear(),
+            referenceDate.getMonth(),
+            referenceDate.getDate()
+        );
+        referenceDate.setHours(0, 0, 0, 0);
+
+        console.log("📅 Using date as reference:", referenceDate.toLocaleDateString());
+
+        filteredReports = filteredReports.filter(report => {
+            if (!report.timestamp) return false;
+
+            try {
+                const reportDate = new Date(report.timestamp);
+                if (isNaN(reportDate.getTime())) return false;
+
+                const reportDateOnly = new Date(
+                    reportDate.getFullYear(),
+                    reportDate.getMonth(),
+                    reportDate.getDate()
+                );
+                reportDateOnly.setHours(0, 0, 0, 0);
+
+                switch(activeFilters.dateRange) {
+                    case 'today': {
+                        return reportDateOnly.getTime() === referenceDate.getTime();
+                    }
+                    case 'yesterday': {
+                        const yesterday = new Date(referenceDate);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        return reportDateOnly.getTime() === yesterday.getTime();
+                    }
+                    case 'week': {
+                        const weekAgo = new Date(referenceDate);
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return reportDateOnly >= weekAgo && reportDateOnly <= referenceDate;
+                    }
+                    case 'month': {
+                        const monthAgo = new Date(referenceDate);
+                        monthAgo.setDate(monthAgo.getDate() - 30);
+                        return reportDateOnly >= monthAgo && reportDateOnly <= referenceDate;
+                    }
+                    default:
+                        return true;
+                }
+            } catch(e) {
+                console.error("Error parsing date for report:", report.id, e);
+                return false;
+            }
+        });
+        console.log("After date filter:", filteredReports.length);
+    }
     // If no filters are applied, show all reports
     if ((!activeFilters.congestionLevels || activeFilters.congestionLevels.length === 0) && 
         (!activeFilters.stations || activeFilters.stations.length === 0) && 
@@ -2667,7 +2685,7 @@ function confirmSubmit() {
 }
   function displayReports(reports) {
 
-     reports.sort((a, b) => b.id - a.id);
+     reports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
      
     const reportsList = document.getElementById('reportsList');
     
@@ -2705,26 +2723,27 @@ function confirmSubmit() {
             borderColor = '#22C55E';
         }
         
-       const reportTime = new Date(report.timestamp);
+    const reportTime = new Date(report.timestamp);
 const now = new Date();
 const diffMs = now - reportTime;
 const diffMins = Math.floor(diffMs / 60000);
 const diffHours = Math.floor(diffMins / 60);
-const diffDays = Math.floor(diffHours / 24);
 
 let timeAgo = '';
 if (diffMins < 1) {
     timeAgo = 'just now';
 } else if (diffMins < 60) {
-    timeAgo = `${diffMins} mins ago`;
+    timeAgo = `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
 } else if (diffHours < 24) {
-    timeAgo = `${diffHours} hours ago`;
-} else if (diffDays < 30) {
-    timeAgo = `${diffDays} days ago`;
+    // 1–23 hours ago → keep relative
+    timeAgo = `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
 } else {
-    // For older reports (30+ days), show the actual date
-    const options = { year: 'numeric', month: 'short', day: 'numeric' };
-    timeAgo = reportTime.toLocaleDateString('en-US', options);
+    // 24h+ → switch to absolute date like the operator page
+    timeAgo = reportTime.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
 }
         
         let displayName = '';

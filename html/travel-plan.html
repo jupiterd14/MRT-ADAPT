@@ -2365,8 +2365,8 @@ function getRandomMessage(arr) {
 // Helper function to determine congestion level
 function getCongestionLevel(congestion) {
     if (congestion > 80) return 'severe';
-    if (congestion > 60) return 'congested';
-    if (congestion > 40) return 'moderate';
+    if (congestion > 50) return 'congested';
+    if (congestion > 25) return 'moderate';
     return 'light';
 }
 
@@ -2530,7 +2530,7 @@ function populateDateTimeSelects() {
     const currentDay = now.getDate();
 
     // ========== YEARS (locked to 2025 for testing) ==========
-    const TEST_YEAR = 2025;
+    const TEST_YEAR = 2026;
     const yearSelect = document.getElementById('yearSelect');
     if (yearSelect) {
         yearSelect.innerHTML = '';
@@ -2668,7 +2668,7 @@ function updateDays() {
 function getFormattedDateTime() {
     const month = document.getElementById('monthSelect')?.value || '1';
     const day = document.getElementById('daySelect')?.value || '1';
-    const year = document.getElementById('yearSelect')?.value || '2025';
+    const year = document.getElementById('yearSelect')?.value || '2026';
     const hour = document.getElementById('hourSelect')?.value || '12';
     const minute = document.getElementById('minuteSelect')?.value || '00';
     const ampm = document.getElementById('ampmSelect')?.value || 'AM';
@@ -2769,7 +2769,7 @@ function cancelRoute() {
 
     document.getElementById('monthSelect').value = currentMonth;
     document.getElementById('daySelect').value = String(currentDay).padStart(2, '0');
-    document.getElementById('yearSelect').value = 2025;   // still fine — locked year
+    document.getElementById('yearSelect').value = 2026;   // still fine — locked year
 
     let hour12 = currentHour24 % 12;
     if (hour12 === 0) hour12 = 12;
@@ -2910,26 +2910,25 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     const adjustedTravelTime = baseTravelTime + etaAdjustment;
     
     const getStatus = (cong) => {
-        if (cong > 80) return { text: 'SEVERE', color: '#EF4444' };
-        if (cong > 60) return { text: 'CONGESTED', color: '#F97316' };
-        if (cong > 40) return { text: 'MODERATE', color: '#F59E0B' };
-        if (cong > 20) return { text: 'LIGHT', color: '#3B82F6' };
-        return { text: 'LIGHT', color: '#22C55E' };
-    };
+    if (cong > 80) return { text: 'SEVERE', color: '#EF4444' };
+    if (cong > 50) return { text: 'CONGESTED', color: '#F97316' };
+    if (cong > 25) return { text: 'MODERATE', color: '#F59E0B' };
+    return { text: 'LIGHT', color: '#22C55E' };
+};
     
     const fromStatus = getStatus(fromCongestion);
     
-    const getShortMessage = (congestion, station) => {
+        const getShortMessage = (congestion, station) => {
         if (congestion > 80) return `${station} severely congested. Long queues expected.`;
-        if (congestion > 60) return `${station} congested. Delay boarding time.`;
-        if (congestion > 40) return `${station} moderate. Normal commute.`;
+        if (congestion > 50) return `${station} congested. Delay boarding time.`;
+        if (congestion > 25) return `${station} moderate. Normal commute.`;
         return `${station} Smooth journey.`;
     };
     
-    const getShortTip = (congestion) => {
+        const getShortTip = (congestion) => {
         if (congestion > 80) return 'Consider an alternative route';
-        if (congestion > 60) return 'Arrive 10-15 min early.';
-        if (congestion > 40) return 'Arrive at normal time.';
+        if (congestion > 50) return 'Arrive 10-15 min early.';
+        if (congestion > 25) return 'Arrive at normal time.';
         return 'No delays expected.';
     };
     
@@ -2962,8 +2961,8 @@ function generateAdvisoriesWithForecast(from, to, fromData, toData, headwayData,
     const advisory2 = document.createElement('div');
     let cardClass = 'info';
     if (fromCongestion > 80) cardClass = 'critical';
-    else if (fromCongestion > 60) cardClass = 'warning';
-    else if (fromCongestion > 40) cardClass = 'moderate';
+    else if (fromCongestion > 50) cardClass = 'warning';
+    else if (fromCongestion > 25) cardClass = 'moderate';
     else cardClass = 'success';
     
     advisory2.className = `advisory-card ${cardClass} advisory-status`;

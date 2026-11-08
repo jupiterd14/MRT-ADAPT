@@ -3064,7 +3064,7 @@ let updateInterval = null;
 let currentDirection = 'north';
 let cachedData = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 300000 ; // 10 minutes cache (600,000 ms)
+const CACHE_DURATION = 30000 ; // 10 minutes cache (600,000 ms)
 let isRefreshing = false; // Prevent concurrent refreshes
 let cachedAlertCount = null;
 let cachedAlertCountTime = 0;
@@ -3628,31 +3628,31 @@ function startCountdownTimer() {
         clearInterval(countdownInterval);
         countdownInterval = null;
     }
-    
-    const northEl = document.getElementById('northTime');
-    const southEl = document.getElementById('southTime');
-    
-    countdownInterval = setInterval(() => {
-        // Get current minutes displayed
-        let northText = northEl ? northEl.textContent : '';
-        let southText = southEl ? southEl.textContent : '';
-        
-        // Northbound countdown
-        if (northText && !isNaN(parseInt(northText)) && !northText.includes('CLOSED') && !northText.includes('LAST')) {
-            let newMin = parseInt(northText) - 1;
-            if (newMin < 0) newMin = 0;
-            northEl.innerHTML = `${newMin} <span>min</span>`;
-        }
-        
-        // Southbound countdown
-        if (southText && !isNaN(parseInt(southText)) && !southText.includes('CLOSED') && !southText.includes('LAST')) {
-            let newMin = parseInt(southText) - 1;
-            if (newMin < 0) newMin = 0;
-            southEl.innerHTML = `${newMin} <span>min</span>`;
-        }
-    }, 60000); // Update every minute
-}
 
+    const tick = () => {
+        ['northTime', 'southTime'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+
+            const arrivalIso = el.dataset.arrivalAt;
+            if (!arrivalIso) return;               // no live timer → leave as-is
+
+            const arrivalMs = new Date(arrivalIso).getTime();
+            if (isNaN(arrivalMs)) return;
+
+            const secsLeft = Math.max(0, Math.round((arrivalMs - Date.now()) / 1000));
+            const minsLeft = Math.ceil(secsLeft / 60);
+
+            el.innerHTML = `${minsLeft} <span>min</span>`;
+        });
+    };
+
+    // Immediate tick so tabs refresh the moment they become visible again
+    tick();
+
+    // 1-second tick → all tabs stay within 1 s of each other
+    countdownInterval = setInterval(tick, 1000);
+}
 function updateTrainScheduleUI(data) {
     const northEl = document.getElementById('northTime');
     const southEl = document.getElementById('southTime');
@@ -3661,16 +3661,90 @@ function updateTrainScheduleUI(data) {
 
     if (!northEl || !southEl) return;
 
-    // Clear any previous "reopen" notice before rendering new state
     const oldNotice = document.getElementById('reopenNotice');
     if (oldNotice) oldNotice.remove();
 
-    // ============================================================
-    // CASE 1 — Station fully closed (outside operating hours)
-    // ============================================================
+    const renderDirection = (timeEl, originEl, d, dirLabel) => {
+        // Always clear the anchor first; only live states re-set it.
+        timeEl.dataset.arrivalAt = '';
+
+        if (!d) {
+            timeEl.innerHTML = '<span>--</span>';
+            if (originEl) originEl.textContent = 'No data';
+            return;
+        }
+
+        // ---- Not available ----
+        if (d.available === false) {
+            if (d.reason === 'closed') {
+                timeEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">CLOSED</span>';
+                if (originEl) {
+                    originEl.textContent = (d.last_train && d.last_train !== 'N/A')
+                        ? `Last ${dirLabel} departure: ${d.last_train}`
+                        : 'MRT-3 is currently closed';
+                }
+                return;
+            }
+            if (d.reason === 'service_ended') {
+                timeEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">ENDED</span>';
+                if (originEl) {
+                    originEl.textContent = (d.last_train && d.last_train !== 'N/A')
+                        ? `Last ${dirLabel} departure: ${d.last_train}`
+                        : 'No more trains today';
+                }
+                return;
+            }
+            timeEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">ENDED</span>';
+            if (originEl) {
+                originEl.textContent = (d.last_train && d.last_train !== 'N/A')
+                    ? `Last ${dirLabel} departure: ${d.last_train}`
+                    : `No ${dirLabel} departures from this terminal`;
+            }
+            return;
+        }
+
+        // ---- Terminus arrival-only (NB at North Ave, SB at Taft) ----
+        if (d.reason === 'terminal_arrival_only') {
+            timeEl.innerHTML = `${d.minutes ?? '--'} <span>min</span>`;
+            timeEl.dataset.arrivalAt = d.next_arrival_at || '';
+            if (originEl) {
+                originEl.textContent = `Train ends its trip here — no ${dirLabel} departure`;
+            }
+            return;
+        }
+
+        // ---- Opens soon ----
+        if (d.reason === 'opens_soon') {
+            timeEl.innerHTML = `${d.minutes ?? '--'} <span>min</span>`;
+            timeEl.dataset.arrivalAt = d.next_arrival_at || '';
+            if (originEl) originEl.textContent = 'Station closed — opens soon';
+            return;
+        }
+
+        // ---- Available (origin departure or mid-line) ----
+        if (d.minutes !== null && d.minutes !== undefined) {
+            timeEl.innerHTML = `${d.minutes} <span>min</span>`;
+            timeEl.dataset.arrivalAt = d.next_arrival_at || '';
+
+            if (originEl) {
+                if (d.destination) {
+                    originEl.textContent = `Departing to ${d.destination}`;
+                } else {
+                    originEl.textContent = 'Departing shortly';
+                }
+            }
+            return;
+        }
+
+        timeEl.innerHTML = '<span>--</span>';
+        if (originEl) originEl.textContent = 'No train data available';
+    };
+
     if (data && data.is_closed === true) {
         northEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">SERVICE ENDED</span>';
         southEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">SERVICE ENDED</span>';
+        northEl.dataset.arrivalAt = '';
+        southEl.dataset.arrivalAt = '';
 
         const nbLast = (data.northbound && data.northbound.last_train) ? data.northbound.last_train : null;
         const sbLast = (data.southbound && data.southbound.last_train) ? data.southbound.last_train : null;
@@ -3686,7 +3760,6 @@ function updateTrainScheduleUI(data) {
                 : 'No SB departures from this terminal';
         }
 
-        // Single line under the grid explaining when it reopens
         const trainGrid = document.querySelector('.train-grid');
         if (trainGrid) {
             const notice = document.createElement('div');
@@ -3698,62 +3771,21 @@ function updateTrainScheduleUI(data) {
         return;
     }
 
-    // ============================================================
-    // CASE 2 — Station open, render per-direction status
-    // ============================================================
     if (data && data.southbound && data.northbound) {
-        const northMinutes = data.northbound.minutes;
-        const southMinutes = data.southbound.minutes;
-        const northOrigin   = data.northbound.origin;
-        const southOrigin   = data.southbound.origin;
-        const nbLast        = data.northbound.last_train;
-        const sbLast        = data.southbound.last_train;
-
-        // ---- NORTHBOUND ----
-        if (data.northbound.available === false) {
-            northEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">ENDED</span>';
-            if (northOriginEl) {
-                northOriginEl.textContent = (nbLast && nbLast !== 'N/A')
-                    ? `Last NB departure: ${nbLast}`
-                    : 'No NB departures from this terminal';
-            }
-        } else if (northMinutes !== null && northMinutes !== undefined) {
-            northEl.innerHTML = `${northMinutes} <span>min</span>`;
-            if (northOriginEl) northOriginEl.textContent = `Arriving from ${northOrigin || 'previous station'}`;
-        } else {
-            northEl.innerHTML = '<span>--</span>';
-            if (northOriginEl) northOriginEl.textContent = 'No train data available';
-        }
-
-        // ---- SOUTHBOUND ----
-        if (data.southbound.available === false) {
-            southEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">ENDED</span>';
-            if (southOriginEl) {
-                southOriginEl.textContent = (sbLast && sbLast !== 'N/A')
-                    ? `Last SB departure: ${sbLast}`
-                    : 'No SB departures from this terminal';
-            }
-        } else if (southMinutes !== null && southMinutes !== undefined) {
-            southEl.innerHTML = `${southMinutes} <span>min</span>`;
-            if (southOriginEl) southOriginEl.textContent = `Arriving from ${southOrigin || 'previous station'}`;
-        } else {
-            southEl.innerHTML = '<span>--</span>';
-            if (southOriginEl) southOriginEl.textContent = 'No train data available';
-        }
-
+        renderDirection(northEl, northOriginEl, data.northbound, 'NB');
+        renderDirection(southEl, southOriginEl, data.southbound, 'SB');
         return;
     }
 
-    // ============================================================
-    // CASE 3 — API failed or incomplete; fall back to clock logic
-    // ============================================================
-    const now          = new Date();
-    const currentTime  = now.getHours() + now.getMinutes() / 60;
-    const isOperating  = currentTime >= OPERATING_START && currentTime < OPERATING_END;
+    const now         = new Date();
+    const currentTime = now.getHours() + now.getMinutes() / 60;
+    const isOperating = currentTime >= OPERATING_START && currentTime < OPERATING_END;
 
     if (!isOperating) {
         northEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">SERVICE ENDED</span>';
         southEl.innerHTML = '<span style="font-size: 18px; letter-spacing: 0.5px;">SERVICE ENDED</span>';
+        northEl.dataset.arrivalAt = '';
+        southEl.dataset.arrivalAt = '';
         if (northOriginEl) northOriginEl.textContent = 'MRT-3 is currently closed';
         if (southOriginEl) southOriginEl.textContent = 'MRT-3 is currently closed';
 
@@ -3768,55 +3800,91 @@ function updateTrainScheduleUI(data) {
         return;
     }
 
-    // Operating but API returned nothing usable
     northEl.innerHTML = '-- <span>min</span>';
     southEl.innerHTML = '-- <span>min</span>';
+    northEl.dataset.arrivalAt = '';
+    southEl.dataset.arrivalAt = '';
     if (northOriginEl) northOriginEl.textContent = 'Schedule unavailable';
     if (southOriginEl) southOriginEl.textContent = 'Schedule unavailable';
 }
-
+// ========== UPDATE BEST TIME UI ==========
 // ========== UPDATE BEST TIME UI ==========
 function updateBestTimeUI(data) {
     const bestTimeText = document.getElementById('bestTimeText');
     if (!bestTimeText) return;
-    
+
     let northCong = 0;
     let southCong = 0;
-    
-    if (data && data.forecastData && data.forecastData.forecasts && data.forecastData.forecasts[0])  {
+
+    if (data && data.forecastData && data.forecastData.forecasts && data.forecastData.forecasts[0]) {
         northCong = data.forecastData.forecasts[0].northbound || 0;
         southCong = data.forecastData.forecasts[0].southbound || 0;
     }
-     
-    
-    // FIX: U
-    // se system time for rush hour detection
+
     const now = new Date();
     const currentHour = now.getHours();
     const isRushHour = (currentHour >= 7 && currentHour < 9) || (currentHour >= 17 && currentHour < 19);
-    
-      const OPERATING_START = 4.5;
-    const OPERATING_END = 22.5;
+    const hour = now.getHours() + now.getMinutes() / 60;
+    const isOperating = hour >= OPERATING_START && hour < OPERATING_END;
 
-    const hour = now.getHours() + (now.getMinutes() / 60);
-
-    const getAdvice = (cong) => {
-        if (cong > 80) return "Expect 30-60 min delays - Severe congestion";
-        if (cong > 50) return "Expect 15-30 min delays - Heavy traffic";
-        if (cong > 25) return "Allow extra 5-10 min - Moderate congestion";
-
-          // 2. If it's under 30, check if the station is operational or closed
-    if (hour < OPERATING_START || hour > OPERATING_END) {
-        return "MRT opens at 4:30 AM"; // Gray color for closed hours
-    }
-
-        return "Fast travel expected - Light traffic";
+    // ---- Deterministic seeded RNG: same phrase for same station+bucket+day ----
+    const seedHash = (str) => {
+        let h = 0;
+        for (let i = 0; i < str.length; i++) {
+            h = ((h << 5) - h) + str.charCodeAt(i);
+            h |= 0;
+        }
+        return Math.abs(h);
     };
-    
-    // Add rush hour warning
-    const rushWarning = isRushHour ? 
-        '<div style="color: #EF4444; font-weight: bold; margin-bottom: 8px;"></div>' : '';
-    
+    const pickFrom = (arr, seedKey) => arr[seedHash(seedKey) % arr.length];
+
+    // ---- Advice pools per congestion bucket ----
+    const advicePools = {
+        severe: [
+            "Expect 30-60 min delays - Severe congestion",
+            "Heavy crowding - plan for major delays",
+            "Severe load - consider postponing your trip"
+        ],
+        congested: [
+            "Expect 15-30 min delays - Heavy traffic",
+            "High passenger volume - allow extra time",
+            "Crowded - arrive earlier than usual"
+        ],
+        moderate: [
+            "Allow extra 5-10 min - Moderate congestion",
+            "Normal commute with minor waits",
+            "Moderate load - arrive at your usual time"
+        ],
+        light: [
+            "Fast travel expected - Light traffic",
+            "Smooth commute ahead - low crowding",
+            "Light crowds - easy boarding"
+        ]
+    };
+
+    const bucketFor = (cong) => {
+        if (cong > 80) return 'severe';
+        if (cong > 50) return 'congested';
+        if (cong > 25) return 'moderate';
+        return 'light';
+    };
+
+    const getAdvice = (cong, station, direction) => {
+        // Operating hours check FIRST — overrides everything else
+        if (!isOperating) {
+            return "MRT opens at 4:30 AM";
+        }
+        const bucket = bucketFor(cong);
+        const key = `${station}_${direction}_${bucket}_${now.toDateString()}`;
+        return pickFrom(advicePools[bucket], key);
+    };
+
+    const stationName = currentStation || 'North Ave';
+
+    const rushWarning = isRushHour
+        ? '<div style="color: #EF4444; font-weight: bold; margin-bottom: 8px;"></div>'
+        : '';
+
     bestTimeText.innerHTML = rushWarning + `
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; margin-bottom: 12px;">
             <div style="display: flex; align-items: center; gap: 10px; min-width: 140px;">
@@ -3824,7 +3892,7 @@ function updateBestTimeUI(data) {
                 <strong style="font-size: 13px;">NORTHBOUND</strong>
                 ${createCongestionPill(northCong, 'xs')}
             </div>
-            <span style="font-size: 11px; color: var(--text-light); flex: 1;">${getAdvice(northCong)}</span>
+            <span style="font-size: 11px; color: var(--text-light); flex: 1;">${getAdvice(northCong, stationName, 'NB')}</span>
         </div>
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
             <div style="display: flex; align-items: center; gap: 10px; min-width: 140px;">
@@ -3832,7 +3900,7 @@ function updateBestTimeUI(data) {
                 <strong style="font-size: 13px;">SOUTHBOUND</strong>
                 ${createCongestionPill(southCong, 'xs')}
             </div>
-            <span style="font-size: 11px; color: var(--text-light); flex: 1;">${getAdvice(southCong)}</span>
+            <span style="font-size: 11px; color: var(--text-light); flex: 1;">${getAdvice(southCong, stationName, 'SB')}</span>
         </div>
     `;
 }

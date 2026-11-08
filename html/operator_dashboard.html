@@ -1034,18 +1034,18 @@
             margin-bottom: 8px;
         }
 
-        .select-all {
-            color: var(--green) !important;  /* Force green color */
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.2s;
-        }
+   .select-all {
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-light);
+    transition: 0.2s;
+}
 
-        .select-all:hover {
-            color: #16A34A !important;  /* Darker green on hover */
-            text-decoration: underline;
-        }
+.select-all:hover {
+    color: var(--text-dark);
+    text-decoration: underline;
+}
 
         .stations-grid {
             display: grid;
@@ -1067,52 +1067,51 @@
 
         /* Custom toggle switch */
         .switch {
-            position: relative;
-            display: inline-block;
-            width: 28px;
-            height: 16px;
-            border: 2px solid #ccc;
-            border-radius: 16px;
-        }
+    position: relative;
+    display: inline-block;
+    width: 28px;
+    height: 16px;
+    flex-shrink: 0;
+}
 
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
 
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #66e742;
-            transition: .3s;
-            border-radius: 34px;
-        }
+       .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #CBD5E1;      /* gray when OFF */
+    transition: .3s;
+    border-radius: 34px;
+}
 
         .slider:before {
-            position: absolute;
-            content: "";
-            height: 12px;
-            width: 12px;
-            left: 2px;
-            bottom: 2px;
-            background-color:  #2c7548; /* Light green background (20% opacity) */
-        
-            transition: .3s;
-            border-radius: 50%;
-        }
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
+    background-color: #FFFFFF;
+    transition: .3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
 
-        input:checked + .slider {
-            background-color: var(--green);
-        }
+     input:checked + .slider {
+    background-color: #22C55E; 
+}
 
-        input:checked + .slider:before {
-            transform: translateX(12px);
-        }
+       input:checked + .slider:before {
+    transform: translateX(12px);
+}
 
         /* --- Apply Button --- */
         .apply-filter-btn {
@@ -3250,8 +3249,10 @@
 
     // Cache metrics for layout consistency
     let cachedData = null;
+    let cachedStations = null;
     let lastFetchTime = 0;
     const CACHE_DURATION = 30000;
+    
 
     // Status mapping configurations matching client metrics
     function getWaitTime(congestion) {
@@ -3867,127 +3868,214 @@ async function confirmArchiveBroadcast() {
     }
     
     // ========== STATION LIST MODAL FUNCTIONS ==========
-    async function showStationListByCategory(category) {
-        const modal = document.getElementById('stationListModal');
-        if (!modal) return;
-        
-        document.getElementById('stationListContent').innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Querying real-time line states...</p></div>';
-        modal.style.display = 'flex';
+let stationListModalState = {
+    category: null,
+    direction: 'all',   // 'all' | 'northbound' | 'southbound'
+    data: []
+};
 
-        let lineData;
+async function showStationListByCategory(category) {
+    const modal = document.getElementById('stationListModal');
+    if (!modal) return;
+
+    const categories = {
+        light:     { min: 0,     max: 25,  name: 'Light Stations',      icon: 'fa-smile', color: '#22C55E', bg: '#DCFCE7', borderColor: '#86EFAC' },
+        moderate:  { min: 25.01, max: 50,  name: 'Moderate Stations',   icon: 'fa-meh',   color: '#F59E0B', bg: '#FEF3C7', borderColor: '#FDE047' },
+        congested: { min: 50.01, max: 80,  name: 'Congested Stations',  icon: 'fa-frown', color: '#F97316', bg: '#FFEDD5', borderColor: '#FDBA74' },
+        severe:    { min: 80.01, max: 100, name: 'Severely Congested',  icon: 'fa-angry', color: '#EF4444', bg: '#FEE2E2', borderColor: '#FCA5A5' }
+    };
+
+    const cat = categories[category];
+    if (!cat) return;
+
+    // Reset modal state
+    stationListModalState.category = category;
+    stationListModalState.direction = 'all';
+
+    document.getElementById('stationListContent').innerHTML =
+        '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Querying real-time line states...</p></div>';
+    modal.style.display = 'flex';
+
+    // ─── Read from cachedStations (same data as the stat cards) ───
+    let stationsData = null;
+
+    if (typeof cachedStations !== 'undefined' && Array.isArray(cachedStations) && cachedStations.length > 0) {
+        stationsData = cachedStations;
+    } else {
         try {
-            const response = await fetch(`/api/live-map/directions/v2?_=${Date.now()}`);
+            const response = await fetch(`/api/operator/station-status?_=${Date.now()}`);
             if (response.ok) {
-                lineData = await response.json();
+                const json = await response.json();
+                stationsData = json.stations || [];
+                cachedStations = stationsData;
             } else {
-                throw new Error('Core API inaccessible');
+                throw new Error('Station status inaccessible');
             }
         } catch (e) {
-            console.warn("Category metrics falling back to local dataset mapping maps", e);
-            lineData = cachedData;
-        }
-
-        if (!lineData) {
-            document.getElementById('stationListContent').innerHTML = '<p style="text-align:center; padding: 20px;">Unable to parse track network status.</p>';
-            return;
-        }
-        
-        const categories = {
-            light: { min: 0, max: 30, name: 'Light Stations', icon: 'fa-smile', color: '#22C55E', bg: '#DCFCE7', borderColor: '#86EFAC' },
-            moderate: { min: 31, max: 60, name: 'Moderate Stations', icon: 'fa-meh', color: '#F59E0B', bg: '#FEF3C7', borderColor: '#FDE047' },
-            congested: { min: 61, max: 80, name: 'Congested Stations', icon: 'fa-frown', color: '#F97316', bg: '#FFEDD5', borderColor: '#FDBA74' },
-            severe: { min: 81, max: 100, name: 'Severely Congested', icon: 'fa-angry', color: '#EF4444', bg: '#FEE2E2', borderColor: '#FCA5A5' }
-        };
-        
-        const cat = categories[category];
-        if (!cat) return;
-        
-        const stationsInCategory = [];
-        
-        for (const station of allStations) {
-            const northData = lineData.northbound?.[station];
-            const southData = lineData.southbound?.[station];
-            
-            if (northData && northData.congestion >= cat.min && northData.congestion <= cat.max) {
-                stationsInCategory.push({
-                    station: station,
-                    direction: 'Northbound',
-                    congestion: northData.congestion,
-                    status: northData.status || getStatusText(northData.congestion),
-                    wait_time: northData.wait_time || getWaitTime(northData.congestion),
-                    ridership: northData.ridership || 0,
-                    overridden: northData.overridden || false
-                });
-            }
-            
-            if (southData && southData.congestion >= cat.min && southData.congestion <= cat.max) {
-                stationsInCategory.push({
-                    station: station,
-                    direction: 'Southbound',
-                    congestion: southData.congestion,
-                    status: southData.status || getStatusText(southData.congestion),
-                    wait_time: southData.wait_time || getWaitTime(southData.congestion),
-                    ridership: southData.ridership || 0,
-                    overridden: southData.overridden || false
-                });
-            }
-        }
-        
-        if (category === 'severe' || category === 'congested') {
-            stationsInCategory.sort((a, b) => b.congestion - a.congestion);
-        } else {
-            stationsInCategory.sort((a, b) => a.congestion - b.congestion);
-        }
-        
-        document.getElementById('modalCategoryTitle').textContent = `${cat.name} (${stationsInCategory.length})`;
-        document.getElementById('modalCategorySubtitle').textContent = `Stations with ${category} congestion (${cat.min}-${cat.max}%)`;
-        document.getElementById('modalCategoryIconElem').className = `fas ${cat.icon}`;
-        const iconContainer = document.getElementById('modalCategoryIcon');
-        iconContainer.style.background = cat.bg;
-        iconContainer.style.color = cat.color;
-        
-        if (stationsInCategory.length === 0) {
-            document.getElementById('stationListContent').innerHTML = `
-                <div style="text-align: center; padding: 80px 40px; color: var(--text-light);">
-                    <i class="fas fa-check-circle" style="font-size: 64px; margin-bottom: 20px; opacity: 0.3;"></i>
-                    <p style="font-size: 16px; margin: 0;">No stations in this category</p>
-                </div>
-            `;
-        } else {
-            document.getElementById('stationListContent').innerHTML = `
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    ${stationsInCategory.map(item => `
-                        <div style="background: white; border: 2px solid ${cat.borderColor}; border-radius: 16px; padding: 20px; transition: all 0.2s;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <strong style="font-size: 18px; color: var(--text-dark);">${item.station}</strong>
-                                    <span style="display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #EFF6FF; color: #3B82F6;">
-                                        <i class="fas ${item.direction === 'Northbound' ? 'fa-arrow-up' : 'fa-arrow-down'}" style="margin-right: 6px;"></i>${item.direction}
-                                    </span>
-                                    ${item.overridden ? '<span style="background: #8B5CF6; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px;"><i class="fas fa-pen"></i> Overridden</span>' : ''}
-                                </div>
-                                
-                            </div>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 20px; padding-top: 16px; border-top: 1px solid #F1F5F9;">
-                                <div>
-                                    <div style="font-size: 11px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Status</div>
-                                    <div style="font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px;">
-                                        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${cat.color};"></span>
-                                        ${item.status}
-                                    </div>
-                                </div>
-                               
-                                <div>
-        
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
+            console.warn("Category metrics falling back — no station data", e);
+            stationsData = [];
         }
     }
 
+    if (!stationsData || stationsData.length === 0) {
+        document.getElementById('stationListContent').innerHTML =
+            '<p style="text-align:center; padding: 20px;">No station data available. Please refresh the dashboard.</p>';
+        document.getElementById('modalCategoryTitle').textContent = cat.name;
+        document.getElementById('modalCategorySubtitle').textContent = `Stations with ${category} congestion (${cat.min}-${cat.max}%)`;
+        return;
+    }
+
+    // ─── Build the list ───
+    const stationsInCategory = [];
+
+    for (const station of stationsData) {
+        const stationName = station.name || station.station || 'Unknown';
+        const northData = station.northbound || {};
+        const southData = station.southbound || {};
+
+        const northCong = typeof northData.congestion === 'number' ? northData.congestion : 0;
+        const southCong = typeof southData.congestion === 'number' ? southData.congestion : 0;
+
+        if (northCong >= cat.min && northCong <= cat.max) {
+            stationsInCategory.push({
+                station: stationName,
+                direction: 'Northbound',
+                congestion: northCong,
+                status: northData.status || getStatusText(northCong),
+                wait_time: northData.wait_time || getWaitTime(northCong),
+                ridership: northData.ridership || 0,
+                overridden: northData.overridden || false
+            });
+        }
+
+        if (southCong >= cat.min && southCong <= cat.max) {
+            stationsInCategory.push({
+                station: stationName,
+                direction: 'Southbound',
+                congestion: southCong,
+                status: southData.status || getStatusText(southCong),
+                wait_time: southData.wait_time || getWaitTime(southCong),
+                ridership: southData.ridership || 0,
+                overridden: southData.overridden || false
+            });
+        }
+    }
+
+    if (category === 'severe' || category === 'congested') {
+        stationsInCategory.sort((a, b) => b.congestion - a.congestion);
+    } else {
+        stationsInCategory.sort((a, b) => a.congestion - b.congestion);
+    }
+
+    stationListModalState.data = stationsInCategory;
+
+    // ─── Update header icon ───
+    document.getElementById('modalCategoryIconElem').className = `fas ${cat.icon}`;
+    const iconContainer = document.getElementById('modalCategoryIcon');
+    iconContainer.style.background = cat.bg;
+    iconContainer.style.color = cat.color;
+
+    // ─── Render the whole body (header + toggle + list) ───
+    renderStationListModal();
+}
+
+function renderStationListModal() {
+    const category = stationListModalState.category;
+    if (!category) return;
+
+    const cat = {
+        light:     { min: 0,     max: 25,  name: 'Light Stations',      color: '#22C55E', bg: '#DCFCE7', borderColor: '#86EFAC' },
+        moderate:  { min: 25.01, max: 50,  name: 'Moderate Stations',   color: '#F59E0B', bg: '#FEF3C7', borderColor: '#FDE047' },
+        congested: { min: 50.01, max: 80,  name: 'Congested Stations',  color: '#F97316', bg: '#FFEDD5', borderColor: '#FDBA74' },
+        severe:    { min: 80.01, max: 100, name: 'Severely Congested',  color: '#EF4444', bg: '#FEE2E2', borderColor: '#FCA5A5' }
+    }[category];
+    if (!cat) return;
+
+    const all = stationListModalState.data;
+    const dir = stationListModalState.direction;
+
+    const northCount = all.filter(i => i.direction === 'Northbound').length;
+    const southCount = all.filter(i => i.direction === 'Southbound').length;
+    const totalCount = all.length;
+
+    const filtered = dir === 'all'
+        ? all
+        : all.filter(i => i.direction.toLowerCase() === dir);
+
+    // ─── Title & subtitle ───
+    document.getElementById('modalCategoryTitle').textContent = `${cat.name} (${totalCount})`;
+    document.getElementById('modalCategorySubtitle').textContent =
+        `Stations with ${category} congestion (${cat.min}-${cat.max}%)`;
+
+    // ─── Direction toggle bar ───
+    const toggleBar = `
+        <div style="display: flex; gap: 8px; margin-bottom: 20px; padding: 4px; background: #F8FAFC; border-radius: 30px; width: fit-content;">
+            <button
+                onclick="setStationListDirection('all')"
+                style="padding: 8px 20px; border: none; border-radius: 30px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif;
+                    ${dir === 'all' ? `background: ${cat.color}; color: white; box-shadow: 0 2px 8px ${cat.color}40;` : 'background: transparent; color: #64748B;'}"
+            >
+                All (${totalCount})
+            </button>
+            <button
+                onclick="setStationListDirection('northbound')"
+                style="padding: 8px 20px; border: none; border-radius: 30px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif;
+                    ${dir === 'northbound' ? `background: ${cat.color}; color: white; box-shadow: 0 2px 8px ${cat.color}40;` : 'background: transparent; color: #64748B;'}"
+            >
+                <i class="fas fa-arrow-up" style="font-size: 11px; margin-right: 4px;"></i>
+                Northbound (${northCount})
+            </button>
+            <button
+                onclick="setStationListDirection('southbound')"
+                style="padding: 8px 20px; border: none; border-radius: 30px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif;
+                    ${dir === 'southbound' ? `background: ${cat.color}; color: white; box-shadow: 0 2px 8px ${cat.color}40;` : 'background: transparent; color: #64748B;'}"
+            >
+                <i class="fas fa-arrow-down" style="font-size: 11px; margin-right: 4px;"></i>
+                Southbound (${southCount})
+            </button>
+        </div>
+    `;
+
+    // ─── List ───
+    let listHtml;
+    if (filtered.length === 0) {
+        listHtml = `
+            <div style="text-align: center; padding: 80px 40px; color: var(--text-light);">
+                <i class="fas fa-check-circle" style="font-size: 64px; margin-bottom: 20px; opacity: 0.3;"></i>
+                <p style="font-size: 16px; margin: 0;">No stations in this view</p>
+            </div>
+        `;
+    } else {
+        listHtml = `
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                ${filtered.map(item => `
+                    <div style="background: white; border: 2px solid ${cat.borderColor}; border-radius: 16px; padding: 18px; transition: all 0.2s;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                <strong style="font-size: 17px; color: var(--text-dark);">${escapeHtml(item.station)}</strong>
+                                <span style="display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #EFF6FF; color: #3B82F6;">
+                                    <i class="fas ${item.direction === 'Northbound' ? 'fa-arrow-up' : 'fa-arrow-down'}" style="margin-right: 4px;"></i>${item.direction}
+                                </span>
+                                ${item.overridden ? '<span style="background: #8B5CF6; color: white; padding: 4px 10px; border-radius: 20px; font-size: 10px;"><i class="fas fa-pen"></i> Overridden</span>' : ''}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: ${cat.color};">
+                                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${cat.color};"></span>
+                                ${escapeHtml(item.status)}
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    document.getElementById('stationListContent').innerHTML = toggleBar + listHtml;
+}
+
+function setStationListDirection(direction) {
+    stationListModalState.direction = direction;
+    renderStationListModal();
+}
     function closeStationListModal() {
         document.getElementById('stationListModal').style.display = 'none';
     }
@@ -4050,6 +4138,7 @@ async function confirmArchiveBroadcast() {
         }
         
         const stations = data.stations;
+        cachedStations = stations;   // ← add this line
         console.log(`📊 Found ${stations.length} stations in response`);
         
         // ========== LOG FIRST STATION STRUCTURE ==========
@@ -4665,7 +4754,7 @@ function displayOperatorReports(reports) {
     }
     
     let html = '';
-    activeReports.sort((a, b) => b.id - a.id);
+    activeReports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     
     activeReports.forEach((report, idx) => {
         const isManaged = managedStations.includes(report.station);
@@ -4681,7 +4770,24 @@ function displayOperatorReports(reports) {
         }
         
         const reportTime = new Date(report.timestamp);
-        const formattedDate = reportTime.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+const now = new Date();
+const diffMins = Math.floor((now - reportTime) / 60000);
+const diffHours = Math.floor(diffMins / 60);
+
+let formattedDate = '';
+if (diffMins < 1) {
+    formattedDate = 'just now';
+} else if (diffMins < 60) {
+    formattedDate = `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
+} else if (diffHours < 24) {
+    formattedDate = `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+} else {
+    formattedDate = reportTime.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+}
         
         let displayName = '', avatarLetter = '?';
         if (report.anonymous) {
@@ -5769,14 +5875,24 @@ async function confirmRemoveOverride() {
     
     // ========== SELECT ALL STATIONS ==========
     const selectAllBtn = document.querySelector('.select-all');
-    if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', function() {
-            const checkboxes = document.querySelectorAll('#stationsGridFilter input');
-            const allChecked = Array.from(checkboxes).every(c => c.checked);
-            checkboxes.forEach(c => c.checked = !allChecked);
-            console.log("📋 Select all stations:", !allChecked);
-        });
-    }
+if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('#stationsGridFilter input');
+        const allChecked = Array.from(checkboxes).every(c => c.checked);
+        checkboxes.forEach(c => c.checked = !allChecked);
+
+        // Toggle the pill state visually
+        if (!allChecked) {
+            this.classList.add('all-selected');
+            this.textContent = 'Deselect all';
+        } else {
+            this.classList.remove('all-selected');
+            this.textContent = 'Select all';
+        }
+
+        console.log("📋 Select all stations:", !allChecked);
+    });
+}
 }
 function applyOperatorFilters() {
     console.log("🔄 APPLY FILTERS BUTTON CLICKED!");
@@ -5807,55 +5923,70 @@ function applyOperatorFilters() {
     let filteredReports = [...allReportsData];
     
     // ========== FILTER BY DATE - FIXED YEAR 2025 ==========
-    if (dateRange && dateRange !== 'all') {
-        // Get current date but FORCE year to 2025
-        const now = new Date();
-        const referenceDate = new Date(2025, now.getMonth(), now.getDate());
-        referenceDate.setHours(0, 0, 0, 0);
-        
-        console.log("📅 Using reference date:", referenceDate.toLocaleDateString());
-        
-        filteredReports = filteredReports.filter(report => {
-            if (!report.timestamp) return false;
-            try {
-                const reportDate = new Date(report.timestamp);
-                if (isNaN(reportDate.getTime())) return false;
-                
-                const reportDateOnly = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
-                reportDateOnly.setHours(0, 0, 0, 0);
-                
-                switch(dateRange) {
-                    case 'today': {
-                        return reportDateOnly.getTime() === referenceDate.getTime();
-                    }
-                    case 'yesterday': {
-                        const yesterday = new Date(referenceDate);
-                        yesterday.setDate(yesterday.getDate() - 1);
-                        return reportDateOnly.getTime() === yesterday.getTime();
-                    }
-                    case 'week': {
-                        const weekAgo = new Date(referenceDate);
-                        weekAgo.setDate(weekAgo.getDate() - 7);
-                        console.log(`Week range: ${weekAgo.toLocaleDateString()} to ${referenceDate.toLocaleDateString()}`);
-                        return reportDateOnly >= weekAgo && reportDateOnly <= referenceDate;
-                    }
-                    case 'month': {
-                        const monthAgo = new Date(referenceDate);
-                        monthAgo.setDate(monthAgo.getDate() - 30);
-                        console.log(`Month range: ${monthAgo.toLocaleDateString()} to ${referenceDate.toLocaleDateString()}`);
-                        return reportDateOnly >= monthAgo && reportDateOnly <= referenceDate;
-                    }
-                    default:
-                        return true;
-                }
-            } catch(e) {
-                console.error("Error parsing date:", e);
-                return false;
-            }
+    // ========== FILTER BY DATE ==========
+if (dateRange && dateRange !== 'all') {
+    // Anchor "today" to the newest report's date, so filters always
+    // match whatever year the backend stored reports in (currently 2024).
+    let referenceDate = new Date();
+    
+    if (allReportsData.length > 0) {
+        const newest = allReportsData.reduce((a, b) => {
+            const ta = new Date(a.timestamp).getTime();
+            const tb = new Date(b.timestamp).getTime();
+            return tb > ta ? b : a;
         });
-        console.log(`📅 After date filter (${dateRange}):`, filteredReports.length);
+        referenceDate = new Date(newest.timestamp);
     }
     
+    referenceDate = new Date(
+        referenceDate.getFullYear(),
+        referenceDate.getMonth(),
+        referenceDate.getDate()
+    );
+    referenceDate.setHours(0, 0, 0, 0);
+    
+    console.log("📅 Reference date (newest report):", referenceDate.toLocaleDateString());
+    
+    filteredReports = filteredReports.filter(report => {
+        if (!report.timestamp) return false;
+        try {
+            const reportDate = new Date(report.timestamp);
+            if (isNaN(reportDate.getTime())) return false;
+            
+            const reportDateOnly = new Date(
+                reportDate.getFullYear(),
+                reportDate.getMonth(),
+                reportDate.getDate()
+            );
+            reportDateOnly.setHours(0, 0, 0, 0);
+            
+            switch(dateRange) {
+                case 'today':
+                    return reportDateOnly.getTime() === referenceDate.getTime();
+                case 'yesterday': {
+                    const yesterday = new Date(referenceDate);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    return reportDateOnly.getTime() === yesterday.getTime();
+                }
+                case 'week': {
+                    const weekAgo = new Date(referenceDate);
+                    weekAgo.setDate(weekAgo.getDate() - 7);
+                    return reportDateOnly >= weekAgo && reportDateOnly <= referenceDate;
+                }
+                case 'month': {
+                    const monthAgo = new Date(referenceDate);
+                    monthAgo.setDate(monthAgo.getDate() - 30);
+                    return reportDateOnly >= monthAgo && reportDateOnly <= referenceDate;
+                }
+                default:
+                    return true;
+            }
+        } catch(e) {
+            return false;
+        }
+    });
+    console.log(`📅 After date filter (${dateRange}):`, filteredReports.length);
+}
     // ========== FILTER BY STATIONS ==========
     if (selectedStations.length > 0 && selectedStations.length < allStations.length) {
         filteredReports = filteredReports.filter(report => 
