@@ -890,3 +890,71 @@ def station_status():
     except Exception as e:
         print(f"[station_status] {e}")
         return jsonify({'stations': []}), 500
+# ======================================================================
+# STATION STATUS WITH OVERRIDES
+# ======================================================================
+@admin_bp.route('/api/admin/station-status-with-overrides')
+@admin_required
+@limiter.limit("120 per minute", key_func=_admin_key)
+def station_status_with_overrides():
+    """
+    Admin-facing station status. Returns predicted congestion AND any
+    active operator override for each station + direction.
+    """
+    try:
+        from routes.operator import get_active_overrides
+
+        now = datetime.now()
+        active_overrides = get_active_overrides()
+
+        result = []
+        for station in STATIONS:
+            north_ovr_key = f"{station}_northbound"
+            south_ovr_key = f"{station}_southbound"
+            north_ovr = active_overrides.get(north_ovr_key)
+            south_ovr = active_overrides.get(south_ovr_key)
+
+            # Predicted values (what the model says)
+            try:
+                north_pred = get_directional_prediction(station, 'Northbound', now)
+            except Exception as e:
+                print(f"[station-status-with-overrides] NB pred failed {station}: {e}")
+                north_pred = None
+            try:
+                south_pred = get_directional_prediction(station, 'Southbound', now)
+            except Exception as e:
+                print(f"[station-status-with-overrides] SB pred failed {station}: {e}")
+                south_pred = None
+
+            # Effective value = override if active, else prediction
+            north_effective = north_ovr['congestion'] if north_ovr else north_pred
+            south_effective = south_ovr['congestion'] if south_ovr else south_pred
+
+            result.append({
+                'name': station,
+                'northbound': {
+                    'predicted': north_pred,
+                    'effective': north_effective,
+                    'congestion': north_effective,
+                    'status_text': _get_status_text(north_effective),
+                    'status_class': _get_status_class(north_effective),
+                    'overridden': bool(north_ovr),
+                    'override': north_ovr,   # None if not overridden
+                },
+                'southbound': {
+                    'predicted': south_pred,
+                    'effective': south_effective,
+                    'congestion': south_effective,
+                    'status_text': _get_status_text(south_effective),
+                    'status_class': _get_status_class(south_effective),
+                    'overridden': bool(south_ovr),
+                    'override': south_ovr,
+                },
+            })
+
+        return jsonify({'stations': result})
+    except Exception as e:
+        print(f"[station_status_with_overrides] {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'stations': [], 'error': str(e)}), 500
