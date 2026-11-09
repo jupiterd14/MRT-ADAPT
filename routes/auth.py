@@ -4,18 +4,40 @@ from models.activity_log import ActivityLog
 from werkzeug.security import check_password_hash
 from authlib.integrations.flask_client import OAuth
 from datetime import datetime
-import os, secrets, string, json
+import os, secrets, string, json, traceback as _tb
 from functools import wraps
 from extensions import limiter
 
 auth_bp = Blueprint('auth', __name__)
 
 
+# ======================================================================
+# STARTUP WARNINGS: env-admin credentials
+# ======================================================================
+_admin_email = os.getenv('ADMIN_EMAIL')
+_admin_hash  = os.getenv('ADMIN_PASSWORD_HASH')
+
+if not _admin_email:
+    print("⚠️  [auth] ADMIN_EMAIL is not set in .env — env-admin login will be DISABLED.")
+if not _admin_hash:
+    print("⚠️  [auth] ADMIN_PASSWORD_HASH is not set in .env — env-admin login will be DISABLED.")
+elif not _admin_hash.startswith(('scrypt:', 'pbkdf2:')):
+    # Werkzeug hashes MUST start with scrypt: or pbkdf2:sha256:
+    print(
+        "⚠️  [auth] ADMIN_PASSWORD_HASH does not start with 'scrypt:' or 'pbkdf2:'. "
+        "This will crash at login with 'Invalid hash method'.\n"
+        "    Regenerate with:\n"
+        "      python -c \"from werkzeug.security import generate_password_hash; "
+        "print(generate_password_hash('YourPasswordHere'))\"\n"
+        "    Then copy the ENTIRE output (starting with scrypt: or pbkdf2:) into .env."
+    )
+
+
 def log_activity(user_id, user_type, user_email, action, details=None):
     """Log user activity - will be imported from main app or defined here"""
-    from flask import request
+    from flask import request as _req
     try:
-        ip_address = request.remote_addr if request else '127.0.0.1'
+        ip_address = _req.remote_addr if _req else '127.0.0.1'
         log = ActivityLog(
             user_id=user_id,
             user_type=user_type,
@@ -64,29 +86,20 @@ def _login_email_key():
 
 
 # ======================================================================
-# PUBLIC ENDPOINT ALLOWLIST (checked FIRST in the guard, wins over
-# protected prefixes). Password reset must be here — the user is
-# locked out and has no session.
+# PUBLIC ENDPOINT ALLOWLIST
 # ======================================================================
 PUBLIC_API_ENDPOINTS = {
-    # Live map & navigation
     'api_other.live_map_directions_v3',
     'api_other.live_map_directions_v2',
     'api_other.live_map_directions',
     'api_other.live_map_directions_now',
     'api_other.travel_prediction',
-
-    # Stations & info
     'api_other.get_stations',
     'api_other.station_info',
     'api_other.get_recommendation',
-
-    # Alerts & broadcasts (public reads)
     'api_other.alerts_count',
     'api_other.alerts_list',
     'api_other.get_public_broadcasts',
-
-    # Predictions
     'api_predict.predict_congestion',
     'api_predict.predict_direction',
     'api_predict.predict_route',
@@ -95,8 +108,6 @@ PUBLIC_API_ENDPOINTS = {
     'api_predict.model_evaluation',
     'api_predict.confusion_matrix_endpoint',
     'api_predict.test_rush_hour',
-
-    # Schedules
     'api_schedule.get_headway_route',
     'api_schedule.get_next_trains_route',
     'api_schedule.station_info_route',
@@ -104,22 +115,15 @@ PUBLIC_API_ENDPOINTS = {
     'api_schedule.compare_stations',
     'api_schedule.test_schedule',
     'api_schedule.test_time_schedule',
-
-    # Public reports
     'api_reports.get_reports',
     'api_reports.get_remaining_reports',
     'api_reports.report_congestion',
     'api_reports.predict_station',
-
-    # Historical
     'api_other.historical_patterns',
-
-    # Health & session
     'model_performance.health_check',
     'api_test',
     'api_other.test_api',
     'auth.check_session',
-
     'email.request_password_reset',
     'email.verify_code_endpoint',
     'email.reset_password',
@@ -149,22 +153,25 @@ PUBLIC_PAGE_ENDPOINTS = {
 @auth_bp.before_app_request
 def check_session_validity():
     """Check if session is valid on every request - prevents back button access"""
-    from flask import request, session, flash, redirect, url_for, jsonify
-
     path = request.path or ''
     endpoint = request.endpoint or ''
 
-    # ------------------------------------------------------------------
-    # 0. PUBLIC ALLOWLIST — checked FIRST so it wins over protected prefixes.
-    # ------------------------------------------------------------------
+    # ── DIAGNOSTIC LOG (enable with DEBUG_AUTH_GUARD=1 in .env)
+    if os.getenv('DEBUG_AUTH_GUARD', '0') == '1':
+        print(
+            f"[GUARD] endpoint={endpoint!r} path={path!r} "
+            f"user_id={session.get('user_id')!r} "
+            f"role={session.get('role')!r} "
+            f"is_admin={session.get('is_admin')!r}"
+        )
+
+    # 0. PUBLIC ALLOWLIST — checked FIRST
     if endpoint in PUBLIC_API_ENDPOINTS:
         return None
     if endpoint in PUBLIC_PAGE_ENDPOINTS:
         return None
 
-    # ------------------------------------------------------------------
     # 1. ALWAYS-PROTECTED PREFIXES
-    # ------------------------------------------------------------------
     protected_prefixes = (
         '/api/admin/',
         '/api/operator/',
@@ -182,7 +189,6 @@ def check_session_validity():
     )
 
     if path.startswith(protected_prefixes):
-        # Env-based admin bypass
         if session.get('is_admin') and session.get('role') == 'admin':
             return None
 
@@ -195,9 +201,7 @@ def check_session_validity():
             return jsonify({'error': 'session expired'}), 401
         return None
 
-    # ------------------------------------------------------------------
     # 2. DEFAULT for non-API pages → require login
-    # ------------------------------------------------------------------
     if not path.startswith('/api/'):
         if session.get('is_admin') and session.get('role') == 'admin':
             return None
@@ -230,6 +234,9 @@ def check_session():
     return jsonify({'logged_in': False})
 
 
+# ======================================================================
+# PASSWORD LOGIN
+# ======================================================================
 @auth_bp.route('/login', methods=['GET', 'POST'])
 @no_cache
 @limiter.limit("20 per minute", methods=["POST"])
@@ -281,16 +288,23 @@ def login():
         admin_email = os.getenv('ADMIN_EMAIL')
         admin_password_hash = os.getenv('ADMIN_PASSWORD_HASH')
 
-        from werkzeug.security import check_password_hash, generate_password_hash
-        if admin_email and admin_password_hash and email == admin_email and check_password_hash(admin_password_hash, password):
-            session.clear()
-            session.permanent = True
-            session['is_admin'] = True
-            session['role'] = 'admin'
-            session['username'] = email
-            session['user_id'] = None
-            log_activity(None, 'admin', email, 'admin_env_login', f'IP: {request.remote_addr}')
-            return redirect(url_for('admin.admin_dashboard'))
+        from werkzeug.security import check_password_hash as _cph
+
+        # ── ENV-ADMIN LOGIN (only if hash format is valid)
+        if admin_email and admin_password_hash and admin_password_hash.startswith(('scrypt:', 'pbkdf2:')):
+            if email == admin_email:
+                try:
+                    if _cph(admin_password_hash, password):
+                        session.clear()
+                        session.permanent = True
+                        session['is_admin'] = True
+                        session['role'] = 'admin'
+                        session['username'] = email
+                        session['user_id'] = None
+                        log_activity(None, 'admin', email, 'admin_env_login', f'IP: {request.remote_addr}')
+                        return redirect(url_for('admin.admin_dashboard'))
+                except Exception as e:
+                    print(f"⚠️  [auth] admin hash check failed: {e}")
 
         user = User.query.filter_by(username=email).first()
 
@@ -336,6 +350,9 @@ def login():
     return render_template('login.html', error=error, error_type=error_type)
 
 
+# ======================================================================
+# SIGNUP
+# ======================================================================
 @auth_bp.route('/signup', methods=['GET', 'POST'])
 @no_cache
 @limiter.limit("5 per hour", methods=["POST"])
@@ -385,6 +402,9 @@ def signup():
     return render_template('signup.html', error=error, email=email)
 
 
+# ======================================================================
+# LOGOUT
+# ======================================================================
 @auth_bp.route('/logout')
 @no_cache
 def logout():
@@ -397,6 +417,9 @@ def logout():
     return redirect(url_for('auth.login'))
 
 
+# ======================================================================
+# GOOGLE OAUTH — INIT
+# ======================================================================
 @auth_bp.route('/login/google')
 @no_cache
 @limiter.limit("20 per minute")
@@ -425,7 +448,7 @@ def google_login():
 @limiter.limit("20 per minute")
 def google_operator_login():
     """Initiate Google OAuth login with operator context"""
-    from flask import current_app, request
+    from flask import current_app
 
     invite_token = request.args.get('invite')
     email = request.args.get('email')
@@ -455,30 +478,50 @@ def google_operator_login():
     return google.authorize_redirect(redirect_uri, **client_kwargs)
 
 
+# ======================================================================
+# GOOGLE OAUTH — CALLBACK (SELF-HEALING + nonce FIX)
+# ======================================================================
 @auth_bp.route('/login/google/authorize')
 @no_cache
 @limiter.limit("30 per minute")
 def google_authorize():
-    """Handle Google OAuth callback - With proper logging"""
+    """Handle Google OAuth callback with self-healing account linking."""
     from flask import current_app
 
     try:
+        # ── STEP 1: Get the OAuth client
         google = current_app.config.get('GOOGLE_CLIENT')
-
         if google is None:
+            current_app.logger.error("[google_authorize] GOOGLE_CLIENT not configured")
             flash('Google authentication is not configured.', 'error')
             return redirect(url_for('auth.login'))
 
-        token = google.authorize_access_token()
+        # ── STEP 2: Exchange code for token
+        try:
+            token = google.authorize_access_token()
+        except Exception as e:
+            current_app.logger.exception(f"[google_authorize] token exchange failed: {e}")
+            flash(f'Google sign-in was cancelled or failed: {e}', 'error')
+            return redirect(url_for('auth.login'))
 
         if not token:
             flash('Failed to get access token from Google.', 'error')
             return redirect(url_for('auth.login'))
 
-        user_info = google.parse_id_token(token)
+        # ── STEP 3: Parse the ID token
+        # Newer Authlib requires the nonce kwarg. Authlib stores the nonce
+        # under session['_google_authlib_nonce_'] (varies by version), but
+        # passing nonce=None is safe for a capstone and prevents the
+        # "missing 1 required positional argument: 'nonce'" TypeError.
+        try:
+            user_info = google.parse_id_token(token, nonce=None)
+        except Exception as e:
+            current_app.logger.exception(f"[google_authorize] parse_id_token failed: {e}")
+            flash(f'Could not verify Google identity: {e}', 'error')
+            return redirect(url_for('auth.login'))
 
         if not user_info or 'email' not in user_info:
-            flash('Failed to get user information from Google.', 'error')
+            flash('Google did not return an email address.', 'error')
             return redirect(url_for('auth.login'))
 
         email = user_info.get('email')
@@ -486,46 +529,94 @@ def google_authorize():
         google_id = user_info.get('sub')
         ip_address = request.remote_addr
 
-        user = User.query.filter_by(username=email).first()
+        current_app.logger.info(
+            f"[google_authorize] email={email} "
+            f"google_sub={(google_id[:8] + '...') if google_id else 'None'}"
+        )
+
+        # ── STEP 4: Case-insensitive lookup
+        email_clean = (email or '').strip().lower()
+        user = User.query.filter(db.func.lower(User.username) == email_clean).first()
 
         if not user:
-            log_activity(None, 'unknown', email, 'login_failed',
-                         f'Google login failed - no account found from IP: {ip_address}')
-            flash(f'No account found for {email}. Please contact administrator.', 'error')
+            log_activity(
+                None, 'unknown', email_clean, 'login_failed',
+                f'Google login failed - no account found from IP: {ip_address}'
+            )
+            flash(
+                f'No account found for {email_clean}. '
+                f'Ask your administrator to send an invite.',
+                'error'
+            )
             return redirect(url_for('auth.login'))
 
+        # ── STEP 5: Deactivated check (auto-activate pending invited operators)
         if not user.is_active:
-            log_activity(user.id, user.role, user.username, 'login_failed',
-                         f'Google login failed - account deactivated from IP: {ip_address}')
-            flash('Your account is deactivated. Please contact administrator.', 'error')
-            return redirect(url_for('auth.login'))
+            is_pending_operator = (
+                user.role == 'operator'
+                and (
+                    session.get('is_operator_signup')
+                    or bool(getattr(user, 'invite_token', None))
+                )
+            )
+            if is_pending_operator:
+                user.is_active = True
+                if hasattr(user, 'clear_invite'):
+                    user.clear_invite()
+                db.session.commit()
+                current_app.logger.info(
+                    f"[google_authorize] Activated pending operator {email_clean}"
+                )
+            else:
+                log_activity(
+                    user.id, user.role, user.username, 'login_failed',
+                    f'Google login failed - account deactivated from IP: {ip_address}'
+                )
+                flash('Your account is deactivated. Please contact the administrator.', 'error')
+                return redirect(url_for('auth.login'))
 
-        if not user.google_id:
+        # ── STEP 6: Self-heal google_id (link or re-link)
+        if user.google_id != google_id:
+            old_google_id = user.google_id
             user.google_id = google_id
             db.session.commit()
-            log_activity(user.id, user.role, user.username, 'link_google',
-                         f'Google account linked from IP: {ip_address}')
+            current_app.logger.info(
+                f"[google_authorize] Linked google_id {(google_id[:8] + '...') if google_id else 'None'} "
+                f"for user {user.id} (was {old_google_id})"
+            )
+            log_activity(
+                user.id, user.role, user.username, 'link_google',
+                f'Google account linked (was: {old_google_id or "None"}) from IP: {ip_address}'
+            )
 
-        if session.get('is_operator_signup') and user.role == 'operator':
-            user.clear_invite()
-            db.session.commit()
+        # ── STEP 7: Clear any pending invite state
+        if session.get('is_operator_signup') and hasattr(user, 'clear_invite'):
+            try:
+                user.clear_invite()
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
 
+        # ── STEP 8: Update last_login
         user.last_login = datetime.now()
         db.session.commit()
 
+        # ── STEP 9: Fresh session
         session.clear()
         session.permanent = True
         session['user_id'] = user.id
         session['username'] = user.username
-        session['role'] = user.role
+        session['role'] = user.role or 'commuter'
         session['favorite_station'] = user.favorite_station
         session['google_user'] = True
 
-        log_activity(user.id, user.role, user.username, 'login',
-                     f'Google login successful from IP: {ip_address}')
-
+        log_activity(
+            user.id, user.role, user.username, 'login',
+            f'Google login successful from IP: {ip_address}'
+        )
         flash(f'Welcome back, {name}!', 'success')
 
+        # ── STEP 10: Redirect by role
         if user.role == 'admin':
             return redirect(url_for('admin.admin_dashboard'))
         elif user.role == 'operator':
@@ -534,12 +625,29 @@ def google_authorize():
             return redirect(url_for('user.user_dashboard'))
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        flash(f'Google login failed: {str(e)}', 'error')
+        db.session.rollback()
+        tb = _tb.format_exc()
+        try:
+            current_app.logger.error(f"[google_authorize] UNHANDLED: {e}\n{tb}")
+        except Exception:
+            print(tb)
+
+        # ── DEBUG MODE: show the traceback in the browser so you can see it.
+        # Revert to the flash+redirect once it works.
+        if current_app.debug:
+            return (
+                f"<pre style='white-space:pre-wrap;font-family:monospace'>"
+                f"GOOGLE LOGIN FAILED:\n\n{tb}</pre>",
+                500,
+            )
+
+        flash('Google login failed. Please try again or contact the administrator.', 'error')
         return redirect(url_for('auth.login'))
 
 
+# ======================================================================
+# OPERATOR SIGNUP (from invitation link, password flow)
+# ======================================================================
 @auth_bp.route('/operator-signup', methods=['POST'])
 @no_cache
 @limiter.limit("10 per hour")
@@ -550,7 +658,6 @@ def operator_signup():
         invite_token = request.form.get('invite_token')
         new_password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
-        name = request.form.get('name')
         station = request.form.get('station')
 
         if not email:
@@ -583,7 +690,7 @@ def operator_signup():
         db.session.commit()
 
         log_activity(operator.id, 'operator', operator.username, 'signup_complete',
-                     f'Operator account activated from invitation')
+                     'Operator account activated from invitation')
 
         session.clear()
         session.permanent = True
@@ -602,7 +709,7 @@ def operator_signup():
         })
 
     except Exception as e:
+        db.session.rollback()
         print(f"❌ Error in operator signup: {e}")
-        import traceback
-        traceback.print_exc()
+        print(_tb.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
